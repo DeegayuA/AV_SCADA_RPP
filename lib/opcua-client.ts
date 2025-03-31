@@ -8,33 +8,23 @@ export class OPCUAClient extends EventEmitter {
 
   constructor() {
     super();
-    // Check if we're in the browser environment
     this.url = typeof window !== 'undefined' 
-      ? `ws://${window.location.host}/api/ws`
-      : 'ws://localhost:8080/api/ws';
+      ? `ws://${window.location.hostname}:8081/api/ws` 
+      : 'ws://localhost:8081/api/ws';
   }
 
   connect() {
-    // Only attempt connection in browser environment
-    if (typeof window === 'undefined') return;
-    if (this.connected) return;
+    if (typeof window === 'undefined' || this.connected) return;
 
     try {
       this.ws = new WebSocket(this.url);
 
       this.ws.onopen = () => {
+        console.log('WebSocket connection opened');
         this.connected = true;
         this.emit('connected');
-        if (this.reconnectTimer) {
-          clearInterval(this.reconnectTimer);
-          this.reconnectTimer = null;
-        }
-      };
-
-      this.ws.onclose = () => {
-        this.connected = false;
-        this.emit('disconnected');
-        this.startReconnectTimer();
+        clearInterval(this.reconnectTimer!);
+        this.reconnectTimer = null;
       };
 
       this.ws.onmessage = (event) => {
@@ -46,9 +36,18 @@ export class OPCUAClient extends EventEmitter {
         }
       };
 
-      this.ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        this.emit('error', error);
+      this.ws.onerror = (event) => {
+        console.error('WebSocket error occurred:', event);
+        this.emit('error', event);
+      };
+
+      this.ws.onclose = (event) => {
+        console.error('WebSocket closed:', event);
+        this.connected = false;
+        this.emit('disconnected');
+        if (!this.reconnectTimer) {
+          this.startReconnectTimer();
+        }
       };
     } catch (error) {
       console.error('Connection error:', error);
@@ -57,40 +56,27 @@ export class OPCUAClient extends EventEmitter {
   }
 
   private startReconnectTimer() {
-    if (!this.reconnectTimer) {
-      this.reconnectTimer = setInterval(() => {
-        this.connect();
-      }, 5000);
-    }
+    this.reconnectTimer = setInterval(() => {
+      console.log('Reconnecting...');
+      this.connect();
+    }, 5000);
   }
 
   disconnect() {
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+    this.ws?.close();
+    this.ws = null;
     this.connected = false;
-    if (this.reconnectTimer) {
-      clearInterval(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+    clearInterval(this.reconnectTimer!);
   }
 
   async writeValue(nodeId: string, value: any) {
-    if (!this.connected || !this.ws) {
-      throw new Error('Not connected');
-    }
+    if (!this.connected) throw new Error('Not connected');
 
     const message = {
       type: 'write',
       nodeId,
       value,
     };
-
-    this.ws.send(JSON.stringify(message));
-  }
-
-  isConnected() {
-    return this.connected;
+    this.ws?.send(JSON.stringify(message));
   }
 }
