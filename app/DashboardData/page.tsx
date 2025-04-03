@@ -24,11 +24,47 @@ interface NodeData {
 const Dashboard = () => {
   const [nodeValues, setNodeValues] = useState<NodeData>({});
   const [isConnected, setIsConnected] = useState(false);
+  const [isPlcConnected, setIsPlcConnected] = useState(false);
   const ws = useRef<WebSocket | null>(null);
   const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
-
   const { theme, setTheme } = useTheme(); // Added useTheme to switch theme
+  const toast = useToast();
 
+  // Function to check PLC connection
+  const checkPlcConnection = async () => {
+    try {
+      const response = await fetch('/api/opcua/status');
+      const data = await response.json();
+      
+      if (data.connected) {
+        setIsPlcConnected(true);
+      } else {
+        setIsPlcConnected(false);
+        toast.toast({
+          title: 'Error',
+          description: 'PLC is not connected. Please check the network.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      setIsPlcConnected(false);
+      toast.toast({
+        title: 'Error',
+        description: 'Failed to check PLC connection. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  useEffect(() => {
+    checkPlcConnection(); // Check PLC connection when component mounts
+    const interval = setInterval(() => {
+      checkPlcConnection(); // Check PLC connection periodically
+    }, 5000); // Every 5 seconds
+    
+    return () => clearInterval(interval); // Clean up interval on component unmount
+  }, []);
+  
   // WebSocket connection handling
   const connectWebSocket = useCallback(() => {
     if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
@@ -51,7 +87,7 @@ const Dashboard = () => {
     ws.current.onmessage = (event) => {
       try {
         const parsedData = JSON.parse(event.data);
-        console.log("Received WebSocket Data:", parsedData); 
+        console.log("Received WebSocket Data:", parsedData);
         setNodeValues((prevValues) => ({
           ...prevValues,
           ...parsedData,
@@ -69,18 +105,17 @@ const Dashboard = () => {
       console.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
       setIsConnected(false);
       ws.current = null;
-
-      // Redirect to OPC UA API on first disconnection only
+  
       if (typeof window !== 'undefined') {
         const alreadyRedirected = sessionStorage.getItem('opcuaRedirected');
-        if (!alreadyRedirected) {
+        if (!alreadyRedirected || alreadyRedirected === 'false') {
           const currentHost = window.location.hostname;
           const currentPort = window.location.port;
           window.location.href = `http://${currentHost}:${currentPort}/api/opcua`;
-          sessionStorage.setItem('opcuaRedirected', 'true');
+          sessionStorage.setItem('opcuaRedirected', 'true'); // Set it to 'true' after redirection
         }
       }
-
+  
       if (!reconnectInterval.current) {
         reconnectInterval.current = setTimeout(() => {
           connectWebSocket();
@@ -88,18 +123,6 @@ const Dashboard = () => {
       }
     };
   }, []);
-
-
-  // Function to send data to WebSocket
-  const sendDataToWebSocket = (nodeId: string, value: boolean) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      const payload = JSON.stringify({ [nodeId]: value });
-      ws.current.send(payload);
-      console.log("Sent data to WebSocket:", payload);
-    } else {
-      console.error("WebSocket is not connected.");
-    }
-  };
 
   // Ensure WebSocket connects only once and reconnects if needed
   useEffect(() => {
@@ -117,6 +140,28 @@ const Dashboard = () => {
       }
     };
   }, [connectWebSocket]);
+
+  // Check PLC connection on mount and periodically
+  useEffect(() => {
+    checkPlcConnection(); // Check PLC connection on mount
+    
+    const interval = setInterval(() => {
+      checkPlcConnection(); // Check PLC connection periodically
+    }, 5000); // Update every 5 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Function to send data to WebSocket
+  const sendDataToWebSocket = (nodeId: string, value: boolean) => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      const payload = JSON.stringify({ [nodeId]: value });
+      ws.current.send(payload);
+      console.log("Sent data to WebSocket:", payload);
+    } else {
+      console.error("WebSocket is not connected.");
+    }
+  };
 
   // Helper function to render node value based on its type
   const renderNodeValue = (nodeId: string, unit: string | undefined) => {
@@ -143,11 +188,24 @@ const Dashboard = () => {
           </h1>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className={`w-4 h-4 rounded-full animate-pulse scale-100 transition-transform duration-500 ${
-                  isConnected ? 'bg-green-500' : 'bg-red-500'
-                }`} />
-                WebSocket: {isConnected ? 'Online' : 'Offline'}
+              <div className="flex items-center gap-2 cursor-pointer">
+                {isPlcConnected !== null && (
+                  <div className="flex items-center gap-2 cursor-pointer">
+                    <div className={`w-4 h-4 rounded-full animate-pulse scale-100 transition-transform duration-500 ${isPlcConnected ? 'bg-blue-500' : 'bg-gray-500'}`} />
+                    PLC: {isPlcConnected ? 'Connected' : 'Disconnected'}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
+                if (typeof window !== 'undefined') {
+                  const currentHost = window.location.hostname;
+                  const currentPort = window.location.port;
+                  window.location.href = `http://${currentHost}:${currentPort}/api/opcua`;
+                }
+              }}>
+                <div className={`w-4 h-4 rounded-full animate-pulse scale-100 transition-transform duration-500 ${isConnected ? 'bg-green-500' : 'bg-red-500'
+                  }`} />
+                WebSocket: {isConnected ? 'Connected' : 'Disconnected, Click here to reconnect'}
               </div>
               <Button
                 variant="outline"
