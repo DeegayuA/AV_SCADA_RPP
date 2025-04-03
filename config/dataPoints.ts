@@ -142,6 +142,191 @@ export const dataPoints: DataPoint[] = [
     max: 65,
     category: 'inverter',
     description: 'Inverter output frequency'
+  },
+  {
+    id: 'current-a',
+    name: 'Current A',
+    nodeId: 'ns=4;i=291',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Activity,
+    unit: 'A',
+    category: 'battery',
+    description: 'Current A'
+  },
+  {
+    id: 'current-b',
+    name: 'Current B',
+    nodeId: 'ns=4;i=292',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Activity,
+    unit: 'A',
+    category: 'battery',
+    description: 'Current B'
+  },
+  {
+    id: 'current-c',
+    name: 'Current C',
+    nodeId: 'ns=4;i=293',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Activity,
+    unit: 'A',
+    category: 'battery',
+    description: 'Current C'
+  },
+  {
+    id: 'current-n',
+    name: 'Current N',
+    nodeId: 'ns=4;i=294',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Activity,
+    unit: 'A',
+    category: 'battery',
+    description: 'Current N'
+  },
+  {
+    id: 'voltage-a-b',
+    name: 'Voltage A-B',
+    nodeId: 'ns=4;i=301',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Zap,
+    unit: 'V',
+    category: 'grid',
+    description: 'Voltage A-B'
+  },
+  {
+    id: 'voltage-b-c',
+    name: 'Voltage B-C',
+    nodeId: 'ns=4;i=302',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Zap,
+    unit: 'V',
+    category: 'grid',
+    description: 'Voltage B-C'
+  },
+  {
+    id: 'voltage-c-a',
+    name: 'Voltage C-A',
+    nodeId: 'ns=4;i=303',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Zap,
+    unit: 'V',
+    category: 'grid',
+    description: 'Voltage C-A'
+  },
+  {
+    id: 'active-power-total',
+    name: 'Active Power Total',
+    nodeId: 'ns=4;i=321',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Zap,
+    unit: 'kW',
+    category: 'grid',
+    description: 'Total active power'
+  },
+  {
+    id: 'reactive-power-total',
+    name: 'Reactive Power Total',
+    nodeId: 'ns=4;i=325',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Zap,
+    unit: 'kVAR',
+    category: 'grid',
+    description: 'Total reactive power'
+  },
+  {
+    id: 'apparent-power-total',
+    name: 'Apparent Power Total',
+    nodeId: 'ns=4;i=329',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Zap,
+    unit: 'kVA',
+    category: 'grid',
+    description: 'Total apparent power'
+  },
+  {
+    id: 'energy-meter2-active-load-timer',
+    name: 'Energy Meter 2 Active Load Timer',
+    nodeId: 'ns=4;i=382',
+    dataType: 'Boolean',
+    uiType: 'switch',
+    icon: Activity,
+    category: 'control',
+    description: 'Energy Meter 2 Active Load Timer'
+  },
+  {
+    id: 'energy-meter2-meter-operation-timer',
+    name: 'Energy Meter 2 Meter Operation Timer',
+    nodeId: 'ns=4;i=383',
+    dataType: 'Boolean',
+    uiType: 'switch',
+    icon: Activity,
+    category: 'control',
+    description: 'Energy Meter 2 Meter Operation Timer'
+  },
+  {
+    id: 'active-energy-delivered',
+    name: 'Active Energy Delivered (Into Load)',
+    nodeId: 'ns=4;i=386',
+    dataType: 'Int16',
+    uiType: 'display',
+    icon: Battery,
+    unit: 'kWh',
+    category: 'battery',
+    description: 'Active energy delivered into load'
+  },
+  {
+    id: 'active-energy-received',
+    name: 'Active Energy Received (Out of Load)',
+    nodeId: 'ns=4;i=387',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Battery,
+    unit: 'kWh',
+    category: 'battery',
+    description: 'Active energy received out of load'
+  },
+  {
+    id: 'reactive-energy-delivered',
+    name: 'Reactive Energy Delivered',
+    nodeId: 'ns=4;i=390',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Battery,
+    unit: 'kVARh',
+    category: 'battery',
+    description: 'Reactive energy delivered'
+  },
+  {
+    id: 'reactive-energy-received',
+    name: 'Reactive Energy Received',
+    nodeId: 'ns=4;i=391',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Battery,
+    unit: 'kVARh',
+    category: 'battery',
+    description: 'Reactive energy received'
+  },
+  {
+    id: 'apparent-energy-delivered',
+    name: 'Apparent Energy Delivered',
+    nodeId: 'ns=4;i=394',
+    dataType: 'Float',
+    uiType: 'display',
+    icon: Battery,
+    unit: 'kVAh',
+    category: 'battery',
+    description: 'Apparent energy delivered'
   }
 ];
 export const nodeIds = dataPoints.map(dataPoint => {
