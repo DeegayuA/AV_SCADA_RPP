@@ -47,6 +47,10 @@ export async function initDB() {
 }
 export async function updateDataPoint(nodeId: string, value: number | boolean) {
   const db = await initDB();
+  if (!db) {
+    console.error("Database is not initialized.");
+    return;
+  }
   await db.put('dataPoints', {
     timestamp: Date.now(),
     value,
@@ -83,6 +87,10 @@ export const getDataPoint = async (nodeId: string) => {
 
 export async function queueControlAction(nodeId: string, value: number | boolean) {
   const db = await initDB();
+  if (!db) {
+    console.error("Database is not initialized.");
+    return;
+  }
   await db.put('controlQueue', {
     nodeId,
     value,
@@ -92,10 +100,18 @@ export async function queueControlAction(nodeId: string, value: number | boolean
 
 export async function getControlQueue() {
   const db = await initDB();
+  if (!db) {
+    console.error("Database is not initialized.");
+    return [];
+  }
   return db.getAll('controlQueue');
 }
 
 export async function clearControlQueue() {
   const db = await initDB();
-  await db.clear('controlQueue');
+  if (db) {
+    await db.clear('controlQueue');
+  } else {
+    console.error("Database is not initialized.");
+  }
 }

@@ -32,7 +32,7 @@ const data = {
   user: {
     name: "AltaVision",
     email: "user@altavision.com",
-    // avatar: "/avatars/shadcn.jpg",
+    avatar: "https://i.pravatar.cc/300",
   },
   navMain: [
     {

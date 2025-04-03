@@ -14,7 +14,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
-import { useWebSocket } from '@/app/layout';
 import { WS_URL } from '@/config/constants';
 
 // Define structure for the data received from the WebSocket
@@ -53,8 +52,6 @@ const Dashboard = () => {
       try {
         const parsedData = JSON.parse(event.data);
         console.log("Received WebSocket Data:", parsedData); 
-
-        // Update nodeValues state correctly
         setNodeValues((prevValues) => ({
           ...prevValues,
           ...parsedData,
@@ -71,15 +68,19 @@ const Dashboard = () => {
     ws.current.onclose = (event) => {
       console.log(`WebSocket disconnected. Code: ${event.code}, Reason: ${event.reason}`);
       setIsConnected(false);
-      ws.current = null; // Clear WebSocket reference
+      ws.current = null;
 
-      // Redirect to OPC UA endpoint if disconnected
-      setTimeout(() => {
-        const host = window.location.origin;
-        window.location.href = `${host}/api/opcua`;
-      }, 2000);
+      // Redirect to OPC UA API on first disconnection only
+      if (typeof window !== 'undefined') {
+        const alreadyRedirected = sessionStorage.getItem('opcuaRedirected');
+        if (!alreadyRedirected) {
+          const currentHost = window.location.hostname;
+          const currentPort = window.location.port;
+          window.location.href = `http://${currentHost}:${currentPort}/api/opcua`;
+          sessionStorage.setItem('opcuaRedirected', 'true');
+        }
+      }
 
-      // Ensure reconnection
       if (!reconnectInterval.current) {
         reconnectInterval.current = setTimeout(() => {
           connectWebSocket();
@@ -87,6 +88,7 @@ const Dashboard = () => {
       }
     };
   }, []);
+
 
   // Function to send data to WebSocket
   const sendDataToWebSocket = (nodeId: string, value: boolean) => {
@@ -123,7 +125,7 @@ const Dashboard = () => {
       return <span className="text-red-500">Error</span>;
     }
     if (value === undefined) {
-      return <span className="text-gray-500">Waiting for data...</span>;
+      return <span className="text-gray-500">Connecting...</span>;
     }
     return (
       <span>

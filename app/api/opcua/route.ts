@@ -12,7 +12,7 @@ import {
 import { WebSocketServer, WebSocket } from "ws";
 
 const endpointUrl = "opc.tcp://192.168.1.2:4840"; // Replace with your OPC UA server endpoint
-const POLLING_INTERVAL = 3000; // ms - Using the interval from your setInterval
+const POLLING_INTERVAL = 1000; // ms - Using the interval from your setInterval
 
 // Singleton instances
 let opcuaClient: OPCUAClient | null = null;
@@ -83,7 +83,10 @@ async function connectOPCUA() {
     await createSessionAndStartPolling();
   } catch (err) {
     console.error("Failed to connect OPC UA client:", err);
-    // Consider sending error to clients as in the old code if needed
+    if (connectedClients.size > 0) {
+      console.log("Connection failed. Attempting OPC UA reconnect.");
+      setTimeout(connectOPCUA, 5000);
+    }
     opcuaClient = null; // Reset client on initial connection failure
   } finally {
     isConnectingOpcua = false;
@@ -126,11 +129,11 @@ async function createSessionAndStartPolling() {
     startDataPolling(); // Start polling after session is created
   } catch (err) {
     console.error("Failed to create OPC UA session:", err);
-    opcuaSession = null;
     if (connectedClients.size > 0) {
       console.log("Session creation failed. Attempting OPC UA reconnect.");
       setTimeout(connectOPCUA, 5000);
     }
+    opcuaSession = null;
   }
 }
 
@@ -160,17 +163,17 @@ function startDataPolling() {
       dataValues.forEach((dataValue, index) => {
         const nodeId = nodesToRead[index].nodeId; // Corrected reference to nodesToRead
         let newValue: any = 'Error';
-
-        if (dataValue.statusCode.isGood() && dataValue.value?.value !== undefined) {
-          newValue = typeof dataValue.value.value === "number" && !Number.isInteger(dataValue.value.value)
-            ? parseFloat(dataValue.value.value.toFixed(2))
-            : dataValue.value.value;
-        } else if (!dataValue.statusCode.isGood()) {
-          console.warn(`Bad status for ${nodeId}: ${dataValue.statusCode.toString()}`);
-          broadcast(JSON.stringify({ error: `Bad status for ${nodeId}: ${dataValue.statusCode.toString()}` }));
-        } else {
-          console.warn(`No value received for ${nodeId}, status: ${dataValue.statusCode.toString()}`);
-          newValue = null;
+        const dataPoint = dataPoints.find((point) => point.nodeId === nodeId);
+        if (dataPoint && dataPoint.factor) {
+            if (dataValue.statusCode.isGood() && dataValue.value?.value !== undefined) {
+                newValue = typeof dataValue.value.value === "number" && !Number.isInteger(dataValue.value.value)
+                    ? parseFloat((dataValue.value.value * dataPoint.factor).toFixed(2)) // Applying factor here
+                    : dataValue.value.value * dataPoint.factor; // Multiply by factor
+            }
+        } else if (dataValue.statusCode.isGood() && dataValue.value?.value !== undefined) {
+            newValue = typeof dataValue.value.value === "number" && !Number.isInteger(dataValue.value.value)
+                ? parseFloat(dataValue.value.value.toFixed(2))
+                : dataValue.value.value;
         }
         currentDataBatch[nodeId] = newValue;
         nodeDataCache[nodeId] = newValue; // Update cache
@@ -233,11 +236,15 @@ function initializeWebSocketServer() {
       }
     }
 
-    // Start OPC UA connection if this is the first client
+    // Ensure OPC UA connection
     if (connectedClients.size === 1) {
       console.log("First client connected, ensuring OPC UA connection.");
       connectOPCUA(); // Ensure connection and polling starts
     }
+
+    ws.on("message", (message) => {
+      console.log("Received message from client:", message);
+    });
 
     ws.on("close", () => {
       console.log("Client disconnected from WebSocket");
@@ -250,6 +257,7 @@ function initializeWebSocketServer() {
 
     ws.on("error", (error) => {
       console.error("WebSocket error:", error);
+      ws.terminate(); // Ensure faulty sockets are cleaned up
       connectedClients.delete(ws);
       if (connectedClients.size === 0) {
         console.log("Last client errored, stopping OPC UA connection.");
@@ -294,6 +302,10 @@ async function disconnectOPCUA() {
       console.log("OPC UA client disconnected.");
     } catch (err) {
       console.error("Error disconnecting OPC UA client:", err);
+      if (connectedClients.size > 0) {
+        console.log("Disconnection failed. Attempting OPC UA reconnect.");
+        setTimeout(connectOPCUA, 5000);
+      }
     } finally {
       opcuaClient = null;
     }
@@ -321,16 +333,22 @@ process.on("SIGTERM", async () => {
   process.exit(0);
 });
 
-
 export async function GET(req: Request) {
-  const host = req.headers.get('host'); // Dynamically get the host
-  const protocol = req.headers.get('x-forwarded-proto') || 'http'; // Fallback to 'http' if not set
-  const origin = `${protocol}://${host}`; // Combine protocol and host
+  const host = req.headers.get('host');
+  const protocol = req.headers.get('x-forwarded-proto') || 'http';
+  const origin = `${protocol}://${host}`;
 
-  return new Response(null, {
-    status: 302, // HTTP status code for redirection
-    headers: {
-      "Location": `${origin}/dashboard`, // Redirect to the dynamic origin with the /dashboard path
-    },
-  });
+  // Only redirect if a condition is met, e.g., user is not authenticated
+  const shouldRedirect = true; // Set to true if needed
+  if (shouldRedirect) {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        "Location": `${origin}/dashboard`,
+      },
+    });
+  }
+
+  // Return success response
+  return new Response("OPC UA Service Ready", { status: 200 });
 }

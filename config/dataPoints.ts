@@ -12,6 +12,7 @@ export interface DataPoint {
   max?: number;
   description?: string;
   category: 'battery' | 'grid' | 'inverter' | 'control';
+  factor?: number;
 }
 
 export const dataPoints: DataPoint[] = [
@@ -23,7 +24,8 @@ export const dataPoints: DataPoint[] = [
     uiType: 'switch',
     icon: Activity,
     category: 'control',
-    description: 'System work mode control'
+    description: 'System work mode control',
+    factor: 1,
   },
   {
     id: 'frequency',
@@ -36,7 +38,8 @@ export const dataPoints: DataPoint[] = [
     min: 0,
     max: 100,
     category: 'battery',
-    description: 'Current Frequency'
+    description: 'Current Frequency',
+    factor: 1,
   },
   {
     id: 'battery-voltage',
@@ -46,10 +49,11 @@ export const dataPoints: DataPoint[] = [
     uiType: 'gauge',
     icon: Battery,
     unit: 'V',
-    min: 0,
-    max: 100,
+    min: 45,
+    max: 65,
     category: 'battery',
-    description: 'Current battery voltage'
+    description: 'Current battery voltage',
+    factor: 0.01,
   },
   {
     id: 'battery-capacity',
@@ -61,8 +65,9 @@ export const dataPoints: DataPoint[] = [
     unit: '%',
     min: 0,
     max: 100,
-    category: 'battery',
-    description: 'Current battery capacity'
+    category: 'inverter',
+    description: 'Current battery capacity',
+    factor: 1,
   },
   {
     id: 'grid-power-a',
@@ -73,7 +78,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'W',
     category: 'grid',
-    description: 'Grid side Phase A power'
+    description: 'Grid side Phase A power',
+    factor: 1,
   },
   {
     id: 'grid-power-b',
@@ -84,7 +90,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'W',
     category: 'grid',
-    description: 'Grid side Phase B power'
+    description: 'Grid side Phase B power',
+    factor: 1,
   },
   {
     id: 'grid-power-c',
@@ -95,7 +102,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'W',
     category: 'grid',
-    description: 'Grid side Phase C power'
+    description: 'Grid side Phase C power',
+    factor: 1,
   },
   {
     id: 'grid-voltage-a',
@@ -106,7 +114,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'V',
     category: 'grid',
-    description: 'Grid Phase A voltage'
+    description: 'Grid Phase A voltage',
+    factor: 1,
   },
   {
     id: 'grid-voltage-b',
@@ -117,7 +126,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'V',
     category: 'grid',
-    description: 'Grid Phase B voltage'
+    description: 'Grid Phase B voltage',
+    factor: 1,
   },
   {
     id: 'grid-voltage-c',
@@ -128,7 +138,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'V',
     category: 'grid',
-    description: 'Grid Phase C voltage'
+    description: 'Grid Phase C voltage',
+    factor: 1,
   },
   {
     id: 'inverter-frequency',
@@ -141,7 +152,8 @@ export const dataPoints: DataPoint[] = [
     min: 45,
     max: 65,
     category: 'inverter',
-    description: 'Inverter output frequency'
+    description: 'Inverter output frequency',
+    factor: 1,
   },
   {
     id: 'current-a',
@@ -152,7 +164,8 @@ export const dataPoints: DataPoint[] = [
     icon: Activity,
     unit: 'A',
     category: 'battery',
-    description: 'Current A'
+    description: 'Current A',
+    factor: 1,
   },
   {
     id: 'current-b',
@@ -163,7 +176,8 @@ export const dataPoints: DataPoint[] = [
     icon: Activity,
     unit: 'A',
     category: 'battery',
-    description: 'Current B'
+    description: 'Current B',
+    factor: 1,
   },
   {
     id: 'current-c',
@@ -174,7 +188,8 @@ export const dataPoints: DataPoint[] = [
     icon: Activity,
     unit: 'A',
     category: 'battery',
-    description: 'Current C'
+    description: 'Current C',
+    factor: 1,
   },
   {
     id: 'current-n',
@@ -185,7 +200,8 @@ export const dataPoints: DataPoint[] = [
     icon: Activity,
     unit: 'A',
     category: 'battery',
-    description: 'Current N'
+    description: 'Current N',
+    factor: 1,
   },
   {
     id: 'voltage-a-b',
@@ -196,7 +212,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'V',
     category: 'grid',
-    description: 'Voltage A-B'
+    description: 'Voltage A-B',
+    factor: 1,
   },
   {
     id: 'voltage-b-c',
@@ -207,7 +224,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'V',
     category: 'grid',
-    description: 'Voltage B-C'
+    description: 'Voltage B-C',
+    factor: 1,
   },
   {
     id: 'voltage-c-a',
@@ -218,7 +236,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'V',
     category: 'grid',
-    description: 'Voltage C-A'
+    description: 'Voltage C-A',
+    factor: 1,
   },
   {
     id: 'active-power-total',
@@ -229,7 +248,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'kW',
     category: 'grid',
-    description: 'Total active power'
+    description: 'Total active power',
+    factor: 1,
   },
   {
     id: 'reactive-power-total',
@@ -240,7 +260,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'kVAR',
     category: 'grid',
-    description: 'Total reactive power'
+    description: 'Total reactive power',
+    factor: 1,
   },
   {
     id: 'apparent-power-total',
@@ -251,7 +272,8 @@ export const dataPoints: DataPoint[] = [
     icon: Zap,
     unit: 'kVA',
     category: 'grid',
-    description: 'Total apparent power'
+    description: 'Total apparent power',
+    factor: 1,
   },
   {
     id: 'energy-meter2-active-load-timer',
@@ -261,7 +283,8 @@ export const dataPoints: DataPoint[] = [
     uiType: 'switch',
     icon: Activity,
     category: 'control',
-    description: 'Energy Meter 2 Active Load Timer'
+    description: 'Energy Meter 2 Active Load Timer',
+    factor: 1,
   },
   {
     id: 'energy-meter2-meter-operation-timer',
@@ -271,7 +294,8 @@ export const dataPoints: DataPoint[] = [
     uiType: 'switch',
     icon: Activity,
     category: 'control',
-    description: 'Energy Meter 2 Meter Operation Timer'
+    description: 'Energy Meter 2 Meter Operation Timer',
+    factor: 1,
   },
   {
     id: 'active-energy-delivered',
@@ -282,7 +306,8 @@ export const dataPoints: DataPoint[] = [
     icon: Battery,
     unit: 'kWh',
     category: 'battery',
-    description: 'Active energy delivered into load'
+    description: 'Active energy delivered into load',
+    factor: 1,
   },
   {
     id: 'active-energy-received',
@@ -293,7 +318,8 @@ export const dataPoints: DataPoint[] = [
     icon: Battery,
     unit: 'kWh',
     category: 'battery',
-    description: 'Active energy received out of load'
+    description: 'Active energy received out of load',
+    factor: 1,
   },
   {
     id: 'reactive-energy-delivered',
@@ -304,7 +330,8 @@ export const dataPoints: DataPoint[] = [
     icon: Battery,
     unit: 'kVARh',
     category: 'battery',
-    description: 'Reactive energy delivered'
+    description: 'Reactive energy delivered',
+    factor: 1,
   },
   {
     id: 'reactive-energy-received',
@@ -315,7 +342,8 @@ export const dataPoints: DataPoint[] = [
     icon: Battery,
     unit: 'kVARh',
     category: 'battery',
-    description: 'Reactive energy received'
+    description: 'Reactive energy received',
+    factor: 1,
   },
   {
     id: 'apparent-energy-delivered',
@@ -326,11 +354,11 @@ export const dataPoints: DataPoint[] = [
     icon: Battery,
     unit: 'kVAh',
     category: 'battery',
-    description: 'Apparent energy delivered'
+    description: 'Apparent energy delivered',
+    factor: 1,
   }
 ];
 export const nodeIds = dataPoints.map(dataPoint => {
-  // Round to two decimal points if the value is a float
   if (dataPoint.dataType === 'Float') {
     dataPoint.min = dataPoint.min ? parseFloat(dataPoint.min.toFixed(2)) : undefined;
     dataPoint.max = dataPoint.max ? parseFloat(dataPoint.max.toFixed(2)) : undefined;
