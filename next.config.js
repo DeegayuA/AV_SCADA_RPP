@@ -6,7 +6,7 @@ const nextConfig = {
   },
   images: { unoptimized: true },
   devServer: {
-    allowedDevOrigins: ['http://192.168.1.169'],
+    allowedDevOrigins: ['http://192.168.1.169', 'http://localhost'],
   },
 };
 

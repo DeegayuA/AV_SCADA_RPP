@@ -39,19 +39,6 @@ export const dataPoints: DataPoint[] = [
     description: 'Current Frequency'
   },
   {
-    id: 'fsdfdas',
-    name: 'Fredsafdsfquency',
-    nodeId: 'ns=4;i=346',
-    dataType: 'Float',
-    uiType: 'display',
-    icon: AudioWaveform,
-    unit: ' Hdsfdfz',
-    min: 0,
-    max: 100,
-    category: 'battery',
-    description: 'Current Frequency'
-  },
-  {
     id: 'battery-voltage',
     name: 'Battery Voltage',
     nodeId: 'ns=4;i=114',
@@ -157,4 +144,11 @@ export const dataPoints: DataPoint[] = [
     description: 'Inverter output frequency'
   }
 ];
-export const nodeIds = dataPoints.map(dataPoint => dataPoint.nodeId);
+export const nodeIds = dataPoints.map(dataPoint => {
+  // Round to two decimal points if the value is a float
+  if (dataPoint.dataType === 'Float') {
+    dataPoint.min = dataPoint.min ? parseFloat(dataPoint.min.toFixed(2)) : undefined;
+    dataPoint.max = dataPoint.max ? parseFloat(dataPoint.max.toFixed(2)) : undefined;
+  }
+  return dataPoint.nodeId;
+});
