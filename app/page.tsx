@@ -18,23 +18,27 @@ export default function Home() {
         <Card className="p-8 space-y-6">
           <div className="flex items-center gap-3">
             <Sun className="w-8 h-8 text-yellow-500" />
-            <h1 className="text-3xl font-bold text-foreground">Solar Mini-Grid Monitor</h1>
+            <h1 className="text-3xl font-bold text-foreground">AV Mini-Grid Control Panel & Monitor</h1>
           </div>
           
           <p className="text-muted-foreground text-lg">
-            Welcome to the Solar Mini-Grid Monitoring System. This dashboard provides real-time monitoring 
-            and control of your solar installation, with full offline support.
-          </p>
+  Welcome to the Solar Mini-Grid Monitoring System. This dashboard enables both offline and online real-time monitoring and intelligent control of your AI-powered solar installation. Designed for ultra-low-latency data fetching (max 1000ms delay), it integrates seamlessly with PLCs like the Siemens S7-1214 via OPC UA, ensuring smart grid management and automation—regardless of connectivity.
+</p>
 
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Key Features:</h2>
-            <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-              <li>Real-time monitoring of battery, grid, and inverter metrics</li>
-              <li>Offline-first architecture for reliable operation</li>
-              <li>Intelligent control queueing system</li>
-              <li>Dark and light mode support</li>
-            </ul>
-          </div>
+<div className="space-y-4">
+  <h2 className="text-xl font-semibold">Key Features:</h2>
+  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+    <li>Real-time data fetching with sub-second latency (≤1000ms)</li>
+    <li>Not only offline first and also online dual-mode support for robust reliability</li>
+    <li>Intelligent control queue with auto-retry and failover mechanisms</li>
+    <li>All time connectivity indicators for both PLC and WebSocket</li>
+    <li><s>AI-powered energy optimization and load balancing</s></li>
+    <li>Easy integration with new systems by just editing one file (DataPoints.ts)</li>
+    <li>PLC (Siemens S7-1200 series) integration via NodeS7 & OPC UA</li>
+    <li>Modular architecture for future extensibility</li>
+    <li>Dark and light mode support for better user accessibility</li>
+  </ul>
+</div>
 
           <Link href="/dashboard" className="block">
             <Button className="w-full group" size="lg">
