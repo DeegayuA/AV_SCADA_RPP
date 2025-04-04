@@ -34,7 +34,7 @@ export default function Home() {
     <li>All time connectivity indicators for both PLC and WebSocket</li>
     <li><s>AI-powered energy optimization and load balancing</s></li>
     <li>Easy integration with new systems by just editing one file (DataPoints.ts)</li>
-    <li>PLC (Siemens S7-1200 series) integration via NodeS7 & OPC UA</li>
+    <li>Direct Data fetching from PLC via NodeS7 & OPC UA</li>
     <li>Modular architecture for future extensibility</li>
     <li>Dark and light mode support for better user accessibility</li>
   </ul>
