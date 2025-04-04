@@ -20,7 +20,7 @@ To get started, clone this repository to your local machine using Git.
 
 1. **Open a terminal/command prompt** and run:
    ```bash
-   git clone https://github.com/yourusername/av-solar-local-control-panel.git
+   git clone https://github.com/DeegayuA/AV-Mini-Grid-Offline-Dashboard.git
    ```
 
 2. **Navigate to the project folder**:
