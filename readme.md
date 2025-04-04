@@ -1,4 +1,3 @@
-
 # AV Solar Local Control Panel
 
 Welcome to the **AV Solar Local Control Panel**! This guide will walk you through the entire process of setting up and running the app locally, and launching it as a Progressive Web App (PWA) on your desktop.
@@ -82,7 +81,7 @@ Now, let's create a `.bat` file that will start the app and open it in your web 
 1. **Create the `.bat` file**:
    In the root folder of your project, create a new text file named `start-next.bat`.
 
-2. **Edit the `.bat` file**:
+2. **Edit the `.bat` file**: (new version coming soon with buf fixes)
    Open `start-next.bat` in a text editor (like Notepad) and add the following code:
    
    ```bat
@@ -145,6 +144,52 @@ If you run into issues, try the following:
 ## 10. License and Acknowledgments
 
 This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## 11. Developer Setup (Windows)
+
+For developers looking to set up the **AV Solar Local Control Panel** on Windows, we’ve provided an automated installer with installation, uninstallation, and setup scripts. Follow the steps below:
+
+### Files Provided
+
+1. **`setup.ps1`**: This PowerShell script handles the entire installation process. It clones the latest version of the repository, installs dependencies, builds the app, and launches it as a PWA.
+   
+2. **`uninstaller.ps1`**: This PowerShell script will remove all files and dependencies associated with the app when executed, effectively uninstalling the app.
+
+3. **`install.iss`**: This Inno Setup script creates an installer for the app, allowing you to install it on a Windows machine. It ensures that all dependencies are installed and the app is correctly configured for use.
+
+### Steps to Use the Installer
+
+1. **Install Inno Setup**:
+   - Download and install [Inno Setup](https://jrsoftware.org/isinfo.php) to compile the installer.
+
+2. **Run the Setup Script**:
+   - Open a PowerShell prompt as Administrator and navigate to the project folder.
+   - Execute the `setup.ps1` script by running:
+     ```powershell
+     .\setup.ps1
+     ```
+   This will:
+   - Clone the repository (if not already cloned).
+   - Install dependencies.
+   - Build the app and start the server.
+   - Launch the app in full-screen mode as a PWA using Chrome.
+
+3. **To Uninstall**:
+   - If you want to uninstall the app, run the `uninstaller.ps1` script:
+     ```powershell
+     .\uninstaller.ps1
+     ```
+
+4. **Create the Installer**:
+   - To generate an installer `.exe`, run the `install.iss` script through Inno Setup Compiler:
+     1. Open Inno Setup Compiler.
+     2. Load `install.iss`.
+     3. Compile the script to create the installer (`SolarMiniGridInstaller.exe`).
+     4. Run the installer on any Windows machine to install the app.
+
+Enjoy the convenience of automated setup on Windows!
 
 ---
 
