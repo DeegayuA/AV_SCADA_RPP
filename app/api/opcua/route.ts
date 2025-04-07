@@ -11,7 +11,8 @@ import {
 } from "node-opcua";
 import { WebSocketServer, WebSocket } from "ws";
 
-let endpointUrl = OPC_UA_ENDPOINT_OFFLINE; // Default to offline first
+// let endpointUrl = OPC_UA_ENDPOINT_OFFLINE; // Default to offline first
+let endpointUrl: string; // Assigned inside connectOPCUA each time
 const POLLING_INTERVAL = 100; // ms - Using the interval from your setInterval
 const RECONNECT_DELAY = 5000; // Delay for reconnection attempts
 
@@ -30,6 +31,7 @@ const nodeIdsToMonitor = () => {
 };
 
 async function connectOPCUA() {
+  endpointUrl = OPC_UA_ENDPOINT_OFFLINE; // Always reset to offline first
   if (opcuaClient || isConnectingOpcua || isDisconnectingOpcua) {
     console.log("OPC UA connection/disconnection already in progress or established.");
     if (opcuaClient && opcuaSession) {
