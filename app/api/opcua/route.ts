@@ -1,4 +1,4 @@
-import { WS_PORT } from "@/config/constants";
+import { WS_PORT, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE } from "@/config/constants";
 import { dataPoints, nodeIds } from "@/config/dataPoints"; // Import nodeIds as well
 import {
   OPCUAClient,
@@ -11,8 +11,9 @@ import {
 } from "node-opcua";
 import { WebSocketServer, WebSocket } from "ws";
 
-const endpointUrl = "opc.tcp://192.168.1.2:4840"; // Replace with your OPC UA server endpoint
-const POLLING_INTERVAL = 1000; // ms - Using the interval from your setInterval
+let endpointUrl = OPC_UA_ENDPOINT_OFFLINE; // Default to offline first
+const POLLING_INTERVAL = 100; // ms - Using the interval from your setInterval
+const RECONNECT_DELAY = 5000; // Delay for reconnection attempts
 
 // Singleton instances
 let opcuaClient: OPCUAClient | null = null;
@@ -44,8 +45,8 @@ async function connectOPCUA() {
     endpointMustExist: false,
     connectionStrategy: {
       maxRetry: 10, // More retries as in the old code
-      initialDelay: 1500,
-      maxDelay: 15000,
+      initialDelay: 1000,
+      maxDelay: 30000,
     },
     keepSessionAlive: true,
     securityMode: MessageSecurityMode.None, // As in the old code
@@ -61,7 +62,8 @@ async function connectOPCUA() {
     console.error("OPC UA connection lost.");
     opcuaSession = null;
     stopDataPolling();
-    // Connection strategy will handle reconnection attempts
+    // Automatically attempt to reconnect
+    setTimeout(connectOPCUA, RECONNECT_DELAY);
   });
   opcuaClient.on("connection_reestablished", () => {
     console.log("OPC UA connection re-established.");
@@ -79,13 +81,28 @@ async function connectOPCUA() {
 
   try {
     await opcuaClient.connect(endpointUrl);
-    console.log("OPC UA client connected.");
+    console.log("OPC UA client connected to:", endpointUrl);
     await createSessionAndStartPolling();
   } catch (err) {
-    console.error("Failed to connect OPC UA client:", err);
-    if (connectedClients.size > 0) {
+    console.error(`Failed to connect OPC UA client to ${endpointUrl}:`, err);
+    if (endpointUrl === OPC_UA_ENDPOINT_OFFLINE) {
+      console.log("Falling back to online OPC UA endpoint...");
+      endpointUrl = OPC_UA_ENDPOINT_ONLINE;
+      try {
+        await opcuaClient.connect(endpointUrl);
+        console.log("OPC UA client connected to fallback:", endpointUrl);
+        await createSessionAndStartPolling();
+      } catch (fallbackErr) {
+        console.error("Failed to connect to fallback OPC UA endpoint:", fallbackErr);
+        if (connectedClients.size > 0) {
+          console.log("Connection failed. Attempting OPC UA reconnect.");
+          setTimeout(connectOPCUA, RECONNECT_DELAY);
+        }
+        opcuaClient = null; // Reset client on fallback failure
+      }
+    } else if (connectedClients.size > 0) {
       console.log("Connection failed. Attempting OPC UA reconnect.");
-      setTimeout(connectOPCUA, 5000);
+      setTimeout(connectOPCUA, RECONNECT_DELAY);
     }
     opcuaClient = null; // Reset client on initial connection failure
   } finally {
@@ -109,7 +126,7 @@ async function createSessionAndStartPolling() {
       stopDataPolling();
       if (connectedClients.size > 0) {
         console.log("Session closed, but clients remain. Attempting OPC UA reconnect.");
-        setTimeout(connectOPCUA, 5000);
+        setTimeout(connectOPCUA, RECONNECT_DELAY);
       }
     });
     opcuaSession.on("keepalive", (state: string) => {
@@ -117,12 +134,11 @@ async function createSessionAndStartPolling() {
     });
     opcuaSession.on("keepalive_failure", (state: string | Error) => {
       console.error("OPC UA session keepalive failure:", state);
-      // Consider sending error to clients
       opcuaSession = null;
       stopDataPolling();
       if (connectedClients.size > 0) {
         console.log("Keepalive failure. Attempting OPC UA reconnect.");
-        setTimeout(connectOPCUA, 5000);
+        setTimeout(connectOPCUA, RECONNECT_DELAY);
       }
     });
 
@@ -131,7 +147,7 @@ async function createSessionAndStartPolling() {
     console.error("Failed to create OPC UA session:", err);
     if (connectedClients.size > 0) {
       console.log("Session creation failed. Attempting OPC UA reconnect.");
-      setTimeout(connectOPCUA, 5000);
+      setTimeout(connectOPCUA, RECONNECT_DELAY);
     }
     opcuaSession = null;
   }
@@ -165,15 +181,15 @@ function startDataPolling() {
         let newValue: any = 'Error';
         const dataPoint = dataPoints.find((point) => point.nodeId === nodeId);
         if (dataPoint && dataPoint.factor) {
-            if (dataValue.statusCode.isGood() && dataValue.value?.value !== undefined) {
-                newValue = typeof dataValue.value.value === "number" && !Number.isInteger(dataValue.value.value)
-                    ? parseFloat((dataValue.value.value * dataPoint.factor).toFixed(2)) // Applying factor here
-                    : dataValue.value.value * dataPoint.factor; // Multiply by factor
-            }
-        } else if (dataValue.statusCode.isGood() && dataValue.value?.value !== undefined) {
+          if (dataValue.statusCode.isGood() && dataValue.value?.value !== undefined) {
             newValue = typeof dataValue.value.value === "number" && !Number.isInteger(dataValue.value.value)
-                ? parseFloat(dataValue.value.value.toFixed(2))
-                : dataValue.value.value;
+              ? parseFloat((dataValue.value.value * dataPoint.factor).toFixed(2)) // Applying factor here
+              : dataValue.value.value * dataPoint.factor; // Multiply by factor
+          }
+        } else if (dataValue.statusCode.isGood() && dataValue.value?.value !== undefined) {
+          newValue = typeof dataValue.value.value === "number" && !Number.isInteger(dataValue.value.value)
+            ? parseFloat(dataValue.value.value.toFixed(2))
+            : dataValue.value.value;
         }
         currentDataBatch[nodeId] = newValue;
         nodeDataCache[nodeId] = newValue; // Update cache
@@ -185,12 +201,12 @@ function startDataPolling() {
     } catch (err) {
       console.error('Error during OPC UA read poll:', err);
       // Handle session or connection errors during polling
-      if (err instanceof Error && (err.message.includes("BadSessionIdInvalid") || err.message.includes("BadSessionClosed") || err.message.includes("BadNotConnected"))) {
+      if (err instanceof Error && (err.message.includes("BadSessionIdInvalid") || err.message.includes("BadSessionClosed") || err.message.includes("BadNotConnected") || err.message.includes("BadTooManySessions"))) {
         console.error("OPC UA Session/Connection error during poll. Stopping poll and attempting reconnect.");
         opcuaSession = null;
         stopDataPolling();
         if (connectedClients.size > 0) {
-          setTimeout(connectOPCUA, 5000);
+          setTimeout(connectOPCUA, RECONNECT_DELAY);
         }
       }
     }
@@ -304,7 +320,7 @@ async function disconnectOPCUA() {
       console.error("Error disconnecting OPC UA client:", err);
       if (connectedClients.size > 0) {
         console.log("Disconnection failed. Attempting OPC UA reconnect.");
-        setTimeout(connectOPCUA, 5000);
+        setTimeout(connectOPCUA, RECONNECT_DELAY);
       }
     } finally {
       opcuaClient = null;
