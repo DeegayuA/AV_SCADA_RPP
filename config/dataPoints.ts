@@ -11,8 +11,11 @@ export interface DataPoint {
   min?: number;
   max?: number;
   description?: string;
-  category: 'battery' | 'grid' | 'inverter' | 'control';
+  category: 'battery' | 'grid' | 'inverter' | 'control' | 'three-phase';
   factor?: number;
+  phase?: 'a' | 'b' | 'c' | 'x';
+  isSinglePhase?: boolean;
+  threePhaseGroup?: string;
 }
 
 export const dataPoints: DataPoint[] = [
@@ -26,6 +29,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     description: 'System work mode control',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'frequency',
@@ -35,11 +39,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: AudioWaveform,
     unit: ' Hz',
-    min: 0,
-    max: 100,
+    min: 49.8,
+    max: 50.2,
     category: 'battery',
     description: 'Current Frequency',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'battery-voltage',
@@ -50,10 +55,11 @@ export const dataPoints: DataPoint[] = [
     icon: Battery,
     unit: 'V',
     min: 45,
-    max: 65,
+    max: 55,
     category: 'battery',
     description: 'Current battery voltage',
     factor: 0.01,
+    phase: 'x',
   },
   {
     id: 'battery-capacity',
@@ -68,6 +74,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter',
     description: 'Current battery capacity',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'grid-power-a',
@@ -77,9 +84,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Zap,
     unit: 'W',
-    category: 'grid',
+    category: 'three-phase',
     description: 'Grid side Phase A power',
     factor: 1,
+    phase: 'a',
+    isSinglePhase: false,
+    threePhaseGroup: 'grid-power',
   },
   {
     id: 'grid-power-b',
@@ -89,9 +99,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Zap,
     unit: 'W',
-    category: 'grid',
+    category: 'three-phase',
     description: 'Grid side Phase B power',
     factor: 1,
+    phase: 'b',
+    isSinglePhase: false,
+    threePhaseGroup: 'grid-power',
   },
   {
     id: 'grid-power-c',
@@ -101,9 +114,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Zap,
     unit: 'W',
-    category: 'grid',
+    category: 'three-phase',
     description: 'Grid side Phase C power',
     factor: 1,
+    phase: 'c',
+    isSinglePhase: false,
+    threePhaseGroup: 'grid-power',
   },
   {
     id: 'grid-voltage-a',
@@ -113,9 +129,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Zap,
     unit: 'V',
-    category: 'grid',
+    category: 'three-phase',
     description: 'Grid Phase A voltage',
     factor: 0.1,
+    phase: 'a',
+    isSinglePhase: false,
+    threePhaseGroup: 'grid-voltage',
   },
   {
     id: 'grid-voltage-b',
@@ -125,9 +144,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Zap,
     unit: 'V',
-    category: 'grid',
+    category: 'three-phase',
     description: 'Grid Phase B voltage',
     factor: 0.1,
+    phase: 'b',
+    isSinglePhase: false,
+    threePhaseGroup: 'grid-voltage',
   },
   {
     id: 'grid-voltage-c',
@@ -137,9 +159,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Zap,
     unit: 'V',
-    category: 'grid',
+    category: 'three-phase',
     description: 'Grid Phase C voltage',
     factor: 0.1,
+    phase: 'c',
+    isSinglePhase: false,
+    threePhaseGroup: 'grid-voltage',
   },
   // {
   //   id: 'inverter-frequency',
@@ -154,6 +179,7 @@ export const dataPoints: DataPoint[] = [
   //   category: 'inverter',
   //   description: 'Inverter output frequency',
   //   factor: 1,
+  //   phase: 'x',
   // },
   {
     id: 'current-a',
@@ -163,9 +189,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Activity,
     unit: 'A',
-    category: 'battery',
+    category: 'three-phase',
     description: 'Current A',
     factor: 1,
+    phase: 'a',
+    isSinglePhase: false,
+    threePhaseGroup: 'current',
   },
   {
     id: 'current-b',
@@ -175,9 +204,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Activity,
     unit: 'A',
-    category: 'battery',
+    category: 'three-phase',
     description: 'Current B',
     factor: 1,
+    phase: 'b',
+    isSinglePhase: false,
+    threePhaseGroup: 'current',
   },
   {
     id: 'current-c',
@@ -187,9 +219,12 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: Activity,
     unit: 'A',
-    category: 'battery',
+    category: 'three-phase',
     description: 'Current C',
     factor: 1,
+    phase: 'c',
+    isSinglePhase: false,
+    threePhaseGroup: 'current',
   },
   {
     id: 'current-n',
@@ -202,6 +237,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     description: 'Current N',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'voltage-a-b',
@@ -214,6 +250,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     description: 'Voltage A-B',
     factor: 0.1,
+    phase: 'x',
   },
   {
     id: 'voltage-b-c',
@@ -226,6 +263,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     description: 'Voltage B-C',
     factor: 0.1,
+    phase: 'x',
   },
   {
     id: 'voltage-c-a',
@@ -238,6 +276,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     description: 'Voltage C-A',
     factor: 0.1,
+    phase: 'x',
   },
   {
     id: 'active-power-total',
@@ -250,6 +289,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     description: 'Total active power',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'reactive-power-total',
@@ -262,6 +302,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     description: 'Total reactive power',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'apparent-power-total',
@@ -274,6 +315,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     description: 'Total apparent power',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'energy-meter2-active-load-timer',
@@ -285,6 +327,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     description: 'Energy Meter 2 Active Load Timer',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'energy-meter2-meter-operation-timer',
@@ -296,6 +339,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     description: 'Energy Meter 2 Meter Operation Timer',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'active-energy-delivered',
@@ -308,6 +352,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     description: 'Active energy delivered into load',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'active-energy-received',
@@ -320,6 +365,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     description: 'Active energy received out of load',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'reactive-energy-delivered',
@@ -332,6 +378,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     description: 'Reactive energy delivered',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'reactive-energy-received',
@@ -344,6 +391,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     description: 'Reactive energy received',
     factor: 1,
+    phase: 'x',
   },
   {
     id: 'apparent-energy-delivered',
@@ -356,6 +404,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     description: 'Apparent energy delivered',
     factor: 1,
+    phase: 'x',
   }
 ];
 export const nodeIds = dataPoints.map(dataPoint => {

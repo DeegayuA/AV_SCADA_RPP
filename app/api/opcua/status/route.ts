@@ -20,7 +20,7 @@ const connectToEndpoint = async (endpoint: string): Promise<void> => {
 
 const connectOPC = async (): Promise<boolean> => {
   if (client && client.isReconnecting === false) {
-    console.log("Client is already connected, no need to reconnect.");
+    // console.log("Client is already connected, no need to reconnect.");
     return true;
   }
 

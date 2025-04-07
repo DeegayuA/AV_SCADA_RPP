@@ -13,7 +13,7 @@ import { WebSocketServer, WebSocket } from "ws";
 
 // let endpointUrl = OPC_UA_ENDPOINT_OFFLINE; // Default to offline first
 let endpointUrl: string; // Assigned inside connectOPCUA each time
-const POLLING_INTERVAL = 100; // ms - Using the interval from your setInterval
+const POLLING_INTERVAL = 1000; // ms - Using the interval from your setInterval
 const RECONNECT_DELAY = 5000; // Delay for reconnection attempts
 
 // Singleton instances

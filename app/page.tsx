@@ -20,25 +20,25 @@ export default function Home() {
             <Sun className="w-8 h-8 text-yellow-500" />
             <h1 className="text-3xl font-bold text-foreground">AV Mini-Grid Control Panel & Monitor</h1>
           </div>
-          
-          <p className="text-muted-foreground text-lg">
-  Welcome to the Solar Mini-Grid Monitoring System. This dashboard enables both offline and online real-time monitoring and intelligent control of your AI-powered solar installation. Designed for ultra-low-latency data fetching (max 1000ms delay), it integrates seamlessly with PLCs like the Siemens S7-1214 via OPC UA, ensuring smart grid management and automation—regardless of connectivity.
-</p>
 
-<div className="space-y-4">
-  <h2 className="text-xl font-semibold">Key Features:</h2>
-  <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-    <li>Real-time data fetching with sub-second latency (≤1000ms)</li>
-    <li>Not only offline first and also online dual-mode support for robust reliability</li>
-    <li>Intelligent control queue with auto-retry and failover mechanisms</li>
-    <li>All time connectivity indicators for both PLC and WebSocket</li>
-    <li><s>AI-powered energy optimization and load balancing</s></li>
-    <li>Easy integration with new systems by just editing one file (DataPoints.ts)</li>
-    <li>Direct Data fetching from PLC via NodeS7 & OPC UA</li>
-    <li>Modular architecture for future extensibility</li>
-    <li>Dark and light mode support for better user accessibility</li>
-  </ul>
-</div>
+          <p className="text-muted-foreground text-lg">
+            Welcome to the Solar Mini-Grid Monitoring System. This dashboard enables both offline and online real-time monitoring and intelligent control of your AI-powered solar installation. Designed for ultra-low-latency data fetching (max 1000ms delay), it integrates seamlessly with PLCs like the Siemens S7-1214 via OPC UA, ensuring smart grid management and automation—regardless of connectivity.
+          </p>
+
+          <div className="space-y-4">
+            <h2 className="text-xl font-semibold">Key Features:</h2>
+            <ul className="list-disc list-inside space-y-2 text-muted-foreground">
+              <li>Real-time data fetching: typically &lt;2s latency, occasional &gt;2s.</li>
+              <li>Not only offline first and also online dual-mode support for robust reliability</li>
+              <li>Intelligent control queue with auto-retry and failover mechanisms</li>
+              <li>All time connectivity indicators for both PLC and WebSocket</li>
+              <li><s>AI-powered energy optimization and load balancing</s></li>
+              <li>Easy integration with new systems by just editing one file (DataPoints.ts)</li>
+              <li>Direct Data fetching from PLC via NodeS7 & OPC UA</li>
+              <li>Modular architecture for future extensibility</li>
+              <li>Dark and light mode support for better user accessibility</li>
+            </ul>
+          </div>
 
           <Link href="/dashboard" className="block">
             <Button className="w-full group" size="lg">
