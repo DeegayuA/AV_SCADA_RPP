@@ -116,7 +116,7 @@ const Dashboard = () => {
 
   return (
     <div className="p-4">
-      <h1>Solar Mini-Grid Dashboard</h1>
+      <h1>RT Dashboard</h1>
       <p className="mb-4">
         WebSocket Status: {isConnected ? (
           <span className="font-bold text-green-600">Connected</span>

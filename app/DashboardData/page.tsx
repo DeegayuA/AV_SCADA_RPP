@@ -16,6 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { WS_URL, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE, VERSION } from '@/config/constants';
 // Import necessary icons from lucide-react based on your dataPoints config
 import { Activity, AudioWaveform, Battery, Zap, Gauge, Sun, Moon, AlertCircle, Power, Sigma } from 'lucide-react'; // Add/remove icons as needed
+import { TextHoverEffect } from '@/components/ui/text-hover-effect';
 
 // Define the interface for a single data point configuration
 export interface DataPointConfig {
@@ -154,8 +155,7 @@ function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseGroups: 
       commonUnit = potentialGroup[0].unit;
 
       for (const point of potentialGroup) {
-        if (
-          point.isSinglePhase ||
+        if (          point.isSinglePhase ||
           !point.phase ||
           !['a', 'b', 'c'].includes(point.phase) ||
           phases[point.phase as 'a' | 'b' | 'c'] || // Explicit type assertion
@@ -217,6 +217,8 @@ const Dashboard = () => {
   const { toast } = useToast();
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 10; // Example maximum attempts
 
   // --- Core Hooks (Time, Delay, PLC Check) ---
   useEffect(() => { /* Current time update */
@@ -228,15 +230,15 @@ const Dashboard = () => {
     const interval = setInterval(() => {
       const currentDelay = Date.now() - lastUpdateTime;
       setDelay(currentDelay);
-      if (isConnected && currentDelay > 15000) { // Increased threshold slightly
+      if (isConnected && currentDelay > 20000) { // Increased threshold slightly
         if (typeof window !== 'undefined' && sessionStorage.getItem('reloadingDueToDelay') !== 'true') {
-          console.warn(`WebSocket delay (${currentDelay}ms) exceeded 15 seconds. Reloading page.`);
+          console.warn(`WebSocket delay (${currentDelay}ms) exceeded 20 seconds. Reloading page.`);
           sessionStorage.setItem('reloadingDueToDelay', 'true');
           window.location.reload();
         }
       }
     }, 1000);
-    if (delay < 15000 && typeof window !== 'undefined') { sessionStorage.removeItem('reloadingDueToDelay'); }
+    if (delay < 20000 && typeof window !== 'undefined') { sessionStorage.removeItem('reloadingDueToDelay'); }
     return () => clearInterval(interval);
   }, [lastUpdateTime, isConnected, delay]);
 
@@ -254,25 +256,91 @@ const Dashboard = () => {
   const connectWebSocket = useCallback(() => {
     if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
     if (typeof window !== 'undefined' && sessionStorage.getItem('reloadingDueToDelay') === 'true') { setTimeout(() => sessionStorage.removeItem('reloadingDueToDelay'), 2000); return; }
-    console.log(`Attempting WS connection: ${WS_URL}`);
-    ws.current = new WebSocket(WS_URL); setIsConnected(false);
-    ws.current.onopen = () => { console.log("WS connected"); setIsConnected(true); setLastUpdateTime(Date.now()); if (reconnectInterval.current) { clearTimeout(reconnectInterval.current); reconnectInterval.current = null; } };
-    ws.current.onmessage = (event) => { try { const d = JSON.parse(event.data as string); setNodeValues(p => ({ ...p, ...d })); setLastUpdateTime(Date.now()); } catch (e) { console.error("WS parse error:", e); } };
-    ws.current.onerror = (event) => {
-      console.error("WS error event:", event); console.error("WS error:", 'Connection error.');
-      if (typeof window !== 'undefined') { const redir = sessionStorage.getItem('opcuaRedirected'); if (!redir || redir === 'false') { console.warn("WS error, redirecting to API..."); const url = `${window.location.protocol}//${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}/api/opcua`; sessionStorage.setItem('opcuaRedirected', 'true'); window.location.href = url; } else { console.warn("WS error, already redirected."); } }
-    };
-    ws.current.onclose = (event) => { console.log(`WS disconnected. Code: ${event.code}, Reason: '${event.reason || '-'}'`); setIsConnected(false); ws.current = null; if (event.code !== 1000 && event.code !== 1001) { if (!reconnectInterval.current && typeof window !== 'undefined' && sessionStorage.getItem('opcuaRedirected') !== 'true') { console.log("Attempting WS reconnect in 5s..."); reconnectInterval.current = setTimeout(() => { reconnectInterval.current = null; connectWebSocket(); }, 5000); } else if (sessionStorage.getItem('opcuaRedirected') === 'true') { console.log("WS closed, redirect flag set."); } } else { console.log("WS closed normally/navigating away."); } };
-  }, [WS_URL, toast]); // Added toast dependency
+
+    setIsConnected(false);
+    const delay = Math.min(5000 * Math.pow(2, reconnectAttempts.current), 60000); // Exponential backoff (max 60s)
+    console.log(`Attempting WS connection in ${delay}ms (attempt ${reconnectAttempts.current + 1}): ${WS_URL}`);
+
+    reconnectInterval.current = setTimeout(() => {
+      console.log("Connecting WebSocket...");
+      ws.current = new WebSocket(WS_URL);
+
+      ws.current.onopen = () => {
+        console.log("WebSocket connected");
+        setIsConnected(true);
+        setLastUpdateTime(Date.now());
+        reconnectAttempts.current = 0; // Reset attempts on successful connection
+        if (reconnectInterval.current) { clearTimeout(reconnectInterval.current); reconnectInterval.current = null; }
+      };
+      ws.current.onmessage = (event) => {
+        try {
+          const d = JSON.parse(event.data as string);
+          setNodeValues(p => ({ ...p, ...d }));
+          setLastUpdateTime(Date.now());
+        } catch (e) {
+          console.error("WebSocket message parse error:", e);
+        }
+      };
+      ws.current.onerror = (event) => {
+        console.error("WebSocket error event:", event);
+        console.error("WebSocket error:", 'Connection error.');
+        if (typeof window !== 'undefined') {
+          const redir = sessionStorage.getItem('opcuaRedirected');
+          if (!redir || redir === 'false') {
+            console.warn("WebSocket error, redirecting to API...");
+            const url = `${window.location.protocol}//${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}/api/opcua`;            sessionStorage.setItem('opcuaRedirected', 'true');
+            window.location.href = url;
+          } else {
+            console.warn("WebSocket error, already redirected.");
+          }
+        }
+      };
+      ws.current.onclose = (event) => {
+        console.log(`WebSocket disconnected. Code: <span class="math-inline">\{event\.code\}, Reason\: '</span>{event.reason || '-'}'`);
+        setIsConnected(false);
+        ws.current = null;
+        if (event.code !== 1000 && event.code !== 1001 && reconnectAttempts.current < maxReconnectAttempts && typeof window !== 'undefined' && sessionStorage.getItem('opcuaRedirected') !== 'true') {
+          reconnectAttempts.current++;
+          connectWebSocket(); // Re-attempt connection
+        } else if (reconnectAttempts.current >= maxReconnectAttempts) {
+          console.warn("Max WebSocket reconnect attempts reached.");
+          toast({ title: 'Error', description: 'Failed to connect to WebSocket after multiple attempts.', variant: 'destructive' });
+        }
+      };
+    }, delay);
+  }, [WS_URL, toast]);
 
   useEffect(() => { /* Initial connection & cleanup */
-    if (typeof window === 'undefined') return; connectWebSocket(); sessionStorage.removeItem('opcuaRedirected'); sessionStorage.removeItem('reloadingDueToDelay');
-    return () => { if (reconnectInterval.current) clearTimeout(reconnectInterval.current); if (ws.current) { ws.current.onclose = null; ws.current.close(1000); ws.current = null; } };
+    if (typeof window === 'undefined') return;
+    connectWebSocket();
+    sessionStorage.removeItem('opcuaRedirected');
+    sessionStorage.removeItem('reloadingDueToDelay');
+    return () => {
+      if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
+      if (ws.current) {
+        ws.current.onclose = null;
+        ws.current.close(1000);
+        ws.current = null;
+      }
+    };
   }, [connectWebSocket]);
 
   // --- Send Data ---
   const sendDataToWebSocket = (nodeId: string, value: boolean | number | string) => {
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) { try { const p = JSON.stringify({ [nodeId]: value }); ws.current.send(p); console.log("Sent:", p); } catch (e) { console.error("WS send error:", e); toast({ title: 'Error', description: 'Failed to send command.', variant: 'destructive' }); } } else { console.error("WS not connected."); toast({ title: 'Error', description: 'Cannot send command. WebSocket disconnected.', variant: 'destructive' }); }
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      try {
+        const payload = JSON.stringify({ [nodeId]: value });
+        ws.current.send(payload);
+        console.log("Sent to WebSocket:", payload);
+      } catch (e) {
+        console.error("WebSocket send error:", e);
+        toast({ title: 'Error', description: 'Failed to send command.', variant: 'destructive' });
+      }
+    } else {
+      console.error("WebSocket not connected.");
+      toast({ title: 'Error', description: 'Cannot send command. WebSocket disconnected.', variant: 'destructive' });
+      connectWebSocket(); // Attempt to reconnect if disconnected when trying to send
+    }
   };
 
   // --- Render Value ---
@@ -285,12 +353,16 @@ const Dashboard = () => {
     let content: React.ReactNode;
     let valueClass = "text-foreground font-medium"; // Default class
 
-    if (value === undefined || value === null) { content = <span className="text-gray-400 dark:text-gray-500 italic">---</span>; }
-    else if (value === 'Error') { content = <span className="text-red-500 font-semibold flex items-center gap-1"><AlertCircle size={14} /> Error</span>; }
-    else if (typeof value === 'boolean') { content = <span className={`font-semibold ${value ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{value ? 'ON' : 'OFF'}</span>; }
-    else if (typeof value === 'number') {
+    if (value === undefined || value === null) {
+      content = <span className="text-gray-400 dark:text-gray-500 italic">---</span>;
+    } else if (value === 'Error') {
+      content = <span className="text-red-500 font-semibold flex items-center gap-1"><AlertCircle size={14} /> Error</span>;
+    } else if (typeof value === 'boolean') {
+      content = <span className={`font-semibold ${value ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{value ? 'ON' : 'OFF'}</span>;
+    } else if (typeof value === 'number') {
       const factor = dataPoint?.factor ?? 1;
-      const min = dataPoint?.min; const max = dataPoint?.max;
+      const min = dataPoint?.min;
+      const max = dataPoint?.max;
       let adjustedValue = value * factor;
       let displayValue: string;
       // Adjusted formatting
@@ -298,11 +370,15 @@ const Dashboard = () => {
       else if (Math.abs(adjustedValue) >= 10) displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
       else displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
 
-      if ((min !== undefined && adjustedValue < min) || (max !== undefined && adjustedValue > max)) { valueClass = "text-orange-500 dark:text-orange-400 font-medium"; } // Highlight out-of-range
+      if ((min !== undefined && adjustedValue < min) || (max !== undefined && adjustedValue > max)) {
+        valueClass = "text-orange-500 dark:text-orange-400 font-medium";
+      } // Highlight out-of-range
       content = <>{displayValue}<span className="text-xs text-muted-foreground ml-0.5">{unit || ''}</span></>; // Smaller unit
+    } else if (typeof value === 'string') {
+      content = <>{value.length > 25 ? `${value.substring(0, 22)}...` : value}{unit ? <span className="text-xs text-muted-foreground ml-0.5">{unit}</span> : ''}</>;
+    } else {
+      content = <span className="text-yellow-500">?</span>;
     }
-    else if (typeof value === 'string') { content = <>{value.length > 25 ? `${value.substring(0, 22)}...` : value}{unit ? <span className="text-xs text-muted-foreground ml-0.5">{unit}</span> : ''}</>; }
-    else { content = <span className="text-yellow-500">?</span>; }
 
     return (<motion.span key={key} className={valueClass} initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} transition={{ duration: 0.25, ease: "easeOut" }}>{content}</motion.span>);
   };
@@ -314,17 +390,19 @@ const Dashboard = () => {
   const controlPoints = individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch');
   const gaugePointsIndividual = individualPoints.filter(p => p.uiType === 'gauge');
   const displayPointsIndividual = individualPoints.filter(p => p.uiType === 'display');
-  <motion.div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-center" initial="hidden" animate="visible" variants={containerVariants}></motion.div>
   const displayGroups3Phase = threePhaseGroups.filter(g => g.uiType === 'display');
   const gaugeGroups3Phase = threePhaseGroups.filter(g => g.uiType === 'gauge'); // Prepare for 3-phase gauges if needed
 
+
   // --- Component Return ---
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-foreground p-4 md:p-6 lg:p-8 transition-colors duration-300">
+    <div className="min-h-screen text-foreground p-4 md:p-6 lg:p-8 transition-colors duration-300 rounded-lg shadow-sm bg-background dark:bg-background-dark">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <motion.div className="flex flex-col sm:flex-row justify-between items-center mb-5 gap-3" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
           <h1 className="text-2xl md:text-3xl font-bold text-center sm:text-left text-gray-800 dark:text-gray-100">Solar Mini-Grid Dashboard</h1>
+          {/* <TextHoverEffect text="RT Dashboard" /> */}
+
           <motion.div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-center" initial="hidden" animate="visible" variants={containerVariants}>
             <motion.div variants={itemVariants}><PlcConnectionStatus status={isPlcConnected} /></motion.div>
             <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
@@ -353,7 +431,7 @@ const Dashboard = () => {
                   return (
                     <motion.div key={point.id} variants={itemVariants} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                       <TooltipProvider delayDuration={200}><Tooltip>
-                        <TooltipTrigger asChild><Button onClick={() => sendDataToWebSocket(point.nodeId, true)} className="w-full h-full justify-start p-3 text-left bg-card border dark:border-gray-700 rounded-lg shadow-sm hover:bg-muted/60 dark:hover:bg-gray-700/60" variant="ghost" disabled={!isConnected}>{point.icon && React.createElement(point.icon, { className: "w-4 h-4 mr-2 text-primary flex-shrink-0" })}<span className="text-sm font-medium text-card-foreground">{point.displayName || point.name}</span></Button></TooltipTrigger>
+                        <TooltipTrigger asChild><Button onClick={() => sendDataToWebSocket(point.nodeId, true)} className="w-full h-full justify-start p-3 text-left bg-card border dark:border-gray-700 rounded-lg shadow-sm border-1 hover:bg-muted/60 dark:hover:bg-gray-700/60" variant="ghost" disabled={!isConnected}>{point.icon && React.createElement(point.icon, { className: "w-4 h-4 mr-2 text-primary flex-shrink-0" })}<span className="text-sm font-medium text-card-foreground">{point.displayName || point.name}</span></Button></TooltipTrigger>
                         {point.description && (<TooltipContent><p>{point.description}</p></TooltipContent>)}
                       </Tooltip></TooltipProvider>
                     </motion.div>
@@ -486,7 +564,7 @@ const Dashboard = () => {
                 <motion.div key={point.id} variants={itemVariants} whileHover={{ scale: 1.05 }}>
                   <TooltipProvider delayDuration={200}><Tooltip>
                     <TooltipTrigger asChild>
-                      <Card className="p-3 flex items-center justify-between cursor-default min-h-[70px] shadow-sm">
+                      <Card className="p-3 flex items-center justify-between cursor-default min-h-[70px] shadow-sm border-1">
                         <div className='flex items-center gap-2 overflow-hidden'>
                           {point.icon && <point.icon className="w-4 h-4 text-primary flex-shrink-0" />}
                           <span className="text-sm font-medium text-muted-foreground truncate" title={point.displayName || point.name}>{point.displayName || point.name}</span>

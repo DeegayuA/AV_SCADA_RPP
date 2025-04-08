@@ -361,10 +361,10 @@ export const dataPoints: DataPoint[] = [
     dataType: 'Float',
     uiType: 'display',
     icon: Battery,
-    unit: 'kWh',
+    unit: 'QWh',
     category: 'battery',
     description: 'Active energy received out of load',
-    factor: 1,
+    factor: 1e-30,
     phase: 'x',
   },
   {
