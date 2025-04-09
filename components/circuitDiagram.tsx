@@ -12,39 +12,51 @@ import ReactFlow, {
   ReactFlowProvider,
   ReactFlowInstance,
 } from "reactflow";
-import type { Node } from "reactflow";  // Correct placement of type import
+import type { Node } from "reactflow";
 import "reactflow/dist/style.css";
 
+// Key to save the data in localStorage
 const STORAGE_KEY = "circuit-diagram";
 
-const defaultNodes: Node[] = [];
-
-const loadNodes = () => {
-  if (typeof window === "undefined") return defaultNodes;
+// Function to load the saved diagram data (nodes and edges)
+const loadDiagram = () => {
+  if (typeof window === "undefined") return { nodes: [], edges: [] };
   try {
     const savedData = localStorage.getItem(STORAGE_KEY);
     const parsedData = savedData ? JSON.parse(savedData) : null;
-    return parsedData && parsedData.nodes ? parsedData.nodes : defaultNodes;
+    return parsedData || { nodes: [], edges: [] };  // Default to empty if not found
   } catch (error) {
-    console.error("Failed to load nodes:", error);
-    localStorage.removeItem(STORAGE_KEY);
-    return defaultNodes;
+    console.error("Failed to load diagram:", error);
+    localStorage.removeItem(STORAGE_KEY);  // Remove corrupted data
+    return { nodes: [], edges: [] };
   }
 };
 
 export default function CircuitDiagram() {
-  const [nodes, setNodes, onNodesChange] = useNodesState(loadNodes());
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  // Load saved data (nodes and edges) from localStorage
+  const { nodes: initialNodes, edges: initialEdges } = loadDiagram();
+  
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
+  // Handle connection (edge) creation
   const onConnect = useCallback(
-    (params: Connection) =>
-      setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: "#4f46e5" } }, eds)),
-    [setEdges]
+    (params: Connection) => {
+      setEdges((eds) => {
+        const updatedEdges = addEdge({ ...params, animated: true, style: { stroke: "#4f46e5" } }, eds);
+        // Save both nodes and edges to localStorage after creating the edge
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges: updatedEdges }));
+        return updatedEdges;
+      });
+    },
+    [nodes, edges]  // Ensure that the latest nodes and edges are saved
   );
 
-  const addNode = (label = "New Component", position = { x: 100, y: 100 }) => {
+  // Add a new node
+  const addNode = (label: string, position = { x: 100, y: 100 }) => {
     const id = crypto.randomUUID();
   
     const newNode: Node = {
@@ -53,21 +65,23 @@ export default function CircuitDiagram() {
       position,
       data: { label },
       style: {
-        padding: 10,
-        border: "2px solid #4f46e5",
-        borderRadius: 8,
+        padding: 15,
+        border: "4px solid #4f46e5",
+        borderRadius: 10,
         backgroundColor: "#f9fafb",
-        width: 160,
+        width: 180,
       },
     };
   
     setNodes((nds) => {
       const updatedNodes = [...nds, newNode];
+      // Save the updated diagram (nodes and edges) to localStorage
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes: updatedNodes, edges }));
       return updatedNodes;
     });
   };
 
+  // Handle the drop event when a new node is dragged and dropped onto the canvas
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
 
@@ -84,29 +98,33 @@ export default function CircuitDiagram() {
     addNode(type, position);
   };
 
+  // Handle drag over event
   const handleDragOver = (event: React.DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   };
 
-  useEffect(() => {
+  // Save the diagram manually
+  const handleSave = () => {
+    // Save both nodes and edges to localStorage manually
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
-  }, [nodes, edges]);
+    alert("Circuit Diagram Saved!");
+  };
+
+  useEffect(() => {
+    // Auto-save the diagram (nodes and edges) to localStorage whenever they change
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }));
+  }, [nodes, edges]);  // Save whenever nodes or edges change
 
   return (
     <ReactFlowProvider>
       <div className="h-full w-full relative" ref={reactFlowWrapper}>
         <div className="absolute top-4 left-4 z-10 space-x-2">
           <button
-            onClick={() => {
-              const canvas = document.createElement("canvas");
-              const context = canvas.getContext("2d");
-              // Placeholder: implement image export here if needed
-              alert("Export feature is coming soon!");
-            }}
+            onClick={handleSave}
             className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded shadow"
           >
-            Export Image
+            Save Diagram
           </button>
         </div>
 

@@ -1,7 +1,6 @@
 "use client"
 
 import { ChevronRight, type LucideIcon } from "lucide-react"
-
 import {
   Collapsible,
   CollapsibleContent,
@@ -21,6 +20,7 @@ import {
 
 export function NavMain({
   items,
+  activeSection,
 }: {
   items: {
     title: string
@@ -32,6 +32,7 @@ export function NavMain({
       url: string
     }[]
   }[]
+  activeSection?: string
 }) {
   return (
     <SidebarGroup>
@@ -41,8 +42,8 @@ export function NavMain({
           <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip={item.title}>
-                <a href={item.url}>
-                  <item.icon />
+                <a href={item.url} className={`flex items-center gap-2 ${activeSection?.toLowerCase() === item.title.toLowerCase() ? 'text-green-500' : ''}`}>
+                  <item.icon className={activeSection?.toLowerCase() === item.title.toLowerCase() ? 'text-green-500' : ''} />
                   <span>{item.title}</span>
                 </a>
               </SidebarMenuButton>

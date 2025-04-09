@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { motion } from "framer-motion"
 import {
   BookOpen,
   Bot,
@@ -28,6 +29,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 
+import logo from "@/av_logo.svg"
+
 const data = {
   user: {
     name: "AltaVision",
@@ -37,9 +40,9 @@ const data = {
   navMain: [
     {
       title: "Control Panel",
-      url: "#",
+      url: "control",
       icon: SquareTerminal,
-      isActive: true,
+      isActive: false,
       items: [
         {
           title: "DEYE Hybrid",
@@ -57,16 +60,16 @@ const data = {
     },
     {
       title: "Dashboard",
-      url: "#",
+      url: "dashboard",
       icon: Bot,
       items: [
         {
-          title: "View1",
-          url: "#",
+          title: "Data at a glance",
+          url: "dashboard",
         },
         {
-          title: "View2",
-          url: "#",
+          title: "simeple testing dash",
+          url: "simpledash",
         },
         {
           title: "View3",
@@ -76,7 +79,7 @@ const data = {
     },
     {
       title: "Another Section",
-      url: "#",
+      url: "circuit",
       icon: BookOpen,
       items: [
         {
@@ -119,13 +122,13 @@ const data = {
   ],
   navSecondary: [
     {
-      title: "Support",
-      url: "#",
+      title: "Help",
+      url: "help",
       icon: LifeBuoy,
     },
     {
-      title: "Feedback",
-      url: "#",
+      title: "Report Bugs",
+      url: "report",
       icon: Send,
     },
   ],
@@ -148,7 +151,7 @@ const data = {
   ],
 }
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+export function AppSidebar({ activeSection, ...props }: React.ComponentProps<typeof Sidebar> & { activeSection?: string }) {
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -156,11 +159,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <a href="/">
-                <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"> 
-                  AV
-                </div>
+                <motion.div
+                  className={`flex aspect-square size-12 items-center justify-center rounded-lg bg-white text-white p-1`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  whileHover={{ scale: 1.1 }}
+                >
+                  <img src={logo.src} alt="logo" />
+                </motion.div>
                 <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-medium">AltaVison</span>
+                  <span className="truncate font-xl">AltaVison</span>
                   <span className="truncate text-xs">Solar</span>
                 </div>
               </a>
@@ -169,7 +177,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={data.navMain} activeSection={activeSection} />
         <NavProjects projects={data.projects} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
