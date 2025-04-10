@@ -5,8 +5,24 @@ import { ArrowRight, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { useEffect } from 'react';
+import router from 'next/router';
 
 export default function Home() {
+
+   useEffect(() => {
+      const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
+  
+      if (hasVisitedBefore) {
+        router.push('/dashboard'); // Change to your actual dashboard route
+      } else {
+        localStorage.setItem('hasVisitedBefore', 'true');
+        setIsLoading(true);
+      }
+    }, []);
+
+
+    
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <motion.div
@@ -51,3 +67,7 @@ export default function Home() {
     </div>
   );
 }
+function setIsLoading(arg0: boolean) {
+  throw new Error('Function not implemented.');
+}
+

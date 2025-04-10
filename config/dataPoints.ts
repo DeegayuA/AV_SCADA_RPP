@@ -23,7 +23,7 @@ export const dataPoints: DataPoint[] = [
     id: 'work-mode',
     name: 'Work Mode',
     nodeId: 'ns=4;i=104',
-    dataType: 'Boolean',
+    dataType: 'Int16',
     uiType: 'switch',
     icon: Activity,
     category: 'control',

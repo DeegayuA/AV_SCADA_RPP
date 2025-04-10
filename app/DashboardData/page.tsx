@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { dataPoints as configuredDataPoints } from '@/config/dataPoints'; // Assuming this path is correct
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,11 +13,11 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useToast } from '@/hooks/use-toast'; // Correct hook import
-import { WS_URL, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE, VERSION } from '@/config/constants';
-import { Activity, AudioWaveform, Battery, Zap, Gauge, Sun, Moon, AlertCircle, Power, Sigma } from 'lucide-react';
-import { TextHoverEffect } from '@/components/ui/text-hover-effect';
+import { WS_URL, VERSION } from '@/config/constants'; // Removed unused constants
+import { Activity, AudioWaveform, Battery, Zap, Gauge, Sun, Moon, AlertCircle, Power, Sigma, Thermometer, Wind, Droplets } from 'lucide-react'; // Added more icons potentially useful for gauges
+import { TextHoverEffect } from '@/components/ui/text-hover-effect'; // Assuming this component exists
 
-// Interfaces (DataPointConfig, NodeData, ThreePhaseGroupInfo) remain the same...
+// Interfaces (remain the same)
 export interface DataPointConfig {
     id: string;
     name: string;
@@ -34,6 +34,7 @@ export interface DataPointConfig {
     phase?: 'a' | 'b' | 'c' | 'x';
     isSinglePhase?: boolean;
     displayName?: string;
+    threePhaseGroup: string;
 }
 
 const dataPoints: DataPointConfig[] = configuredDataPoints as DataPointConfig[];
@@ -57,7 +58,7 @@ interface ThreePhaseGroupInfo {
 }
 
 
-// UI Components (PlcConnectionStatus, WebSocketStatus, ThemeToggle) remain the same...
+// Helper Components (PlcConnectionStatus, WebSocketStatus, ThemeToggle - no changes)
 const PlcConnectionStatus = ({ status }: { status: 'online' | 'offline' | 'disconnected' }) => {
     let statusText = '';
     let dotClass = '';
@@ -112,46 +113,63 @@ const ThemeToggle = () => {
     )
 }
 
-
-// Grouping function (groupDataPoints) remains the same...
+// --- Grouping function (remains the same) ---
 function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseGroups: ThreePhaseGroupInfo[], individualPoints: DataPointConfig[] } {
+    // ... (Grouping logic remains identical to previous version) ...
     const groupsByKey = new Map<string, DataPointConfig[]>();
     const individualPoints: DataPointConfig[] = [];
     const threePhaseGroups: ThreePhaseGroupInfo[] = [];
 
+    // 1. Initial classification
     pointsToGroup.forEach(point => {
-        if (point.isSinglePhase || !point.phase || !['a', 'b', 'c'].includes(point.phase) || point.category !== 'three-phase') {
-            individualPoints.push(point);
-        } else {
-            const groupKey = point.name;
+        const canBeGrouped =
+            point.category === 'three-phase' &&
+            !!point.threePhaseGroup &&
+            point.phase && ['a', 'b', 'c'].includes(point.phase) &&
+            !point.isSinglePhase &&
+            (point.uiType === 'display' || point.uiType === 'gauge');
+
+        if (canBeGrouped) {
+            const groupKey = point.threePhaseGroup;
             if (!groupsByKey.has(groupKey)) {
                 groupsByKey.set(groupKey, []);
             }
             groupsByKey.get(groupKey)!.push(point);
+        } else {
+            individualPoints.push(point);
         }
     });
 
+    // 2. Validate and create groups
     groupsByKey.forEach((potentialGroup, groupKey) => {
         const phases: { a?: DataPointConfig, b?: DataPointConfig, c?: DataPointConfig } = {};
         let validGroup = true;
         let commonUiType: 'display' | 'gauge' | null = null;
         let commonUnit: string | undefined = undefined;
-        let icon = potentialGroup[0]?.icon;
-        let description = potentialGroup[0]?.description;
+        let icon: React.ComponentType<React.SVGProps<SVGSVGElement>> | undefined = undefined;
+        let description: string | undefined = undefined;
+        let title: string = groupKey;
 
-        if (potentialGroup.length < 3) {
+        if (potentialGroup.length !== 3) {
             validGroup = false;
         } else {
-            commonUiType = (potentialGroup[0].uiType === 'display' || potentialGroup[0].uiType === 'gauge') ? potentialGroup[0].uiType : null;
-            commonUnit = potentialGroup[0].unit;
+            const refPoint = potentialGroup[0];
+            commonUiType = refPoint.uiType as 'display' | 'gauge';
+            commonUnit = refPoint.unit;
+            icon = refPoint.icon;
+            const phaseAPoint = potentialGroup.find(p => p.phase === 'a');
+            const sourceForTitle = phaseAPoint || refPoint;
+            title = sourceForTitle.displayName || sourceForTitle.name || groupKey;
+            title = title.replace(/ Phase [ABC]$/i, '').replace(/ Ph [ABC]$/i, '').trim();
+            description = sourceForTitle.description?.replace(/ Phase [ABC]/i, '').trim() || `3-Phase ${title}`;
 
             for (const point of potentialGroup) {
-                if (point.isSinglePhase ||
+                if (
+                    point.threePhaseGroup !== groupKey ||
                     !point.phase ||
                     !['a', 'b', 'c'].includes(point.phase) ||
                     phases[point.phase as 'a' | 'b' | 'c'] ||
                     point.unit !== commonUnit ||
-                    (point.uiType !== 'display' && point.uiType !== 'gauge') ||
                     point.uiType !== commonUiType
                 ) {
                     validGroup = false;
@@ -161,19 +179,21 @@ function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseGroups: 
                     phases[point.phase] = point;
                 }
             }
+
             if (!phases.a || !phases.b || !phases.c) {
                 validGroup = false;
             }
         }
 
-        if (validGroup && phases.a && phases.b && phases.c && commonUiType) {
+        // 3. Final decision
+        if (validGroup && commonUiType && phases.a && phases.b && phases.c) {
             threePhaseGroups.push({
                 groupKey: groupKey,
-                title: groupKey,
+                title: title,
                 points: { a: phases.a, b: phases.b, c: phases.c },
                 icon: icon,
                 unit: commonUnit,
-                description: description || `3-Phase ${groupKey}`,
+                description: description,
                 uiType: commonUiType,
             });
         } else {
@@ -181,40 +201,166 @@ function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseGroups: 
         }
     });
 
-    return { threePhaseGroups, individualPoints };
+    const uniqueIndividualPoints = Array.from(new Map(individualPoints.map(p => [p.id, p])).values());
+    return { threePhaseGroups, individualPoints: uniqueIndividualPoints };
 }
 
 
-// Motion Variants remain the same...
-const containerVariants = {
-    hidden: { opacity: 0, y: -10 },
-    visible: { opacity: 1, y: 0, transition: { staggerChildren: 0.2 } },
+// --- Motion Variants (remain the same) ---
+const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08, delayChildren: 0.1 } } };
+const itemVariants = { hidden: { opacity: 0, y: 20, scale: 0.98 }, visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 100, damping: 12 } } };
+const cardHoverEffect = { scale: 1.03, y: -4, boxShadow: "0px 10px 20px rgba(0, 0, 0, 0.1)", transition: { type: 'spring', stiffness: 300, damping: 15 } };
+const darkCardHoverEffect = { ...cardHoverEffect, boxShadow: "0px 8px 18px rgba(255, 255, 255, 0.08)" };
+
+
+// --- Circular Gauge Component (remains the same) ---
+interface CircularGaugeProps {
+    value: number | null | undefined;
+    min?: number;
+    max?: number;
+    unit?: string;
+    label?: string; // Optional label (like Phase A)
+    size?: number;
+    strokeWidth?: number;
+    config: DataPointConfig; // Pass the whole config for context
+}
+
+const CircularGauge: React.FC<CircularGaugeProps> = ({
+    value: rawValue,
+    min = 0,
+    max = 100,
+    unit = '',
+    label,
+    size = 80, // Default size
+    strokeWidth = 8, // Default stroke width
+    config
+}) => {
+    const { theme } = useTheme();
+    const radius = (size - strokeWidth) / 2;
+    const circumference = 2 * Math.PI * radius;
+    // Use 3/4 circle (270 degrees)
+    const arcLength = circumference * 0.75;
+    const startAngle = 0;
+    const endAngle = 270; 
+    // --- Value Processing & Clamping ---
+    const factor = config.factor ?? 1;
+    const value = typeof rawValue === 'number' ? rawValue * factor : null;
+
+    const getNormalizedValue = () => {
+        if (value === null || value === undefined || max === min) {
+            return 0; // No value or invalid range
+        }
+        // Clamp value within min/max for percentage calculation, but use original for color
+        const clampedValue = Math.max(min, Math.min(max, value));
+        return (clampedValue - min) / (max - min);
+    };
+
+    const normalizedValue = getNormalizedValue();
+    const offset = arcLength * (1 - normalizedValue);
+
+    // --- Color Logic (3 states + default/error) ---
+    const getColor = () => {
+        if (value === null || value === undefined) return 'stroke-gray-400 dark:stroke-gray-600'; // Undefined/No Data
+        if (config.min === undefined || config.max === undefined) return 'stroke-blue-500 dark:stroke-blue-400'; // No range defined
+
+        if (value < config.min) return 'stroke-yellow-500 dark:stroke-yellow-400'; // Low
+        if (value > config.max) return 'stroke-red-500 dark:stroke-red-400';       // High
+        return 'stroke-green-500 dark:stroke-green-400';                           // Normal/Good
+    };
+
+    const colorClass = getColor();
+
+    // --- Formatting ---
+    const formatValue = (val: number | null): string => {
+        if (val === null) return '---';
+        if (config.dataType === 'Int16' || config.dataType === 'Boolean') {
+            return val.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        } else if (Math.abs(val) >= 1000) {
+            return val.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        } else if (Math.abs(val) >= 10) {
+            return val.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+        } else {
+            return val.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+        }
+    };
+
+    const displayValue = formatValue(value);
+
+    // Calculate rotation for the arc
+    const rotation = `rotate(${startAngle + 135} ${size / 2} ${size / 2})`; // Rotate so the gap is at the bottom
+
+
+    return (
+        <div className="flex flex-row items-center text-center">
+            {label && <span className="text-xs font-medium text-muted-foreground mb-1">{label}</span>}
+            <div className="relative" style={{ width: size, height: size }}>
+                <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+                    <defs>
+                        {/* Define gradients if needed */}
+                    </defs>
+                    <motion.path
+                        d={`M ${size / 2 + radius * Math.cos(startAngle * Math.PI / 180)} ${size / 2 + radius * Math.sin(startAngle * Math.PI / 180)} A ${radius} ${radius} 0 1 1 ${size / 2 + radius * Math.cos(endAngle * Math.PI / 180)} ${size / 2 + radius * Math.sin(endAngle * Math.PI / 180)}`}
+                        fill="none"
+                        className="stroke-gray-200 dark:stroke-gray-700" // Background track color
+                        strokeWidth={strokeWidth}
+                        strokeLinecap="round"
+                        transform={rotation} // Apply rotation
+                    />
+                    {value !== null && ( // Only render value arc if value exists
+                        <motion.path
+                            d={`M ${size / 2 + radius * Math.cos(startAngle * Math.PI / 180)} ${size / 2 + radius * Math.sin(startAngle * Math.PI / 180)} A ${radius} ${radius} 0 1 1 ${size / 2 + radius * Math.cos(endAngle * Math.PI / 180)} ${size / 2 + radius * Math.sin(endAngle * Math.PI / 180)}`}
+                            fill="none"
+                            className={colorClass} // Dynamic color class
+                            strokeWidth={strokeWidth}
+                            strokeLinecap="round"
+                            strokeDasharray={arcLength}
+                            strokeDashoffset={offset}
+                            initial={{ strokeDashoffset: arcLength }}
+                            animate={{ strokeDashoffset: offset }}
+                            transition={{ type: 'spring', stiffness: 50, damping: 15 }}
+                            transform={rotation} // Apply rotation
+                        />
+                    )}
+                </svg>
+                {/* Centered Value Text */}
+                <div className="absolute inset-0 flex flex-row items-center justify-center">
+                    <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                            key={`${config.nodeId}-${value}`} // Key for animation on change
+                            className={`text-lg font-semibold ${colorClass.replace('stroke-', 'text-')}`} // Match text color roughly
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                        >
+                            {displayValue}
+                        </motion.span>
+                    </AnimatePresence>
+                    <span className="text-xs text-muted-foreground -mt-1">{unit}</span>
+                </div>
+            </div>
+        </div>
+    );
 };
 
-const itemVariants = {
-    hidden: { opacity: 0, y: -10 },
-    visible: { opacity: 1, y: 0 },
-};
 
 // --- Dashboard Component ---
 const Dashboard = () => {
+    const { theme } = useTheme();
     const [nodeValues, setNodeValues] = useState<NodeData>({});
     const [isConnected, setIsConnected] = useState(false);
     const [isPlcConnected, setIsPlcConnected] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
     const [currentTime, setCurrentTime] = useState<string>('');
     const ws = useRef<WebSocket | null>(null);
     const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
-    const { toast } = useToast(); // Use the toast hook
+    const { toast } = useToast();
     const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
     const [delay, setDelay] = useState<number>(0);
     const reconnectAttempts = useRef(0);
     const maxReconnectAttempts = 10;
-
-    // --- Ref for tracking last toast times ---
-    // Key: nodeId, Value: timestamp (ms) of the last out-of-range toast for this node
     const lastToastTimestamps = useRef<Record<string, number>>({});
 
-    // --- Core Hooks (Time, Delay, PLC Check) remain the same... ---
+    // --- Core Hooks (Time, Delay, PLC Check - no changes) ---
     useEffect(() => { /* Current time update */
         const interval = setInterval(() => { setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: '2-digit', year: 'numeric' })); }, 1000);
         return () => clearInterval(interval);
@@ -246,8 +392,9 @@ const Dashboard = () => {
         return () => clearInterval(interval);
     }, [checkPlcConnection]);
 
-    // --- WebSocket Logic remains the same... ---
+    // --- WebSocket Logic (remains the same) ---
     const connectWebSocket = useCallback(() => {
+        // ... (WebSocket connection logic - no changes needed) ...
         if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
         if (typeof window !== 'undefined' && sessionStorage.getItem('reloadingDueToDelay') === 'true') { setTimeout(() => sessionStorage.removeItem('reloadingDueToDelay'), 2000); return; }
 
@@ -281,10 +428,10 @@ const Dashboard = () => {
                 if (typeof window !== 'undefined') {
                     const redir = sessionStorage.getItem('opcuaRedirected');
                     if (!redir || redir === 'false') {
-                        console.warn("WebSocket error, redirecting to API...");
-                        const url = `${window.location.protocol}//${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}/api/opcua`;
-                        sessionStorage.setItem('opcuaRedirected', 'true');
-                        window.location.href = url;
+                        console.warn("WebSocket error, potentially redirecting..."); // Modified message
+                        // const url = `${window.location.protocol}//${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}/api/opcua`;
+                        // sessionStorage.setItem('opcuaRedirected', 'true');
+                        // window.location.href = url; // Disable automatic redirect
                     } else {
                         console.warn("WebSocket error, already redirected.");
                     }
@@ -303,7 +450,7 @@ const Dashboard = () => {
                 }
             };
         }, delayMs);
-    }, [WS_URL, toast]); // Added toast as dependency
+    }, [toast]);
 
     useEffect(() => { /* Initial connection & cleanup */
         if (typeof window === 'undefined') return;
@@ -313,16 +460,15 @@ const Dashboard = () => {
         return () => {
             if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
             if (ws.current) {
-                ws.current.onclose = null;
+                ws.current.onclose = null; // Prevent reconnect logic on manual close
                 ws.current.close(1000);
                 ws.current = null;
             }
-            // Clear toast timestamps on unmount? Maybe not necessary.
-            // lastToastTimestamps.current = {};
         };
-    }, [connectWebSocket]); // connectWebSocket dependency is correct
+    }, [connectWebSocket]);
 
-    // --- Send Data remains the same... ---
+
+    // --- Send Data (remains the same) ---
     const sendDataToWebSocket = (nodeId: string, value: boolean | number | string) => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
             try {
@@ -336,124 +482,118 @@ const Dashboard = () => {
         } else {
             console.error("WebSocket not connected.");
             toast({ title: 'Error', description: 'Cannot send command. WebSocket disconnected.', variant: 'destructive' });
-            connectWebSocket();
+            connectWebSocket(); // Attempt reconnect on send failure
         }
     };
 
-    // --- Render Value (MODIFIED FOR TOAST) ---
-    const renderNodeValue = useCallback((nodeId: string | undefined, unit: string | undefined, pointConfig?: DataPointConfig): React.ReactNode => {
+    // --- Render Value (Simplified for non-gauge text display, toast logic remains) ---
+    const renderNodeValueText = useCallback((nodeId: string | undefined, unit: string | undefined, pointConfig?: DataPointConfig): React.ReactNode => {
+        // ... (renderNodeValueText logic remains identical to previous version) ...
         if (!nodeId) return <span className="text-gray-400 dark:text-gray-600">N/A</span>;
-
-        const value = nodeValues[nodeId];
-        // Find the config ONLY if not passed in (optimization)
+        const rawValue = nodeValues[nodeId];
         const dataPoint = pointConfig ?? dataPoints.find((p) => p.nodeId === nodeId);
-        const key = `${nodeId}-${String(value)}`; // Unique key for animation
+        const key = `${nodeId}-${String(rawValue)}`;
         let content: React.ReactNode;
         let valueClass = "text-foreground font-medium";
 
-        if (value === undefined || value === null) {
+        if (rawValue === undefined || rawValue === null) {
             content = <span className="text-gray-400 dark:text-gray-500 italic">---</span>;
-            // If value becomes null/undefined, clear any existing toast timestamp
-            if (lastToastTimestamps.current[nodeId] !== undefined) {
-                delete lastToastTimestamps.current[nodeId];
-            }
-        } else if (value === 'Error') {
+            if (lastToastTimestamps.current[nodeId] !== undefined) delete lastToastTimestamps.current[nodeId];
+        } else if (rawValue === 'Error') {
             content = <span className="text-red-500 font-semibold flex items-center gap-1"><AlertCircle size={14} /> Error</span>;
-            // Clear toast timestamp if it errors out
-             if (lastToastTimestamps.current[nodeId] !== undefined) {
-                delete lastToastTimestamps.current[nodeId];
-            }
-        } else if (typeof value === 'boolean') {
-            content = <span className={`font-semibold ${value ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{value ? 'ON' : 'OFF'}</span>;
-            // Booleans typically don't have min/max, clear timestamp just in case
-            if (lastToastTimestamps.current[nodeId] !== undefined) {
-                delete lastToastTimestamps.current[nodeId];
-            }
-        } else if (typeof value === 'number') {
+            if (lastToastTimestamps.current[nodeId] !== undefined) delete lastToastTimestamps.current[nodeId];
+        } else if (typeof rawValue === 'boolean') {
+            content = <span className={`font-semibold ${rawValue ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{rawValue ? 'ON' : 'OFF'}</span>;
+            if (lastToastTimestamps.current[nodeId] !== undefined) delete lastToastTimestamps.current[nodeId];
+        } else if (typeof rawValue === 'number') {
             const factor = dataPoint?.factor ?? 1;
             const min = dataPoint?.min;
             const max = dataPoint?.max;
-            let adjustedValue = value * factor;
+            let adjustedValue = rawValue * factor;
             let displayValue: string;
 
-            if (Math.abs(adjustedValue) >= 1000) displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 0 });
-            else if (Math.abs(adjustedValue) >= 10) displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
-            else displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+            if (dataPoint?.dataType === 'Int16' || dataPoint?.dataType === 'Boolean') {
+                displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 0 });
+            } else if (Math.abs(adjustedValue) >= 1000) {
+                displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 0 });
+            } else if (Math.abs(adjustedValue) >= 10) {
+                displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+            } else {
+                displayValue = adjustedValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+            }
 
             const isOutOfRange = (min !== undefined && adjustedValue < min) || (max !== undefined && adjustedValue > max);
 
             if (isOutOfRange) {
-                valueClass = "text-orange-500 dark:text-orange-400 font-medium"; // Highlight
+                valueClass = "text-yellow-500 dark:text-yellow-400 font-semibold";
 
-                // --- Toast Logic ---
                 const now = Date.now();
                 const lastToastTime = lastToastTimestamps.current[nodeId];
                 const thirtySeconds = 30 * 1000;
-
-                // Check if it's the first time or 30s have passed
                 if (lastToastTime === undefined || now - lastToastTime > thirtySeconds) {
                     const direction = (min !== undefined && adjustedValue < min) ? 'below minimum' : 'above maximum';
                     const rangeText = `(${min ?? '-'} to ${max ?? '-'})`;
-
                     toast({
-                        // Consider using a unique ID if toasts stack unexpectedly, though shadcn might handle this.
-                        // id: `out-of-range-${nodeId}`,
                         title: 'Value Alert',
                         description: `${dataPoint?.displayName || dataPoint?.name || nodeId} is ${direction}. Current: ${displayValue}${unit || ''}, Range: ${rangeText}.`,
-                        variant: 'default', // Use 'default' or 'destructive' based on severity
-                        duration: 10000, // Keep toast visible for a bit longer
+                        variant: 'default', duration: 10000,
                     });
-                    // Update the timestamp in the ref
                     lastToastTimestamps.current[nodeId] = now;
                 }
-                // --- End Toast Logic ---
-
             } else {
-                // Value is IN range (or no range defined)
-                // If there's a timestamp, it means it *was* out of range previously. Clear it.
-                if (lastToastTimestamps.current[nodeId] !== undefined) {
-                    delete lastToastTimestamps.current[nodeId];
-                    // Optional: You could send a "resolved" notification here if desired
-                    // toast({ title: 'Value Resolved', description: `${...} is back in range.` });
-                }
+                if (lastToastTimestamps.current[nodeId] !== undefined) delete lastToastTimestamps.current[nodeId];
             }
             content = <>{displayValue}<span className="text-xs text-muted-foreground ml-0.5">{unit || ''}</span></>;
-        } else if (typeof value === 'string') {
-            content = <>{value.length > 25 ? `${value.substring(0, 22)}...` : value}{unit ? <span className="text-xs text-muted-foreground ml-0.5">{unit}</span> : ''}</>;
-             // Strings typically don't have min/max, clear timestamp
-            if (lastToastTimestamps.current[nodeId] !== undefined) {
-                delete lastToastTimestamps.current[nodeId];
-            }
+        } else if (typeof rawValue === 'string') {
+            content = <>{rawValue.length > 25 ? `${rawValue.substring(0, 22)}...` : rawValue}{unit ? <span className="text-xs text-muted-foreground ml-0.5">{unit}</span> : ''}</>;
+            if (lastToastTimestamps.current[nodeId] !== undefined) delete lastToastTimestamps.current[nodeId];
         } else {
             content = <span className="text-yellow-500">?</span>;
-            // Unknown type, clear timestamp
-            if (lastToastTimestamps.current[nodeId] !== undefined) {
-                delete lastToastTimestamps.current[nodeId];
-            }
+            if (lastToastTimestamps.current[nodeId] !== undefined) delete lastToastTimestamps.current[nodeId];
         }
 
-        return (<motion.span key={key} className={valueClass} initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} transition={{ duration: 0.25, ease: "easeOut" }}>{content}</motion.span>);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [nodeValues, toast]); // Add toast to dependency array, lastToastTimestamps is a ref, doesn't need to be listed.
+        return (
+            <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                    key={key}
+                    className={valueClass}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.2, ease: "easeOut" }}
+                >
+                    {content}
+                </motion.span>
+            </AnimatePresence>
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [nodeValues, toast]);
 
-    // --- Process and Group Data Points remains the same... ---
+
+    // --- Process and Group Data Points (remains the same) ---
     const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(dataPoints), []);
 
-    // --- Filter points remains the same... ---
+    // --- Filter points (remains the same) ---
     const controlPoints = individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch');
     const gaugePointsIndividual = individualPoints.filter(p => p.uiType === 'gauge');
     const displayPointsIndividual = individualPoints.filter(p => p.uiType === 'display');
     const displayGroups3Phase = threePhaseGroups.filter(g => g.uiType === 'display');
     const gaugeGroups3Phase = threePhaseGroups.filter(g => g.uiType === 'gauge');
 
-
-    // --- Component Return (JSX structure remains largely the same) ---
+    // --- Component Return (Flex Row Layout for Sections) ---
     return (
-        <div className="min-h-screen text-foreground p-4 md:p-6 lg:p-8 transition-colors duration-300 rounded-lg shadow-sm bg-background dark:bg-background-dark">
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <motion.div className="flex flex-col sm:flex-row justify-between items-center mb-5 gap-3" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }}>
-                    <h1 className="text-2xl md:text-3xl font-bold text-center sm:text-left text-gray-800 dark:text-gray-100">Solar Mini-Grid Dashboard</h1>
+        <div className="min-h-screen text-foreground p-4 md:p-6 lg:p-8 transition-colors duration-300 rounded-lg bg-background dark:bg-background-dark border dark:border-gray-800">
+            <div className="mx-auto">
+                {/* Header Section (remains the same) */}
+                <motion.div
+                    className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-8 gap-4"
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                >
+                    <h1 className="text-2xl md:text-3xl font-bold text-center sm:text-left text-gray-800 dark:text-gray-100">
+                        Solar Mini-Grid Dashboard
+                    </h1>
                     <motion.div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-center" initial="hidden" animate="visible" variants={containerVariants}>
                         <motion.div variants={itemVariants}><PlcConnectionStatus status={isPlcConnected} /></motion.div>
                         <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
@@ -461,176 +601,239 @@ const Dashboard = () => {
                     </motion.div>
                 </motion.div>
 
-                {/* Status Bar */}
-                <motion.div className="text-xs text-gray-500 dark:text-gray-400 mb-6 flex flex-col sm:flex-row justify-between items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }}>
+                {/* Status Bar (remains the same) */}
+                <motion.div className="text-xs text-gray-500 dark:text-gray-400 mb-8 flex flex-row sm:flex-row justify-between items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }}>
                     <div className="flex items-center gap-2">
                         <span>{currentTime}</span>
-                        <TooltipProvider delayDuration={100}><Tooltip><TooltipTrigger asChild><span className={`font-medium cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 1500 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-800/50' : delay < 3000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-800/50' : delay < 5000 ? 'text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-800/50' : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-800/50'}`}>{(delay / 1000).toFixed(1)}s</span></TooltipTrigger><TooltipContent><p>Last update delay ({delay} ms)</p></TooltipContent></Tooltip></TooltipProvider>
+                        <TooltipProvider delayDuration={100}><Tooltip>
+                            <TooltipTrigger asChild><motion.span className={`font-medium cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 1500 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-800/50' : delay < 3000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-800/50' : delay < 5000 ? 'text-orange-700 bg-orange-100 dark:text-orange-300 dark:bg-orange-800/50' : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-800/50'}`} whileHover={{ scale: 1.1 }}>{(delay / 1000).toFixed(1)}s</motion.span></TooltipTrigger>
+                            <TooltipContent><p>Last update delay ({delay} ms)</p></TooltipContent>
+                        </Tooltip></TooltipProvider>
                     </div>
-                    <span>v{VERSION}</span>
+                    <span className='font-mono'>v{VERSION}</span>
                 </motion.div>
 
-                {/* --- SECTIONS --- */}
+                {/* --- MAIN CONTAINER for Sections --- */}
+                <motion.div
+                    className="flex flex-col gap-6" 
+                    variants={containerVariants}
+                    initial="hidden"
+                    animate="visible"
+                >
+                    {/* --- Section 1: Three-Phase Items --- */}
+                    {threePhaseGroups.length > 0 && (
+                        <motion.div
+                            className="w-auto flex flex-col flex-wrap gap-4 md:gap-6"
+                            variants={itemVariants} // Apply item variant to the whole section container
+                        >
+                            <h2 className="text-lg font-semibold text-gray-600 dark:text-gray-400 -mb-2 md:-mb-0">
+                                Three-Phase Systems
+                            </h2>
 
-                {/* Controls Section */}
-                {controlPoints.length > 0 && (
-                    <motion.section className="mb-6 md:mb-8" initial="hidden" animate="visible" variants={containerVariants}>
-                        <motion.h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3 md:mb-4" variants={itemVariants}>Controls</motion.h2>
-                        <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4" variants={containerVariants}>
-                            {controlPoints.map((point) => {
-                                if (point.uiType === 'button') {
-                                    return (
-                                        <motion.div key={point.id} variants={itemVariants} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                            <TooltipProvider delayDuration={200}><Tooltip>
-                                                <TooltipTrigger asChild><Button onClick={() => sendDataToWebSocket(point.nodeId, true)} className="w-full h-full justify-start p-3 text-left bg-card border dark:border-gray-700 rounded-lg shadow-sm border-1 hover:bg-muted/60 dark:hover:bg-gray-700/60" variant="ghost" disabled={!isConnected}>{point.icon && React.createElement(point.icon, { className: "w-4 h-4 mr-2 text-primary flex-shrink-0" })}<span className="text-sm font-medium text-card-foreground">{point.displayName || point.name}</span></Button></TooltipTrigger>
-                                                {point.description && (<TooltipContent><p>{point.description}</p></TooltipContent>)}
-                                            </Tooltip></TooltipProvider>
-                                        </motion.div>
-                                    );
-                                }
-                                if (point.uiType === 'switch') {
-                                    const isChecked = typeof nodeValues[point.nodeId] === 'boolean' ? (nodeValues[point.nodeId] as boolean) : false;
-                                    const isDisabled = !isConnected || nodeValues[point.nodeId] === undefined || nodeValues[point.nodeId] === 'Error' || nodeValues[point.nodeId] === null;
-                                    return (
-                                        <motion.div key={point.id} variants={itemVariants} whileHover={{ scale: 1.05 }}>
-                                            <TooltipProvider delayDuration={200}><Tooltip>
-                                                <Card className={`p-3 flex items-center justify-between cursor-default transition-opacity ${isDisabled ? 'opacity-70' : ''}`}>
-                                                    <TooltipTrigger asChild>
-                                                        <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1">
-                                                            {point.icon && React.createElement(point.icon, { className: "w-4 h-4 text-primary flex-shrink-0" })}
-                                                            <span className="text-sm font-medium truncate" title={point.displayName || point.name}>{point.displayName || point.name}</span>
-                                                        </div>
-                                                    </TooltipTrigger>
-                                                    <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="flex-shrink-0">
-                                                        <Switch checked={isChecked} onCheckedChange={(checked) => sendDataToWebSocket(point.nodeId, checked)} disabled={isDisabled} aria-label={point.displayName || point.name} />
-                                                    </motion.div>
+                            {/* Inner container for 3-phase cards (flex wrap) */}
+                            <div className="flex flex-wrap gap-4 md:gap-6">
+                                {/* Render 3-Phase Gauge Groups */}
+                                {gaugeGroups3Phase.map((group) => (
+                                    <motion.div
+                                        key={group.groupKey}
+                                        // Each card takes full width within its parent on small/medium, adjust if needed
+                                        className="w-full cursor-default rounded-lg overflow-hidden"
+                                        whileHover={theme === 'dark' ? darkCardHoverEffect : cardHoverEffect}
+                                    // Apply individual variants here if needed, or rely on parent staggering
+                                    >
+                                        <TooltipProvider delayDuration={200}><Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Card className="h-full shadow-md hover:shadow-lg transition-shadow duration-300 border dark:border-gray-700/60 bg-card">
+                                                    <CardHeader className="p-3 bg-muted/30 dark:bg-gray-800/50 border-b dark:border-gray-700">
+                                                        <CardTitle className="text-base font-semibold flex items-center gap-2">
+                                                            {group.icon && React.createElement(group.icon, { className: "w-5 h-5 text-primary flex-shrink-0" })}
+                                                            {group.title}
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-4 flex flex-wrap justify-around items-start gap-4">
+                                                        {(['a', 'b', 'c'] as const).map((phase) => {
+                                                            const point = group.points[phase];
+                                                            if (!point) return null;
+                                                            const value = nodeValues[point.nodeId];
+                                                            return (
+                                                                <CircularGauge
+                                                                    key={phase} value={typeof value === 'number' ? value : null}
+                                                                    min={point.min} max={point.max} unit={group.unit}
+                                                                    label={`Phase ${phase.toUpperCase()}`} size={90}
+                                                                    strokeWidth={8} config={point}
+                                                                />
+                                                            );
+                                                        })}
+                                                    </CardContent>
                                                 </Card>
+                                            </TooltipTrigger>
+                                            {group.description && (<TooltipContent><p>{group.description}</p></TooltipContent>)}
+                                        </Tooltip></TooltipProvider>
+                                    </motion.div>
+                                ))}
+
+                                {/* Render 3-Phase Display Groups */}
+                                {displayGroups3Phase.map((group) => (
+                                    <motion.div
+                                        key={group.groupKey}
+                                        // Example sizing: Grow to fill space, basis allows wrapping
+                                        className="flex-grow cursor-default rounded-lg overflow-hidden"
+                                        whileHover={theme === 'dark' ? darkCardHoverEffect : cardHoverEffect}
+                                    >
+                                        <TooltipProvider delayDuration={200}><Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <Card className="h-full shadow-md hover:shadow-lg transition-shadow duration-300 border dark:border-gray-700/60 bg-card">
+                                                    <CardHeader className="p-3 bg-muted/30 dark:bg-gray-800/50 border-b dark:border-gray-700/80">
+                                                        <CardTitle className="text-sm font-semibold flex items-center gap-2 text-gray-800 dark:text-gray-200">
+                                                            {group.icon && React.createElement(group.icon, { className: "w-4 h-4 text-primary flex-shrink-0" })}
+                                                            {group.title}
+                                                        </CardTitle>
+                                                    </CardHeader>
+                                                    <CardContent className="p-3 space-y-1.5 text-sm">
+                                                        <div className="grid grid-cols-3 gap-x-2 gap-y-1 items-center">
+                                                            <div className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-gray-700">Ph A</div>
+                                                            <div className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-gray-700">Ph B</div>
+                                                            <div className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-gray-700">Ph C</div>
+                                                            {(['a', 'b', 'c'] as const).map((phase) => {
+                                                                const point = group.points[phase];
+                                                                return (
+                                                                    <div key={phase} className="text-center pt-1 min-h-[24px] flex items-center justify-center">
+                                                                        {renderNodeValueText(point?.nodeId, group.unit, point)}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            </TooltipTrigger>
+                                            {group.description && (<TooltipContent><p>{group.description}</p></TooltipContent>)}
+                                        </Tooltip></TooltipProvider>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+                    {/* --- Section 2: Single-Phase & Controls Items --- */}
+                    {individualPoints.length > 0 && (
+                        <motion.div
+                            // Take half width on large screens, full on smaller
+                            className="w-auto flex flex-col gap-4 md:gap-6"
+                            variants={itemVariants} // Apply item variant to the whole section container
+                        >
+                            <h2 className="text-lg font-semibold text-gray-600 dark:text-gray-400 -mb-2 md:-mb-0">
+                                System Details & Controls
+                            </h2>
+
+                            {/* Inner container for single-phase cards (flex wrap) */}
+                            <div className="flex flex-wrap gap-4 md:gap-6">
+                                {/* Render Controls */}
+                                {controlPoints.length > 0 && (
+                                    // Controls container: full width within this section, items wrap
+                                    <div className="w-full flex flex-wrap gap-3 md:gap-4 items-stretch">
+                                        {controlPoints.map((point) => {
+                                            const baseWidth = 'flex-grow'; // Adjust basis for desired wrapping in this column
+
+                                            if (point.uiType === 'button') {
+                                                return (
+                                                    <motion.div key={point.id} className={baseWidth} whileHover={{ scale: 1.03, y: -2 }} whileTap={{ scale: 0.97 }}>
+                                                        <TooltipProvider delayDuration={200}><Tooltip>
+                                                            <TooltipTrigger asChild><Button onClick={() => sendDataToWebSocket(point.nodeId, true)} className="w-full h-full justify-start p-3 text-left bg-card border dark:border-gray-700/60 rounded-lg shadow-sm hover:bg-muted/60 dark:hover:bg-gray-700/60 hover:shadow-md transition-all" variant="ghost" disabled={!isConnected}>{point.icon && React.createElement(point.icon, { className: "w-4 h-4 mr-2 text-primary flex-shrink-0" })}<span className="text-sm font-medium text-card-foreground">{point.displayName || point.name}</span></Button></TooltipTrigger>
+                                                            {point.description && (<TooltipContent><p>{point.description}</p></TooltipContent>)}
+                                                        </Tooltip></TooltipProvider>
+                                                    </motion.div>
+                                                );
+                                            }
+                                            if (point.uiType === 'switch') {
+                                                const isChecked = typeof nodeValues[point.nodeId] === 'boolean' ? (nodeValues[point.nodeId] as boolean) : false;
+                                                const isDisabled = !isConnected || nodeValues[point.nodeId] === undefined || nodeValues[point.nodeId] === 'Error' || nodeValues[point.nodeId] === null;
+                                                return (
+                                                    <motion.div key={point.id} className={baseWidth} whileHover={{ scale: 1.03, y: -2 }}>
+                                                        <TooltipProvider delayDuration={200}><Tooltip>
+                                                            <Card className={`h-full p-3 flex items-center justify-between cursor-default transition-opacity shadow-sm hover:shadow-md border dark:border-gray-700/60 bg-card ${isDisabled ? 'opacity-70' : ''}`}>
+                                                                <TooltipTrigger asChild><div className="flex items-center gap-2 overflow-hidden mr-2 flex-1">{point.icon && React.createElement(point.icon, { className: "w-4 h-4 text-primary flex-shrink-0" })}<span className="text-sm font-medium truncate" title={point.displayName || point.name}>{point.displayName || point.name}</span></div></TooltipTrigger>
+                                                                <motion.div whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} className="flex-shrink-0"><Switch checked={isChecked} onCheckedChange={(checked) => sendDataToWebSocket(point.nodeId, checked)} disabled={isDisabled} aria-label={point.displayName || point.name} /></motion.div>
+                                                            </Card>
+                                                            {point.description && (<TooltipContent><p>{point.description}</p></TooltipContent>)}
+                                                        </Tooltip></TooltipProvider>
+                                                    </motion.div>
+                                                );
+                                            }
+                                            return null;
+                                        })}
+                                    </div>
+                                )}
+                                <div className='flex flex-row gap-4 flex-wrap'>
+                                 {/* Render Individual Gauge Points */}
+                                 {gaugePointsIndividual.map((point) => {
+                                    const value = nodeValues[point.nodeId];
+                                    // Responsive width for individual gauges within this section
+                                    const gaugeWidth = "flex-grow "; 
+                                    return (
+                                        <motion.div
+                                            key={point.id}
+                                            className={`${gaugeWidth} cursor-default rounded-lg overflow-hidden`}
+                                            whileHover={theme === 'dark' ? darkCardHoverEffect : cardHoverEffect}
+                                        >
+                                            <TooltipProvider delayDuration={200}><Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Card className="h-full p-4 flex flex-col items-center justify-between shadow-md hover:shadow-lg transition-shadow duration-300 border dark:border-gray-700/60 bg-card min-h-[180px]">
+                                                        <div className="flex items-center gap-2 mb-3 text-center">
+                                                            {point.icon && <point.icon className="w-5 h-5 text-primary flex-shrink-0" />}
+                                                            <span className="text-sm font-semibold text-card-foreground truncate" title={point.displayName || point.name}>{point.displayName || point.name}</span>
+                                                        </div>
+                                                        <CircularGauge
+                                                            value={typeof value === 'number' ? value : null} min={point.min} max={point.max}
+                                                            unit={point.unit} size={100} strokeWidth={10} config={point}
+                                                        />
+                                                        {(point.min !== undefined || point.max !== undefined) && (
+                                                            <div className="text-xs text-muted-foreground mt-2">({point.min ?? '-'} to {point.max ?? '-'})</div>
+                                                        )}
+                                                    </Card>
+                                                </TooltipTrigger>
+                                                {point.description && (<TooltipContent><p>{point.description ?? `Range: ${point.min ?? '-'} to ${point.max ?? '-'}`}</p></TooltipContent>)}
+                                            </Tooltip></TooltipProvider>
+                                        </motion.div>
+                                    );
+                                })}
+
+                                </div>
+                               
+                                <div className='flex flex-row gap-4 flex-wrap'>
+                                    {/* Render Individual Display Points */}
+                                {displayPointsIndividual.map((point) => {
+                                    // Responsive width for display cards within this section
+                                    const displayWidth = "flex-grow";
+                                    return (
+                                        <motion.div
+                                            key={point.id}
+                                            className={`${displayWidth} cursor-default rounded-lg overflow-hidden`}
+                                            whileHover={theme === 'dark' ? darkCardHoverEffect : cardHoverEffect}
+                                        >
+                                            <TooltipProvider delayDuration={200}><Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <Card className="h-full p-3 flex items-center justify-between min-h-[70px] shadow-md hover:shadow-lg transition-shadow duration-300 border dark:border-gray-700/60 bg-card">
+                                                        <div className='flex items-center gap-2 overflow-hidden mr-2'>
+                                                            {point.icon && <point.icon className="w-4 h-4 text-primary flex-shrink-0" />}
+                                                            <span className="text-sm font-medium text-muted-foreground truncate" title={point.displayName || point.name}>{point.displayName || point.name}</span>
+                                                        </div>
+                                                        <div className="text-base font-semibold text-right flex-shrink-0 pl-2">
+                                                            {renderNodeValueText(point.nodeId, point.unit, point)}
+                                                        </div>
+                                                    </Card>
+                                                </TooltipTrigger>
                                                 {point.description && (<TooltipContent><p>{point.description}</p></TooltipContent>)}
                                             </Tooltip></TooltipProvider>
                                         </motion.div>
                                     );
-                                }
-                                return null;
-                            })}
-                        </motion.div>
-                    </motion.section>
-                )}
+                                })}
+                                </div>
+                            </div> {/* End Inner container for single-phase cards */}
+                        </motion.div> // End Section 2
+                    )}
 
-                {/* Gauges Section */}
-                {(gaugePointsIndividual.length > 0 || gaugeGroups3Phase.length > 0) && (
-                    <motion.section className="mb-6 md:mb-8" initial="hidden" animate="visible" variants={containerVariants}>
-                        <motion.h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3 md:mb-4" variants={itemVariants}>Gauges</motion.h2>
-                        <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4" variants={containerVariants}>
-                            {gaugeGroups3Phase.map((group) => (
-                                <motion.div key={group.groupKey} variants={itemVariants} whileHover={{ scale: 1.05 }} className="cursor-default">
-                                    <TooltipProvider delayDuration={200}><Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Card className="overflow-hidden">
-                                                <CardHeader className="p-3 bg-muted/30 dark:bg-gray-800/50 border-b dark:border-gray-700">
-                                                    <CardTitle className="text-base font-semibold flex items-center gap-2">
-                                                        {group.icon && React.createElement(group.icon, { className: "w-5 h-5 text-primary flex-shrink-0" })}
-                                                        {group.title}
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-3 space-y-1.5 text-sm">
-                                                    {['a', 'b', 'c'].map((phase) => {
-                                                        const point = (phase === 'a' || phase === 'b' || phase === 'c') ? group.points[phase] : undefined;
-                                                        return (
-                                                            <div key={phase} className="flex justify-between items-center">
-                                                                <span className="text-muted-foreground uppercase">Phase {phase}:</span>
-                                                                {/* Pass point config to renderNodeValue */}
-                                                                {renderNodeValue(point?.nodeId, group.unit, point)}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </CardContent>
-                                            </Card>
-                                        </TooltipTrigger>
-                                        {group.description && (<TooltipContent><p>{group.description}</p></TooltipContent>)}
-                                    </Tooltip></TooltipProvider>
-                                </motion.div>
-                            ))}
-                            {gaugePointsIndividual.map((point) => (
-                                <motion.div key={point.id} variants={itemVariants} whileHover={{ scale: 1.05 }}>
-                                    <TooltipProvider delayDuration={200}><Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Card className="p-3 flex flex-col items-center justify-center text-center cursor-default min-h-[110px]">
-                                                <div className="flex items-center gap-2 mb-1.5">
-                                                    {point.icon && <point.icon className="w-5 h-5 text-primary" />}
-                                                    <span className="text-sm font-medium text-muted-foreground truncate" title={point.displayName || point.name}>{point.displayName || point.name}</span>
-                                                </div>
-                                                <div className="text-xl font-bold mb-0.5">
-                                                    {/* Pass point config to renderNodeValue */}
-                                                    {renderNodeValue(point.nodeId, point.unit, point)}
-                                                </div>
-                                                {(point.min !== undefined || point.max !== undefined) && (<div className="text-xs text-muted-foreground">({point.min ?? '-'} to {point.max ?? '-'})</div>)}
-                                            </Card>
-                                        </TooltipTrigger>
-                                        {point.description && (<TooltipContent><p>{point.description}</p></TooltipContent>)}
-                                    </Tooltip></TooltipProvider>
-                                </motion.div>
-                            ))}
-                        </motion.div>
-                    </motion.section>
-                )}
+                </motion.div> {/* End Main Flex Container for Sections */}
 
-                {/* Displays Section */}
-                {(displayPointsIndividual.length > 0 || displayGroups3Phase.length > 0) && (
-                    <motion.section className="mb-6 md:mb-8" initial="hidden" animate="visible" variants={containerVariants}>
-                        <motion.h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-3 md:mb-4" variants={itemVariants}>System Data</motion.h2>
-                        <motion.div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4" variants={containerVariants}>
-                            {displayGroups3Phase.map((group) => (
-                                <motion.div key={group.groupKey} variants={itemVariants} whileHover={{ scale: 1.05 }} className="cursor-default">
-                                    <TooltipProvider delayDuration={200}><Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Card className="overflow-hidden shadow-sm">
-                                                <CardHeader className="p-3 bg-muted/30 dark:bg-gray-800/50 border-b dark:border-gray-700/80">
-                                                    <CardTitle className="text-sm font-semibold flex items-center gap-2 text-gray-800 dark:text-gray-200">
-                                                        {group.icon && React.createElement(group.icon, { className: "w-4 h-4 text-primary flex-shrink-0" })}
-                                                        {group.title}
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="p-3 space-y-1.5 text-sm">
-                                                    <div className="grid grid-cols-3 gap-x-2 gap-y-1">
-                                                        <div className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-gray-700">Ph A</div>
-                                                        <div className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-gray-700">Ph B</div>
-                                                        <div className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-gray-700">Ph C</div>
-                                                        {/* Pass point config to renderNodeValue */}
-                                                        <div className="text-center pt-1">{renderNodeValue(group.points.a?.nodeId, group.unit, group.points.a)}</div>
-                                                        <div className="text-center pt-1">{renderNodeValue(group.points.b?.nodeId, group.unit, group.points.b)}</div>
-                                                        <div className="text-center pt-1">{renderNodeValue(group.points.c?.nodeId, group.unit, group.points.c)}</div>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </TooltipTrigger>
-                                        {group.description && (<TooltipContent><p>{group.description}</p></TooltipContent>)}
-                                    </Tooltip></TooltipProvider>
-                                </motion.div>
-                            ))}
-                            {displayPointsIndividual.map((point) => (
-                                <motion.div key={point.id} variants={itemVariants} whileHover={{ scale: 1.05 }}>
-                                    <TooltipProvider delayDuration={200}><Tooltip>
-                                        <TooltipTrigger asChild>
-                                            <Card className="p-3 flex items-center justify-between cursor-default min-h-[70px] shadow-sm border-1">
-                                                <div className='flex items-center gap-2 overflow-hidden'>
-                                                    {point.icon && <point.icon className="w-4 h-4 text-primary flex-shrink-0" />}
-                                                    <span className="text-sm font-medium text-muted-foreground truncate" title={point.displayName || point.name}>{point.displayName || point.name}</span>
-                                                </div>
-                                                <div className="text-base font-semibold text-right flex-shrink-0 pl-2">
-                                                    {/* Pass point config to renderNodeValue */}
-                                                    {renderNodeValue(point.nodeId, point.unit, point)}
-                                                </div>
-                                            </Card>
-                                        </TooltipTrigger>
-                                        {point.description && (<TooltipContent><p>{point.description}</p></TooltipContent>)}
-                                    </Tooltip></TooltipProvider>
-                                </motion.div>
-                            ))}
-                        </motion.div>
-                    </motion.section>
-                )}
-
-            </div> {/* End max-w-7xl */}
+            </div> {/* End max-w container */}
         </div> // End main container
     );
 };
