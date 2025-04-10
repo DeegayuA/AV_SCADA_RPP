@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useEffect } from 'react';
 import router from 'next/router';
+import { useRouter } from 'next/navigation';
+
+
 
 export default function Home() {
-
+  const router = useRouter();
    useEffect(() => {
       const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
   
