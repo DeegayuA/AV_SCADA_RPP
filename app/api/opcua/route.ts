@@ -7,8 +7,8 @@ import {
   AttributeIds,
   MessageSecurityMode,
   SecurityPolicy,
-  DataType, // <-- Import DataType
-  DataValue, // <-- Import DataValue
+  DataType, 
+  DataValue,
 } from "node-opcua";
 import { WebSocketServer, WebSocket } from "ws";
 import { NextRequest, NextResponse } from 'next/server';
@@ -18,9 +18,9 @@ const KEEP_OPCUA_ALIVE = true;
 
 let endpointUrl: string;
 const POLLING_INTERVAL = 500;
-const RECONNECT_DELAY = 5000;
+const RECONNECT_DELAY = 2000;
 const SESSION_TIMEOUT = 60000; // Increased session timeout
-const WEBSOCKET_HEARTBEAT_INTERVAL = 30000; // 30 seconds
+const WEBSOCKET_HEARTBEAT_INTERVAL = 3000; // 3 seconds
 
 let opcuaClient: OPCUAClient | null = null;
 let opcuaSession: ClientSession | null = null;
@@ -210,7 +210,7 @@ async function createSessionAndStartPolling() {
       attemptReconnect("session_closed");
     });
     opcuaSession.on("keepalive", (state: string) => {
-      // console.log("OPC UA session keepalive state:", state);
+      console.log("OPC UA session keepalive state:", state);
     });
     opcuaSession.on("keepalive_failure", (state: string | Error) => {
       console.error("OPC UA session keepalive failure:", state);
@@ -230,7 +230,7 @@ async function createSessionAndStartPolling() {
 
 function startDataPolling() {
   if (dataInterval) {
-    // console.log("Polling already running.");
+    console.log("Polling already running.");
     return;
   }
    if (!opcuaSession) {
@@ -246,7 +246,7 @@ function startDataPolling() {
       console.log("No active session found during poll cycle, stopping polling.");
       stopDataPolling();
       // Optionally attempt reconnect here if session disappeared unexpectedly
-      // attemptReconnect("session_missing_during_poll");
+      attemptReconnect("session_missing_during_poll");
       return;
     }
 
@@ -257,7 +257,7 @@ function startDataPolling() {
       }));
 
       if(nodesToRead.length === 0) {
-        // console.log("No nodes configured to monitor."); // Avoid polling if nothing to read
+        console.log("No nodes configured to monitor."); // Avoid polling if nothing to read
         return;
       }
 
@@ -285,7 +285,7 @@ function startDataPolling() {
              readSuccess = true;
          } else {
             // Log specific error status if available
-            // console.warn(`Failed to read NodeId ${nodeId}: ${dataValue.statusCode.toString()}`);
+            console.warn(`Failed to read NodeId ${nodeId}: ${dataValue.statusCode.toString()}`);
             newValue = "Error"; // Indicate read failure
          }
 

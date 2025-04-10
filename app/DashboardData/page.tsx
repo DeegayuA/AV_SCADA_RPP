@@ -429,9 +429,9 @@ const Dashboard = () => {
                     const redir = sessionStorage.getItem('opcuaRedirected');
                     if (!redir || redir === 'false') {
                         console.warn("WebSocket error, potentially redirecting..."); // Modified message
-                        // const url = `${window.location.protocol}//${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}/api/opcua`;
-                        // sessionStorage.setItem('opcuaRedirected', 'true');
-                        // window.location.href = url; // Disable automatic redirect
+                        const url = `${window.location.protocol}//${window.location.hostname}:${window.location.port || (window.location.protocol === 'https:' ? '443' : '80')}/api/opcua`;
+                        sessionStorage.setItem('opcuaRedirected', 'true');
+                        window.location.href = url; // Disable automatic redirect
                     } else {
                         console.warn("WebSocket error, already redirected.");
                     }
