@@ -5,27 +5,26 @@ import { ArrowRight, Sun } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { useEffect } from 'react';
-import router from 'next/router';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-
-
 
 export default function Home() {
   const router = useRouter();
-   useEffect(() => {
-      const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
-  
-      if (hasVisitedBefore) {
-        router.push('/dashboard'); // Change to your actual dashboard route
-      } else {
-        localStorage.setItem('hasVisitedBefore', 'true');
-        setIsLoading(true);
-      }
-    }, []);
+  const [isLoading, setIsLoading] = useState(false); // Initialize isLoading state
 
+  useEffect(() => {
+    const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
 
-    
+    if (hasVisitedBefore) {
+      router.push('/dashboard'); // Change to your actual dashboard route
+    } else {
+      localStorage.setItem('hasVisitedBefore', 'true');
+      // Optionally, you can add a delay or other logic here before potentially redirecting
+      // For now, the user will see the landing page on their first visit.
+      // If you want to redirect new users as well, you can add router.push('/dashboard'); here.
+    }
+  }, [router]); // Add router to the dependency array
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <motion.div
@@ -70,7 +69,3 @@ export default function Home() {
     </div>
   );
 }
-function setIsLoading(arg0: boolean) {
-  throw new Error('Function not implemented.');
-}
-

@@ -19,7 +19,7 @@ const KEEP_OPCUA_ALIVE = true;
 let endpointUrl: string;
 const POLLING_INTERVAL = 500;
 const RECONNECT_DELAY = 2000;
-const SESSION_TIMEOUT = 60000; // Increased session timeout
+const SESSION_TIMEOUT = 60000; 
 const WEBSOCKET_HEARTBEAT_INTERVAL = 3000; // 3 seconds
 
 let opcuaClient: OPCUAClient | null = null;

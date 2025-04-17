@@ -3,113 +3,127 @@ import { OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE } from '@/config/consta
 import { NextResponse } from 'next/server';
 
 let client: OPCUAClient | null = null;
-let session: ClientSession | null = null; // Keep track of the session
+let session: ClientSession | null = null;
 let subscription: ClientSubscription | null = null;
-let currentConnectionStatus: 'offline' | 'online' | 'disconnected' = 'disconnected'; // Store the current status
-let isConnecting = false; // Prevent concurrent connection attempts
+let currentConnectionStatus: 'offline' | 'online' | 'disconnected' = 'disconnected';
+let isConnecting = false;
+let connectionCheckInterval: NodeJS.Timeout | null = null;
 
-const MAX_RETRIES = 3; // Reduced retries for faster feedback if offline fails
-const RETRY_BACKOFF = [1500, 3000, 6000]; // Adjusted backoff times
+const MAX_RETRIES = 3;
+const RETRY_BACKOFF = [1500, 3000, 6000];
+const CONNECTION_CHECK_INTERVAL = 5000; // Check connection every 5 seconds
 
-// --- Helper function to attempt connection and session creation ---
 const tryConnectAndCreateSession = async (endpoint: string): Promise<ClientSession | null> => {
     if (!client) {
-        console.log("Creating new OPC UA client instance.");
+        // console.log("Creating new OPC UA client instance.");
         client = OPCUAClient.create({
-            endpointMustExist: false, // Allow connection even if endpoint is initially unavailable
+            endpointMustExist: false,
             keepSessionAlive: true,
-            connectionStrategy: { // Manage retries internally somewhat, though we add our own layer
-                maxRetry: 1, // We handle the main retry logic
+            connectionStrategy: {
+                maxRetry: 1,
                 initialDelay: 1000,
                 maxDelay: 5000
             },
-            securityMode: MessageSecurityMode.None, // Adjust if security is needed
-            securityPolicy: SecurityPolicy.None,   // Adjust if security is needed
-            // requestedSessionTimeout: 60000, // Optional: Longer timeout
+            securityMode: MessageSecurityMode.None,
+            securityPolicy: SecurityPolicy.None,
         });
 
-        // Basic event listeners for debugging
-        client.on("backoff", (retry, delay) => console.log(`Client backoff: retry ${retry}, delay ${delay}ms`));
-        client.on("connection_reestablished", () => console.log("Client connection re-established."));
-        client.on("connection_lost", () => console.log("Client connection lost."));
-        client.on("start_reconnection", () => console.log("Client starting reconnection..."));
-        client.on("reconnection_attempt_has_failed", (error, endpointUrl) => console.error(`Client reconnection attempt failed for ${endpointUrl}:`, error?.message));
-
+        client.on("backoff", (retry, delay) => /* console.log(`Client backoff: retry ${retry}, delay ${delay}ms`) */ {});
+        client.on("connection_reestablished", () => {
+            // console.log("Client connection re-established.");
+            // Ensure subscription is recreated after re-establishment
+            createSubscriptionIfNotExist();
+        });
+        client.on("connection_lost", () => {
+            // console.log("Client connection lost.");
+            currentConnectionStatus = 'disconnected';
+            // No need to explicitly call connectOPC here as the client's connectionStrategy will handle it
+        });
+        client.on("start_reconnection", () => /* console.log("Client starting reconnection...") */ {});
+        client.on("reconnection_attempt_has_failed", (error: Error, endpointUrl: string) => {
+            console.error(`Client reconnection attempt failed for ${endpointUrl}:`, error.message);
+        });
     }
 
     try {
-        console.log(`Attempting to connect client to ${endpoint}`);
-        // Disconnect if connected to a *different* endpoint or if session is invalid
-        if (session && (!session.isOpen() || client.endpointUrl !== endpoint)) {
-             console.log(`Session invalid or endpoint mismatch. Disconnecting before reconnecting to ${endpoint}`);
-             await disconnectOPC(); // Use a dedicated disconnect function
-        } else if (!session && client.endpointUrl) {
-             // Client might exist but no session, ensure clean state
-             console.log("Client exists but no session. Disconnecting client.");
-             await client.disconnect();
+        // console.log(`Attempting to connect client to ${endpoint}`);
+        if (session && (!session.sessionId || client?.endpointUrl !== endpoint)) {
+            // console.log(`Session invalid or endpoint mismatch. Disconnecting before reconnecting to ${endpoint}`);
+            await disconnectOPC();
+        } else if (!session && client?.endpointUrl && !client.isReconnecting) {
+            // console.log("Client exists but no session. Closing existing connection.");
+            await client.disconnect();
         }
 
-        // Only connect if not already connected to the desired endpoint
-        if (client.endpointUrl !== endpoint) {
-             await client.connect(endpoint);
-             console.log(`Client connected to ${endpoint}`);
-        } else {
-             console.log(`Client already connected to ${endpoint}.`);
+        if (client?.isReconnecting || client?.endpointUrl !== endpoint) {
+            await client.connect(endpoint);
+            // console.log(`Client connected to ${endpoint}`);
         }
 
-
-        console.log("Creating session...");
+        // console.log("Creating session...");
         session = await client.createSession();
-        console.log("Session created successfully.");
+        // console.log("Session created successfully.");
+        // console.log(`Session created successfully for endpoint: ${endpoint}`); // Log the endpoint instead of assigning it
 
-         // Optional: Clean up old subscription if it exists and belongs to a closed session
-         if (subscription && subscription.session.hasEnded()) {
-             console.log("Cleaning up old subscription from closed session.");
-             // No explicit cleanup needed if session is gone, but good practice to nullify
-             subscription = null;
-         }
+        await createSubscriptionIfNotExist();
 
-
-        // Recreate subscription if needed (or if it belongs to a different session)
-        if (!subscription || subscription.session !== session) {
-            console.log("Creating subscription...");
-            subscription = await session.createSubscription2({
-                requestedPublishingInterval: 1000,
-                requestedLifetimeCount: 600, // 10 minutes lifetime
-                requestedMaxKeepAliveCount: 10, // 10 seconds keep-alive
-                maxNotificationsPerPublish: 100,
-                publishingEnabled: true,
-                priority: 10,
-            });
-            console.log("Subscription created.");
-
-            subscription.on("keepalive", () => console.log("Subscription keepalive"));
-            subscription.on("terminated", () => {
-                console.log("Subscription terminated.");
-                subscription = null; // Clear subscription reference
-            });
-        }
-
-
-        return session; // Return the created session
-
+        return session;
     } catch (error: any) {
         console.error(`Error connecting or creating session for ${endpoint}:`, error.message);
-        // Clean up potentially partially connected state
-        if (session && !session.isOpen()) session = null;
-        // Don't disconnect the client here, let the outer logic handle retries/fallback
-        return null; // Indicate failure
+        if (session && !session.sessionId) session = null;
+        return null;
     }
 };
 
-// --- Dedicated Disconnect Function ---
+const createSubscriptionIfNotExist = async (): Promise<void> => {
+    if (session && (!subscription || subscription.session !== session || !subscription.subscriptionId)) {
+        if (subscription && subscription.subscriptionId) {
+            // console.log("Cleaning up existing subscription before creating a new one.");
+            try {
+                await subscription.terminate();
+            } catch (error) {
+                console.warn("Error terminating old subscription:", error);
+            }
+            subscription = null;
+        }
+        // console.log("Creating subscription...");
+        subscription = await session.createSubscription2({
+            requestedPublishingInterval: 1000,
+            requestedLifetimeCount: 600,
+            requestedMaxKeepAliveCount: 10,
+            maxNotificationsPerPublish: 100,
+            publishingEnabled: true,
+            priority: 10,
+        });
+        // console.log("Subscription created.");
+
+        subscription.on("keepalive", () => /* console.log("Subscription keepalive") */ {});
+        subscription.on("terminated", () => {
+            // console.log("Subscription terminated.");
+            subscription = null;
+        });
+    } else if (subscription) {
+        // Optionally check if the publishing is still enabled
+        if (!subscription.publishingEnabled) {
+            // console.log("Subscription publishing is disabled, re-enabling...");
+            try {
+                // console.log("Recreating subscription to enable publishing mode...");
+                await createSubscriptionIfNotExist();
+                // console.log("Subscription publishing re-enabled.");
+            } catch (error) {
+                console.error("Error re-enabling subscription publishing:", error);
+            }
+        }
+    }
+};
+
 const disconnectOPC = async (): Promise<void> => {
-    console.log("Disconnecting OPC UA...");
+    // console.log("Disconnecting OPC UA...");
     if (subscription) {
         try {
-            console.log("Terminating subscription...");
+            // console.log("Terminating subscription...");
             await subscription.terminate();
-            console.log("Subscription terminated.");
+            // console.log("Subscription terminated.");
         } catch (subError: any) {
             console.error("Error terminating subscription:", subError.message);
         } finally {
@@ -118,9 +132,9 @@ const disconnectOPC = async (): Promise<void> => {
     }
     if (session) {
         try {
-            console.log("Closing session...");
-            await session.close(); // Pass true to delete subscriptions
-            console.log("Session closed.");
+            // console.log("Closing session...");
+            await session.close();
+            // console.log("Session closed.");
         } catch (sessError: any) {
             console.error("Error closing session:", sessError.message);
         } finally {
@@ -129,112 +143,117 @@ const disconnectOPC = async (): Promise<void> => {
     }
     if (client) {
         try {
-            console.log("Disconnecting client...");
+            // console.log("Disconnecting client...");
             await client.disconnect();
-            console.log("Client disconnected.");
-             // Optional: Nullify client if you want a completely fresh start next time
-             // client = null;
+            // console.log("Client disconnected.");
         } catch (clientError: any) {
             console.error("Error disconnecting client:", clientError.message);
+        } finally {
+            client = null; // Allow reconnect to create a fresh client if needed
         }
     }
-    currentConnectionStatus = 'disconnected'; // Update status after full disconnect
-    console.log("OPC UA Disconnection complete.");
+    currentConnectionStatus = 'disconnected';
+    // console.log("OPC UA Disconnection complete.");
 };
 
-
-// --- Main Connection Logic ---
 const connectOPC = async (): Promise<'offline' | 'online' | 'disconnected'> => {
     if (isConnecting) {
-        console.log("Connection attempt already in progress. Returning current status:", currentConnectionStatus);
-        return currentConnectionStatus; // Avoid race conditions
+        // console.log("Connection attempt already in progress. Returning current status:", currentConnectionStatus);
+        return currentConnectionStatus;
     }
     isConnecting = true;
 
-    // 1. Check if already connected and session is valid
-    if (session && session.isOpen() && client?.endpointUrl) {
-        console.log(`Already connected and session is open to ${client.endpointUrl}. Status: ${currentConnectionStatus}`);
+    if (session && session.sessionId && client?.endpointUrl && !client.isReconnecting) {
+        // console.log(`Already connected and session is open to ${client.endpointUrl}. Status: ${currentConnectionStatus}`);
         isConnecting = false;
-        return currentConnectionStatus; // Return existing status
-    } else if (session && !session.isOpen()) {
-         console.log("Session found but not open. Attempting full reconnect.");
-         await disconnectOPC(); // Ensure clean state if session died
+        return currentConnectionStatus;
+    } else if (session && !session.sessionId) {
+        // console.log("Session found but not open. Attempting full reconnect.");
+        await disconnectOPC();
     } else if (client && client.isReconnecting) {
-         console.log("Client is currently attempting reconnection. Returning 'disconnected' for now.");
-         // We might be in a state where the client library is trying to reconnect.
-         // It's safer to report disconnected until it succeeds or we force a new connection.
-         isConnecting = false;
-         return 'disconnected';
+        // console.log("Client is currently attempting reconnection. Returning 'disconnected' for now.");
+        isConnecting = false;
+        return 'disconnected';
+    } else if (client && client.isReconnecting === false && !session?.sessionId) {
+        // console.log("Client is connected but no session. Attempting to create session.");
+        const endpoint = client.endpointUrl;
+        if (endpoint) {
+            const newSession = await tryConnectAndCreateSession(endpoint);
+            if (newSession) {
+                currentConnectionStatus = endpoint === OPC_UA_ENDPOINT_OFFLINE ? 'offline' : 'online';
+                isConnecting = false;
+                return currentConnectionStatus;
+            }
+        }
     }
 
-
-    console.log("No valid connection found. Starting connection process...");
+    // console.log("No valid connection found. Starting connection process...");
     let connectionType: 'offline' | 'online' | 'disconnected' = 'disconnected';
     let sessionCreated: ClientSession | null = null;
 
-
-    // 2. Try OFFLINE endpoint first with retries
-    console.log("--- Attempting OFFLINE Connection ---");
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-        console.log(`Offline Attempt ${attempt}/${MAX_RETRIES}...`);
+        // console.log(`Offline Attempt ${attempt}/${MAX_RETRIES}...`);
         sessionCreated = await tryConnectAndCreateSession(OPC_UA_ENDPOINT_OFFLINE);
         if (sessionCreated) {
-            console.log("Successfully connected to OFFLINE endpoint.");
+            // console.log("Successfully connected to OFFLINE endpoint.");
             connectionType = 'offline';
-            break; // Exit loop on success
+            break;
         } else {
-             console.log(`Offline attempt ${attempt} failed.`);
-             // If client exists but failed, disconnect it before retrying or falling back
-             if(client && client.endpointUrl) {
-                 console.log("Disconnecting client after failed offline attempt...");
-                 await client.disconnect().catch(e => console.error("Error disconnecting client after failed attempt:", e.message));
-             }
+            // console.log(`Offline attempt ${attempt} failed.`);
             if (attempt < MAX_RETRIES) {
                 const backoffTime = RETRY_BACKOFF[attempt - 1];
-                console.log(`Waiting ${backoffTime}ms before next offline attempt...`);
+                // console.log(`Waiting ${backoffTime}ms before next offline attempt...`);
                 await new Promise(resolve => setTimeout(resolve, backoffTime));
             }
         }
     }
 
-    // 3. If OFFLINE failed, try ONLINE endpoint once
     if (connectionType === 'disconnected') {
-        console.log("--- Offline connection failed. Attempting ONLINE Connection ---");
+        // console.log("--- Offline connection failed. Attempting ONLINE Connection ---");
         sessionCreated = await tryConnectAndCreateSession(OPC_UA_ENDPOINT_ONLINE);
         if (sessionCreated) {
-            console.log("Successfully connected to ONLINE endpoint.");
+            // console.log("Successfully connected to ONLINE endpoint.");
             connectionType = 'online';
         } else {
-            console.log("Online connection attempt failed.");
-            // Ensure disconnected state if online also fails
-            await disconnectOPC(); // Clean up thoroughly if both failed
+            // console.log("Online connection attempt failed.");
+            await disconnectOPC();
             connectionType = 'disconnected';
         }
     }
 
-    currentConnectionStatus = connectionType; // Update the global status
-    isConnecting = false; // Release lock
-    console.log(`Connection process finished. Final Status: ${currentConnectionStatus}`);
+    currentConnectionStatus = connectionType;
+    isConnecting = false;
+    // console.log(`Connection process finished. Final Status: ${currentConnectionStatus}`);
     return currentConnectionStatus;
 };
 
-// --- API Route Handler ---
+const monitorConnection = (): void => {
+    if (connectionCheckInterval) {
+        clearInterval(connectionCheckInterval);
+    }
+    connectionCheckInterval = setInterval(async () => {
+        if (currentConnectionStatus !== 'online' && currentConnectionStatus !== 'offline' && !isConnecting) {
+            // console.log("Connection status is disconnected, attempting to reconnect...");
+            await connectOPC();
+        } else if (session && !session.sessionId && !isConnecting) {
+            // console.log("Session is invalid, attempting to reconnect...");
+            await connectOPC();
+        } else if (client && !client.isReconnecting && !isConnecting) {
+            // console.log("Client is disconnected, attempting to reconnect...");
+            await connectOPC();
+        } else if (session?.sessionId && client && (!subscription?.subscriptionId || subscription?.session !== session)) {
+            // console.log("Session and client are connected, but subscription is missing or invalid. Recreating subscription.");
+            await createSubscriptionIfNotExist();
+        }
+    }, CONNECTION_CHECK_INTERVAL);
+};
+
+// Start monitoring the connection when this module loads
+monitorConnection();
+
 export async function GET() {
     console.log("GET /api/opcua/status received");
     const status = await connectOPC();
     console.log(`API returning status: ${status}`);
-    // Return the status string directly
     return NextResponse.json({ connectionStatus: status });
 }
-
-// Optional: Add a cleanup mechanism on server shutdown
-// process.on('SIGINT', async () => {
-//     console.log("Received SIGINT. Disconnecting OPC UA Client...");
-//     await disconnectOPC();
-//     process.exit(0);
-// });
-// process.on('SIGTERM', async () => {
-//     console.log("Received SIGTERM. Disconnecting OPC UA Client...");
-//     await disconnectOPC();
-//     process.exit(0);
-// });
