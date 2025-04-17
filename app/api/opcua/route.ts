@@ -61,7 +61,7 @@ async function connectOPCUA() {
       opcuaClient = OPCUAClient.create({
         endpointMustExist: false,
         connectionStrategy: {
-          maxRetry: 0, // Handle retries manually
+          maxRetry: 1, // Handle retries manually
           initialDelay: RECONNECT_DELAY,
           maxDelay: RECONNECT_DELAY * 3,
         },

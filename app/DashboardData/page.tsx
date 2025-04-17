@@ -58,29 +58,54 @@ interface ThreePhaseGroupInfo {
 }
 
 
-// Helper Components (PlcConnectionStatus, WebSocketStatus, ThemeToggle - no changes)
+// Helper Components (PlcConnectionStatus, WebSocketStatus, ThemeToggle - no changes needed)
 const PlcConnectionStatus = ({ status }: { status: 'online' | 'offline' | 'disconnected' }) => {
     let statusText = '';
     let dotClass = '';
     let title = `Status: ${status}`;
-    let clickHandler = () => { };
+    let clickHandler = () => { }; // Default no-op
 
     switch (status) {
-        case 'online': statusText = 'PLC: Online (Remote)'; dotClass = 'bg-blue-500'; break;
-        case 'offline': statusText = 'PLC: Online (Local)'; dotClass = 'bg-sky-400'; break;
+        case 'online':
+            statusText = 'PLC: Online (Remote)';
+            dotClass = 'bg-blue-500'; // Blue for remote online
+            title = 'PLC connected remotely';
+            break;
+        case 'offline':
+            statusText = 'PLC: Online (Local)';
+            dotClass = 'bg-sky-400'; // Sky blue/Cyan for local online
+            title = 'PLC connected locally';
+            break;
         case 'disconnected':
-            statusText = 'PLC: Disconnected'; dotClass = 'bg-gray-400 dark:bg-gray-600'; title = 'PLC Disconnected. Click to reload.';
-            clickHandler = () => { if (typeof window !== 'undefined') { console.log("Reloading page..."); window.location.reload(); } };
+            statusText = 'PLC: Disconnected';
+            dotClass = 'bg-gray-400 dark:bg-gray-600'; // Gray for disconnected
+            title = 'PLC Disconnected. Click to try reconnecting.';
+            // Add reload handler specifically for disconnected state
+            clickHandler = () => {
+                if (typeof window !== 'undefined') {
+                    console.log("Reloading page to re-attempt connection...");
+                    window.location.reload();
+                }
+            };
             break;
     }
     const dotVariants = { initial: { scale: 0 }, animate: { scale: 1 }, pulse: { scale: [1, 1.2, 1], transition: { duration: 1, repeat: Infinity, ease: "easeInOut" } } };
     return (
         <motion.div className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-            <TooltipProvider delayDuration={100}><Tooltip>
-                <TooltipTrigger asChild>
-                    <motion.div className={`w-3.5 h-3.5 rounded-full ${dotClass} cursor-pointer flex-shrink-0`} variants={dotVariants} initial="initial" animate={["animate", "pulse"]} onClick={clickHandler} />
-                </TooltipTrigger><TooltipContent><p>{title}</p></TooltipContent>
-            </Tooltip></TooltipProvider>
+            <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <motion.div
+                             className={`w-3.5 h-3.5 rounded-full ${dotClass} ${status === 'disconnected' ? 'cursor-pointer' : ''} flex-shrink-0`} // Add cursor only when clickable
+                             variants={dotVariants}
+                             initial="initial"
+                             animate={status !== 'disconnected' ? ["animate", "pulse"] : "animate"} // Pulse only when connected
+                             onClick={clickHandler} // Assign the click handler
+                        />
+                    </TooltipTrigger>
+                    <TooltipContent><p>{title}</p></TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
             <span className="text-xs sm:text-sm">{statusText}</span>
         </motion.div>
     );
@@ -382,9 +407,41 @@ const Dashboard = () => {
         return () => clearInterval(interval);
     }, [lastUpdateTime, isConnected, delay]);
 
-    const checkPlcConnection = useCallback(async () => { /* Mock PLC check */
-        setIsPlcConnected(prev => prev === 'disconnected' ? 'offline' : prev === 'offline' ? 'online' : 'offline');
-    }, []);
+    const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected'); // Initialize state
+
+    const checkPlcConnection = useCallback(async () => {
+        console.log("Checking PLC connection status...");
+        try {
+            const res = await fetch('/api/opcua/status'); // Your API endpoint
+            if (!res.ok) {
+                // Handle HTTP errors (like 500 Internal Server Error)
+                throw new Error(`API request failed with status ${res.status}`);
+            }
+            const data = await res.json();
+    
+            // *** Use the status string directly from the API response ***
+            if (data.connectionStatus && ['online', 'offline', 'disconnected'].includes(data.connectionStatus)) {
+                 console.log("Received PLC Status:", data.connectionStatus);
+                 setPlcStatus(data.connectionStatus);
+            } else {
+                 console.error("Invalid status received from API:", data);
+                 setPlcStatus('disconnected'); // Fallback to disconnected on unexpected response
+            }
+    
+        } catch (err) {
+            console.error("Failed to fetch PLC connection status:", err);
+            setPlcStatus('disconnected'); // Set to disconnected on fetch error
+        }
+    }, []); // Add dependencies if needed, though likely none for this basic fetch
+    
+    // Call checkPlcConnection on component mount and potentially periodically
+    useEffect(() => {
+        checkPlcConnection();
+        // Optional: Set up an interval to periodically check the status
+        // const intervalId = setInterval(checkPlcConnection, 30000); // Check every 30 seconds
+        // return () => clearInterval(intervalId); // Cleanup interval on unmount
+    }, [checkPlcConnection]);
+
 
     useEffect(() => { /* Periodic PLC check */
         checkPlcConnection();
@@ -595,7 +652,7 @@ const Dashboard = () => {
                         Solar Mini-Grid Dashboard
                     </h1>
                     <motion.div className="flex items-center gap-3 sm:gap-4 flex-wrap justify-center" initial="hidden" animate="visible" variants={containerVariants}>
-                        <motion.div variants={itemVariants}><PlcConnectionStatus status={isPlcConnected} /></motion.div>
+                        <motion.div variants={itemVariants}> <PlcConnectionStatus status={plcStatus} /></motion.div>
                         <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
                         <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
                     </motion.div>
