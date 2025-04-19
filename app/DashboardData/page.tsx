@@ -19,6 +19,7 @@ import {
     Wind, Droplets, Info, Settings, Minimize2, Maximize2, FileOutput, Waypoints, SigmaSquare, Lightbulb,
     HelpCircle, Clock, Percent, ToggleLeft, ToggleRight, Waves // Import all used icons
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 // Interfaces (Combined DataPointConfig from import)
 interface NodeData {
@@ -96,9 +97,47 @@ const PlcConnectionStatus = ({ status }: { status: 'online' | 'offline' | 'disco
     );
 };
 
-const WebSocketStatus = ({ isConnected, connectFn }: { isConnected: boolean; connectFn: () => void }) => {
+interface WebSocketStatusProps {
+    isConnected: boolean;
+    connectFn: () => void;
+}
+
+const WebSocketStatus = ({ isConnected, connectFn }: WebSocketStatusProps) => {
+    const router = useRouter();
+    const [wasConnected, setWasConnected] = useState(isConnected);
+
     const title = isConnected ? "WebSocket Connected" : "WebSocket Disconnected. Click to attempt reconnect.";
     const pulseVariants = { pulse: { scale: [1, 1.15, 1], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } } };
+
+    const handleTextClick = useCallback(() => {
+        router.push('/api/opcua');
+    }, [router]);
+
+    useEffect(() => {
+        let timeoutId: NodeJS.Timeout | null = null;
+
+        if (!isConnected && wasConnected) {
+            // WebSocket just went offline
+            timeoutId = setTimeout(() => {
+                router.push('/api/opcua');
+            }, 10000); // 10 seconds
+        } else if (isConnected) {
+            // WebSocket is now connected, clear any pending redirects
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+        }
+
+        setWasConnected(isConnected);
+
+        return () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        };
+    }, [isConnected, router, wasConnected]);
+
     return (
         <motion.div className="flex items-center gap-2 cursor-pointer" onClick={connectFn} title={title} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
             <motion.div
@@ -106,10 +145,17 @@ const WebSocketStatus = ({ isConnected, connectFn }: { isConnected: boolean; con
                 variants={pulseVariants}
                 animate={isConnected ? "pulse" : {}} // Only pulse when connected
             />
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground">WS: {isConnected ? 'Live' : 'Offline'}</span>
+            <span
+                className="text-xs sm:text-sm font-medium text-muted-foreground cursor-pointer"
+                onClick={handleTextClick}
+            >
+                WS: {isConnected ? 'Live' : 'Offline'}
+            </span>
         </motion.div>
     );
 };
+
+
 
 const ThemeToggle = () => {
     const { resolvedTheme, setTheme } = useTheme(); // Use resolvedTheme for accurate state
