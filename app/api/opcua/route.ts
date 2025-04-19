@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 const KEEP_OPCUA_ALIVE = true;
 
 let endpointUrl: string;
-const POLLING_INTERVAL = 500;
+const POLLING_INTERVAL = 5000;
 const RECONNECT_DELAY = 2000;
 const SESSION_TIMEOUT = 60000; 
 const WEBSOCKET_HEARTBEAT_INTERVAL = 3000; // 3 seconds
