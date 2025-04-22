@@ -18,9 +18,9 @@ const KEEP_OPCUA_ALIVE = true;
 
 let endpointUrl: string;
 const POLLING_INTERVAL = 3000;
-const RECONNECT_DELAY = 2000;
+const RECONNECT_DELAY = 5000;
 const SESSION_TIMEOUT = 60000; 
-const WEBSOCKET_HEARTBEAT_INTERVAL = 3000; // 3 seconds
+const WEBSOCKET_HEARTBEAT_INTERVAL = 5000; // 3 seconds
 
 let opcuaClient: OPCUAClient | null = null;
 let opcuaSession: ClientSession | null = null;
