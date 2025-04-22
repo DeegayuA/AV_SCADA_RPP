@@ -5,6 +5,8 @@ import { Inter } from 'next/font/google';
 import React, { useEffect, useState } from 'react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useRouter } from 'next/navigation';
+import { Toaster } from "@/components/ui/sonner"
+
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -34,7 +36,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             {children}
           </ThemeProvider>
         )}
-      </body>
+          <Toaster richColors theme="system" position="bottom-right" closeButton />
+          </body>
     </html>
   );
 }

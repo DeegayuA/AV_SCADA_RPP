@@ -257,7 +257,7 @@ export const dataPoints: DataPoint[] = [
     id: 'on-grid-export-power-limit-switch',
     name: 'On Grid Export Power Limit Switch',
     nodeId: 'ns=4;i=19',
-    dataType: 'Boolean', // Mapped from UInt16 (0/1)
+    dataType: 'UInt16',
     uiType: 'switch',
     icon: FileOutput, // Icon for export control
     description: 'Enable/Disable the grid export power limitation feature.',
@@ -3081,9 +3081,9 @@ export const dataPoints: DataPoint[] = [
     nodeId: 'ns=4;i=351',
     dataType: 'Boolean',
     uiType: 'switch',
-    icon: Activity, // Placeholder
+    icon: Activity,
     category: 'control',
-    description: 'Remote auto key (Placeholder from original).',
+    description: 'Remote auto key',
     factor: 1,
     phase: 'x',
     notes: "Included from original prompt example - Index > 199"
@@ -3096,8 +3096,8 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: AudioWaveform,
     unit: ' Hz',
-    min: 49.8,
-    max: 50.2,
+    min: 49.5,
+    max: 50.5,
     category: 'grid', // More appropriate than battery
     description: 'Current Frequency (Placeholder from original).',
     factor: 1, // Float usually doesn't need factor unless specified
