@@ -384,7 +384,7 @@ const Dashboard = () => {
                 whileHover={{ scale: 1.1, rotate: 10 }}
                 whileTap={{ scale: 0.9 }}
               >
-                {soundEnabled ? (
+                {!soundEnabled ? (
                   <BellOff className="w-5 h-5" />
                 ) : (
                   <Bell className="w-5 h-5" />
@@ -394,7 +394,7 @@ const Dashboard = () => {
           </TooltipTrigger>
           <TooltipContent>
             <p>
-              {soundEnabled ? 'Mute Notifications' : 'Unmute Notifications'}
+              {!soundEnabled ? 'Mute Notifications' : 'Unmute Notifications'}
             </p>
           </TooltipContent>
         </Tooltip>
@@ -496,8 +496,8 @@ const Dashboard = () => {
 
     // --- Component Return ---
     return (
-        <div className="min-h-screen bg-background text-foreground p-3 sm:p-4 md:p-6 lg:p-8 transition-colors duration-300">
-            <div className="max-w-screen-2xl mx-auto">
+        <div className="min-h-screen bg-background text-foreground p-3 sm:p-4 md:p-6 lg:p-8 transition-colors duration-300 truncate">
+            <div className="max-w-screen-3xl mx-auto">
                 {/* Header */}
                 <motion.div className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-8 gap-4" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }} >
                     <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left"> Mini-Grid Dashboard </h1>
@@ -559,7 +559,7 @@ const Dashboard = () => {
                                                     {/* FIX: Card is direct child */}
                                                     <TooltipTrigger asChild>
                                                         <Card className={`h-full shadow-sm hover:shadow-md transition-all duration-200 border dark:border-border/50 bg-card ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-default'}`}>
-                                                            <CardHeader className="p-3 bg-muted/30 dark:bg-muted/20 border-b dark:border-border/50"> <CardTitle className="text-sm font-semibold flex items-center gap-2 text-card-foreground/90"> <RepresentativeIcon className="w-4 h-4 text-primary flex-shrink-0" /> <span className="truncate" title={group.title}>{group.title}</span> {group.unit && <span className="ml-auto text-xs text-muted-foreground">({group.unit})</span>} </CardTitle> </CardHeader>
+                                                            <CardHeader className="p-3 bg-muted/30 dark:bg-muted/20 border-b dark:border-border/50"> <CardTitle className="text-sm font-semibold flex items-center gap-2 text-card-foreground/90 truncate"> <RepresentativeIcon className="w-4 h-4 text-primary flex-shrink-0" /> <span className="truncate" title={group.title}>{group.title}</span> {group.unit && <span className="ml-auto text-xs text-muted-foreground">({group.unit})</span>} </CardTitle> </CardHeader>
                                                             <CardContent className="p-3 text-sm">
                                                                 <div className="grid grid-cols-3 gap-x-2 gap-y-1 items-center">
                                                                     {(['a', 'b', 'c'] as const).map(phase => (<div key={`head-${phase}`} className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-border/50"> {group.points[phase] ? `Ph ${phase.toUpperCase()}` : '-'} </div>))}
