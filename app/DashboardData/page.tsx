@@ -1,350 +1,24 @@
-// src/app/page.tsx (or your main dashboard page component)
 'use client';
+
+// src/components/dashboard/Dashboard.tsx
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { dataPoints as configuredDataPoints, DataPoint as DataPointConfig } from '@/config/dataPoints';
-import { motion, AnimatePresence } from 'framer-motion';
+import { dataPoints as configuredDataPoints } from '@/config/dataPoints'; // Keep config here
+import { motion } from 'framer-motion'; // Used for outer container
 import { useTheme } from 'next-themes';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 import { toast } from 'sonner';
 import { WS_URL, VERSION } from '@/config/constants'; // Adjust path if needed
-import { playSound } from '@/lib/utils'; // Adjust path for sound utility
-import {
-    Activity, AudioWaveform, Battery, Zap, Gauge, Sun, Moon, AlertCircle, Power, Sigma, Thermometer,
-    Wind, Droplets, Info, Settings, Minimize2, Maximize2, FileOutput, Waypoints, SigmaSquare, Lightbulb,
-    HelpCircle, Clock, Percent, ToggleLeft, ToggleRight, Waves, DivideIcon as LucideIcon,
-    Volume2, VolumeX,
-    CheckCircle,
-    XCircle,
-    AlertTriangleIcon,
-    InfoIcon,
-    BellOff,
-    Bell
-} from 'lucide-react';
-import { useRouter } from 'next/navigation'; // Although not used for redirection here, keep if used elsewhere
-
-// --- Interfaces --- (Keep unchanged)
-interface NodeData {
-    [nodeId: string]: string | number | boolean | null | 'Error';
-}
-interface ThreePhaseGroupInfo {
-    groupKey: string;
-    title: string;
-    points: {
-        a?: DataPointConfig;
-        b?: DataPointConfig;
-        c?: DataPointConfig;
-    };
-    icon: typeof LucideIcon;
-    unit?: string;
-    description?: string;
-    uiType: 'display' | 'gauge';
-    config: DataPointConfig;
-}
-
-// --- Helper Components --- (Keep unchanged)
-const PlcConnectionStatus = ({ status }: { status: 'online' | 'offline' | 'disconnected' }) => {
-    let statusText = '';
-    let dotClass = '';
-    let title = `PLC Status: ${status}`;
-    let clickHandler = () => { };
-
-    switch (status) {
-        case 'online': statusText = 'PLC: Online (Remote)'; dotClass = 'bg-blue-500 ring-2 ring-blue-500/30 animate-pulse'; title = 'PLC connected remotely via API'; break;
-        case 'offline': statusText = 'PLC: Online (Local)'; dotClass = 'bg-sky-400 ring-2 ring-sky-400/30 animate-pulse'; title = 'PLC connected locally (Direct?)'; break;
-        case 'disconnected': default: statusText = 'PLC: Disconnected'; dotClass = 'bg-gray-400 dark:bg-gray-600'; title = 'PLC Disconnected. Click to refresh page.'; clickHandler = () => { if (typeof window !== 'undefined') window.location.reload(); }; break;
-    }
-    const dotVariants = { initial: { scale: 0 }, animate: { scale: 1 } };
-
-    return (
-        <motion.div className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
-            <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        {/* Ensure motion.div is the SINGLE child */}
-                        <motion.div className={`w-3 h-3 rounded-full ${dotClass} ${status === 'disconnected' ? 'cursor-pointer hover:opacity-80' : ''} flex-shrink-0`}
-                            variants={dotVariants} initial="initial" animate={"animate"} onClick={clickHandler} whileHover={status === 'disconnected' ? { scale: 1.2 } : {}} />
-                    </TooltipTrigger>
-                    <TooltipContent><p>{title}</p></TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-            <span className="text-xs sm:text-sm text-muted-foreground">{statusText}</span>
-        </motion.div>
-    );
-};
-
-interface WebSocketStatusProps { isConnected: boolean; connectFn: () => void; }
-const WebSocketStatus = ({ isConnected, connectFn }: WebSocketStatusProps) => {
-    const title = isConnected ? "WebSocket Connected (Live Data)" : "WebSocket Disconnected. Click to attempt reconnect.";
-    const pulseVariants = { pulse: { scale: [1, 1.15, 1], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } } };
-    return (
-        <motion.div className="flex items-center gap-2 cursor-pointer" onClick={connectFn} title={title} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <motion.div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-500 ring-2 ring-green-500/30' : 'bg-red-500 ring-2 ring-red-500/30'} flex-shrink-0`} variants={pulseVariants} animate={isConnected ? "pulse" : {}} />
-            <span className="text-xs sm:text-sm font-medium text-muted-foreground"> WS: {isConnected ? 'Live' : 'Offline'} </span>
-        </motion.div>
-    );
-};
-
-const ThemeToggle = () => {
-    const { resolvedTheme, setTheme } = useTheme();
-    const Icon = resolvedTheme === 'dark' ? Sun : Moon;
-    const title = `Switch to ${resolvedTheme === 'dark' ? 'Light' : 'Dark'} Mode`;
-    return (
-        <TooltipProvider delayDuration={100}><Tooltip>
-            <TooltipTrigger asChild>
-                {/* Button with asChild forwarding to motion.button */}
-                <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} aria-label={title} asChild >
-                    <motion.button className="text-muted-foreground hover:text-foreground transition-colors" whileHover={{ scale: 1.1, rotate: 15 }} whileTap={{ scale: 0.9 }} >
-                        <Icon className="w-5 h-5" />
-                    </motion.button>
-                </Button>
-            </TooltipTrigger><TooltipContent><p>{title}</p></TooltipContent>
-        </Tooltip></TooltipProvider>
-    );
-};
-
-// --- Grouping Function --- (Keep unchanged)
-function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseGroups: ThreePhaseGroupInfo[], individualPoints: DataPointConfig[] } {
-    const groupsByKey = new Map<string, DataPointConfig[]>();
-    const individualPoints: DataPointConfig[] = [];
-    const threePhaseGroups: ThreePhaseGroupInfo[] = [];
-
-    pointsToGroup.forEach(point => {
-        const canBeGrouped =
-            point.category === 'three-phase' &&
-            !!point.threePhaseGroup &&
-            point.phase && ['a', 'b', 'c'].includes(point.phase) &&
-            !point.isSinglePhase &&
-            (point.uiType === 'display' || point.uiType === 'gauge');
-
-        if (canBeGrouped && point.threePhaseGroup) {
-            if (!groupsByKey.has(point.threePhaseGroup)) groupsByKey.set(point.threePhaseGroup, []);
-            groupsByKey.get(point.threePhaseGroup)?.push(point);
-        } else {
-            individualPoints.push(point);
-        }
-    });
-
-    groupsByKey.forEach((potentialGroup, groupKey) => {
-        const phases: { a?: DataPointConfig, b?: DataPointConfig, c?: DataPointConfig } = {};
-        let validGroup = true;
-        let commonUiType: 'display' | 'gauge' | null = null;
-        let commonUnit: string | undefined = undefined;
-        let icon: typeof LucideIcon | undefined = undefined;
-        let description: string | undefined = undefined;
-        let title: string = groupKey;
-        let representativePoint: DataPointConfig | null = null;
-
-        if (potentialGroup.length < 2 || potentialGroup.length > 3) { validGroup = false; }
-        else {
-            representativePoint = potentialGroup.find(p => p.phase === 'a') || potentialGroup[0];
-            commonUiType = representativePoint.uiType as 'display' | 'gauge';
-            commonUnit = representativePoint.unit;
-            icon = representativePoint.icon || HelpCircle;
-            title = representativePoint.name || groupKey;
-            title = title.replace(/ Phase [ABC]$/i, '').replace(/ Ph [ABC]$/i, '').replace(/ L[123]$/i, '')
-                .replace(/[ _-][abc]$/i, '').replace(/ \(Precise\)$/i, '').replace(/ Phase$/i, '').trim();
-            description = representativePoint.description?.replace(/ Phase [ABC]/i, '').replace(/ L[123]/i, '')
-                .replace(/ \(high precision\)/i, '').trim() || `3-Phase ${title}`;
-
-            for (const point of potentialGroup) {
-                if (!point.phase || !['a', 'b', 'c'].includes(point.phase) || phases[point.phase as 'a' | 'b' | 'c'] ||
-                    point.threePhaseGroup !== groupKey || point.unit !== commonUnit || point.uiType !== commonUiType) {
-                    validGroup = false; break;
-                }
-                if (point.phase === 'a' || point.phase === 'b' || point.phase === 'c') { phases[point.phase] = point; }
-            }
-            if (!((phases.a && phases.b) || (phases.a && phases.c) || (phases.b && phases.c))) { validGroup = false; }
-        }
-
-        if (validGroup && commonUiType && representativePoint && icon) {
-            threePhaseGroups.push({ groupKey, title, points: phases, icon, unit: commonUnit, description, uiType: commonUiType, config: representativePoint });
-        } else {
-            individualPoints.push(...potentialGroup);
-        }
-    });
-    const uniqueIndividualPoints = Array.from(new Map(individualPoints.map(p => [p.id, p])).values());
-    return { threePhaseGroups, individualPoints: uniqueIndividualPoints };
-}
-
-// --- Motion Variants --- (Keep unchanged)
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05, delayChildren: 0.1 } } };
-const itemVariants = { hidden: { opacity: 0, y: 10, scale: 0.98 }, visible: { opacity: 1, y: 0, scale: 1, transition: { type: 'spring', stiffness: 150, damping: 18 } } };
-const cardHoverEffect = { y: -4, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.08), 0 5px 8px -5px rgba(0, 0, 0, 0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } };
-const darkCardHoverEffect = { y: -4, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.15), 0 5px 8px -5px rgba(0, 0, 0, 0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } };
-
-// --- Circular Gauge Component --- (Keep unchanged)
-interface CircularGaugeConfig {
-    min?: number;
-    max?: number;
-    factor?: number;
-    dataType?: string;
-    nodeId: string;
-}
-
-interface CircularGaugeProps {
-    value: number | null;
-    unit?: string;
-    label?: string;
-    size?: number;
-    strokeWidth?: number;
-    config: CircularGaugeConfig;
-}
-
-const CircularGauge: React.FC<CircularGaugeProps> = React.memo(
-    ({ value: rawValue, unit = '', label, size = 120, strokeWidth = 10, config }) => {
-        const { resolvedTheme } = useTheme();
-        const factor = config.factor ?? 1;
-        const value = typeof rawValue === 'number' ? rawValue * factor : null;
-        const min = config.min ?? 0;
-        const max = config.max ?? (value !== null && value > 10 ? Math.ceil(value / 10) * 10 * 1.2 : 100);
-
-        const normalizedValue = useMemo(() => {
-            if (value === null || max === min) return 0;
-            return (Math.max(min, Math.min(max, value)) - min) / (max - min);
-        }, [value, min, max]);
-
-        const getColor = useCallback(() => {
-            if (value === null) return 'gray';
-            const range = max - min;
-            const buffer = range * 0.1;
-            if ((config.dataType === 'Boolean' || config.dataType?.includes('Int')) && (value === 0 || value === 1) && max === 1) {
-                return value === 1 ? 'green' : 'red';
-            }
-            if (value < min || value > max) return 'red';
-            if (value < min + buffer || value > max - buffer) return 'yellow';
-            return 'green';
-        }, [value, min, max, config.dataType]);
-
-        const color = getColor();
-        const isCritical = color === 'red';
-        const gradientId = `gauge-gradient-${config.nodeId.replace(/[^a-zA-Z0-9]/g, '-')}`;
-        const center = size / 2;
-        const radius = (size - strokeWidth) / 2;
-        const startAngle = -240;
-        const endAngle = 60;
-        const angleRange = endAngle - startAngle;
-        const arcAngle = normalizedValue * angleRange + startAngle;
-
-        const polarToCartesian = (cx: number, cy: number, r: number, angle: number) => {
-            const rad = (angle * Math.PI) / 180;
-            return {
-                x: cx + r * Math.cos(rad),
-                y: cy + r * Math.sin(rad),
-            };
-        };
-
-        const describeArc = (start: number, end: number) => {
-            const startCoord = polarToCartesian(center, center, radius, end);
-            const endCoord = polarToCartesian(center, center, radius, start);
-            const largeArcFlag = end - start <= 180 ? '0' : '1';
-
-            return `M ${startCoord.x} ${startCoord.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${endCoord.x} ${endCoord.y}`;
-        };
-
-        const valueArc = describeArc(startAngle, Math.min(arcAngle, endAngle));
-
-        const formatGaugeValue = useCallback((val: number | null): string => {
-            if (val === null) return '--';
-            if ((config.dataType === 'Boolean' || config.dataType?.includes('Int')) && (val === 0 || val === 1) && max === 1) {
-                return val === 1 ? 'ON' : 'OFF';
-            }
-            const absVal = Math.abs(val);
-            let options: Intl.NumberFormatOptions = {};
-            if (absVal < 1 && absVal !== 0) options = { minimumFractionDigits: 2, maximumFractionDigits: 2 };
-            else if (absVal < 100 && max > 20) options = { minimumFractionDigits: 1, maximumFractionDigits: 1 };
-            else options = { maximumFractionDigits: 0 };
-            if (config.dataType?.includes('Int') && absVal >= 1) {
-                options = { maximumFractionDigits: 0 };
-            }
-            return val.toLocaleString(undefined, options);
-        }, [config.dataType, max]);
-
-        const displayValue = formatGaugeValue(value);
-        const isOnOff = displayValue === 'ON' || displayValue === 'OFF';
-
-        return (
-            <div className={`flex flex-col items-center gap-1 transition-all duration-300 ${{
-                    green: 'shadow-green-400/20 dark:shadow-green-500/25',
-                    yellow: 'shadow-yellow-400/25 dark:shadow-yellow-500/30',
-                    red: 'shadow-red-500/30 dark:shadow-red-600/35',
-                    gray: 'shadow-gray-400/15 dark:shadow-gray-600/20',
-                }[color]
-                }`}>
-                {label && (
-                    <span className="text-xs font-medium text-muted-foreground text-center max-w-[120px] truncate" title={label}>
-                        {label}
-                    </span>
-                )}
-                <div className="relative" style={{ width: size, height: size }} aria-label={`Gauge for ${label || config.nodeId}, value ${displayValue} ${unit}`}>
-                    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-                        <defs>
-                            <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
-                                {color === 'green' && (<><stop offset="0%" stopColor="#4ade80" /><stop offset="100%" stopColor="#22c55e" /></>)}
-                                {color === 'yellow' && (<><stop offset="0%" stopColor="#facc15" /><stop offset="100%" stopColor="#eab308" /></>)}
-                                {color === 'red' && (<><stop offset="0%" stopColor="#f87171" /><stop offset="100%" stopColor="#ef4444" /></>)}
-                                {color === 'gray' && (<><stop offset="0%" stopColor="#9ca3af" /><stop offset="100%" stopColor="#6b7280" /></>)}
-                            </linearGradient>
-                        </defs>
-                        <path
-                            d={describeArc(startAngle, endAngle)}
-                            strokeWidth={strokeWidth}
-                            strokeLinecap="round"
-                            stroke="#e5e7eb"
-                            fill="none"
-                            className="opacity-30"
-                        />
-                        {value !== null && !isNaN(normalizedValue) && normalizedValue >= 0 && (
-                            <motion.path
-                                d={valueArc}
-                                fill="none"
-                                stroke={`url(#${gradientId})`}
-                                strokeWidth={strokeWidth}
-                                strokeLinecap="round"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{ type: 'spring', stiffness: 80, damping: 20 }}
-                            />
-                        )}
-                    </svg>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <AnimatePresence mode="popLayout" initial={false}>
-                            <motion.div
-                                key={`${config.nodeId}-${displayValue}`}
-                                className={`flex flex-col items-center justify-center text-center ${isCritical && !isOnOff ? 'animate-pulse' : ''}`}
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                transition={{ duration: 0.2 }}
-                            >
-                                <span className={`text-lg sm:text-xl lg:text-2xl font-semibold leading-tight ${color === 'gray' ? 'text-muted-foreground' : `text-${color}-${resolvedTheme === 'dark' ? 400 : 600}`
-                                    }`}>
-                                    {displayValue}
-                                </span>
-                                {!isOnOff && unit && (
-                                    <span className="text-[10px] sm:text-xs text-muted-foreground -mt-0.5">{unit}</span>
-                                )}
-                            </motion.div>
-                        </AnimatePresence>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-);
-
-CircularGauge.displayName = 'CircularGauge';
+import { NodeData } from './dashboardInterfaces'; // Import interfaces
+import DashboardHeader from './DashboardHeader'; // Import header
+import DashboardSection from './DashboardSection'; // Import section
+import { containerVariants, itemVariants } from '@/config/animationVariants'; // Import variants
+import { AlertTriangleIcon, CheckCircle, InfoIcon, XCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { playSound } from '@/lib/utils';
+import { groupDataPoints } from './groupDataPoints';
+// import { usePathname } from 'next/navigation'; // Not used in this component
 
 
-// --- Main Dashboard Component ---
-const Dashboard = () => {
+const Dashboard: React.FC = () => {
     const { resolvedTheme } = useTheme();
     const [nodeValues, setNodeValues] = useState<NodeData>({});
     const [isConnected, setIsConnected] = useState(false);
@@ -353,94 +27,89 @@ const Dashboard = () => {
     const ws = useRef<WebSocket | null>(null);
     const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
     const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
-    const [delay, setDelay] = useState<number>(0); // State to hold current delay in ms
+    const [delay, setDelay] = useState<number>(0);
     const reconnectAttempts = useRef(0);
     const maxReconnectAttempts = 10;
-    const lastToastTimestamps = useRef<Record<string, number>>({});
-    // const router = useRouter(); // Keep if used elsewhere, not needed for window.location
+    const lastToastTimestamps = useRef<Record<string, number>>({}); // Ref for toasts from ValueDisplayContent
 
     // --- Sound State & Toggle ---
     const [soundEnabled, setSoundEnabled] = useState(() => {
         if (typeof window !== 'undefined') { return localStorage.getItem('dashboardSoundEnabled') === 'true'; } return false;
     });
     useEffect(() => { if (typeof window !== 'undefined') { localStorage.setItem('dashboardSoundEnabled', String(soundEnabled)); } }, [soundEnabled]);
-    const SoundToggle = () => (
-        <TooltipProvider delayDuration={100}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              aria-label={soundEnabled ? 'Mute Notifications' : 'Unmute Notifications'}
-              asChild
-            >
-              <motion.button
-                className={`transition-colors rounded-full ${
-                  soundEnabled
-                    ? 'text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200'
-                    : 'text-green-700 hover:text-green-800 dark:text-green-300 dark:hover:text-green-200'
-                }`}
-                whileHover={{ scale: 1.1, rotate: 10 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                {!soundEnabled ? (
-                  <BellOff className="w-5 h-5" />
-                ) : (
-                  <Bell className="w-5 h-5" />
-                )}
-              </motion.button>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>
-              {/* Corrected Tooltip Content */}
-              {soundEnabled ? 'Unmute Notifications' : 'Mute Notifications'}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    );
+
     const playNotificationSound = useCallback((type: 'success' | 'error' | 'warning' | 'info') => {
-        if (!soundEnabled) return; const soundMap = { success: '/sounds/success.mp3', error: '/sounds/error.mp3', warning: '/sounds/warning.mp3', info: '/sounds/info.mp3' }; const volumeMap = { success: 0.99, error: 0.6, warning: 0.5, info: 0.3 }; playSound(soundMap[type], volumeMap[type]);
+        if (!soundEnabled) return;
+        const soundMap = { success: '/sounds/success.mp3', error: '/sounds/error.mp3', warning: '/sounds/warning.mp3', info: '/sounds/info.mp3' };
+        const volumeMap = { success: 0.99, error: 0.6, warning: 0.5, info: 0.3 };
+        // Ensure playSound exists and is imported correctly
+        if (typeof playSound === 'function') {
+            playSound(soundMap[type], volumeMap[type]);
+        } else {
+             console.warn("playSound utility not found or not a function.");
+        }
     }, [soundEnabled]);
+
 
     // --- Core Hooks ---
     useEffect(() => { // Clock
-        const updateClock = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); updateClock(); const interval = setInterval(updateClock, 1000); return () => clearInterval(interval);
+        const updateClock = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
+        updateClock();
+        const interval = setInterval(updateClock, 1000);
+        return () => clearInterval(interval);
     }, []);
 
-    // --- MODIFIED: Lag Check & Redirection ---
-    useEffect(() => { // Lag Check
+    // --- Lag Check & Redirection ---
+    // Added comments for clarity on redirect/reload flags
+    useEffect(() => {
         const interval = setInterval(() => {
+            // Calculate and update data delay
             const currentDelay = Date.now() - lastUpdateTime;
-            setDelay(currentDelay); // Update state for display
+            setDelay(currentDelay);
 
+            // Flags to prevent multiple redirects/reloads triggered by this hook
             const reloadingFlag = 'reloadingDueToDelay';
             const redirectingFlag = 'redirectingDueToExtremeDelay';
+            const opcuaRedirectedFlag = 'opcuaRedirected'; // Flag for initial WS error redirect
 
-            // --- Check for > 40s lag for REDIRECT ---
-            if (isConnected && currentDelay > 40000 && typeof window !== 'undefined' && sessionStorage.getItem(redirectingFlag) !== 'true') {
+            // Check if any critical recovery is already in progress (reloading, redirecting, or initial opcuaRedirected)
+            if (typeof window !== 'undefined' && (
+                sessionStorage.getItem(reloadingFlag) === 'true' ||
+                sessionStorage.getItem(redirectingFlag) === 'true' ||
+                sessionStorage.getItem(opcuaRedirectedFlag) === 'true' // Added check for the initial redirect flag
+            )) {
+                 // If already handling a critical state, do not trigger *new* actions from this lag check
+                 return;
+            }
+
+
+            // --- Check for > 40s lag for REDIRECT (Critical Stale Data) ---
+            if (isConnected && currentDelay > 40000 && typeof window !== 'undefined') {
                 console.error(`Extreme WS data lag (${(currentDelay / 1000).toFixed(1)}s) > 40s. Redirecting to API endpoint.`);
                 toast.error('Critical Lag Detected', { description: 'Redirecting to API page for connection check...', duration: 5000 });
                 playNotificationSound('error');
-                sessionStorage.setItem(redirectingFlag, 'true'); // Set flag before redirecting
+                sessionStorage.setItem(redirectingFlag, 'true'); // Set specific lag redirect flag
                 const apiUrl = new URL('/api/opcua', window.location.origin);
                 window.location.href = apiUrl.href; // Perform redirect
                 return; // Stop further checks in this interval iteration after triggering redirect
             }
 
-            // --- Check for > 30s lag for RELOAD --- (Only if not already redirecting)
-            else if (isConnected && currentDelay > 30000 && typeof window !== 'undefined' && sessionStorage.getItem(reloadingFlag) !== 'true') {
+            // --- Check for > 30s lag for RELOAD (Stale Data) --- (Only if not already triggering a redirect)
+            else if (isConnected && currentDelay > 30000 && typeof window !== 'undefined') {
                 console.warn(`WS data lag (${(currentDelay / 1000).toFixed(1)}s) exceeded 30s threshold. Reloading.`);
-                // Changed to warning as 40s is now the critical error
                 toast.warning('Stale Data Detected', { description: 'Refreshing connection...', duration: 5000 });
-                playNotificationSound('warning'); // Use warning sound
-                sessionStorage.setItem(reloadingFlag, 'true'); // Set flag before reload timeout
-                setTimeout(() => window.location.reload(), 1500);
+                playNotificationSound('warning');
+                sessionStorage.setItem(reloadingFlag, 'true'); // Set reload flag
+                // Wait a moment before reloading to allow toast/sound to register
+                setTimeout(() => {
+                     if (typeof window !== 'undefined') {
+                         window.location.reload();
+                     }
+                 }, 1500);
             }
 
             // --- Reset flags if delay is back below 30s ---
+            // This ensures that if connection recovers on its own, future lags can trigger actions again.
             else if (currentDelay < 30000 && typeof window !== 'undefined') {
                 // Only remove flags if they exist, slight optimization
                 if (sessionStorage.getItem(reloadingFlag)) {
@@ -460,267 +129,389 @@ const Dashboard = () => {
     }, [plcStatus]);
     useEffect(() => { checkPlcConnection(); const interval = setInterval(checkPlcConnection, 10000); return () => clearInterval(interval); }, [checkPlcConnection]);
 
-    const connectWebSocket = useCallback(() => { // WebSocket Connection (Keep unchanged)
-        if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return; if (typeof window !== 'undefined' && (sessionStorage.getItem('reloadingDueToDelay') === 'true' || sessionStorage.getItem('redirectingDueToExtremeDelay') === 'true')) { setTimeout(() => { sessionStorage.removeItem('reloadingDueToDelay'); sessionStorage.removeItem('redirectingDueToExtremeDelay'); }, 3000); return; } setIsConnected(false); const delayMs = Math.min(1000 + 2000 * Math.pow(1.6, reconnectAttempts.current), 60000); console.log(`Attempting WS connect (Attempt ${reconnectAttempts.current + 1}) in ${(delayMs / 1000).toFixed(1)}s...`); if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
+    const connectWebSocket = useCallback(() => { // WebSocket Connection
+
+        // Define session storage flags
+        const opcuaRedirectedFlag = 'opcuaRedirected';
+        const reloadingFlag = 'reloadingDueToDelay';
+        const redirectingFlag = 'redirectingDueToExtremeDelay';
+
+
+        // Prevent new connection attempts if one is already open/connecting
+        if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
+            console.log("WS already connecting or open, skipping new attempt.");
+            return;
+        }
+
+        // --- IMPORTANT: Check if a redirect is already mandated by session storage ---
+        // If the flag is set, it means a previous error or lag condition already decided
+        // that the user needs to go to the API page. Do NOT attempt to reconnect WS here.
+        if (typeof window !== 'undefined' && (
+             sessionStorage.getItem(opcuaRedirectedFlag) === 'true' || // Initial WS error redirect flag
+             sessionStorage.getItem(reloadingFlag) === 'true' ||       // Lag reload flag
+             sessionStorage.getItem(redirectingFlag) === 'true'        // Extreme lag redirect flag
+        )) {
+             console.log("Session storage indicates a recovery is in progress (redirect or reload). Aborting WS connect attempt.");
+             // Optionally clear flags after a longer timeout if needed,
+             // but generally, let the navigation handle the state reset.
+             // setTimeout(() => {
+             //     sessionStorage.removeItem(opcuaRedirectedFlag);
+             //     sessionStorage.removeItem(reloadingFlag);
+             //     sessionStorage.removeItem(redirectingFlag);
+             // }, 10000); // Clear flags after 10 seconds just in case navigation fails?
+             return; // *** EXIT FUNCTION ***
+        }
+
+
+        setIsConnected(false); // Set status to disconnected before attempting connection
+        const delayMs = Math.min(1000 + 2000 * Math.pow(1.5, reconnectAttempts.current), 60000);
+        console.log(`Attempting WS connect (Attempt ${reconnectAttempts.current + 1}/${maxReconnectAttempts}) in ${(delayMs / 1000).toFixed(1)}s...`);
+
+        // Clear any existing reconnect timeout before setting a new one
+        if (reconnectInterval.current) {
+            clearTimeout(reconnectInterval.current);
+            reconnectInterval.current = null;
+        }
+
         reconnectInterval.current = setTimeout(() => {
-            ws.current = new WebSocket(WS_URL); ws.current.onopen = () => { console.log("WS Connected"); setIsConnected(true); setLastUpdateTime(Date.now()); reconnectAttempts.current = 0; if (reconnectInterval.current) { clearTimeout(reconnectInterval.current); reconnectInterval.current = null; } toast.success('Connection Established', { description: 'Live data feed active.', duration: 3000 }); playNotificationSound('success'); if (typeof window !== 'undefined') sessionStorage.removeItem('opcuaRedirected'); }; ws.current.onmessage = (event) => { try { const receivedData = JSON.parse(event.data as string); setNodeValues(prev => ({ ...prev, ...receivedData })); setLastUpdateTime(Date.now()); } catch (e) { console.error("WS parse error:", e, "Data:", event.data); toast.error('Data Error', { description: 'Received invalid data format.', duration: 4000 }); playNotificationSound('error'); } }; ws.current.onerror = (event) => {
-                console.error("WebSocket error event:", event);
-                toast.error('WebSocket Error', { description: 'Connection error occurred. Attempting recovery...', duration: 5000 });
-                playNotificationSound('error');
+            if (typeof window === 'undefined') return;
 
-                // --- START: Redirection Logic (Keep unchanged) ---
-                if (typeof window !== 'undefined') {
-                    const redir = sessionStorage.getItem('opcuaRedirected');
-                    if (!redir || redir === 'false') {
-                        console.warn("WebSocket connection error, redirecting to API endpoint for potential authentication/setup...");
-                        // Construct the URL relative to the current origin
-                        const apiUrl = new URL('/api/opcua', window.location.origin);
-                        console.log("Redirecting to:", apiUrl.href);
-                        sessionStorage.setItem('opcuaRedirected', 'true'); // Set flag BEFORE redirecting
-                        window.location.href = apiUrl.href; // Perform the redirect
+            console.log(`Initiating WebSocket connection to ${WS_URL}...`);
+            ws.current = new WebSocket(WS_URL);
+
+            ws.current.onopen = () => {
+                console.log("WS Connected");
+                setIsConnected(true);
+                setNodeValues({}); // Clear old values on successful reconnect? Or merge? Clearing is safer for stale data.
+                setLastUpdateTime(Date.now());
+                reconnectAttempts.current = 0; // Reset attempts on success
+                if (reconnectInterval.current) {
+                     clearTimeout(reconnectInterval.current);
+                     reconnectInterval.current = null;
+                }
+                toast.success('Connection Established', { description: 'Live data feed active.', duration: 3000 });
+                playNotificationSound('success');
+                // Clear any pending redirect/reload flags on successful connection
+                 if (typeof window !== 'undefined') {
+                     sessionStorage.removeItem(opcuaRedirectedFlag);
+                     sessionStorage.removeItem(reloadingFlag);
+                     sessionStorage.removeItem(redirectingFlag);
+                 }
+            };
+
+            ws.current.onmessage = (event) => {
+                try {
+                    const receivedData = JSON.parse(event.data as string);
+                    // Only update if data is an object, basic validation
+                    if (typeof receivedData === 'object' && receivedData !== null) {
+                         setNodeValues(prev => ({ ...prev, ...receivedData }));
+                         setLastUpdateTime(Date.now()); // Update timestamp on *any* successful message
                     } else {
-                        console.warn("WebSocket error occurred, but redirection already attempted. Manual intervention may be required.");
+                         console.warn("Received non-object data on WS:", receivedData);
                     }
+                } catch (e) {
+                    console.error("WS parse error:", e, "Data:", event.data);
+                    // Avoid repeated toasts for the same parse error within a short time? Maybe.
+                    toast.error('Data Error', { description: 'Received invalid data format.', duration: 4000 });
+                    playNotificationSound('error');
                 }
-                // Ensure the socket is closed to allow the onclose handler to potentially trigger reconnects
-                if (ws.current && ws.current.readyState !== WebSocket.CLOSED) {
-                    ws.current.close();
+            };
+
+            ws.current.onerror = (event) => {
+                console.error("WebSocket error event:", event);
+                 if (event && (event as any).error) {
+                     console.error("Detailed WebSocket error:", (event as any).error);
+                 }
+
+                // Check if redirection is already in progress or attempted
+                 if (typeof window !== 'undefined' && sessionStorage.getItem(opcuaRedirectedFlag) !== 'true') {
+                     console.warn("WebSocket connection error, redirecting to API endpoint for potential authentication/setup...");
+                      toast.error('Connection Error', { description: 'Attempting to reconnect. Redirecting for status check.', duration: 5000 });
+                     playNotificationSound('error');
+
+                     // Set the flag BEFORE redirecting to prevent loop if API page also fails
+                     sessionStorage.setItem(opcuaRedirectedFlag, 'true');
+                     const apiUrl = new URL('/api/opcua', window.location.origin);
+                     console.log("Redirecting to:", apiUrl.href);
+                     window.location.href = apiUrl.href; // Perform the redirect
+
+                 } else {
+                      // If redirection was already attempted, log and wait for onclose
+                      console.warn("WebSocket error occurred, but redirection already attempted or in progress. Letting onclose handle reconnect logic.");
+                      // Close the socket if it's not already closed, to ensure onclose fires
+                      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+                           ws.current.close(1011, 'Error encountered'); // Use 1011 for internal error
+                      } else if (ws.current && ws.current.readyState !== WebSocket.CLOSED) {
+                           ws.current.close(); // Force close if in connecting/closing state
+                      }
+                 }
+            };
+
+            ws.current.onclose = (event) => {
+                console.log(`WS disconnected. Code: ${event.code}, Reason: ${event.reason || 'N/A'}, Clean: ${event.wasClean}`);
+                setIsConnected(false);
+                setNodeValues({}); // Clear values on disconnect
+
+                // Important: Check if a redirect flag is set. If so, this close event
+                // is likely *because* of the redirect navigation happening, or
+                // a prior error already triggered a redirect attempt.
+                // In these cases, we should *not* attempt auto-reconnect here.
+                 if (typeof window !== 'undefined' && (
+                      sessionStorage.getItem(opcuaRedirectedFlag) === 'true' ||
+                      sessionStorage.getItem(reloadingFlag) === 'true' ||
+                      sessionStorage.getItem(redirectingFlag) === 'true'
+                 )) {
+                     console.log("WS closed, but session flags indicate ongoing recovery action. Aborting auto-reconnect.");
+                     return; // *** EXIT onclose handler ***
+                 }
+
+
+                // If no redirect flag is set and closure was not clean (or specific codes), attempt reconnect
+                if (event.code !== 1000 && event.code !== 1001 && reconnectAttempts.current < maxReconnectAttempts) {
+                    reconnectAttempts.current++;
+                    console.log(`WS closed unexpectedly. Attempting reconnect... Attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+                    connectWebSocket(); // Attempt reconnect with backoff
+                } else if (reconnectAttempts.current >= maxReconnectAttempts) {
+                    console.warn("Max WS reconnect attempts reached after repeated failures.");
+                    toast.error('Connection Failed', { description: 'Max reconnect attempts reached. Please refresh manually or check server status.', duration: 10000 });
+                    playNotificationSound('error');
+                     // At this point, if max attempts are reached and no redirect happened,
+                     // maybe *now* trigger a redirect as a last resort? Or just leave it
+                     // disconnected and let the user manually refresh or go to API page.
+                     // The current logic relies on the *initial* onerror or the *lag* check
+                     // for redirection. Let's stick to that for simplicity unless proven insufficient.
+                } else {
+                    console.log("WS closed cleanly or max attempts reached, no automatic reconnect needed/attempted.");
+                    // Inform the user about clean disconnect if needed
+                     if (event.code === 1000) {
+                          toast.info('Disconnected', { description: 'Connection closed cleanly.', duration: 3000 });
+                     }
                 }
-            }; ws.current.onclose = (event) => { console.log(`WS disconnected. Code: ${event.code}, Clean: ${event.wasClean}`); setIsConnected(false); ws.current = null; if (event.code !== 1000 && event.code !== 1001 && reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); } else if (reconnectAttempts.current >= maxReconnectAttempts) { console.warn("Max WS reconnect attempts reached."); toast.error('Connection Failed', { description: 'Max reconnect attempts reached.', duration: 10000 }); playNotificationSound('error'); } else { console.log("WS closed cleanly or max attempts reached."); } };
-        }, delayMs);
-    }, [playNotificationSound]);
+            };
 
-    useEffect(() => { // Initial WS connect & cleanup (Keep unchanged)
-        if (typeof window === 'undefined') return; connectWebSocket(); sessionStorage.removeItem('opcuaRedirected'); sessionStorage.removeItem('reloadingDueToDelay'); sessionStorage.removeItem('redirectingDueToExtremeDelay'); return () => { if (reconnectInterval.current) clearTimeout(reconnectInterval.current); if (ws.current) { ws.current.onclose = null; ws.current.close(1000); ws.current = null; } };
-    }, [connectWebSocket]);
+        }, delayMs); // Delay before the actual connection attempt
+    }, [playNotificationSound, reconnectAttempts, maxReconnectAttempts]);
 
 
-    // --- Data Handling and Rendering Functions --- (Keep unchanged)
-    const sendDataToWebSocket = useCallback((nodeId: string, value: boolean | number | string) => { // Send Data
-        if (ws.current && ws.current.readyState === WebSocket.OPEN) { try { const pointConfig = configuredDataPoints.find(p => p.nodeId === nodeId); let valueToSend = value; if (pointConfig?.dataType.includes('Int') && typeof value === 'boolean') { valueToSend = value ? 1 : 0; } if (pointConfig?.uiType === 'button' && typeof value === 'boolean' && value === true) { valueToSend = 1; } const payload = JSON.stringify({ [nodeId]: valueToSend }); ws.current.send(payload); console.log("Sent via WebSocket:", payload); toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(value)}`, duration: 2500 }); playNotificationSound('info'); } catch (e) { console.error("WebSocket send error:", e); toast.error('Send Error', { description: 'Failed to send command via WebSocket.' }); playNotificationSound('error'); } }
-        else { console.error("WS not connected, cannot send", nodeId); toast.error('Connection Error', { description: 'Cannot send command. WebSocket is disconnected.' }); playNotificationSound('error'); if (!isConnected) connectWebSocket(); }
-    }, [isConnected, connectWebSocket, playNotificationSound]);
+    // --- Initial WS connect & cleanup ---
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        console.log("Dashboard component mounted.");
 
-    const formatValue = useCallback((val: number | null, config: DataPointConfig): string => { // Format Value
-        if (val === null) return '--'; if (config.dataType === 'Boolean' || (config.dataType?.includes('Int') && (val === 0 || val === 1) && (config.name.includes('Status') || config.name.includes('Switch') || config.name.includes('Enable') || config.name.includes('Key')))) { return val === 1 ? 'ON' : 'OFF'; } if (config.id === 'work-mode-status') { const modes: { [k: number]: string } = { 0: 'Standby', 1: 'Grid-tie', 2: 'Off-grid', 3: 'Fault', 4: 'Charging' }; return modes[val] || `Code ${val}`; } if (config.id === 'run-state') { const states: { [k: number]: string } = { 0: 'Idle', 1: 'Self-Test', 2: 'Running', 3: 'Fault', 4: 'Derating', 5: 'Shutdown' }; return states[val] || `State ${val}`; } const absVal = Math.abs(val); let options: Intl.NumberFormatOptions = {}; if (config.unit === '%' || config.dataType === 'Float' || config.dataType === 'Double') { if (absVal < 1 && absVal !== 0) options = { minimumFractionDigits: 2, maximumFractionDigits: 2 }; else if (absVal < 100) options = { minimumFractionDigits: 1, maximumFractionDigits: 1 }; else options = { maximumFractionDigits: 0 }; } else if (config.dataType?.includes('Int')) { options = { maximumFractionDigits: 0 }; } else { if (absVal < 10) options = { minimumFractionDigits: 1, maximumFractionDigits: 1 }; else options = { maximumFractionDigits: 0 }; } return val.toLocaleString(undefined, options);
-    }, []);
+        // --- IMPORTANT: Clear critical session storage flags on mount ---
+        // This ensures a fresh start if the user navigates back or reloads after a failed attempt/redirect.
+        sessionStorage.removeItem('opcuaRedirected'); // Clear initial WS error redirect flag
+        sessionStorage.removeItem('reloadingDueToDelay'); // Clear lag reload flag
+        sessionStorage.removeItem('redirectingDueToExtremeDelay'); // Clear extreme lag redirect flag
+         // Also reset reconnect attempts counter on mount
+         reconnectAttempts.current = 0;
 
-    const renderNodeValueText = useCallback((nodeId: string | undefined, pointConfig: DataPointConfig): React.ReactNode => { // Render Display Text/Value
-        if (!nodeId || !pointConfig) return <span className="text-gray-400 dark:text-gray-500">--</span>;
-        const rawValue = nodeValues[nodeId]; const key = `${nodeId}-${String(rawValue)}-${Date.now()}`; let content: React.ReactNode; let valueClass = "text-foreground font-medium"; let iconPrefix: React.ReactNode = null; const unit = pointConfig.unit;
-        if (rawValue === undefined || rawValue === null) { content = <span className="text-gray-400 dark:text-gray-500 italic">--</span>; }
-        else if (rawValue === 'Error') { content = <span className="font-semibold">Error</span>; valueClass = "text-red-600 dark:text-red-400"; iconPrefix = <AlertCircle size={14} className="mr-1 inline-block" />; }
-        else if (typeof rawValue === 'boolean') { content = rawValue ? 'ON' : 'OFF'; valueClass = `font-semibold ${rawValue ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`; }
-        else if (typeof rawValue === 'number') {
-            const factor = pointConfig.factor ?? 1; const min = pointConfig.min; const max = pointConfig.max; let adjustedValue = rawValue * factor; let displayValue = formatValue(adjustedValue, pointConfig); const isOutOfRange = (min !== undefined && adjustedValue < min) || (max !== undefined && adjustedValue > max); const isOnOff = displayValue === 'ON' || displayValue === 'OFF';
-            if (isOnOff) { valueClass = `font-semibold ${displayValue === 'ON' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`; }
-            else if (isOutOfRange) {
-                valueClass = "text-yellow-600 dark:text-yellow-400 font-semibold"; iconPrefix = <AlertCircle size={14} className="mr-1 inline-block" />;
-                const now = Date.now(); const lastToastTime = lastToastTimestamps.current[nodeId]; const cooldown = 60 * 1000;
-                if (!lastToastTime || now - lastToastTime > cooldown) { const direction = (min !== undefined && adjustedValue < min) ? 'below min' : 'above max'; const rangeText = `(${formatValue(min ?? null, pointConfig)} to ${formatValue(max ?? null, pointConfig)})`; toast.warning('Value Alert', { description: `${pointConfig.name} is ${direction}. Val: ${displayValue}${unit || ''} ${rangeText}.`, duration: 8000 }); playNotificationSound('warning'); lastToastTimestamps.current[nodeId] = now; }
-            } else { if (lastToastTimestamps.current[nodeId]) delete lastToastTimestamps.current[nodeId]; }
-            content = isOnOff ? displayValue : <>{displayValue}<span className="text-[10px] sm:text-xs text-muted-foreground ml-0.5">{unit || ''}</span></>;
-        } else if (typeof rawValue === 'string') {
-            if (pointConfig.dataType === 'DateTime') { try { content = new Date(rawValue).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' }); } catch { content = rawValue; } } else if (pointConfig.dataType === 'Guid') { content = `${rawValue.substring(0, 8)}...`; } else if (pointConfig.dataType === 'ByteString') { content = `[${rawValue.length} bytes]`; } else { content = rawValue.length > 25 ? `${rawValue.substring(0, 22)}...` : rawValue; } valueClass = "text-sm text-muted-foreground font-normal";
-        } else { content = <span className="text-yellow-500">?</span>; valueClass = "text-yellow-500"; }
-        return (<AnimatePresence mode="wait" initial={false}><motion.span key={key} className={`inline-flex items-center ${valueClass}`} initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} exit={{ opacity: 0.6 }} transition={{ duration: 0.15, ease: "linear" }} > {iconPrefix}{content} </motion.span></AnimatePresence>);
-    }, [nodeValues, formatValue, playNotificationSound]);
 
-    // --- Data Processing & Layout --- (Keep unchanged)
+        // Attempt initial WebSocket connection
+        console.log("Attempting initial WebSocket connection...");
+        connectWebSocket();
+
+
+        // Cleanup function: Runs on component unmount or when dependencies change (if any, currently none)
+        return () => {
+            console.log("Dashboard component unmounting, cleaning up resources...");
+            // Clear any pending reconnect timer
+            if (reconnectInterval.current) {
+                clearTimeout(reconnectInterval.current);
+                reconnectInterval.current = null;
+            }
+            // Close the WebSocket connection cleanly if it exists and is not already closed
+            if (ws.current && ws.current.readyState !== WebSocket.CLOSED) {
+                 console.log("Closing WebSocket connection due to component unmount.");
+                 // Remove the onclose handler temporarily to prevent it from triggering
+                 // reconnect logic for this intentional close.
+                 if (ws.current.onclose) {
+                      const originalOnClose = ws.current.onclose;
+                      ws.current.onclose = null; // Remove the handler
+                       // Re-attach the handler briefly after closing? Or just let it go.
+                       // For intentional unmount, just closing is usually sufficient.
+                 }
+                ws.current.close(1000, 'Component Unmounted'); // Use 1000 for normal closure
+                ws.current = null;
+            }
+        };
+    }, [connectWebSocket]); // Effect depends on the memoized connectWebSocket function
+
+
+    // --- Data Processing & Layout ---
     const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(configuredDataPoints), []);
+
     const sections = useMemo(() => {
         const controlItems = individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch');
         const gaugeItemsIndividual = individualPoints.filter(p => p.uiType === 'gauge');
         const displayItemsIndividual = individualPoints.filter(p => p.uiType === 'display');
+
         const gaugeGroups3Phase = threePhaseGroups.filter(g => g.uiType === 'gauge');
         const displayGroups3Phase = threePhaseGroups.filter(g => g.uiType === 'display');
-        const displayByCategory = displayItemsIndividual.reduce((acc, point) => { const isInGroup = threePhaseGroups.some(g => g.points.a?.id === point.id || g.points.b?.id === point.id || g.points.c?.id === point.id); if (isInGroup) return acc; const category = point.category || 'status'; if (!acc[category]) acc[category] = []; acc[category].push(point); return acc; }, {} as Record<string, DataPointConfig[]>);
-        const layoutSections = [{ title: "Controls & Settings", items: controlItems, gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6' }, { title: "Gauges & Overview", items: [...gaugeItemsIndividual, ...gaugeGroups3Phase], gridCols: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' }, { title: "Three Phase Readings", items: displayGroups3Phase, gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6' }, ...Object.entries(displayByCategory).sort(([catA], [catB]) => catA.localeCompare(catB)).map(([category, points]) => ({ title: category.charAt(0).toUpperCase() + category.slice(1) + " Readings", items: points, gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6' }))];
-        return layoutSections.filter(section => section.items.length > 0);
-    }, [individualPoints, threePhaseGroups]);
 
+        // Group individual display items by category, excluding those already part of a 3-phase group
+         const displayByCategory = displayItemsIndividual.reduce((acc, point) => {
+             // Check if this point's nodeId is referenced in any of the 3-phase groups' point configs
+             const isInGroup = threePhaseGroups.some(g =>
+                 Object.values(g.points as Record<string, { nodeId?: string }>).some((p) => p?.nodeId === point.nodeId)
+             );
+             if (isInGroup) return acc; // Skip if already in a 3-phase group
+
+             const category = point.category || 'status'; // Default to 'status' if category is missing
+             if (!acc[category]) acc[category] = [];
+             acc[category].push(point);
+             return acc;
+         }, {} as Record<string, typeof individualPoints>); // Type the accumulator correctly
+
+        // Define the sections with grid column classes
+        const layoutSections = [
+            { title: "Controls & Settings", items: controlItems, gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-6' },
+            { title: "Gauges & Overview", items: [...gaugeItemsIndividual, ...gaugeGroups3Phase], gridCols: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6' },
+            { title: "Three Phase Readings", items: displayGroups3Phase, gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6' },
+            // Dynamically add sections for individual display points by category
+            ...Object.entries(displayByCategory)
+                     .sort(([catA], [catB]) => catA.localeCompare(catB)) // Sort categories alphabetically
+                     .map(([category, points]) => ({
+                         title: category.charAt(0).toUpperCase() + category.slice(1) + " Readings", // Capitalize first letter
+                         items: points,
+                         gridCols: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6' // Standard grid for these
+                     }))
+        ];
+
+        // Filter out sections that have no items
+        return layoutSections.filter(section => section.items.length > 0);
+
+    }, [individualPoints, threePhaseGroups]); // Recompute if grouped points change
+
+    // Determine card hover effect based on theme
+    const cardHoverEffect = { y: -4, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.08), 0 5px 8px -5px rgba(0, 0, 0, 0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } };
+    const darkCardHoverEffect = { y: -4, boxShadow: "0 8px 20px -4px rgba(0, 0, 0, 0.15), 0 5px 8px -5px rgba(0, 0, 0, 0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } };
     const currentHoverEffect = resolvedTheme === 'dark' ? darkCardHoverEffect : cardHoverEffect;
+
+
+     // --- Data Sending Function ---
+     const sendDataToWebSocket = useCallback((nodeId: string, value: boolean | number | string) => {
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+            try {
+                const pointConfig = configuredDataPoints.find(p => p.nodeId === nodeId);
+                let valueToSend = value;
+
+                // Ensure valueToSend matches expected type based on config dataType
+                if (pointConfig?.dataType.includes('Int')) {
+                    // If target is Int, convert boolean to 0/1
+                     if (typeof value === 'boolean') valueToSend = value ? 1 : 0;
+                    // If target is Int and value is string, try parsing (e.g., from input field)
+                     else if (typeof value === 'string') valueToSend = parseInt(value, 10); // Use radix 10
+                } else if (pointConfig?.dataType === 'Boolean') {
+                     // If target is Boolean, convert number (0/1) or string to boolean
+                     if (typeof value === 'number') valueToSend = value !== 0;
+                     else if (typeof value === 'string') valueToSend = value.toLowerCase() === 'true' || value === '1';
+                } else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') {
+                     // If target is Float/Double, convert string to float
+                     if (typeof value === 'string') valueToSend = parseFloat(value);
+                }
+                 // Ensure valueToSend is not NaN/Infinity after conversion if it was a number type
+                 if (typeof valueToSend === 'number' && !isFinite(valueToSend)) {
+                      console.error(`Invalid number value for nodeId ${nodeId}: ${value}`);
+                      toast.error('Send Error', { description: 'Invalid number value provided.', duration: 3000 });
+                      playNotificationSound('error');
+                      return; // Abort send if value is invalid number
+                 }
+
+                const payload = JSON.stringify({ [nodeId]: valueToSend });
+                ws.current.send(payload);
+                console.log("Sent via WebSocket:", payload);
+                toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(value)}`, duration: 2500 });
+                playNotificationSound('info');
+
+            } catch (e) {
+                console.error("WebSocket send error:", e);
+                toast.error('Send Error', { description: 'Failed to send command via WebSocket.' });
+                playNotificationSound('error');
+            }
+        } else {
+            console.error("WS not connected, cannot send", nodeId);
+            toast.error('Connection Error', { description: 'Cannot send command. WebSocket is disconnected.' });
+            playNotificationSound('error');
+            // If not connected, attempt to connect
+            if (!isConnected) {
+                 console.log("Attempting to reconnect WS after failed send...");
+                 connectWebSocket(); // Attempt reconnect if not connected
+            }
+        }
+    }, [ws, isConnected, connectWebSocket, configuredDataPoints, playNotificationSound]);
+
 
     // --- Component Return ---
     return (
         <div className="min-h-screen bg-background text-foreground p-3 sm:p-4 md:p-6 lg:p-8 transition-colors duration-300 truncate">
             <div className="max-w-screen-3xl mx-auto">
-                {/* Header (Keep unchanged) */}
-                <motion.div className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-8 gap-4" initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: "easeOut" }} >
-                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left"> Mini-Grid Dashboard </h1>
-                    <motion.div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center" initial="hidden" animate="visible" variants={containerVariants}>
-                        <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
-                        <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
-                        <motion.div variants={itemVariants}><SoundToggle /></motion.div>
-                        <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
-                    </motion.div>
-                </motion.div>
+                {/* Header component */}
+                <DashboardHeader
+                    plcStatus={plcStatus}
+                    isConnected={isConnected}
+                    connectWebSocket={connectWebSocket}
+                    soundEnabled={soundEnabled}
+                    setSoundEnabled={setSoundEnabled}
+                    currentTime={currentTime}
+                    delay={delay}
+                    version={VERSION} // Pass version from config
+                />
 
-                {/* --- MODIFIED: Status Bar with Conditional Lag Display --- */}
-                <motion.div className="text-xs text-muted-foreground mb-6 flex flex-col sm:flex-row justify-between items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }}>
-                    <div className="flex items-center gap-2">
-                        <Clock size={12} /><span>{currentTime}</span>
-                        <TooltipProvider delayDuration={100}><Tooltip>
-                            <TooltipTrigger asChild>
-                                {/* Make sure motion.span is the single child */}
-                                <motion.span
-                                    className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${
-                                        delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                                        : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50' // Stays red for >10s
-                                    }`}
-                                    whileHover={{ scale: 1.1 }}
-                                >
-                                    {/* --- Conditional Lag Text --- */}
-                                    {delay > 30000
-                                        ? '>30s lag'
-                                        : `${(delay / 1000).toFixed(1)}s lag`
-                                    }
-                                </motion.span>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Last data received {delay} ms ago</p></TooltipContent>
-                        </Tooltip></TooltipProvider>
-                    </div>
-                    <span className='font-mono'>v{VERSION || '?.?.?'}</span>
-                </motion.div>
-
-                {/* Sections (Keep unchanged) */}
-                <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible" >
+                {/* Sections */}
+                <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
                     {sections.map((section) => (
-                        <motion.section key={section.title} variants={itemVariants}>
-                            <h2 className="text-lg md:text-xl font-semibold tracking-tight text-card-foreground mb-4 border-l-4 border-primary pl-3"> {section.title} </h2>
-                            <div className={`grid ${section.gridCols} gap-3 md:gap-4`}>
-                                {section.items.map((item) => {
-                                    const isGroupInfo = (obj: any): obj is ThreePhaseGroupInfo => obj && obj.groupKey !== undefined;
-                                    const isDataPoint = (obj: any): obj is DataPointConfig => obj && obj.id !== undefined;
-
-                                    if (isGroupInfo(item)) { // --- Render 3-Phase Group ---
-                                        const group = item; const RepresentativeIcon = group.icon || HelpCircle; const isDisabled = !isConnected;
-                                        if (group.uiType === 'gauge') {
-                                            return (<motion.div key={group.groupKey} className="rounded-lg overflow-hidden col-span-2 md:col-span-3" whileHover={currentHoverEffect} variants={itemVariants}>
-                                                <TooltipProvider delayDuration={200}><Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Card className={`h-full shadow-sm hover:shadow-md transition-all duration-200 border dark:border-border/50 bg-card ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-default'}`}>
-                                                            <CardHeader className="p-3 bg-muted/30 dark:bg-muted/20 border-b dark:border-border/50"> <CardTitle className="text-sm font-semibold flex items-center gap-2 text-card-foreground/90"> <RepresentativeIcon className="w-4 h-4 text-primary flex-shrink-0" /> <span className="truncate" title={group.title}>{group.title}</span> </CardTitle> </CardHeader>
-                                                            <CardContent className="p-4 flex flex-wrap justify-around items-end gap-x-4 gap-y-3">
-                                                                {(['a', 'b', 'c'] as const).map((phase) => { const point = group.points[phase]; if (!point) return <div key={phase} className="w-[90px] h-[110px] flex items-center justify-center text-xs text-muted-foreground opacity-50">(N/A)</div>; const value = nodeValues[point.nodeId]; return (<CircularGauge key={point.id} value={typeof value === 'number' ? value : null} unit={group.unit} label={`Phase ${phase.toUpperCase()}`} size={90} strokeWidth={9} config={point} />); })}
-                                                            </CardContent>
-                                                        </Card>
-                                                    </TooltipTrigger>
-                                                    {group.description && (<TooltipContent><p>{group.description}</p></TooltipContent>)}
-                                                </Tooltip></TooltipProvider>
-                                            </motion.div>);
-                                        } else { // Display Group
-                                            return (<motion.div key={group.groupKey} className="rounded-lg overflow-hidden col-span-1 md:col-span-2" whileHover={currentHoverEffect} variants={itemVariants}>
-                                                <TooltipProvider delayDuration={200}><Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Card className={`h-full shadow-sm hover:shadow-md transition-all duration-200 border dark:border-border/50 bg-card ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-default'}`}>
-                                                            <CardHeader className="p-3 bg-muted/30 dark:bg-muted/20 border-b dark:border-border/50"> <CardTitle className="text-sm font-semibold flex items-center gap-2 text-card-foreground/90 truncate"> <RepresentativeIcon className="w-4 h-4 text-primary flex-shrink-0" /> <span className="truncate" title={group.title}>{group.title}</span> {group.unit && <span className="ml-auto text-xs text-muted-foreground">({group.unit})</span>} </CardTitle> </CardHeader>
-                                                            <CardContent className="p-3 text-sm">
-                                                                <div className="grid grid-cols-3 gap-x-2 gap-y-1 items-center">
-                                                                    {(['a', 'b', 'c'] as const).map(phase => (<div key={`head-${phase}`} className="text-xs font-medium text-muted-foreground text-center border-b pb-1 dark:border-border/50"> {group.points[phase] ? `Ph ${phase.toUpperCase()}` : '-'} </div>))}
-                                                                    {(['a', 'b', 'c'] as const).map((phase) => { const point = group.points[phase]; return (<div key={phase} className="text-center pt-1 min-h-[28px] flex items-center justify-center text-base md:text-lg"> {point ? renderNodeValueText(point.nodeId, point) : <span className="text-gray-400 dark:text-gray-600">-</span>} </div>); })}
-                                                                </div>
-                                                            </CardContent>
-                                                        </Card>
-                                                    </TooltipTrigger>
-                                                    {group.description && (<TooltipContent><p>{group.description}</p></TooltipContent>)}
-                                                </Tooltip></TooltipProvider>
-                                            </motion.div>);
-                                        }
-                                    }
-                                    else if (isDataPoint(item)) { // --- Render Individual Point ---
-                                        const point = item; const PointIcon = point.icon || HelpCircle; const isDisabled = !isConnected || nodeValues[point.nodeId] === 'Error'; const rawValue = nodeValues[point.nodeId];
-                                        if (point.uiType === 'gauge') {
-                                            const value = typeof rawValue === 'number' ? rawValue : null;
-                                            return (<motion.div key={point.id} className="rounded-lg overflow-hidden col-span-1" whileHover={currentHoverEffect} variants={itemVariants}>
-                                                <TooltipProvider delayDuration={200}><Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Card className={`h-full p-3 flex flex-col items-center justify-center shadow-sm hover:shadow-md transition-all duration-200 border dark:border-border/50 bg-card min-h-[160px] sm:min-h-[180px] ${isDisabled ? 'opacity-60 cursor-not-allowed' : 'cursor-default'}`}>
-                                                            <div className="flex flex-col items-center gap-0.5 mb-2 text-center"> <PointIcon className="w-5 h-5 text-primary flex-shrink-0 mb-1" /> <span className="text-xs font-semibold text-card-foreground/90 leading-tight px-1 truncate max-w-[120px]" title={point.name}>{point.name}</span> {(point.min !== undefined || point.max !== undefined) && (<div className="text-[10px] text-muted-foreground">({point.min ?? '-'} to {point.max ?? '-'})</div>)} </div>
-                                                            <CircularGauge value={value} unit={point.unit} size={100} strokeWidth={10} config={point} />
-                                                        </Card>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="bottom"> <p>{point.description ?? 'No description.'}</p> <p className="text-xs text-muted-foreground mt-1">ID: {point.nodeId} ({point.dataType})</p> </TooltipContent>
-                                                </Tooltip></TooltipProvider>
-                                            </motion.div>);
-                                        } else if (point.uiType === 'display') {
-                                            return (<motion.div key={point.id} className="rounded-lg overflow-hidden col-span-1" whileHover={currentHoverEffect} variants={itemVariants}>
-                                                <TooltipProvider delayDuration={200}><Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <Card className={`h-full p-3 flex items-center justify-between min-h-[60px] sm:min-h-[64px] shadow-sm hover:shadow-md transition-all duration-200 border dark:border-border/50 bg-card ${isDisabled && point.category !== 'status' ? 'opacity-60 cursor-not-allowed' : 'cursor-default'}`}>
-                                                            <div className='flex items-center gap-2 overflow-hidden mr-2'> <PointIcon className="w-4 h-4 text-primary flex-shrink-0" /> <span className="text-xs font-medium text-card-foreground/80 truncate" title={point.name}>{point.name}</span> </div>
-                                                            <div className="text-sm sm:text-base md:text-lg text-right flex-shrink-0 pl-1 whitespace-nowrap"> {renderNodeValueText(point.nodeId, point)} </div>
-                                                        </Card>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="bottom"> <p>{point.description ?? 'No description.'}</p> <p className="text-xs text-muted-foreground mt-1">ID: {point.nodeId} ({point.dataType})</p> {point.notes && <p className="text-xs text-blue-500 mt-1">Note: {point.notes}</p>} </TooltipContent>
-                                                </Tooltip></TooltipProvider>
-                                            </motion.div>);
-                                        } else if (point.uiType === 'button') {
-                                            return (<motion.div key={point.id} className="col-span-1" variants={itemVariants}>
-                                                <TooltipProvider delayDuration={200}><Tooltip>
-                                                    <TooltipTrigger asChild>
-                                                        <motion.div whileHover={!isDisabled ? { scale: 1.03, y: -1 } : {}} whileTap={!isDisabled ? { scale: 0.98 } : {}} className="h-full">
-                                                            <Button onClick={() => sendDataToWebSocket(point.nodeId, true)} className="w-full h-full justify-start p-3 text-left bg-card border dark:border-border/50 rounded-lg shadow-sm hover:bg-muted/50 dark:hover:bg-muted/30 hover:shadow-md transition-all text-card-foreground/90" variant="outline" disabled={isDisabled} >
-                                                                <PointIcon className="w-4 h-4 mr-2 text-primary flex-shrink-0" /> <span className="text-sm font-medium">{point.name}</span>
-                                                            </Button>
-                                                        </motion.div>
-                                                    </TooltipTrigger>
-                                                    <TooltipContent side="bottom"> <p>{point.description ?? 'Click to activate.'}</p> <p className="text-xs text-muted-foreground mt-1">ID: {point.nodeId} ({point.dataType})</p> </TooltipContent>
-                                                </Tooltip></TooltipProvider>
-                                            </motion.div>);
-                                        } else if (point.uiType === 'switch') {
-                                            let isChecked = false; if (typeof rawValue === 'boolean') isChecked = rawValue; else if (typeof rawValue === 'number') isChecked = rawValue === 1;
-                                            const switchDisabled = isDisabled || rawValue === undefined || rawValue === null;
-                                            return (<motion.div key={point.id} className="col-span-1" variants={itemVariants}>
-                                                <TooltipProvider delayDuration={200}><Tooltip>
-                                                    <Card className={`h-full p-3 flex items-center justify-between cursor-default transition-opacity shadow-sm hover:shadow-md border dark:border-border/50 bg-card min-h-[60px] sm:min-h-[64px] ${switchDisabled ? 'opacity-60 pointer-events-none' : ''}`}>
-                                                        <TooltipTrigger asChild>
-                                                            <div className="flex items-center gap-2 overflow-hidden mr-2 flex-1 cursor-help">
-                                                                <PointIcon className="w-4 h-4 text-primary flex-shrink-0" />
-                                                                <span className="text-xs font-medium truncate text-card-foreground/80" title={point.name}>{point.name}</span>
-                                                            </div>
-                                                        </TooltipTrigger>
-                                                        <motion.div whileHover={!switchDisabled ? { scale: 1.05 } : {}} whileTap={!switchDisabled ? { scale: 0.95 } : {}} className="flex-shrink-0">
-                                                            <Switch checked={isChecked} onCheckedChange={(checked) => sendDataToWebSocket(point.nodeId, checked)} disabled={switchDisabled} aria-label={point.name} id={`switch-${point.id}`} />
-                                                        </motion.div>
-                                                    </Card>
-                                                    <TooltipContent side="bottom"> <p>{point.description ?? 'Toggle setting.'}</p> <p className="text-xs text-muted-foreground mt-1">ID: {point.nodeId} ({point.dataType})</p> </TooltipContent>
-                                                </Tooltip></TooltipProvider>
-                                            </motion.div>);
-                                        }
-                                    }
-                                    return null;
-                                })}
-                            </div>
-                        </motion.section>
+                        <DashboardSection
+                            key={section.title} // Use title as key for sections
+                            title={section.title}
+                            gridCols={section.gridCols}
+                            items={section.items}
+                            nodeValues={nodeValues} // Pass data down
+                            isDisabled={!isConnected} // Pass connection status down
+                            currentHoverEffect={currentHoverEffect} // Pass theme-based hover effect
+                            sendDataToWebSocket={sendDataToWebSocket} // Pass send function
+                            playNotificationSound={playNotificationSound} // Pass sound utility
+                            lastToastTimestamps={lastToastTimestamps} // Pass ref for toasts
+                        />
                     ))}
                 </motion.div>
-            </div>
 
-            {/* Toast & Sound Testing UI (Keep unchanged or remove for production) */}
-            {process.env.NODE_ENV === 'development' && (
-                <motion.section className="m-8 p-4 border border-dashed rounded-lg border-muted-foreground/50" variants={itemVariants}>
-                    <h2 className="text-base font-semibold text-muted-foreground mb-3">Toast & Sound Test Area (Dev Only)</h2>
-                    <div className="flex flex-wrap gap-3">
-                        <Button size="sm" variant="outline" onClick={() => { toast.success("Success Toast", { description: "Operation completed successfully." }); playNotificationSound('success'); }}>
-                            <CheckCircle className="w-4 h-4 mr-2 text-green-500" /> Trigger Success
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { toast.error("Error Toast", { description: "Something went wrong." }); playNotificationSound('error'); }}>
-                            <XCircle className="w-4 h-4 mr-2 text-red-500" /> Trigger Error
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { toast.warning("Warning Toast", { description: "Check configuration." }); playNotificationSound('warning'); }}>
-                            <AlertTriangleIcon className="w-4 h-4 mr-2 text-yellow-500" /> Trigger Warning
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { toast.info("Info Toast", { description: "Command sent to device." }); playNotificationSound('info'); }}>
-                            <InfoIcon className="w-4 h-4 mr-2 text-blue-500" /> Trigger Info
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => { toast("Default Toast", { description: "This is a default message." }); /* Optional: playInfoSound(); */ }}>
-                            Trigger Default
-                        </Button>
-                    </div>
-                </motion.section>
-            )}
+                {/* Toast & Sound Testing UI (Keep unchanged or remove for production) */}
+                {process.env.NODE_ENV === 'development' && (
+                    <motion.section className="m-8 p-4 border border-dashed rounded-lg border-muted-foreground/50" variants={containerVariants} initial="hidden" animate="visible">
+                         <motion.div variants={itemVariants}>
+                            <h2 className="text-base font-semibold text-muted-foreground mb-3">Toast & Sound Test Area (Dev Only)</h2>
+                         </motion.div>
+                        <motion.div className="flex flex-wrap gap-3" variants={containerVariants}>
+                            <motion.div variants={itemVariants}>
+                                <Button size="sm" variant="outline" onClick={() => { toast.success("Success Toast", { description: "Operation completed successfully." }); playNotificationSound('success'); }}>
+                                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" /> Trigger Success
+                                </Button>
+                            </motion.div>
+                             <motion.div variants={itemVariants}>
+                                <Button size="sm" variant="outline" onClick={() => { toast.error("Error Toast", { description: "Something went wrong." }); playNotificationSound('error'); }}>
+                                    <XCircle className="w-4 h-4 mr-2 text-red-500" /> Trigger Error
+                                </Button>
+                            </motion.div>
+                             <motion.div variants={itemVariants}>
+                                <Button size="sm" variant="outline" onClick={() => { toast.warning("Warning Toast", { description: "Check configuration." }); playNotificationSound('warning'); }}>
+                                    <AlertTriangleIcon className="w-4 h-4 mr-2 text-yellow-500" /> Trigger Warning
+                                </Button>
+                            </motion.div>
+                             <motion.div variants={itemVariants}>
+                                <Button size="sm" variant="outline" onClick={() => { toast.info("Info Toast", { description: "Command sent to device." }); playNotificationSound('info'); }}>
+                                    <InfoIcon className="w-4 h-4 mr-2 text-blue-500" /> Trigger Info
+                                </Button>
+                            </motion.div>
+                             <motion.div variants={itemVariants}>
+                                <Button size="sm" variant="outline" onClick={() => { toast("Default Toast", { description: "This is a default message." }); /* Optional: playInfoSound(); */ }}>
+                                    Trigger Default
+                                </Button>
+                            </motion.div>
+                        </motion.div>
+                    </motion.section>
+                )}
+            </div>
         </div>
     );
 };

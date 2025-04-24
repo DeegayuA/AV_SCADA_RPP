@@ -224,3 +224,18 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes pulse-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(var(--glow-color), 0.4)) opacity(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(var(--glow-color), 0.7)) opacity(0.95);
+     transform: scale(1.01);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

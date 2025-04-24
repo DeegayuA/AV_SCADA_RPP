@@ -1562,9 +1562,9 @@ export const dataPoints: DataPoint[] = [
     max: 60,  // Example range
     description: 'Temperature of the battery.',
     category: 'battery',
-    factor: 0.1, // 1280 -> 128.0C still seems high, but using scaling
+    factor: (1 / 4095) * 100, // 1280 -> 128.0C still seems high, but using scaling
     phase: 'x',
-    notes: 'Factor 0.1 yields high temp (128C from log). Verify scaling.',
+    notes: 'Factor F to  C  yields high temp (128C from log). Verify scaling.',
   },
   // --- Index 100 ---
   {
@@ -3096,8 +3096,8 @@ export const dataPoints: DataPoint[] = [
     uiType: 'display',
     icon: AudioWaveform,
     unit: ' Hz',
-    min: 49.5,
-    max: 50.5,
+    min: 49.8,
+    max: 50.2,
     category: 'grid', // More appropriate than battery
     description: 'Current Frequency (Placeholder from original).',
     factor: 1, // Float usually doesn't need factor unless specified
@@ -3175,19 +3175,19 @@ export const dataPoints: DataPoint[] = [
     notes: 'Unit (W) and factor (1) assumed. Verify required scaling.',
   },
   // --- Index 205 ---
-  {
-    id: createId('Unknown i223'),
-    name: 'Unknown (i=223)',
-    nodeId: 'ns=4;i=223',
-    dataType: 'Int16',
-    uiType: 'display',
-    icon: HelpCircle,
-    description: 'Unidentified data point at ns=4;i=223.',
-    category: 'status',
-    factor: 1,
-    phase: 'x',
-    notes: 'Marked as "-" in log. Identify purpose or remove.',
-  },
+  // { 
+  //   id: createId('Unknown i223'),
+  //   name: 'Unknown (i=223)',
+  //   nodeId: 'ns=4;i=223',
+  //   dataType: 'Int16',
+  //   uiType: 'display',
+  //   icon: HelpCircle,
+  //   description: 'Unidentified data point at ns=4;i=223.',
+  //   category: 'status',
+  //   factor: 1,
+  //   phase: 'x',
+  //   notes: 'Marked as "-" in log. Identify purpose or remove.',
+  // },
   // --- Index 206 ---
   {
     id: createId('Solar sell enable'),
@@ -3943,9 +3943,9 @@ export const dataPoints: DataPoint[] = [
     max: 60, // Example range
     description: 'Real-time temperature reported by BMS.',
     category: 'battery',
-    factor: 0.1, // Assume °C * 10
+    factor: (1 / 4095) * 100, // 1280 -> 128.0C still seems high, but using scaling
     phase: 'x',
-    notes: 'Factor 0.1 assumed.',
+    notes: 'Factor F to  C  yields high temp (128C from log). Verify scaling.',
   },
   // --- Index 258 ---
   {
