@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import CircuitDiagram from "@/components/circuitDiagram";
+import SLDWidget from "./sld/SLDWidget";
 
 const categorizedComponents = {
   Inverters: ["DEYE INVERTER", "GOODWE 10kW", "GOODWE 5kW"],
@@ -74,9 +75,9 @@ export default function Home() {
 
         <div className="h-full">
           <CircuitDiagram />
+   
         </div>
       </main>
     </div>
   );
 }
-

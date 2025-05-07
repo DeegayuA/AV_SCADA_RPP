@@ -46,7 +46,7 @@ export default function Home() {
           <div className="space-y-4">
             <h2 className="text-xl font-semibold">Key Features:</h2>
             <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-              <li>Real-time data fetching: typically &lt;2s latency, occasional &gt;2s.</li>
+              <li>Real-time data fetching: typically &lt;2s latency, occasional {'>'}2s.</li>
               <li>Not only offline first and also online dual-mode support for robust reliability</li>
               <li>Intelligent control queue with auto-retry and failover mechanisms</li>
               <li>All time connectivity indicators for both PLC and WebSocket</li>

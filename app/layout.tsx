@@ -27,8 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   }, []);
 
   return (
-    <html lang="en">
-      <head></head>
+<html lang="en" suppressHydrationWarning>
+        <head></head>
       <body className={inter.className}>
         {isLoading && <LoadingScreen onDone={() => setIsLoading(false)} />}
         {!isLoading && (

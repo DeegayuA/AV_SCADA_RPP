@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 
 export interface DataPoint {
+  label: string;
   id: string; // Unique kebab-case identifier
   name: string; // Human-readable name
   nodeId: string; // OPC UA Node ID
@@ -5845,5 +5846,3 @@ function combineWords(high: number, low: number): number {
    return (highUnsigned << 16) | lowUnsigned;
    // For signed, it's more complex. Best handled server-side if possible.
 }
-
-

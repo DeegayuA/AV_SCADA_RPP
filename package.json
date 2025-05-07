@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -42,6 +42,7 @@
     "@types/node": "22.13.17",
     "@types/react": "19.0.12",
     "@types/react-dom": "19.0.4",
+    "@xyflow/react": "^12.6.0",
     "badge-maker": "^4.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
