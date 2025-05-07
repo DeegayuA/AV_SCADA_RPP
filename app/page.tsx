@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { PLANT_NAME } from '@/config/constants';
 
 export default function Home() {
   const router = useRouter();
@@ -36,11 +37,11 @@ export default function Home() {
         <Card className="p-8 space-y-6">
           <div className="flex items-center gap-3">
             <Sun className="w-8 h-8 text-yellow-500" />
-            <h1 className="text-3xl font-bold text-foreground">AV Mini-Grid Control Panel & Monitor</h1>
+            <h1 className="text-3xl font-bold text-foreground">AV {PLANT_NAME} Control Panel & Monitor</h1>
           </div>
 
           <p className="text-muted-foreground text-lg">
-            Welcome to the Solar Mini-Grid Monitoring System. This dashboard enables both offline and online real-time monitoring and intelligent control of your AI-powered solar installation. Designed for ultra-low-latency data fetching (max 1000ms delay), it integrates seamlessly with PLCs like the Siemens S7-1214 via OPC UA, ensuring smart grid management and automation—regardless of connectivity.
+            Welcome to the Solar {PLANT_NAME} Monitoring System. This dashboard enables both offline and online real-time monitoring and intelligent control of your AI-powered solar installation. Designed for ultra-low-latency data fetching (max 1000ms delay), it integrates seamlessly with PLCs like the Siemens S7-1214 via OPC UA, ensuring smart grid management and automation—regardless of connectivity.
           </p>
 
           <div className="space-y-4">

@@ -1,4 +1,6 @@
+"use client";
 import { AppSidebar } from "@/components/app-sidebar"
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,10 +17,15 @@ import {
 } from "@/components/ui/sidebar"
 import DashboardData from "../DashboardData/page"
 
+import { useParams, usePathname } from "next/navigation"
+import { PLANT_LOCATION } from "@/config/constants";
+
 export default function Page() {
+  const pathname = usePathname();
+  const controlParam = pathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Control Panel';
   return (
     <SidebarProvider>
-      <AppSidebar activeSection="dashboard" />
+      <AppSidebar activeSection="Control Panel" />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">
           <div className="flex items-center gap-2 px-4">
@@ -31,18 +38,18 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="/">
-                    Colombo Branch
+                   {PLANT_LOCATION}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Real Time Dashboard</BreadcrumbPage>
+                  <BreadcrumbPage>{controlParam}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 ">
+        <div className="flex flex-1 flex-col gap-4 px-4 pt-0 ">
         <DashboardData />
         </div>
       </SidebarInset>

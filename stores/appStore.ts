@@ -8,6 +8,7 @@ import {
 } from '@/types/sld'; // Adjust path
 import { Cable, CircuitBoard, BatteryCharging, Gauge, Zap, Rows } from 'lucide-react'; // Example icons
 import { dataPoints } from '@/config/dataPoints';
+import { USER } from '@/config/constants';
 
 
 // Define the initial state structure matching SLDState
@@ -18,7 +19,7 @@ const initialState: Omit<SLDState, 'updateRealtimeData' | 'setDataPoints' | 'tog
     return acc;
   }, {}), // Use the example data points
   isEditMode: false, // Start in view mode by default
-  currentUser: { id: 'user-123', role: 'admin' },
+  currentUser: { id: 'user-123', role: USER },
 };
 
 interface SLDActions {

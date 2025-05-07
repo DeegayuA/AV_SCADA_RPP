@@ -1,4 +1,6 @@
+"use client";
 import { AppSidebar } from "@/components/app-sidebar"
+
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,8 +15,15 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
+import ControlPanel from "./header"
+import ControlBody from "./control-body"
+
+import { useParams, usePathname } from "next/navigation"
+import { PLANT_LOCATION } from "@/config/constants";
 
 export default function Page() {
+  const pathname = usePathname();
+  const controlParam = pathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Control Panel';
   return (
     <SidebarProvider>
       <AppSidebar activeSection="Control Panel" />
@@ -30,19 +39,20 @@ export default function Page() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="/">
-                    Colombo Branch
+                   {PLANT_LOCATION}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Control Panel</BreadcrumbPage>
+                  <BreadcrumbPage>{controlParam}</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0 ">
-          {/* <ControlPanel/> */}
+        <div className="flex flex-1 flex-col gap-4 px-4 pt-0 ">
+          <ControlPanel/>
+          <ControlBody/>
         </div>
       </SidebarInset>
     </SidebarProvider>

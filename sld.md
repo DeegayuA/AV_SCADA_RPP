@@ -77,7 +77,7 @@ export default function PlantViewPage({ params }: { params: { layoutId: string }
   const { isEditMode, toggleEditMode, currentUser } = useAppStore();
 
   // Only allow Admins to toggle edit mode
-  const canToggleEdit = currentUser?.role === 'admin';
+  const canToggleEdit = currentUser?.role === USER;
 
   return (
     <div className="flex flex-col h-screen">

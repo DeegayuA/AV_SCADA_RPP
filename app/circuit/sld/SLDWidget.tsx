@@ -61,6 +61,7 @@ import { useAppStore } from '@/stores/appStore';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 import { Button } from '@/components/ui/button';
 import SLDDrillDownDialog from './ui/SLDDrillDownDialog';
+import { USER } from '@/config/constants';
 
 // Define Node Types Mapping
 const nodeTypes: NodeTypes = {
@@ -108,7 +109,7 @@ const SLDWidgetContent: React.FC<SLDWidgetProps> = ({ layoutId }) => {
   const { project } = useReactFlow();
 
   // Determine if editing is allowed
-  const canEdit = useMemo(() => isEditMode && currentUser?.role === 'admin', [isEditMode, currentUser]);
+  const canEdit = useMemo(() => isEditMode && currentUser?.role === USER, [isEditMode, currentUser]);
 
   // --- Data Loading ---
   useEffect(() => {
@@ -392,7 +393,6 @@ const SLDWidgetContent: React.FC<SLDWidgetProps> = ({ layoutId }) => {
         </ReactFlow>
       </div>
 
-        {/* --- REMOVED Old Inspector Panel Div --- */}
 
         {/* Inspector Dialog - Rendered conditionally but controlled by isOpen state */}
         {/* Render it regardless of selectedElement so it can handle its closing animation */}

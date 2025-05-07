@@ -65,20 +65,20 @@ export interface BaseNodeData {
 export type CustomNodeData =
   | InverterNodeData | PanelNodeData | BreakerNodeData | MeterNodeData
   | BatteryNodeData | DataLabelNodeData | TextLabelNodeData
-  | ContactorNodeData | GridNodeData | LoadNodeData | BusbarNodeData // Added new types
+  | ContactorNodeData | GridNodeData | LoadNodeData | BusbarNodeData 
   | GenericDeviceNodeData;
 
 // --- Interfaces for New Node Types ---
 export interface ContactorNodeData extends BaseNodeData { elementType: SLDElementType.Contactor; }
 export interface GridNodeData extends BaseNodeData { elementType: SLDElementType.Grid; }
 export interface LoadNodeData extends BaseNodeData { elementType: SLDElementType.Load; }
-export interface BusbarNodeData extends BaseNodeData { elementType: 'busbar'; }
+export interface BusbarNodeData extends BaseNodeData { elementType: SLDElementType.Busbar; }
 
 // --- Existing Node Data Interfaces (ensure elementType matches) ---
 export interface InverterNodeData extends BaseNodeData { elementType: SLDElementType.Inverter; }
 export interface PanelNodeData extends BaseNodeData { elementType: SLDElementType.Panel; }
 export interface BreakerNodeData extends BaseNodeData { elementType: SLDElementType.Breaker; }
-export interface MeterNodeData extends BaseNodeData { elementType: 'meter'; }
+export interface MeterNodeData extends BaseNodeData { elementType: SLDElementType.Meter; }
 export interface BatteryNodeData extends BaseNodeData { elementType: SLDElementType.Battery; }
 export interface DataLabelNodeData extends BaseNodeData { elementType: SLDElementType.DataLabel; }
 export interface TextLabelNodeData extends BaseNodeData { elementType: SLDElementType.TextLabel; text: string; }
@@ -109,6 +109,7 @@ export const enum SLDElementType {
   Battery = 'battery', DataLabel = 'dataLabel', TextLabel = 'textLabel',
   Contactor = 'contactor', Grid = 'grid', Load = 'load', Busbar = 'busbar', // Added new types
   GenericDevice = 'genericDevice',
+
   // Add Transformer, Generator, PLC, Relay etc. as needed
 }
 

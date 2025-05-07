@@ -60,6 +60,61 @@ export interface DataPoint {
   notes?: string; // Internal notes for clarification/TODOs
 }
 
+export interface DataPointConfig {
+  id: string; // Unique kebab-case identifier from your original DataPoint interface
+  label: string; // Make sure this exists or adapt
+  name: string;
+  nodeId: string;
+  dataType:
+  | 'Boolean'
+  | 'Float'
+  | 'Double'
+  | 'Int16'
+  | 'Int32'
+  | 'UInt16'
+  | 'UInt32'
+  | 'String'
+  // ... other types from your DataPoint interface
+  | 'DateTime'
+  | 'ByteString'
+  | 'Guid'
+  | 'Byte'
+  | 'SByte'
+  | 'Int64'
+  | 'UInt64';
+  uiType: 'display' | 'button' | 'switch' | 'gauge';
+  icon: typeof LucideIcon; // Or specific icon type
+  unit?: string;
+  min?: number;
+  max?: number;
+  description?: string;
+  category: 'battery' | 'grid' | 'inverter' | 'control' | 'three-phase' | 'pv' | 'settings' | 'status' | 'energy' | string; // Allow string for flexibility
+  factor?: number;
+  phase?: 'a' | 'b' | 'c' | 'x';
+  isSinglePhase?: boolean;
+  threePhaseGroup?: string;
+  notes?: string;
+  // Any other fields from your original DataPoint type
+}
+
+// ... other interfaces like NodeData, ThreePhaseDisplayGroup if not already defined
+export interface ThreePhasePointsConfig {
+    a?: DataPointConfig;
+    b?: DataPointConfig;
+    c?: DataPointConfig;
+}
+
+export interface ThreePhaseDisplayGroup {
+    groupName: string;
+    uiType: 'display' | 'gauge'; // Typically
+    points: ThreePhasePointsConfig;
+    average?: DataPointConfig; // Optional, if you calculate averages
+    total?: DataPointConfig;   // Optional, if you calculate totals
+    category: string;
+    // An 'id' could be useful here too, e.g., `${groupName}-${uiType}`
+    id?: string; 
+}
+
 // Helper function for creating IDs
 const createId = (name: string): string => {
   return name
@@ -83,6 +138,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Guess: Voltage often scaled by 10
     phase: 'x',
     notes: 'Factor 0.1 assumed for V scaling.',
+    label: ''
   },
   // --- Index 1 ---
   {
@@ -97,6 +153,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // Assume raw seconds
     phase: 'x',
+    label: ''
   },
   // --- Index 2 ---
   {
@@ -111,6 +168,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.1, // Consistent with V scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 3 ---
   {
@@ -125,6 +183,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.1, // Consistent with V scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 4 ---
   {
@@ -139,6 +198,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // Frequency often scaled by 100
     phase: 'x',
+    label: ''
   },
   // --- Index 5 ---
   {
@@ -153,6 +213,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // Frequency often scaled by 100
     phase: 'x',
+    label: ''
   },
   // --- Index 6 ---
   {
@@ -167,6 +228,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw encoded value
     phase: 'x',
     notes: 'Value likely needs decoding.',
+    label: ''
   },
   // --- Index 7 ---
   {
@@ -181,6 +243,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw encoded value
     phase: 'x',
     notes: 'Value likely needs decoding.',
+    label: ''
   },
   // --- Index 8 ---
   {
@@ -195,6 +258,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw encoded value
     phase: 'x',
     notes: 'Value likely needs decoding.',
+    label: ''
   },
   // --- Index 9 ---
   {
@@ -209,6 +273,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     factor: 0.1, // Common scaling for %
     phase: 'x',
+    label: ''
   },
   // --- Index 10 ---
   {
@@ -224,6 +289,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.001, // PF often scaled by 1000
     phase: 'x',
     notes: 'Factor 0.001 assumed for PF scaling.',
+    label: ''
   },
   // --- Index 11 ---
   {
@@ -238,6 +304,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     factor: 1, // Assume raw VAR
     phase: 'x',
+    label: ''
   },
   // --- Index 12 ---
   {
@@ -252,6 +319,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // Assume raw VAR
     phase: 'x',
+    label: ''
   },
   // --- Index 13 ---
   {
@@ -265,6 +333,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 14 ---
   {
@@ -279,6 +348,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     factor: 0.1, // Common scaling for %
     phase: 'x',
+    label: ''
   },
   // --- Index 15 ---
   {
@@ -294,6 +364,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Common scaling for %
     phase: 'x',
     notes: 'Purpose of _1 unclear, assuming alternative/redundant.',
+    label: ''
   },
   // --- Index 16 ---
   {
@@ -309,6 +380,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw code
     phase: 'x',
     notes: 'Value likely needs lookup table for description.',
+    label: ''
   },
   // --- Index 17 ---
   {
@@ -324,6 +396,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with low byte (i=25) for full value. Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 18 ---
   {
@@ -339,6 +412,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with high byte (i=24) for full value. Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 19 ---
   {
@@ -354,6 +428,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with low byte (i=27) for full value. Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 20 ---
   {
@@ -369,6 +444,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with high byte (i=26) for full value. Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 21 ---
   {
@@ -383,6 +459,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1, // Common PV scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 22 ---
   {
@@ -397,6 +474,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1, // Common PV scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 23 ---
   {
@@ -411,6 +489,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1, // Common PV scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 24 ---
   {
@@ -425,6 +504,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1, // Common PV scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 25 ---
   {
@@ -441,6 +521,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage-raw',
+    label: ''
   },
   // --- Index 26 ---
   {
@@ -457,6 +538,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage-raw',
+    label: ''
   },
   // --- Index 27 ---
   {
@@ -473,6 +555,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage-raw',
+    label: ''
   },
   // --- Index 28 ---
   {
@@ -489,6 +572,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'grid-current-raw',
+    label: ''
   },
   // --- Index 29 ---
   {
@@ -505,6 +589,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'grid-current-raw',
+    label: ''
   },
   // --- Index 30 ---
   {
@@ -521,6 +606,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'grid-current-raw',
+    label: ''
   },
   // --- Index 31 ---
   {
@@ -537,6 +623,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'grid-frequency-raw',
+    label: ''
   },
   // --- Index 32 ---
   {
@@ -553,6 +640,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'grid-frequency-raw',
+    label: ''
   },
   // --- Index 33 ---
   {
@@ -569,6 +657,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'grid-frequency-raw',
+    label: ''
   },
   // --- Index 34 ---
   {
@@ -584,6 +673,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts, check value range
     phase: 'x',
     notes: 'Name ambiguous (Pac L / inverter current). Assumed Power.',
+    label: ''
   },
   // --- Index 35 ---
   {
@@ -599,6 +689,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw code
     phase: 'x',
     notes: 'Value likely needs lookup table for description.',
+    label: ''
   },
   // --- Index 36 ---
   {
@@ -614,6 +705,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Common temp scaling
     phase: 'x',
     notes: 'Name "Inverter internal" is vague, assumed temperature.',
+    label: ''
   },
   // --- Index 37 ---
   {
@@ -629,6 +721,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assuming raw value is Wh*10
     phase: 'x',
     notes: 'Factor 0.1 assumes raw value is 0.1 kWh units.',
+    label: ''
   },
   // --- Index 38 ---
   {
@@ -645,6 +738,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'grid-current-precise',
+    label: ''
   },
   // --- Index 39 ---
   {
@@ -661,6 +755,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'grid-current-precise',
+    label: ''
   },
   // --- Index 40 ---
   {
@@ -677,6 +772,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'grid-current-precise',
+    label: ''
   },
   // --- Index 41 ---
   {
@@ -694,6 +790,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage-precise',
     notes: 'Factor 0.001 for Voltage seems unusual. Verify if raw value matches expected range.',
+    label: ''
   },
   // --- Index 42 ---
   {
@@ -711,6 +808,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage-precise',
     notes: 'Factor 0.001 for Voltage seems unusual. Verify if raw value matches expected range.',
+    label: ''
   },
   // --- Index 43 ---
   {
@@ -728,6 +826,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage-precise',
     notes: 'Factor 0.001 for Voltage seems unusual. Verify if raw value matches expected range.',
+    label: ''
   },
   // --- Index 44 ---
   {
@@ -744,6 +843,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'limit-current-precise',
+    label: ''
   },
   // --- Index 45 ---
   {
@@ -760,6 +860,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'limit-current-precise',
+    label: ''
   },
   // --- Index 46 ---
   {
@@ -776,6 +877,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'limit-current-precise',
+    label: ''
   },
   // --- Index 47 ---
   {
@@ -791,6 +893,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.001, // Divisor 1000 noted in log (Unusual for V, check value)
     phase: 'x',
     notes: 'Factor 0.001 for PV Voltage seems unusual. Verify.',
+    label: ''
   },
   // --- Index 48 ---
   {
@@ -805,6 +908,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.001, // Divisor 1000 noted in log
     phase: 'x',
+    label: ''
   },
   // --- Index 49 ---
   {
@@ -820,6 +924,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.001, // Divisor 1000 noted in log (Unusual for V, check value)
     phase: 'x',
     notes: 'Factor 0.001 for PV Voltage seems unusual. Verify.',
+    label: ''
   },
   // --- Index 50 ---
   {
@@ -834,6 +939,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.001, // Divisor 1000 noted in log
     phase: 'x',
+    label: ''
   },
   // --- Index 51 ---
   {
@@ -850,6 +956,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-current-precise',
+    label: ''
   },
   // --- Index 52 ---
   {
@@ -866,6 +973,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-current-precise',
+    label: ''
   },
   // --- Index 53 ---
   {
@@ -882,6 +990,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-current-precise',
+    label: ''
   },
   // --- Index 54 ---
   {
@@ -899,6 +1008,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'inverter-voltage-precise',
     notes: 'Factor 0.001 for Voltage seems unusual. Verify.',
+    label: ''
   },
   // --- Index 55 ---
   {
@@ -916,6 +1026,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'inverter-voltage-precise',
     notes: 'Factor 0.001 for Voltage seems unusual. Verify.',
+    label: ''
   },
   // --- Index 56 ---
   {
@@ -933,6 +1044,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'inverter-voltage-precise',
     notes: 'Factor 0.001 for Voltage seems unusual. Verify.',
+    label: ''
   },
   // --- Index 57 ---
   {
@@ -947,6 +1059,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     factor: 0.001, // Divisor 1000 noted in log
     phase: 'x',
+    label: ''
   },
   // --- Index 58 ---
   {
@@ -962,6 +1075,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.001, // Divisor 1000 noted in log (Unusual for V, check value)
     phase: 'x',
     notes: 'Factor 0.001 for Battery Voltage seems unusual (e.g. 50V -> 50000). Verify.',
+    label: ''
   },
   // --- Index 59 ---
   {
@@ -977,6 +1091,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Log shows Boolean, but name/value suggest Int16 power setting.',
+    label: ''
   },
   // --- Index 60 ---
   {
@@ -992,6 +1107,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw code
     phase: 'x',
     notes: 'Value likely needs lookup table for description.',
+    label: ''
   },
   // --- Index 61 ---
   {
@@ -1007,6 +1123,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assuming raw value is Wh*10
     phase: 'x',
     notes: 'Factor 0.1 assumes raw value is 0.1 kWh units.',
+    label: ''
   },
   // --- Index 62 ---
   {
@@ -1022,6 +1139,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assuming similar scaling as active power
     phase: 'x',
     notes: 'Factor 0.1 assumes raw value is 0.1 kVARh units.',
+    label: ''
   },
   // --- Index 63 ---
   {
@@ -1036,6 +1154,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1, // Assume raw minutes
     phase: 'x',
+    label: ''
   },
   // --- Index 64 ---
   {
@@ -1051,6 +1170,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=75). Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 65 ---
   {
@@ -1066,6 +1186,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=74). Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 66 ---
   {
@@ -1081,6 +1202,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=77). Purpose of _1 unclear. Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 67 ---
   {
@@ -1096,6 +1218,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=76). Purpose of _1 unclear. Unit/Factor TBD.',
+    label: ''
   },
   // --- Index 68 ---
   {
@@ -1111,6 +1234,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh
     phase: 'x',
     notes: 'Name "Total charge" vs value 3 is confusing. Assumed Daily Wh.',
+    label: ''
   },
   // --- Index 69 ---
   {
@@ -1126,6 +1250,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=81). Unit (Ah? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 70 ---
   {
@@ -1141,6 +1266,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=80). Unit (Ah? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 71 ---
   {
@@ -1156,6 +1282,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=83). Unit (Ah? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 72 ---
   {
@@ -1171,6 +1298,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=82). Unit (Ah? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 73 ---
   {
@@ -1185,6 +1313,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 74 ---
   {
@@ -1199,6 +1328,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 75 ---
   {
@@ -1214,6 +1344,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=87). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 76 ---
   {
@@ -1229,6 +1360,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=86). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 77 ---
   {
@@ -1244,6 +1376,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=89). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 78 ---
   {
@@ -1259,6 +1392,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=88). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 79 ---
   {
@@ -1273,6 +1407,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 80 ---
   {
@@ -1288,6 +1423,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=92). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 81 ---
   {
@@ -1303,6 +1439,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=91). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 82 ---
   {
@@ -1317,6 +1454,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 83 ---
   {
@@ -1331,6 +1469,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 84 ---
   {
@@ -1345,6 +1484,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 85 ---
   {
@@ -1359,6 +1499,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 86 ---
   {
@@ -1373,6 +1514,7 @@ export const dataPoints: DataPoint[] = [
     category: 'energy',
     factor: 1, // Assume raw Wh
     phase: 'x',
+    label: ''
   },
   // --- Index 87 ---
   {
@@ -1388,6 +1530,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with High word (i=99). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 88 ---
   {
@@ -1403,6 +1546,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Combine with Low word (i=98). Unit (Wh? kWh?) and Factor TBD.',
+    label: ''
   },
   // --- Index 89 ---
   {
@@ -1417,6 +1561,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter',
     factor: 0.1, // Common temp scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 90 ---
   {
@@ -1431,6 +1576,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter',
     factor: 0.1, // Common temp scaling
     phase: 'x',
+    label: ''
   },
   // --- Index 91 ---
   {
@@ -1444,6 +1590,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 92 ---
   {
@@ -1459,6 +1606,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw code
     phase: 'x',
     notes: 'Value needs decoding (bitmask or enum).',
+    label: ''
   },
   // --- Index 93 ---
   {
@@ -1474,6 +1622,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw bits
     phase: 'x',
     notes: 'Value is likely a bitmask. Needs decoding.',
+    label: ''
   },
   // --- Index 94 ---
   {
@@ -1489,6 +1638,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw bits
     phase: 'x',
     notes: 'Value is likely a bitmask. Needs decoding.',
+    label: ''
   },
   // --- Index 95 ---
   {
@@ -1504,6 +1654,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw bits
     phase: 'x',
     notes: 'Value is likely a bitmask. Needs decoding.',
+    label: ''
   },
   // --- Index 96 ---
   {
@@ -1519,6 +1670,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw bits
     phase: 'x',
     notes: 'Value is likely a bitmask. Needs decoding.',
+    label: ''
   },
   // --- Index 97 ---
   {
@@ -1534,6 +1686,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw bits
     phase: 'x',
     notes: 'Value is likely a bitmask. Needs decoding.',
+    label: ''
   },
   // --- Index 98 ---
   {
@@ -1549,6 +1702,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw bits
     phase: 'x',
     notes: 'Value is likely a bitmask. Needs decoding.',
+    label: ''
   },
   // --- Index 99 ---
   {
@@ -1560,12 +1714,13 @@ export const dataPoints: DataPoint[] = [
     icon: Thermometer, // Changed from Gauge to Thermometer
     unit: '°C',
     min: -10, // Example range
-    max: 60,  // Example range
+    max: 60, // Example range
     description: 'Temperature of the battery.',
     category: 'battery',
     factor: (1 / 4095) * 100, // 1280 -> 128.0C still seems high, but using scaling
     phase: 'x',
     notes: 'Factor F to  C  yields high temp (128C from log). Verify scaling.',
+    label: ''
   },
   // --- Index 100 ---
   {
@@ -1576,12 +1731,13 @@ export const dataPoints: DataPoint[] = [
     uiType: 'gauge',
     icon: Battery,
     unit: 'V',
-    min: 40,  // Example range for LiFePO4
-    max: 58,  // Example range for LiFePO4
+    min: 40, // Example range for LiFePO4
+    max: 58, // Example range for LiFePO4
     description: 'Current battery voltage.',
     category: 'battery',
     factor: 0.01, // 5163 -> 51.63V (Confirmed plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 101 ---
   {
@@ -1598,6 +1754,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     factor: 1, // 100 -> 100% (Confirmed plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 102 ---
   {
@@ -1612,6 +1769,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked N/A in log. Identify purpose or remove.',
+    label: ''
   },
   // --- Index 103 ---
   {
@@ -1626,6 +1784,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     factor: 1, // -7 -> -7W (Plausible low power flow)
     phase: 'x',
+    label: ''
   },
   // --- Index 104 ---
   {
@@ -1640,6 +1799,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     factor: 0.1, // -15 -> -1.5A (Seems plausible scaling)
     phase: 'x',
+    label: ''
   },
   // --- Index 105 ---
   {
@@ -1654,6 +1814,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     factor: 0.1, // 712 -> 71.2 Ah (Plausible magnitude for capacity)
     phase: 'x',
+    label: ''
   },
   // --- Index 106 ---
   {
@@ -1672,6 +1833,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage',
+    label: ''
   },
   // --- Index 107 ---
   {
@@ -1690,6 +1852,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage',
+    label: ''
   },
   // --- Index 108 ---
   {
@@ -1708,6 +1871,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'grid-voltage',
+    label: ''
   },
   // --- Index 109 ---
   {
@@ -1724,6 +1888,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'x', // Represents L-L
     isSinglePhase: false,
     threePhaseGroup: 'grid-line-voltage',
+    label: ''
   },
   // --- Index 110 ---
   {
@@ -1740,6 +1905,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'x', // Represents L-L
     isSinglePhase: false,
     threePhaseGroup: 'grid-line-voltage',
+    label: ''
   },
   // --- Index 111 ---
   {
@@ -1756,6 +1922,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'x', // Represents L-L
     isSinglePhase: false,
     threePhaseGroup: 'grid-line-voltage',
+    label: ''
   },
   // --- Index 112 ---
   {
@@ -1772,6 +1939,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'grid-inner-power',
+    label: ''
   },
   // --- Index 113 ---
   {
@@ -1788,6 +1956,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'grid-inner-power',
+    label: ''
   },
   // --- Index 114 ---
   {
@@ -1804,6 +1973,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'grid-inner-power',
+    label: ''
   },
   // --- Index 115 ---
   {
@@ -1818,6 +1988,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1, // -2076 -> -2076W (Sum matches phases, plausible raw)
     phase: 'x',
+    label: ''
   },
   // --- Index 116 ---
   {
@@ -1832,6 +2003,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1, // Assume raw VA
     phase: 'x',
+    label: ''
   },
   // --- Index 117 ---
   {
@@ -1848,6 +2020,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 0.01, // 5008 -> 50.08 Hz (Confirmed plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 118 ---
   {
@@ -1864,6 +2037,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'grid-side-inner-current',
+    label: ''
   },
   // --- Index 119 ---
   {
@@ -1880,6 +2054,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'grid-side-inner-current',
+    label: ''
   },
   // --- Index 120 ---
   {
@@ -1896,6 +2071,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'grid-side-inner-current',
+    label: ''
   },
   // --- Index 121 ---
   {
@@ -1912,6 +2088,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'out-of-grid-current',
+    label: ''
   },
   // --- Index 122 ---
   {
@@ -1928,6 +2105,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'out-of-grid-current',
+    label: ''
   },
   // --- Index 123 ---
   {
@@ -1944,6 +2122,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'out-of-grid-current',
+    label: ''
   },
   // --- Index 124 ---
   {
@@ -1960,6 +2139,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'out-of-grid-power',
+    label: ''
   },
   // --- Index 125 ---
   {
@@ -1976,6 +2156,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'out-of-grid-power',
+    label: ''
   },
   // --- Index 126 ---
   {
@@ -1992,6 +2173,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'out-of-grid-power',
+    label: ''
   },
   // --- Index 127 ---
   {
@@ -2006,6 +2188,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter', // Represents inverter output in this mode
     factor: 1, // 2086 -> 2086W (Sum matches phases, plausible raw)
     phase: 'x',
+    label: ''
   },
   // --- Index 128 ---
   {
@@ -2020,6 +2203,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter',
     factor: 1, // Assume raw VA
     phase: 'x',
+    label: ''
   },
   // --- Index 129 ---
   {
@@ -2034,6 +2218,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 0.01, // Assume scaling * 100 (0 -> 0.00)
     phase: 'x',
+    label: ''
   },
   // --- Index 130 ---
   {
@@ -2051,6 +2236,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'grid-side-power',
     notes: 'Seems redundant with grid-inner-power-a (i=127). Verify difference.',
+    label: ''
   },
   // --- Index 131 ---
   {
@@ -2068,6 +2254,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'grid-side-power',
     notes: 'Seems redundant with grid-inner-power-b (i=128). Verify difference.',
+    label: ''
   },
   // --- Index 132 ---
   {
@@ -2085,6 +2272,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'grid-side-power',
     notes: 'Seems redundant with grid-inner-power-c (i=129). Verify difference.',
+    label: ''
   },
   // --- Index 133 ---
   {
@@ -2100,6 +2288,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // -2076 -> -2076W
     phase: 'x',
     notes: 'Seems redundant with grid-total-active-power-side-to-side (i=130). Verify difference.',
+    label: ''
   },
   // --- Index 134 ---
   {
@@ -2114,6 +2303,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked N/A in log. Identify purpose or remove.',
+    label: ''
   },
   // --- Index 135 ---
   {
@@ -2130,6 +2320,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-voltage',
+    label: ''
   },
   // --- Index 136 ---
   {
@@ -2146,6 +2337,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-voltage',
+    label: ''
   },
   // --- Index 137 ---
   {
@@ -2162,6 +2354,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-voltage',
+    label: ''
   },
   // --- Index 138 ---
   {
@@ -2178,6 +2371,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-current',
+    label: ''
   },
   // --- Index 139 ---
   {
@@ -2194,6 +2388,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-current',
+    label: ''
   },
   // --- Index 140 ---
   {
@@ -2210,6 +2405,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-current',
+    label: ''
   },
   // --- Index 141 ---
   {
@@ -2226,6 +2422,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-power',
+    label: ''
   },
   // --- Index 142 ---
   {
@@ -2242,6 +2439,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-power',
+    label: ''
   },
   // --- Index 143 ---
   {
@@ -2258,6 +2456,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'inverter-output-power',
+    label: ''
   },
   // --- Index 144 ---
   {
@@ -2272,6 +2471,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter',
     factor: 1, // 5438 -> 5438W (Sum matches phases, plausible raw)
     phase: 'x',
+    label: ''
   },
   // --- Index 145 ---
   {
@@ -2286,6 +2486,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter',
     factor: 1, // 5438 -> 5438VA (Matches total W, implies PF=1? Check.)
     phase: 'x',
+    label: ''
   },
   // --- Index 146 ---
   {
@@ -2302,6 +2503,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter',
     factor: 0.01, // 5008 -> 50.08 Hz (Confirmed plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 147 ---
   {
@@ -2316,6 +2518,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked N/A_1 in log. Identify purpose or remove.',
+    label: ''
   },
   // --- Index 148 ---
   {
@@ -2332,6 +2535,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'ups-load-power',
+    label: ''
   },
   // --- Index 149 ---
   {
@@ -2348,6 +2552,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'ups-load-power',
+    label: ''
   },
   // --- Index 150 ---
   {
@@ -2364,6 +2569,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'ups-load-power',
+    label: ''
   },
   // --- Index 151 ---
   {
@@ -2378,6 +2584,7 @@ export const dataPoints: DataPoint[] = [
     category: 'inverter', // Represents UPS output
     factor: 1, // 3362 -> 3362W (Sum matches phases, plausible raw)
     phase: 'x',
+    label: ''
   },
   // --- Index 152 ---
   {
@@ -2394,6 +2601,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'load-voltage',
+    label: ''
   },
   // --- Index 153 ---
   {
@@ -2410,6 +2618,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'load-voltage',
+    label: ''
   },
   // --- Index 154 ---
   {
@@ -2426,6 +2635,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'load-voltage',
+    label: ''
   },
   // --- Index 155 ---
   {
@@ -2440,6 +2650,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'a',
     notes: 'Marked "no use" in log. Hide or remove.',
+    label: ''
   },
   // --- Index 156 ---
   {
@@ -2454,6 +2665,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'b',
     notes: 'Marked "no use" in log. Hide or remove.',
+    label: ''
   },
   // --- Index 157 ---
   {
@@ -2468,6 +2680,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'c',
     notes: 'Marked "no use" in log. Hide or remove.',
+    label: ''
   },
   // --- Index 158 ---
   {
@@ -2484,6 +2697,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'load-power',
+    label: ''
   },
   // --- Index 159 ---
   {
@@ -2500,6 +2714,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'load-power',
+    label: ''
   },
   // --- Index 160 ---
   {
@@ -2516,6 +2731,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'load-power',
+    label: ''
   },
   // --- Index 161 ---
   {
@@ -2528,8 +2744,9 @@ export const dataPoints: DataPoint[] = [
     unit: 'kW',
     description: 'Total active power consumed by the load.',
     category: 'grid', // Load often relates to grid consumption/backup
-    factor: 0.0001, 
+    factor: 0.0001,
     phase: 'x',
+    label: ''
   },
   // --- Index 162 ---
   {
@@ -2545,6 +2762,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // 3362 -> 3362VA (Matches W, implies PF=1? Check.)
     phase: 'x',
     notes: 'Name mentions "undefine". Verify calculation if different from W.',
+    label: ''
   },
   // --- Index 163 ---
   {
@@ -2561,6 +2779,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid', // Related to the power supplied to load
     factor: 0.01, // 5008 -> 50.08 Hz (Confirmed plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 164 ---
   {
@@ -2575,6 +2794,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 1, // 4838 -> 4838W (Plausible raw)
     phase: 'x',
+    label: ''
   },
   // --- Index 165 ---
   {
@@ -2589,6 +2809,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 1, // 714 -> 714W (Plausible raw)
     phase: 'x',
+    label: ''
   },
   // --- Index 166 ---
   {
@@ -2603,6 +2824,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 167 ---
   {
@@ -2617,6 +2839,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 168 ---
   {
@@ -2632,6 +2855,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // 3845 -> 384.5V (Plausible for PV)
     phase: 'x',
     notes: 'Potentially redundant with vpv1 (i=28) or pv1-v-precise (i=55).',
+    label: ''
   },
   // --- Index 169 ---
   {
@@ -2647,6 +2871,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // 124 -> 12.4A (Plausible for PV)
     phase: 'x',
     notes: 'Potentially redundant with ipv1 (i=30) or pv1-i-precise (i=56).',
+    label: ''
   },
   // --- Index 170 ---
   {
@@ -2662,6 +2887,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // 1498 -> 149.8V (Plausible for PV)
     phase: 'x',
     notes: 'Potentially redundant with vpv2 (i=29) or pv2-v-precise (i=57).',
+    label: ''
   },
   // --- Index 171 ---
   {
@@ -2677,6 +2903,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // 47 -> 4.7A (Plausible for PV)
     phase: 'x',
     notes: 'Potentially redundant with ipv2 (i=31) or pv2-i-precise (i=58).',
+    label: ''
   },
   // --- Index 172 ---
   {
@@ -2691,6 +2918,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1,
     phase: 'x',
+    label: ''
   },
   // --- Index 173 ---
   {
@@ -2705,6 +2933,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1,
     phase: 'x',
+    label: ''
   },
   // --- Index 174 ---
   {
@@ -2719,6 +2948,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1,
     phase: 'x',
+    label: ''
   },
   // --- Index 175 ---
   {
@@ -2733,6 +2963,7 @@ export const dataPoints: DataPoint[] = [
     category: 'pv',
     factor: 0.1,
     phase: 'x',
+    label: ''
   },
   // --- Index 176 ---
   {
@@ -2748,6 +2979,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw code
     phase: 'x',
     notes: 'Value likely needs lookup table for description.',
+    label: ''
   },
   // --- Index 177 ---
   {
@@ -2762,6 +2994,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 5720 -> 57.20V (Plausible for lead-acid)
     phase: 'x',
+    label: ''
   },
   // --- Index 178 ---
   {
@@ -2776,6 +3009,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 5720 -> 57.20V (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 179 ---
   {
@@ -2790,6 +3024,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 5525 -> 55.25V (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 180 ---
   {
@@ -2805,6 +3040,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // 1000 -> 1000Ah (Seems large, maybe 0.1 for 100Ah? Verify.)
     phase: 'x',
     notes: 'Factor 1 yields large capacity (1000Ah). Verify if scaling is needed.',
+    label: ''
   },
   // --- Index 181 ---
   {
@@ -2819,6 +3055,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 4500 -> 45.00V (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 182 ---
   {
@@ -2833,6 +3070,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // 20 -> 20W (Plausible low threshold)
     phase: 'x',
+    label: ''
   },
   // --- Index 183 ---
   {
@@ -2847,6 +3085,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // 90 -> 90 days
     phase: 'x',
+    label: ''
   },
   // --- Index 184 ---
   {
@@ -2861,6 +3100,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // Assume raw minutes
     phase: 'x',
+    label: ''
   },
   // --- Index 185 ---
   {
@@ -2876,6 +3116,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Unknown scaling
     phase: 'x',
     notes: 'Unit and factor need verification.',
+    label: ''
   },
   // --- Index 186 ---
   {
@@ -2890,6 +3131,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.1, // 200 -> 20.0A (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 187 ---
   {
@@ -2904,6 +3146,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.1, // 195 -> 19.5A (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 188 ---
   {
@@ -2917,6 +3160,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 189 ---
   {
@@ -2932,6 +3176,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // 25 -> 25mΩ (Plausible raw)
     phase: 'x',
     notes: 'Unit mΩ assumed.',
+    label: ''
   },
   // --- Index 190 ---
   {
@@ -2946,6 +3191,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.1, // 990 -> 99.0% (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 191 ---
   {
@@ -2960,6 +3206,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // 20 -> 20% (Plausible direct %)
     phase: 'x',
+    label: ''
   },
   // --- Index 192 ---
   {
@@ -2974,6 +3221,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // 50 -> 50% (Plausible direct %)
     phase: 'x',
+    label: ''
   },
   // --- Index 193 ---
   {
@@ -2988,6 +3236,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // 20 -> 20% (Plausible direct %)
     phase: 'x',
+    label: ''
   },
   // --- Index 194 ---
   {
@@ -3002,6 +3251,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 4600 -> 46.00V (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 195 ---
   {
@@ -3016,6 +3266,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 5200 -> 52.00V (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 196 ---
   {
@@ -3030,6 +3281,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 4750 -> 47.50V (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 197 ---
   {
@@ -3044,6 +3296,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.01, // 4900 -> 49.00V (Plausible)
     phase: 'x',
+    label: ''
   },
   // --- Index 198 ---
   {
@@ -3058,6 +3311,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1, // 40 -> 40% (Plausible direct %)
     phase: 'x',
+    label: ''
   },
   // --- Index 199 ---
   {
@@ -3072,39 +3326,28 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 0.1, // 40 -> 4.0A (Plausible, depends on system size)
     phase: 'x',
+    label: ''
   },
 
   // NOTE: Entries from index 200 onwards are excluded as per the request.
   // Adding placeholders for some existing items from the original prompt for context
-  {
-    id: 'remote-auto-key',
-    name: 'Remote Auto Key',
-    nodeId: 'ns=4;i=351',
-    dataType: 'Boolean',
-    uiType: 'switch',
-    icon: Activity,
-    category: 'control',
-    description: 'Remote auto key',
-    factor: 1,
-    phase: 'x',
-    notes: "Included from original prompt example - Index > 199"
-  },
     {
-    id: 'frequency',
-    name: 'Frequency',
-    nodeId: 'ns=4;i=346',
-    dataType: 'Float',
-    uiType: 'display',
-    icon: AudioWaveform,
-    unit: ' Hz',
-    min: 49.8,
-    max: 50.2,
-    category: 'grid', // More appropriate than battery
-    description: 'Current Frequency (Placeholder from original).',
-    factor: 1, // Float usually doesn't need factor unless specified
-    phase: 'x',
-    notes: "Included from original prompt example - Index > 199"
-  },
+      id: 'frequency',
+      name: 'Frequency',
+      nodeId: 'ns=4;i=346',
+      dataType: 'Float',
+      uiType: 'display',
+      icon: AudioWaveform,
+      unit: ' Hz',
+      min: 49.8,
+      max: 50.2,
+      category: 'grid', // More appropriate than battery
+      description: 'Current Frequency (Placeholder from original).',
+      factor: 1, // Float usually doesn't need factor unless specified
+      phase: 'x',
+      notes: "Included from original prompt example - Index > 199",
+      label: ''
+    },
   // --- Index 200 ---
   {
     id: createId('Grid Charged Enable'),
@@ -3118,6 +3361,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Might be a boolean status (0/1). Confirm if read-only or writable setting.',
+    label: ''
   },
   // --- Index 201 ---
   {
@@ -3132,6 +3376,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Confirm if a setting (e.g., enable/disable) or a status.',
+    label: ''
   },
   // --- Index 202 ---
   {
@@ -3146,6 +3391,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value is a code requiring a lookup table for description.',
+    label: ''
   },
   // --- Index 203 ---
   {
@@ -3159,6 +3405,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 204 ---
   {
@@ -3174,6 +3421,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts, verify scaling
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed. Verify required scaling.',
+    label: ''
   },
   // --- Index 205 ---
   // { 
@@ -3201,6 +3449,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 207 ---
   {
@@ -3214,6 +3463,7 @@ export const dataPoints: DataPoint[] = [
     category: 'control',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 208 ---
   {
@@ -3228,6 +3478,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value is a code requiring lookup (e.g., 1=Single, 3=Three).',
+    label: ''
   },
   // --- Index 209 ---
   {
@@ -3242,6 +3493,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value likely needs decoding (e.g., HHMM format?).',
+    label: ''
   },
   // --- Index 210 ---
   {
@@ -3256,6 +3508,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value likely needs decoding (e.g., HHMM format?).',
+    label: ''
   },
   // --- Index 211 ---
   {
@@ -3270,6 +3523,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value likely needs decoding (e.g., HHMM format?).',
+    label: ''
   },
   // --- Index 212 ---
   {
@@ -3284,6 +3538,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value likely needs decoding (e.g., HHMM format?).',
+    label: ''
   },
   // --- Index 213 ---
   {
@@ -3298,6 +3553,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value likely needs decoding (e.g., HHMM format?).',
+    label: ''
   },
   // --- Index 214 ---
   {
@@ -3312,6 +3568,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value likely needs decoding (e.g., HHMM format?).',
+    label: ''
   },
   // --- Index 215 ---
   {
@@ -3327,6 +3584,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 216 ---
   {
@@ -3342,6 +3600,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 217 ---
   {
@@ -3357,6 +3616,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 218 ---
   {
@@ -3372,6 +3632,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 219 ---
   {
@@ -3387,6 +3648,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 220 ---
   {
@@ -3402,6 +3664,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 221 ---
   {
@@ -3417,6 +3680,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume V * 10
     phase: 'x',
     notes: 'Purpose (limit/target?), unit (V), and factor (0.1) assumed.',
+    label: ''
   },
   // --- Index 222 ---
   {
@@ -3432,6 +3696,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume V * 10
     phase: 'x',
     notes: 'Purpose, unit (V), and factor (0.1) assumed.',
+    label: ''
   },
   // --- Index 223 ---
   {
@@ -3447,6 +3712,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume V * 10
     phase: 'x',
     notes: 'Purpose, unit (V), and factor (0.1) assumed.',
+    label: ''
   },
   // --- Index 224 ---
   {
@@ -3462,6 +3728,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume V * 10
     phase: 'x',
     notes: 'Purpose, unit (V), and factor (0.1) assumed.',
+    label: ''
   },
   // --- Index 225 ---
   {
@@ -3477,6 +3744,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume V * 10
     phase: 'x',
     notes: 'Purpose, unit (V), and factor (0.1) assumed.',
+    label: ''
   },
   // --- Index 226 ---
   {
@@ -3492,6 +3760,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume V * 10
     phase: 'x',
     notes: 'Purpose, unit (V), and factor (0.1) assumed.',
+    label: ''
   },
   // --- Index 227 ---
   {
@@ -3507,6 +3776,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume direct %
     phase: 'x',
     notes: 'Purpose (limit/target?) and unit (%) assumed.',
+    label: ''
   },
   // --- Index 228 ---
   {
@@ -3522,6 +3792,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume direct %
     phase: 'x',
     notes: 'Purpose and unit (%) assumed.',
+    label: ''
   },
   // --- Index 229 ---
   {
@@ -3537,6 +3808,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume direct %
     phase: 'x',
     notes: 'Purpose and unit (%) assumed.',
+    label: ''
   },
   // --- Index 230 ---
   {
@@ -3552,6 +3824,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume direct %
     phase: 'x',
     notes: 'Purpose and unit (%) assumed.',
+    label: ''
   },
   // --- Index 231 ---
   {
@@ -3567,6 +3840,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume direct %
     phase: 'x',
     notes: 'Purpose and unit (%) assumed.',
+    label: ''
   },
   // --- Index 232 ---
   {
@@ -3582,6 +3856,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume direct %
     phase: 'x',
     notes: 'Purpose and unit (%) assumed.',
+    label: ''
   },
   // --- Index 233 ---
   {
@@ -3595,6 +3870,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 234 ---
   {
@@ -3608,6 +3884,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 235 ---
   {
@@ -3621,6 +3898,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 236 ---
   {
@@ -3634,6 +3912,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 237 ---
   {
@@ -3647,6 +3926,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 238 ---
   {
@@ -3660,6 +3940,7 @@ export const dataPoints: DataPoint[] = [
     category: 'settings',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 239 ---
   {
@@ -3674,6 +3955,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value requires lookup table.',
+    label: ''
   },
   // --- Index 240 ---
   {
@@ -3689,6 +3971,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.01, // Assume Hz * 100 if scaled
     phase: 'x',
     notes: 'Assume factor 0.01 if value represents 5000/6000 etc.',
+    label: ''
   },
   // --- Index 241 ---
   {
@@ -3703,6 +3986,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value requires lookup table.',
+    label: ''
   },
   // --- Index 242 ---
   {
@@ -3718,6 +4002,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Consistent with previous V limits
     phase: 'x',
     notes: 'Potentially redundant with i=6.',
+    label: ''
   },
   // --- Index 243 ---
   {
@@ -3733,6 +4018,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Consistent with previous V limits
     phase: 'x',
     notes: 'Potentially redundant with i=5.',
+    label: ''
   },
   // --- Index 244 ---
   {
@@ -3748,6 +4034,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.01, // Consistent with previous Hz limits
     phase: 'x',
     notes: 'Potentially redundant with i=8.',
+    label: ''
   },
   // --- Index 245 ---
   {
@@ -3763,6 +4050,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.01, // Consistent with previous Hz limits
     phase: 'x',
     notes: 'Potentially redundant with i=7.',
+    label: ''
   },
   // --- Index 246 ---
   {
@@ -3777,6 +4065,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Confirm if status or setting.',
+    label: ''
   },
   // --- Index 247 ---
   {
@@ -3792,6 +4081,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 248 ---
   {
@@ -3807,6 +4097,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Unit (W) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 249 ---
   {
@@ -3822,6 +4113,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw seconds
     phase: 'x',
     notes: 'Unit (s) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 250 ---
   {
@@ -3837,6 +4129,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.01, // Assume V * 100
     phase: 'x',
     notes: 'Factor 0.01 assumed.',
+    label: ''
   },
   // --- Index 251 ---
   {
@@ -3852,6 +4145,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.01, // Assume V * 100
     phase: 'x',
     notes: 'Factor 0.01 assumed.',
+    label: ''
   },
   // --- Index 252 ---
   {
@@ -3867,6 +4161,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume A * 10
     phase: 'x',
     notes: 'Factor 0.1 assumed.',
+    label: ''
   },
   // --- Index 253 ---
   {
@@ -3882,6 +4177,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume A * 10
     phase: 'x',
     notes: 'Factor 0.1 assumed.',
+    label: ''
   },
   // --- Index 254 ---
   {
@@ -3898,6 +4194,7 @@ export const dataPoints: DataPoint[] = [
     category: 'battery',
     factor: 1, // Assume direct %
     phase: 'x',
+    label: ''
   },
   // --- Index 255 ---
   {
@@ -3915,6 +4212,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.01, // Assume V * 100
     phase: 'x',
     notes: 'Factor 0.01 assumed.',
+    label: ''
   },
   // --- Index 256 ---
   {
@@ -3930,6 +4228,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume A * 10
     phase: 'x',
     notes: 'Factor 0.1 assumed. Verify sign convention.',
+    label: ''
   },
   // --- Index 257 ---
   {
@@ -3947,6 +4246,7 @@ export const dataPoints: DataPoint[] = [
     factor: (1 / 4095) * 100, // 1280 -> 128.0C still seems high, but using scaling
     phase: 'x',
     notes: 'Factor F to  C  yields high temp (128C from log). Verify scaling.',
+    label: ''
   },
   // --- Index 258 ---
   {
@@ -3962,6 +4262,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume A * 10
     phase: 'x',
     notes: 'Factor 0.1 assumed. Check difference from i=272.',
+    label: ''
   },
   // --- Index 259 ---
   {
@@ -3977,6 +4278,7 @@ export const dataPoints: DataPoint[] = [
     factor: 0.1, // Assume A * 10
     phase: 'x',
     notes: 'Factor 0.1 assumed. Check difference from i=273.',
+    label: ''
   },
   // --- Index 260 ---
   {
@@ -3991,6 +4293,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Value requires lookup table.',
+    label: ''
   },
   // --- Index 261 ---
   {
@@ -4008,6 +4311,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume direct %
     phase: 'x',
     notes: 'Unit (%) and factor (1) assumed.',
+    label: ''
   },
   // --- Index 262 ---
   {
@@ -4022,6 +4326,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // N/A for button trigger
     phase: 'x',
     notes: 'This is likely a write-only command trigger.',
+    label: ''
   },
   // --- Index 263 ---
   {
@@ -4036,6 +4341,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // N/A for button trigger
     phase: 'x',
     notes: 'This is likely a write-only command trigger. Purpose of "_1" unclear.',
+    label: ''
   },
   // --- Index 264 ---
   {
@@ -4050,6 +4356,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // N/A for button trigger
     phase: 'x',
     notes: 'This is likely a write-only command trigger.',
+    label: ''
   },
   // --- Index 265 ---
   {
@@ -4066,6 +4373,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'meter-current',
+    label: ''
   },
   // --- Index 266 ---
   {
@@ -4082,6 +4390,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'meter-current',
+    label: ''
   },
   // --- Index 267 ---
   {
@@ -4098,6 +4407,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'meter-current',
+    label: ''
   },
   // --- Index 268 ---
   {
@@ -4111,7 +4421,8 @@ export const dataPoints: DataPoint[] = [
     description: 'External Meter - Current Neutral.',
     category: 'grid', // Neutral current is system-wide
     factor: 1,
-    phase: 'x', // Neutral isn't a phase
+    phase: 'x',
+    label: ''
   },
   // --- Index 269 ---
   {
@@ -4127,6 +4438,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x', // Ground isn't a phase
     notes: 'Verify if this is Ground/PE current.',
+    label: ''
   },
   // --- Index 270 ---
   {
@@ -4141,6 +4453,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 271 ---
   {
@@ -4158,6 +4471,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-current-unbalance',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 272 ---
   {
@@ -4175,6 +4489,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-current-unbalance',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 273 ---
   {
@@ -4192,6 +4507,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-current-unbalance',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 274 ---
   {
@@ -4207,6 +4523,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 275 ---
   {
@@ -4223,6 +4540,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'x', // Represents L-L
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-ll',
+    label: ''
   },
   // --- Index 276 ---
   {
@@ -4239,6 +4557,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'x',
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-ll',
+    label: ''
   },
   // --- Index 277 ---
   {
@@ -4255,6 +4574,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'x',
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-ll',
+    label: ''
   },
   // --- Index 278 ---
   {
@@ -4269,6 +4589,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 279 ---
   {
@@ -4285,6 +4606,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-ln',
+    label: ''
   },
   // --- Index 280 ---
   {
@@ -4301,6 +4623,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-ln',
+    label: ''
   },
   // --- Index 281 ---
   {
@@ -4317,6 +4640,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-ln',
+    label: ''
   },
   // --- Index 282 ---
   {
@@ -4331,6 +4655,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use" in log.',
+    label: ''
   },
   // --- Index 283 ---
   {
@@ -4345,6 +4670,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 284 ---
   {
@@ -4362,6 +4688,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-unbalance-ll',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 285 ---
   {
@@ -4379,6 +4706,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-unbalance-ll',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 286 ---
   {
@@ -4396,6 +4724,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-unbalance-ll',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 287 ---
   {
@@ -4411,6 +4740,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 288 ---
   {
@@ -4428,6 +4758,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-unbalance-ln',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 289 ---
   {
@@ -4445,6 +4776,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-unbalance-ln',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 290 ---
   {
@@ -4462,6 +4794,7 @@ export const dataPoints: DataPoint[] = [
     isSinglePhase: false,
     threePhaseGroup: 'meter-voltage-unbalance-ln',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 291 ---
   {
@@ -4477,6 +4810,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (%) assumed.',
+    label: ''
   },
   // --- Index 292 ---
   {
@@ -4493,6 +4827,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'meter-active-power',
+    label: ''
   },
   // --- Index 293 ---
   {
@@ -4509,6 +4844,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'meter-active-power',
+    label: ''
   },
   // --- Index 294 ---
   {
@@ -4525,6 +4861,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'meter-active-power',
+    label: ''
   },
   // --- Index 295 ---
   {
@@ -4539,6 +4876,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 296 ---
   {
@@ -4555,6 +4893,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'meter-reactive-power',
+    label: ''
   },
   // --- Index 297 ---
   {
@@ -4571,6 +4910,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'meter-reactive-power',
+    label: ''
   },
   // --- Index 298 ---
   {
@@ -4587,6 +4927,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'meter-reactive-power',
+    label: ''
   },
   // --- Index 299 ---
   {
@@ -4601,6 +4942,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 300 ---
   {
@@ -4617,6 +4959,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'meter-apparent-power',
+    label: ''
   },
   // --- Index 301 ---
   {
@@ -4633,6 +4976,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'meter-apparent-power',
+    label: ''
   },
   // --- Index 302 ---
   {
@@ -4649,6 +4993,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'meter-apparent-power',
+    label: ''
   },
   // --- Index 303 ---
   {
@@ -4663,6 +5008,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 304 ---
   {
@@ -4677,6 +5023,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_1" in log.',
+    label: ''
   },
   // --- Index 305 ---
   {
@@ -4691,6 +5038,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_2" in log.',
+    label: ''
   },
   // --- Index 306 ---
   {
@@ -4705,6 +5053,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_3" in log.',
+    label: ''
   },
   // --- Index 307 ---
   {
@@ -4719,6 +5068,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_4" in log.',
+    label: ''
   },
   // --- Index 308 ---
   {
@@ -4733,6 +5083,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_5" in log.',
+    label: ''
   },
   // --- Index 309 ---
   {
@@ -4747,6 +5098,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_6" in log.',
+    label: ''
   },
   // --- Index 310 ---
   {
@@ -4761,6 +5113,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_7" in log.',
+    label: ''
   },
   // --- Index 311 ---
   {
@@ -4775,6 +5128,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked "Not use_8" in log.',
+    label: ''
   },
   // --- Index 312 ---
   {
@@ -4791,6 +5145,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'meter-power-factor',
+    label: ''
   },
   // --- Index 313 ---
   {
@@ -4807,6 +5162,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'meter-power-factor',
+    label: ''
   },
   // --- Index 314 ---
   {
@@ -4823,6 +5179,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'meter-power-factor',
+    label: ''
   },
   // --- Index 315 ---
   {
@@ -4837,6 +5194,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 316 ---
   {
@@ -4853,6 +5211,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'a',
     isSinglePhase: false,
     threePhaseGroup: 'meter-displacement-pf',
+    label: ''
   },
   // --- Index 317 ---
   {
@@ -4869,6 +5228,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'b',
     isSinglePhase: false,
     threePhaseGroup: 'meter-displacement-pf',
+    label: ''
   },
   // --- Index 318 ---
   {
@@ -4885,6 +5245,7 @@ export const dataPoints: DataPoint[] = [
     phase: 'c',
     isSinglePhase: false,
     threePhaseGroup: 'meter-displacement-pf',
+    label: ''
   },
   // --- Index 319 ---
   {
@@ -4899,6 +5260,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 320 ---
   // Note: Index 320 (i=346, Frequency) was already added as an example placeholder in the original code.
@@ -4917,6 +5279,7 @@ export const dataPoints: DataPoint[] = [
     category: 'grid',
     factor: 1, // Float assumed raw Hz
     phase: 'x',
+    label: ''
   },
   // --- Index 321 ---
   {
@@ -4931,6 +5294,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 322 ---
   {
@@ -4945,6 +5309,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 323 ---
   {
@@ -4959,6 +5324,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 324 ---
   // Note: Index 324 (i=351, Remote Auto Key) was already added as an example placeholder.
@@ -4975,6 +5341,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Confirm if momentary button or toggle switch. Write-only.',
+    label: ''
   },
   // --- Index 325 ---
   {
@@ -4989,6 +5356,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Confirm if momentary button or toggle switch. Write-only.',
+    label: ''
   },
   // --- Index 326 ---
   {
@@ -5003,6 +5371,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Abbreviation C/O needs clarification. Write-only.',
+    label: ''
   },
   // --- Index 327 ---
   {
@@ -5017,6 +5386,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Abbreviation C/O needs clarification. Write-only.',
+    label: ''
   },
   // --- Index 328 ---
   {
@@ -5031,6 +5401,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 329 ---
   {
@@ -5045,6 +5416,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 330 ---
   {
@@ -5059,6 +5431,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked Reserved.',
+    label: ''
   },
   // --- Index 331 ---
   {
@@ -5073,6 +5446,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked Reserved_1.',
+    label: ''
   },
   // --- Index 332 ---
   {
@@ -5087,6 +5461,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 333 ---
   {
@@ -5101,6 +5476,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 334 ---
   {
@@ -5115,6 +5491,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked Reserved_2.',
+    label: ''
   },
   // --- Index 335 ---
   {
@@ -5129,6 +5506,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked Reserved_3.',
+    label: ''
   },
   // --- Index 336 ---
   {
@@ -5143,6 +5521,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Write-only command trigger.',
+    label: ''
   },
   // --- Index 337 ---
   {
@@ -5157,6 +5536,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked Reserved_4.',
+    label: ''
   },
   // --- Index 338 ---
   {
@@ -5171,6 +5551,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked Reserved_5.',
+    label: ''
   },
   // --- Index 339 ---
   {
@@ -5185,6 +5566,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Marked Reserved_6.',
+    label: ''
   },
   // --- Index 340 ---
   {
@@ -5199,6 +5581,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'May represent boolean state (0/1) or an analog value.',
+    label: ''
   },
   // --- Index 341 ---
   {
@@ -5212,6 +5595,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 342 ---
   {
@@ -5225,6 +5609,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 343 ---
   {
@@ -5238,6 +5623,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 344 ---
   {
@@ -5251,6 +5637,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 345 ---
   {
@@ -5264,6 +5651,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 346 ---
   {
@@ -5278,6 +5666,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Raw value
     phase: 'x',
     notes: 'Part of meter date/time. May need assembly/decoding.',
+    label: ''
   },
   // --- Index 347 ---
   {
@@ -5291,6 +5680,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 348 ---
   {
@@ -5304,6 +5694,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 349 ---
   {
@@ -5317,6 +5708,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 350 ---
   {
@@ -5330,6 +5722,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 351 ---
   {
@@ -5343,6 +5736,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 352 ---
   {
@@ -5356,6 +5750,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 353 ---
   {
@@ -5369,6 +5764,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 354 ---
   {
@@ -5383,6 +5779,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Purpose of "_1" unclear.',
+    label: ''
   },
   // --- Index 355 ---
   {
@@ -5396,6 +5793,7 @@ export const dataPoints: DataPoint[] = [
     category: 'status',
     factor: 1,
     phase: 'x',
+    label: ''
   },
   // --- Index 356 ---
   {
@@ -5411,6 +5809,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh, verify scaling
     phase: 'x',
     notes: 'Unit (Wh) and factor (1) assumed. Int16 seems small, may need combining or larger type.',
+    label: ''
   },
   // --- Index 357 ---
   {
@@ -5426,6 +5825,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh from Float
     phase: 'x',
     notes: 'Unit (Wh) assumed.',
+    label: ''
   },
   // --- Index 358 ---
   {
@@ -5441,6 +5841,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh
     phase: 'x',
     notes: 'Unit (Wh) and factor (1) assumed. Int16 seems small.',
+    label: ''
   },
   // --- Index 359 ---
   {
@@ -5456,6 +5857,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh from Float
     phase: 'x',
     notes: 'Unit (Wh) assumed.',
+    label: ''
   },
   // --- Index 360 ---
   {
@@ -5471,6 +5873,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VARh from Float
     phase: 'x',
     notes: 'Unit (VARh) assumed.',
+    label: ''
   },
   // --- Index 361 ---
   {
@@ -5486,6 +5889,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (VARh) assumed.',
+    label: ''
   },
   // --- Index 362 ---
   {
@@ -5501,6 +5905,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (VARh) assumed.',
+    label: ''
   },
   // --- Index 363 ---
   {
@@ -5516,6 +5921,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (VARh) assumed.',
+    label: ''
   },
   // --- Index 364 ---
   {
@@ -5531,6 +5937,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VAh from Float
     phase: 'x',
     notes: 'Unit (VAh) assumed.',
+    label: ''
   },
   // --- Index 365 ---
   {
@@ -5546,6 +5953,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (VAh) assumed.',
+    label: ''
   },
   // --- Index 366 ---
   {
@@ -5561,6 +5969,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (VAh) assumed.',
+    label: ''
   },
   // --- Index 367 ---
   {
@@ -5576,6 +5985,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1,
     phase: 'x',
     notes: 'Unit (VAh) assumed.',
+    label: ''
   },
   // --- Index 368 ---
   {
@@ -5590,6 +6000,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // N/A
     phase: 'x',
     notes: 'Data type DATE mapped to String. Format needs handling.',
+    label: ''
   },
   // --- Index 369 ---
   {
@@ -5605,6 +6016,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh
     phase: 'x',
     notes: 'Duplicate name from i=386, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 370 ---
   {
@@ -5620,6 +6032,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh
     phase: 'x',
     notes: 'Duplicate name from i=387, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 371 ---
   {
@@ -5635,6 +6048,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh
     phase: 'x',
     notes: 'Duplicate name from i=388, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 372 ---
   {
@@ -5650,6 +6064,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Wh
     phase: 'x',
     notes: 'Name in log "Delivered + Received_1" was confusing, assumed Net like i=389. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 373 ---
   {
@@ -5665,6 +6080,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VARh
     phase: 'x',
     notes: 'Duplicate name from i=390, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 374 ---
   {
@@ -5680,6 +6096,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VARh
     phase: 'x',
     notes: 'Duplicate name from i=391, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 375 ---
   {
@@ -5695,6 +6112,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VARh
     phase: 'x',
     notes: 'Duplicate name from i=392, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 376 ---
   {
@@ -5710,6 +6128,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VARh
     phase: 'x',
     notes: 'Duplicate name from i=393, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 377 ---
   {
@@ -5725,6 +6144,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VAh
     phase: 'x',
     notes: 'Duplicate name from i=394, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 378 ---
   {
@@ -5740,6 +6160,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VAh
     phase: 'x',
     notes: 'Duplicate name from i=395, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 379 ---
   {
@@ -5755,6 +6176,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VAh
     phase: 'x',
     notes: 'Duplicate name from i=396, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 380 ---
   {
@@ -5770,6 +6192,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw VAh
     phase: 'x',
     notes: 'Duplicate name from i=397, different NodeId/Type. Marked Alt. Int16 small.',
+    label: ''
   },
   // --- Index 381 ---
   {
@@ -5785,6 +6208,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Log listed Boolean, changed to Float for Power. Unit (W) assumed.',
+    label: ''
   },
   // --- Index 382 ---
   {
@@ -5800,6 +6224,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Log listed Boolean, changed to Float for Power. Unit (W) assumed.',
+    label: ''
   },
   // --- Index 383 ---
   {
@@ -5815,6 +6240,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Log listed Boolean, changed to Float for Power. Unit (W) assumed.',
+    label: ''
   },
   // --- Index 384 ---
   {
@@ -5830,6 +6256,7 @@ export const dataPoints: DataPoint[] = [
     factor: 1, // Assume raw Watts
     phase: 'x',
     notes: 'Log listed Boolean, changed to Float for Power. Unit (W) assumed.',
+    label: ''
   },
 ];
 

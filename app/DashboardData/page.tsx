@@ -36,6 +36,7 @@ const Dashboard: React.FC = () => {
     const [soundEnabled, setSoundEnabled] = useState(() => {
         if (typeof window !== 'undefined') { return localStorage.getItem('dashboardSoundEnabled') === 'true'; } return false;
     });
+    const [isEditMode, setIsEditMode] = useState<boolean>(false);
     useEffect(() => { if (typeof window !== 'undefined') { localStorage.setItem('dashboardSoundEnabled', String(soundEnabled)); } }, [soundEnabled]);
 
     const playNotificationSound = useCallback((type: 'success' | 'error' | 'warning' | 'info') => {
@@ -442,9 +443,13 @@ const Dashboard: React.FC = () => {
     }, [ws, isConnected, connectWebSocket, configuredDataPoints, playNotificationSound]);
 
 
+    function setIsConfiguratorOpen(arg0: boolean): void {
+        throw new Error('Function not implemented.');
+    }
+
     // --- Component Return ---
     return (
-        <div className="min-h-screen bg-background text-foreground p-3 sm:p-4 md:p-6 lg:p-8 transition-colors duration-300 truncate">
+        <div className="min-h-screen bg-background text-foreground px-3 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 truncate">
             <div className="max-w-screen-3xl mx-auto">
                 {/* Header component */}
                 <DashboardHeader
@@ -456,7 +461,8 @@ const Dashboard: React.FC = () => {
                     currentTime={currentTime}
                     delay={delay}
                     version={VERSION} // Pass version from config
-                />
+                    isEditMode={isEditMode}
+                    onOpenConfigurator={() => setIsConfiguratorOpen(true)}           />
 
                 {/* Sections */}
                 <motion.div className="space-y-8" variants={containerVariants} initial="hidden" animate="visible">
@@ -472,6 +478,8 @@ const Dashboard: React.FC = () => {
                             sendDataToWebSocket={sendDataToWebSocket} // Pass send function
                             playNotificationSound={playNotificationSound} // Pass sound utility
                             lastToastTimestamps={lastToastTimestamps} // Pass ref for toasts
+                            onRemoveItem={() => {}} // Default empty function for removing item
+                            allPossibleDataPoints={configuredDataPoints} // Provide all possible data points
                         />
                     ))}
                 </motion.div>
