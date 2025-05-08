@@ -15,8 +15,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import ControlPanel from "./header"
-import ControlBody from "./control-body"
+import ControlPanel from "./control_dash"
 
 import { useParams, usePathname } from "next/navigation"
 import { PLANT_LOCATION } from "@/config/constants";
@@ -52,7 +51,6 @@ export default function Page() {
         </header>
         <div className="flex flex-1 flex-col gap-4 px-4 pt-0 ">
           <ControlPanel/>
-          <ControlBody/>
         </div>
       </SidebarInset>
     </SidebarProvider>

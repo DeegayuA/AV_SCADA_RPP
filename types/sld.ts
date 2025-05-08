@@ -89,6 +89,11 @@ export interface GenericDeviceNodeData extends BaseNodeData { elementType: SLDEl
 export interface CustomFlowEdgeData {
     label?: string;
     dataPointLinks?: DataPointLink[];
+    flowType?: 'AC' | 'DC' | 'CONTROL_SIGNAL' | 'OFFLINE' | 'FAULT'; // Type of energy/signal
+  voltageLevel?: 'HV' | 'MV' | 'LV'; // High, Medium, Low Voltage
+  currentLoad?: number; // 0-100 (percentage) or actual Amps
+  direction?: 'forward' | 'reverse' | 'none'; // For bi-directional or static lines
+  isEnergized?: boolean;
 }
 
 // --- React Flow Element Types ---
@@ -128,6 +133,7 @@ export interface PaletteCategory {
 // --- State & Props ---
 export interface SLDWidgetProps {
   layoutId: string;
+  isEditMode?: boolean; 
   // Optional prop to handle drilling down into a sub-layout
   onNavigateToLayout?: (layoutId: string) => void;
 }

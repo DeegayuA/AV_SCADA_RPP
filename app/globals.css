@@ -259,3 +259,9 @@
     stroke-dashoffset: -1000; 
     animation: dashdraw 30s linear infinite reverse; 
 }
+
+@keyframes faultPulse {
+  0% { opacity: 1; stroke-width: inherit; } 
+  50% { opacity: 0.6; stroke-width: calc(inherit + 1px); } 
+  100% { opacity: 1; stroke-width: inherit; }
+}

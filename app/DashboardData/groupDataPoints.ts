@@ -1,15 +1,14 @@
 import { DataPoint as DataPointConfig } from '@/config/dataPoints';
-import { HelpCircle } from 'lucide-react'; // Import necessary icons
-import type { LucideIcon } from 'lucide-react'; // Import LucideIcon as a type
+import { HelpCircle, LucideIcon } from 'lucide-react'; // Import necessary icons
 import { ThreePhaseGroupInfo } from './dashboardInterfaces';
-
-export function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseGroups: ThreePhaseGroupInfo[], individualPoints: DataPointConfig[] } {
+import { IconComponentType, DataPoint } from '@/config/dataPoints'; // Import the correct type
+export function groupDataPoints(pointsToGroup: DataPoint[]): { threePhaseGroups: ThreePhaseGroupInfo[], individualPoints: DataPoint[] } {
+    
     const groupsByKey = new Map<string, DataPointConfig[]>();
     const individualPoints: DataPointConfig[] = [];
     const threePhaseGroups: ThreePhaseGroupInfo[] = [];
 
     pointsToGroup.forEach(point => {
-        // Only group if explictly marked as 'three-phase' category, has a group key, phase, etc.
         const canBeGrouped =
             point.category === 'three-phase' &&
             !!point.threePhaseGroup &&
@@ -35,7 +34,7 @@ export function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseG
         let validGroup = true;
         let commonUiType: 'display' | 'gauge' | null = null;
         let commonUnit: string | undefined = undefined;
-        let icon: LucideIcon | undefined = undefined;
+        let icon: LucideIcon | undefined = undefined; // Use the imported type
         let description: string | undefined = undefined;
         let title: string = groupKeyWithType.split('-')[0]; // Default title from key
         let representativePoint: DataPointConfig | null = null;
@@ -48,7 +47,7 @@ export function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseG
             representativePoint = potentialGroup.find(p => p.phase?.toLowerCase() === 'a') || potentialGroup[0];
             commonUiType = representativePoint.uiType as 'display' | 'gauge';
             commonUnit = representativePoint.unit;
-            icon = representativePoint.icon || HelpCircle;
+            icon = (representativePoint.icon || HelpCircle) as LucideIcon; 
             title = representativePoint.name || title; // Use name if available, fallback to key
             // Clean up common naming patterns from the title
              title = title
@@ -95,6 +94,7 @@ export function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseG
                 description,
                 uiType: commonUiType,
                 config: representativePoint, // Pass the representative config
+                // originalIds: potentialGroup.map(p => p.id), // Removed originalIds
             });
         } else {
             // If a group is invalid, push its points back to individual points
@@ -106,5 +106,5 @@ export function groupDataPoints(pointsToGroup: DataPointConfig[]): { threePhaseG
     // Ensure individual points are unique after potentially adding back invalid group points
     const uniqueIndividualPoints = Array.from(new Map(individualPoints.map(p => [p.id, p])).values());
 
-    return { threePhaseGroups, individualPoints: uniqueIndividualPoints };
+    return { threePhaseGroups, individualPoints: uniqueIndividualPoints }; // Removed mapping for originalIds
 }

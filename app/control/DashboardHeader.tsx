@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { PLANT_NAME } from '@/config/constants';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Settings, PlusCircle, Clock, Trash2, RotateCcw, Power } from 'lucide-react'; // Added Power, Trash2, RotateCcw
+import { Settings, PlusCircle, Clock, Trash2, RotateCcw, Power, Check } from 'lucide-react'; // Added Power, Trash2, RotateCcw
 import {
     AlertDialog,
     AlertDialogAction,
@@ -117,9 +117,9 @@ const DashboardHeaderControl: React.FC<DashboardHeaderProps> = React.memo(
                                 <AlertDialog>
                                     <AlertDialogTrigger asChild>
                                         <motion.div variants={itemVariants}>
-                                             <Button variant="outline" size="sm" title="Reset dashboard to default layout">
+                                            <Button variant="outline" size="sm" title="Reset dashboard to default layout">
                                                 <RotateCcw className="mr-1.5 h-4 w-4" />
-                                                 <span className="hidden md:inline">Reset Layout</span>
+                                                <span className="hidden md:inline">Reset Layout</span>
                                             </Button>
                                         </motion.div>
                                     </AlertDialogTrigger>
@@ -139,41 +139,58 @@ const DashboardHeaderControl: React.FC<DashboardHeaderProps> = React.memo(
                             </>
                         )}
                         <motion.div variants={itemVariants}>
-                            <Button
-                                variant={isEditMode ? "secondary" : "outline"}
-                                size="sm"
-                                onClick={() => setIsEditMode(!isEditMode)}
-                                title={isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}
-                            >
-                                <Settings className="mr-0 sm:mr-1.5 h-4 w-4" />
-                                <span className="hidden sm:inline">{isEditMode ? 'Done Editing' : 'Edit Layout'}</span>
-                                <span className="sm:hidden">{isEditMode ? 'Done' : 'Edit'}</span>
-                            </Button>
+
                         </motion.div>
                         <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
                         <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
+                        
+                        <motion.div variants={itemVariants}>
+                            <TooltipProvider delayDuration={100}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant={isEditMode ? "secondary" : "ghost"} // 'secondary' when active, 'ghost' otherwise
+                                            size="icon" // Standard icon button size
+                                            onClick={() => setIsEditMode(!isEditMode)}
+                                        >
+                                            {isEditMode ? (
+                                                <Check className="h-5 w-5" /> // Icon when in edit mode (Done)
+                                            ) : (
+                                                <Settings className="h-5 w-5" /> // Icon when not in edit mode (Edit)
+                                            )}
+                                            <span className="sr-only">
+                                                {isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}
+                                            </span>
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                        <p>{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</p>
+                                    </TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                        </motion.div>
+
                         <motion.div variants={itemVariants}><SoundToggle soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} /></motion.div>
                         <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
                     </div>
                 </motion.div>
-                 <motion.div
+                <motion.div
                     className="text-xs text-muted-foreground mb-4 flex flex-col sm:flex-row justify-between items-center gap-2"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.2, duration: 0.5 }}
                 >
-                   <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                         <Clock className="h-3 w-3" />
                         <span>{currentTime}</span>
                         {isConnected ? (
-                             <TooltipProvider delayDuration={100}>
+                            <TooltipProvider delayDuration={100}>
                                 <Tooltip>
                                     <TooltipTrigger asChild>
                                         <span
-                                            className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${
-                                                delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                                                : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                                                : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`}
+                                            className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
+                                                    : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
+                                                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`}
                                         >
                                             {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
                                         </span>

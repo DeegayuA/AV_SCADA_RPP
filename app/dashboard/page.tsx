@@ -25,7 +25,7 @@ export default function Page() {
   const controlParam = pathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Control Panel';
   return (
     <SidebarProvider>
-      <AppSidebar activeSection="Control Panel" />
+      <AppSidebar activeSection="Dashboard" />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">
           <div className="flex items-center gap-2 px-4">

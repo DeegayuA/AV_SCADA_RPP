@@ -27,10 +27,12 @@ import ReactFlow, {
   isEdge
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { useShallow } from 'zustand/react/shallow'; // Use for selecting multiple state values
+import { useShallow } from 'zustand/react/shallow';
 
+// *** Updated type import ***
+// Make sure SLDWidgetProps in @/types/sld includes isEditMode
 import {
-  SLDWidgetProps,
+  SLDWidgetProps, // This MUST include `isEditMode?: boolean;`
   SLDLayout,
   CustomNodeType,
   CustomFlowEdge,
@@ -47,21 +49,19 @@ import TextLabelNode from './nodes/TextLabelNode';
 import InverterNode from './nodes/InverterNode';
 import PanelNode from './nodes/PanelNode';
 
-// ... import other custom nodes (BreakerNode, etc.)
-
 // Import Custom Edges
 import AnimatedFlowEdge from './edges/AnimatedFlowEdge';
 
 // Import UI Components
 import SLDElementPalette from './ui/SLDElementPalette';
-// *** Import the new Dialog instead of the Panel ***
 import SLDInspectorDialog from './ui/SLDInspectorDialog';
 import SLDElementDetailSheet from './ui/SLDElementDetailSheet';
-import { useAppStore } from '@/stores/appStore';
+import { useAppStore } from '@/stores/appStore'; // Keep for currentUser
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 import { Button } from '@/components/ui/button';
 import SLDDrillDownDialog from './ui/SLDDrillDownDialog';
 import { USER } from '@/config/constants';
+import { toast } from 'sonner';
 
 // Define Node Types Mapping
 const nodeTypes: NodeTypes = {
@@ -69,13 +69,11 @@ const nodeTypes: NodeTypes = {
   [SLDElementType.TextLabel]: TextLabelNode,
   [SLDElementType.Inverter]: InverterNode,
   [SLDElementType.Panel]: PanelNode,
-  // Map other custom node types here
 };
 
 // Define Edge Types Mapping
 const edgeTypes: EdgeTypes = {
   animatedFlow: AnimatedFlowEdge,
-  // Add other custom edge types if needed
 };
 
 // Default edge options
@@ -85,12 +83,13 @@ const defaultEdgeOptions = {
   style: { strokeWidth: 3, stroke: '#00f' },
 };
 
-const SLDWidgetContent: React.FC<SLDWidgetProps> = ({ layoutId }) => {
+// Renamed to avoid conflict with the wrapper component name
+const SLDWidgetCore: React.FC<SLDWidgetProps> = ({ layoutId, isEditMode: isMasterEditMode }) => { // Accept the master prop
   const { sendJsonMessage, lastJsonMessage, isConnected } = useWebSocket();
 
-  // Zustand Store Access
-  const { isEditMode, currentUser } = useAppStore(
-      useShallow((state) => ({ isEditMode: state.isEditMode, currentUser: state.currentUser }))
+  // Get currentUser for permission check
+  const { currentUser } = useAppStore(
+    useShallow((state) => ({ currentUser: state.currentUser })) // Only need currentUser now
   );
 
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
@@ -101,34 +100,30 @@ const SLDWidgetContent: React.FC<SLDWidgetProps> = ({ layoutId }) => {
   const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
   const [drillDownLayoutId, setDrillDownLayoutId] = useState<string | null>(null);
   const [drillDownParentLabel, setDrillDownParentLabel] = useState<string | undefined>(undefined);
-  // State for the Inspector Dialog visibility
   const [isInspectorDialogOpen, setIsInspectorDialogOpen] = useState(false);
   const [isDetailSheetOpen, setIsDetailSheetOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const { project } = useReactFlow();
 
-  // Determine if editing is allowed
-  const canEdit = useMemo(() => isEditMode && currentUser?.role === USER, [isEditMode, currentUser]);
+  // *** MODIFIED: Use the passed prop for canEdit calculation ***
+  const canEdit = useMemo(() => isMasterEditMode && currentUser?.role === USER, [isMasterEditMode, currentUser]);
 
   // --- Data Loading ---
   useEffect(() => {
     if (layoutId && sendJsonMessage && isConnected) {
-      console.log(`Requesting layout for: sld_${layoutId} (WebSocket connected)`);
+      console.log(`SLDWidget: Requesting layout for: sld_${layoutId} (WebSocket connected)`);
       setIsLoading(true);
       setSelectedElement(null);
-      setIsInspectorDialogOpen(false); // Close inspector on layout change
-      setIsDetailSheetOpen(false); // Close detail sheet on layout change
-      setIsDrillDownOpen(false); // Close drill-down on layout change
-      setDrillDownLayoutId(null); // Clear drill-down ID
-      sendJsonMessage({
-        type: 'get-layout',
-        payload: { key: `sld_${layoutId}` }
-      });
+      setIsInspectorDialogOpen(false);
+      setIsDetailSheetOpen(false);
+      setIsDrillDownOpen(false);
+      setDrillDownLayoutId(null);
+      sendJsonMessage({ type: 'get-layout', payload: { key: `sld_${layoutId}` } });
       setNodes([]);
       setEdges([]);
     } else if (layoutId && !isConnected) {
-      console.log("Waiting for WebSocket connection to request layout...");
+      console.log("SLDWidget: Waiting for WebSocket connection...");
     }
   }, [layoutId, sendJsonMessage, isConnected]);
 
@@ -136,299 +131,250 @@ const SLDWidgetContent: React.FC<SLDWidgetProps> = ({ layoutId }) => {
   useEffect(() => {
     if (lastJsonMessage) {
       const message = lastJsonMessage as any;
-
       if (message.type === 'layout-data' && message.payload?.key === `sld_${layoutId}`) {
-        console.log('Received layout data:', message.payload.layout);
+        console.log('SLDWidget: Received layout data:', message.payload.layout);
         const layout = message.payload.layout as SLDLayout | null;
         if (layout?.nodes && layout?.edges) {
-           const validatedNodes = layout.nodes.map(n => ({
-               ...n,
-               type: n.type || n.data?.elementType || 'default', // Ensure type exists
-           }));
-           setNodes(validatedNodes);
-           setEdges(layout.edges);
-           if (layout.viewport && reactFlowInstance) {
-               reactFlowInstance.setViewport(layout.viewport, { duration: 300 });
-           }
-           setIsLoading(false);
+          const validatedNodes = layout.nodes.map(n => ({ ...n, type: n.type || n.data?.elementType || 'default', }));
+          setNodes(validatedNodes);
+          setEdges(layout.edges);
+          if (layout.viewport && reactFlowInstance) {
+            reactFlowInstance.setViewport(layout.viewport, { duration: 300 });
+          }
+          setIsLoading(false);
         } else {
-            console.warn(`No valid layout data received for sld_${layoutId}. Initializing empty.`);
-            setNodes([]);
-            setEdges([]);
-            setIsLoading(false);
+          console.warn(`SLDWidget: No valid layout data for sld_${layoutId}. Initializing empty.`);
+          setNodes([]);
+          setEdges([]);
+          setIsLoading(false);
         }
       }
-
       if (message.type === 'layout-error' && message.payload?.key === `sld_${layoutId}`) {
-          console.error("Error loading layout:", message.payload.error);
-          setIsLoading(false);
+        console.error("SLDWidget: Error loading layout:", message.payload.error);
+        setIsLoading(false);
       }
     }
   }, [lastJsonMessage, layoutId, reactFlowInstance]);
 
-  // --- React Flow State Handlers ---
+  // --- React Flow State Handlers (Dependencies use updated `canEdit`) ---
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-       if (!canEdit && changes.some(c => c.type !== 'select' && c.type !== 'dimensions')) return;
+      // Only allow actual edits if `canEdit` is true
+      if (!canEdit && changes.some(c => c.type !== 'select' && c.type !== 'dimensions')) return;
       setNodes((nds) => applyNodeChanges(changes, nds));
     },
-    [canEdit, setNodes]
+    [canEdit, setNodes] // Dependency now correctly includes canEdit derived from prop
   );
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
+      // Only allow actual edits if `canEdit` is true
       if (!canEdit && changes.some(c => c.type !== 'select')) return;
       setEdges((eds) => applyEdgeChanges(changes, eds));
     },
-    [canEdit, setEdges]
+    [canEdit, setEdges] // Dependency now correctly includes canEdit derived from prop
   );
 
   const onConnect = useCallback(
     (connection: Connection) => {
-       if (!canEdit) return;
-      console.log("Connecting:", connection);
+      if (!canEdit) return;
+      console.log("SLDWidget: Connecting:", connection);
       setEdges((eds) => addEdge({ ...connection, ...defaultEdgeOptions }, eds));
     },
-    [canEdit, setEdges]
+    [canEdit, setEdges] // Dependency now correctly includes canEdit derived from prop
   );
 
-  // --- Element Interaction ---
- const handleElementClick = useCallback((event: React.MouseEvent, element: CustomNodeType | CustomFlowEdge) => {
-      setSelectedElement(element);
-
-      // Check for Drill-Down condition first (only for Nodes in view mode)
-      if (!canEdit && isNode(element) && element.data?.isDrillable && element.data?.subLayoutId) {
-          console.log(`Drilling down into: ${element.data.subLayoutId} from ${element.data.label}`);
-          setDrillDownLayoutId(element.data.subLayoutId);
-          setDrillDownParentLabel(element.data.label);
-          setIsDrillDownOpen(true);
-          setIsDetailSheetOpen(false); // Ensure detail sheet is closed
-          setIsInspectorDialogOpen(false); // Ensure inspector is closed
-      }
-      // If not drilling down, proceed with previous logic
-      else if (!canEdit) {
-          // Open detail sheet for non-drillable elements in view mode
-          setIsDetailSheetOpen(true);
-          setIsDrillDownOpen(false); // Ensure drilldown is closed
-          setIsInspectorDialogOpen(false); // Ensure inspector is closed
-      } else {
-          // Open Inspector Dialog in edit mode
-          setIsInspectorDialogOpen(true);
-          setIsDetailSheetOpen(false); // Ensure detail sheet is closed
-          setIsDrillDownOpen(false); // Ensure drilldown is closed
-      }
-  }, [canEdit]); // Add dependencies if needed
+  // --- Element Interaction (Depends on updated `canEdit`) ---
+  const handleElementClick = useCallback((event: React.MouseEvent, element: CustomNodeType | CustomFlowEdge) => {
+    setSelectedElement(element);
+    if (!canEdit && isNode(element) && element.data?.isDrillable && element.data?.subLayoutId) {
+      console.log(`SLDWidget: Drilling down into: ${element.data.subLayoutId} from ${element.data.label}`);
+      setDrillDownLayoutId(element.data.subLayoutId);
+      setDrillDownParentLabel(element.data.label);
+      setIsDrillDownOpen(true);
+      setIsDetailSheetOpen(false);
+      setIsInspectorDialogOpen(false);
+    } else if (!canEdit) {
+      setIsDetailSheetOpen(true);
+      setIsDrillDownOpen(false);
+      setIsInspectorDialogOpen(false);
+    } else { // We are in edit mode (`canEdit` is true)
+      setIsInspectorDialogOpen(true);
+      setIsDetailSheetOpen(false);
+      setIsDrillDownOpen(false);
+    }
+  }, [canEdit]); // Dependency now correctly includes canEdit derived from prop
 
   const onPaneClick = useCallback(() => {
     setSelectedElement(null);
     setIsDetailSheetOpen(false);
     setIsInspectorDialogOpen(false);
-    setIsDrillDownOpen(false); // Close drill-down on pane click
-    setDrillDownLayoutId(null); // Clear ID
+    setIsDrillDownOpen(false);
+    setDrillDownLayoutId(null);
   }, []);
 
-    const onNodeDragStop = useCallback((event: React.MouseEvent, node: CustomNodeType) => {
-        // Optional: trigger save or other actions
-    }, []);
+  const onNodeDragStop = useCallback((event: React.MouseEvent, node: CustomNodeType) => {
+     if(!canEdit) return;
+     // Optionally trigger save or validation on drag stop during edit mode
+     console.log("Node dragged:", node.id, "New position:", node.position);
+  }, [canEdit]);
 
-  // --- Edit Mode: Drag & Drop ---
+  // --- Edit Mode: Drag & Drop (Depends on updated `canEdit`) ---
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-    if (canEdit) {
-        event.dataTransfer.dropEffect = 'move';
-    } else {
-         event.dataTransfer.dropEffect = 'none';
-    }
-  }, [canEdit]);
+    event.dataTransfer.dropEffect = canEdit ? 'move' : 'none';
+  }, [canEdit]); // Dependency now correctly includes canEdit derived from prop
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
-       if (!canEdit || !reactFlowWrapper.current || !reactFlowInstance) return;
-
+      if (!canEdit || !reactFlowWrapper.current || !reactFlowInstance) return;
       event.preventDefault();
-
       const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect();
       const nodeInfoString = event.dataTransfer.getData('application/reactflow-node');
-
       if (!nodeInfoString) return;
-
-      let nodeInfo;
-      try { nodeInfo = JSON.parse(nodeInfoString); } catch (e) { console.error("Parse error on drop:", e); return; }
-
-      const type = nodeInfo.type as SLDElementType;
-      if (!type || !nodeTypes[type]) { console.error(`Invalid drop type "${type}".`); return; }
-
-      const position = project({
-        x: event.clientX - reactFlowBounds.left,
-        y: event.clientY - reactFlowBounds.top,
-      });
-
-      const newNode: CustomNodeType = {
-        id: `${type}_${Date.now()}_${Math.random().toString(16).substring(2, 8)}`,
-        type,
-        position,
-        data: {
-           elementType: type,
-           label: nodeInfo.label || `New ${type}`,
-          ...(nodeInfo.defaultData || {}),
-           dataPointLinks: [],
-        },
-      };
-      console.log("Adding new node:", newNode);
-      setNodes((nds) => nds.concat(newNode));
+      try {
+        const nodeInfo = JSON.parse(nodeInfoString);
+        const type = nodeInfo.type as SLDElementType;
+        if (!type || !nodeTypes[type]) { console.error(`SLDWidget: Invalid drop type "${type}".`); return; }
+        const position = project({ x: event.clientX - reactFlowBounds.left, y: event.clientY - reactFlowBounds.top, });
+        const newNode: CustomNodeType = {
+            id: `${type}_${Date.now()}_${Math.random().toString(16).substring(2, 8)}`, type, position,
+            data: { elementType: type, label: nodeInfo.label || `New ${type}`, ...(nodeInfo.defaultData || {}), dataPointLinks: [], },
+        };
+        console.log("SLDWidget: Adding new node:", newNode);
+        setNodes((nds) => nds.concat(newNode));
+      } catch (e) { console.error("SLDWidget: Parse error on drop:", e); }
     },
-    [canEdit, project, reactFlowInstance, setNodes]
+    [canEdit, project, reactFlowInstance, setNodes] // Dependency now correctly includes canEdit derived from prop
   );
 
-   // --- Edit Mode: Inspector Dialog Updates ---
-   const handleUpdateElement = useCallback((updatedElement: CustomNodeType | CustomFlowEdge) => {
-        if (!canEdit) return;
+  // --- Edit Mode: Inspector/Delete (Depends on updated `canEdit`) ---
+  const handleUpdateElement = useCallback((updatedElement: CustomNodeType | CustomFlowEdge) => {
+    if (!canEdit) return;
+    if (isNode(updatedElement)) { setNodes((nds) => nds.map((node) => node.id === updatedElement.id ? updatedElement : node)); }
+    else if (isEdge(updatedElement)) { setEdges((eds) => eds.map((edge) => edge.id === updatedElement.id ? updatedElement : edge)); }
+    setSelectedElement(updatedElement);
+  }, [canEdit, setNodes, setEdges]); // Dependency now correctly includes canEdit derived from prop
 
-        if (isNode(updatedElement)) {
-             setNodes((nds) => nds.map((node) => node.id === updatedElement.id ? updatedElement : node));
-        } else if (isEdge(updatedElement)) {
-            setEdges((eds) => eds.map((edge) => edge.id === updatedElement.id ? updatedElement : edge));
-        }
-        // Keep the element selected after update (dialog handles closing)
-        setSelectedElement(updatedElement);
-   }, [canEdit, setNodes, setEdges]);
+  const handleDeleteElement = useCallback((elementId: string) => {
+    if (!canEdit) return;
+    setNodes((nds) => nds.filter((node) => node.id !== elementId));
+    setEdges((eds) => eds.filter((edge) => edge.id !== elementId));
+    setSelectedElement(null);
+    setIsInspectorDialogOpen(false); // Ensure dialog closes
+  }, [canEdit, setNodes, setEdges]); // Dependency now correctly includes canEdit derived from prop
 
-    const handleDeleteElement = useCallback((elementId: string) => {
-        if (!canEdit) return;
-         setNodes((nds) => nds.filter((node) => node.id !== elementId));
-         setEdges((eds) => eds.filter((edge) => edge.id !== elementId));
-         setSelectedElement(null); // Deselect after deletion
-         // The dialog will close itself via its onOpenChange callback
-    }, [canEdit, setNodes, setEdges]);
-
-  // --- Layout Persistence ---
+  // --- Layout Persistence (Depends on updated `canEdit`) ---
   const handleSaveLayout = useCallback(() => {
     if (!canEdit || !sendJsonMessage || !reactFlowInstance) return;
-
     const currentViewport = reactFlowInstance.getViewport();
-    const layoutToSave: SLDLayout = {
-      layoutId: layoutId,
-      nodes: nodes,
-      edges: edges,
-      viewport: currentViewport,
-    };
+    const layoutToSave: SLDLayout = { layoutId: layoutId, nodes: nodes, edges: edges, viewport: currentViewport };
+    console.log(`SLDWidget: Saving layout for: sld_${layoutId}`, layoutToSave);
+    sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${layoutId}`, layout: layoutToSave } });
+    toast.success("Layout Saved!"); // Use toast for better feedback
+  }, [canEdit, sendJsonMessage, reactFlowInstance, layoutId, nodes, edges]); // Dependency now correctly includes canEdit derived from prop
 
-    console.log(`Saving layout for: sld_${layoutId}`, layoutToSave);
-    sendJsonMessage({
-      type: 'save-sld-widget-layout',
-      payload: {
-        key: `sld_${layoutId}`,
-        layout: layoutToSave,
-      },
-    });
-     alert("Layout Saved!"); // Simple feedback
-  }, [canEdit, sendJsonMessage, reactFlowInstance, layoutId, nodes, edges]);
-
-   // --- Render ---
+  // --- Render ---
   if (isLoading) {
     return <div className="flex justify-center items-center h-full text-muted-foreground">Loading Diagram...</div>;
   }
 
   return (
     <div className="h-full w-full flex relative bg-background" ref={reactFlowWrapper}>
-       {/* Palette - Only visible in Edit Mode */}
+      {/* Palette - Controlled by canEdit (derived from prop) */}
       {canEdit && (
-          <div className="w-64 h-full border-r border-border shadow-md z-10 bg-card"> {/* Added bg */}
-              <SLDElementPalette />
-          </div>
+        <div className="w-64 h-full border-r border-border shadow-md z-10 bg-card">
+          <SLDElementPalette />
+        </div>
       )}
 
       {/* React Flow Canvas */}
       <div className="flex-grow h-full relative">
         <ReactFlow
-            nodes={nodes}
-            edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            onConnect={onConnect}
-            onNodeClick={handleElementClick}
-            onEdgeClick={handleElementClick}
-            onPaneClick={onPaneClick}
-            onNodeDragStop={onNodeDragStop}
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onConnect={onConnect}
+          onNodeClick={handleElementClick}
+          onEdgeClick={handleElementClick}
+          onPaneClick={onPaneClick}
+          onNodeDragStop={onNodeDragStop}
+          nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
+          defaultEdgeOptions={defaultEdgeOptions}
+          onInit={setReactFlowInstance}
+          onDrop={onDrop}
+          onDragOver={onDragOver}
+          fitView
+          fitViewOptions={{ padding: 0.15, duration: 300 }}
 
-            nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            defaultEdgeOptions={defaultEdgeOptions}
+          // Interaction options controlled by canEdit (derived from prop)
+          nodesDraggable={canEdit}
+          nodesConnectable={canEdit}
+          elementsSelectable={true}
+          selectNodesOnDrag={canEdit}
+          panOnDrag={!canEdit} // Simplified: Allow pan only when not in edit mode
+          zoomOnScroll={true}
+          zoomOnPinch={true}
+          zoomOnDoubleClick={true}
+          panOnScroll={false}
+          panOnScrollMode={PanOnScrollMode.Free}
+          selectionOnDrag={canEdit}
+          selectionMode={SelectionMode.Partial}
 
-            onInit={setReactFlowInstance}
-            onDrop={onDrop}
-            onDragOver={onDragOver}
-
-            fitView
-            fitViewOptions={{ padding: 0.15, duration: 300 }}
-
-            // Interaction options based on mode
-            nodesDraggable={canEdit}
-            nodesConnectable={canEdit}
-            elementsSelectable={true} // Always allow selection
-            selectNodesOnDrag={canEdit}
-            panOnDrag={!canEdit || !isEditMode} // Allow panning in view mode, or edit mode if not dragging node
-            zoomOnScroll={true}
-            zoomOnPinch={true}
-            zoomOnDoubleClick={true}
-            panOnScroll={true}
-            panOnScrollMode={PanOnScrollMode.Free}
-            selectionOnDrag={canEdit}
-            selectionMode={SelectionMode.Partial}
-
-            proOptions={{ hideAttribution: true }}
+          proOptions={{ hideAttribution: true }}
         >
-            <Controls showInteractive={canEdit} />
-            <MiniMap nodeStrokeWidth={3} zoomable pannable />
-            <Background variant={"dots" as any} gap={16} size={1} /> {/* Removed color for theme support */}
+          <Controls showInteractive={canEdit} />
+          <MiniMap nodeStrokeWidth={3} zoomable pannable />
+          <Background variant={"dots" as any} gap={16} size={1} />
 
-             {/* Save Button - Only visible in Edit Mode */}
-            {canEdit && (
-                <div className="absolute top-4 left-4 z-10">
-                    <Button onClick={handleSaveLayout} size="sm">
-                        Save Layout
-                    </Button>
-                </div>
-             )}
+          {/* Save Button - Controlled by canEdit (derived from prop) */}
+          {canEdit && (
+            <div className="absolute top-4 left-4 z-10">
+              <Button onClick={handleSaveLayout} size="sm">
+                Save SLD Layout
+              </Button>
+            </div>
+          )}
         </ReactFlow>
       </div>
 
+      {/* Inspector Dialog - Logic remains, visibility depends on state triggered by `handleElementClick` which depends on `canEdit` */}
+      <SLDInspectorDialog
+        isOpen={isInspectorDialogOpen}
+        onOpenChange={setIsInspectorDialogOpen}
+        selectedElement={selectedElement}
+        onUpdateElement={handleUpdateElement}
+        onDeleteElement={handleDeleteElement}
+      />
 
-        {/* Inspector Dialog - Rendered conditionally but controlled by isOpen state */}
-        {/* Render it regardless of selectedElement so it can handle its closing animation */}
-        <SLDInspectorDialog
-            isOpen={isInspectorDialogOpen}
-            onOpenChange={setIsInspectorDialogOpen} // Let dialog control its open state
-            selectedElement={selectedElement}       // Pass the currently selected element
-            onUpdateElement={handleUpdateElement}
-            onDeleteElement={handleDeleteElement}
+      {/* Detail Sheet - Logic remains, visibility depends on state triggered by `handleElementClick` which depends on `canEdit` */}
+      {!canEdit && (
+        <SLDElementDetailSheet
+          element={selectedElement}
+          isOpen={isDetailSheetOpen}
+          onOpenChange={setIsDetailSheetOpen}
         />
+      )}
 
-        {/* Detail Sheet - Only visible in View Mode and when an element is selected */}
-        {/* Controlled separately from the inspector */}
-        {!canEdit && (
-            <SLDElementDetailSheet
-                element={selectedElement}
-                isOpen={isDetailSheetOpen}
-                onOpenChange={setIsDetailSheetOpen}
-            />
-        )}
-
-<SLDDrillDownDialog
-            isOpen={isDrillDownOpen}
-            onOpenChange={setIsDrillDownOpen}
-            layoutId={drillDownLayoutId}
-            parentLabel={drillDownParentLabel}
-        />
+      {/* Drill Down Dialog - Logic remains */}
+      <SLDDrillDownDialog
+        isOpen={isDrillDownOpen}
+        onOpenChange={setIsDrillDownOpen}
+        layoutId={drillDownLayoutId}
+        parentLabel={drillDownParentLabel}
+      />
     </div>
   );
 };
 
-// Wrap with ReactFlowProvider
-const SLDWidget: React.FC<SLDWidgetProps> = (props) => (
-    <ReactFlowProvider>
-        <SLDWidgetContent {...props} />
-    </ReactFlowProvider>
+// Wrap with ReactFlowProvider - IMPORTANT: Props passed to SLDWidgetCore
+const SLDWidget: React.FC<SLDWidgetProps> = (props) => ( // Accept props here
+  <ReactFlowProvider>
+    {/* Pass all props down to SLDWidgetCore, including the crucial isEditMode */}
+    <SLDWidgetCore {...props} />
+  </ReactFlowProvider>
 );
 
 export default SLDWidget;
