@@ -15,6 +15,8 @@ export type IconComponentType = React.FC<React.SVGProps<SVGSVGElement>>;
 // Base Lucide Icon Type (if needed for comparison or external use)
 // export type LucideIconBaseType = import('lucide-react').LucideIcon; // Alternative if specific LucideIcon type is needed
 
+
+
 export interface DataPoint {
   label: string;
   id: string; // Unique kebab-case identifier

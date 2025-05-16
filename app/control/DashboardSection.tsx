@@ -7,6 +7,7 @@ import { DataPoint } from '@/config/dataPoints'; // This is for individual items
 import { NodeData, ThreePhaseGroupInfo } from '../DashboardData/dashboardInterfaces';
 import DataPointCard from '../DashboardData/DataPointCard';
 import ValueDisplayContent from '../DashboardData/ValueDisplayContent';
+import { UserRole } from '@/types/auth';
 
 
 
@@ -23,6 +24,8 @@ interface DashboardSectionProps {
     isEditMode: boolean;
     onRemoveItem: (dataPointId: string) => void;
     allPossibleDataPoints: DataPoint[];
+    currentUserRole?: UserRole;
+
 }
 
 const DashboardSection: React.FC<DashboardSectionProps> = ({

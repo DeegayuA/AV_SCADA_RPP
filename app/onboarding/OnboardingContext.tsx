@@ -1,17 +1,18 @@
+// app/onboarding/OnboardingContext.tsx
 'use client';
-import React, { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction, useCallback, useMemo } from 'react'; // Added useCallback, useMemo
+import React, { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction, useCallback, useMemo } from 'react';
 import { AppOnboardingData, saveOnboardingData as saveToIDB, clearOnboardingData as clearFromIDB } from '@/lib/idb-store';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { DataPointConfig, dataPoints as actualDefaultDataPointsFromConfig } from '@/config/dataPoints'; // Source of truth
-// Use the aliased import consistently or just one of them
+import { DataPointConfig, dataPoints as actualDefaultDataPointsFromConfig } from '@/config/dataPoints';
 import { APP_NAME, OPC_UA_ENDPOINT_OFFLINE, PLANT_CAPACITY, PLANT_LOCATION, PLANT_NAME as initialPlantNameFromConst, PLANT_TYPE } from '@/config/constants';
+import { Sparkles } from 'lucide-react';
 
 export type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 export type PartialOnboardingData = Partial<Omit<AppOnboardingData, 'onboardingCompleted' | 'version'>>;
 
-
+// Keep your existing type definitions
 type PartialDataPointFromFile = Partial<Omit<DataPointConfig, 'icon'>> & { icon?: string | React.ComponentType };
 interface FullConfigFile {
     plantName?: string;
@@ -29,18 +30,16 @@ interface OnboardingContextType {
   nextStep: () => void;
   prevStep: () => void;
   completeOnboarding: () => Promise<void>;
-  resetOnboarding: () => Promise<void>;
+  resetOnboardingData: () => Promise<void>; // <--- CHANGED HERE
   defaultDataPoints: DataPointConfig[];
   configuredDataPoints: DataPointConfig[];
   setConfiguredDataPoints: Dispatch<SetStateAction<DataPointConfig[]>>;
   saveStatus: SaveStatus;
   setPlantDetails: (details: Partial<FullConfigFile>) => void;
-
 }
 
 const OnboardingContext = createContext<OnboardingContextType | undefined>(undefined);
 
-// This global 'defaultDataPoints' is the source for resets. It's created once.
 const sourceDefaultDataPoints: DataPointConfig[] = JSON.parse(JSON.stringify(actualDefaultDataPointsFromConfig));
 
 export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
@@ -58,10 +57,10 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   });
 
   const [configuredDataPoints, setConfiguredDataPoints] = useState<DataPointConfig[]>(
-    () => JSON.parse(JSON.stringify(sourceDefaultDataPoints)) // Initial state from the source copy
+    () => JSON.parse(JSON.stringify(sourceDefaultDataPoints))
   );
 
-  const totalSteps = 5;
+  const totalSteps = 5; // This seems fixed for the defined steps
 
   const updateOnboardingData = useCallback((data: PartialOnboardingData) => {
     setOnboardingData((prev) => ({ ...prev, ...data }));
@@ -76,43 +75,64 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const completeOnboarding = useCallback(async () => {
-    setCurrentStep(5);
+    setCurrentStep(5); // Move to finalizing screen
     setSaveStatus('saving');
     let loadingToastId: string | number | undefined;
-    loadingToastId = toast.loading("Saving configuration...", { duration: Infinity });
+    // Show indefinite loading toast
+    loadingToastId = toast.loading("Finalizing configuration...", { duration: Infinity });
 
     try {
       const finalDataToSave = {
         ...onboardingData,
-        configuredDataPoints: configuredDataPoints,
+        configuredDataPoints: configuredDataPoints, // Ensure this is the up-to-date state
       } as Omit<AppOnboardingData, 'onboardingCompleted' | 'version'>;
 
-      if (!finalDataToSave.plantName || !finalDataToSave.opcUaEndpointOffline) {
-        throw new Error("Essential configuration data is missing.");
+      // Basic validation
+      if (!finalDataToSave.plantName || !finalDataToSave.opcUaEndpointOffline || !finalDataToSave.plantLocation) {
+        console.error("Missing essential data for save:", finalDataToSave);
+        throw new Error("Essential plant details or OPC UA endpoint are missing.");
       }
-
+      if (!finalDataToSave.configuredDataPoints || finalDataToSave.configuredDataPoints.length === 0) {
+        // Depending on requirements, this might be an error or a warning.
+        // For now, let's assume some data points are expected.
+        console.warn("No data points configured. Saving with empty set.");
+        // throw new Error("At least one data point must be configured.");
+      }
+      
       await saveToIDB(finalDataToSave);
-      await new Promise(resolve => setTimeout(resolve, 1200));
+      // Simulate some network latency if desired for better UX feedback
+      await new Promise(resolve => setTimeout(resolve, 1200)); 
 
       setSaveStatus('success');
-      if (loadingToastId) toast.dismiss(loadingToastId);
-      toast.success("Configuration complete! Welcome aboard.", { duration: 3000 });
-
+      if(loadingToastId) toast.dismiss(loadingToastId); // Dismiss the loading toast
+      toast.success("Configuration Complete!", { 
+        description: `Welcome to ${APP_NAME}. Your settings have been saved.`,
+        duration: 3500 
+      });
+      
+      // Redirect after success
       setTimeout(() => {
-        router.push('/login');
-      }, 1800);
+        router.push('/login'); // Or to the dashboard if the user is already logged in
+      }, 2000); // Delay slightly more than toast
 
-    } catch (errorCaught) { // Renamed to avoid conflict with any outer 'error'
+    } catch (errorCaught) {
       console.error("Failed to save onboarding data:", errorCaught);
-      if (loadingToastId) toast.dismiss(loadingToastId);
-      toast.error(`Failed to save configuration: ${(errorCaught as Error).message || "Please try again."}`);
+      if(loadingToastId) toast.dismiss(loadingToastId);
+      const errorMessage = (errorCaught instanceof Error) ? errorCaught.message : "An unknown error occurred.";
+      toast.error("Save Failed", {
+          description: `Could not save configuration: ${errorMessage}. Please review your settings or try again.`,
+          duration: 7000
+      });
       setSaveStatus('error');
-      setCurrentStep(4);
+      // Optionally, send user back to review step or last configuration step
+      setCurrentStep(4); // Example: back to review step
     }
-  }, [onboardingData, configuredDataPoints, router]); // router added as dependency
+  }, [onboardingData, configuredDataPoints, router]);
 
-  const resetOnboarding = useCallback(async () => {
-    await clearFromIDB();
+
+  const resetOnboardingDataInternal = useCallback(async () => { // <--- CHANGED HERE (function name)
+    await clearFromIDB(); // Clear data from IndexedDB
+    // Reset local state in context
     setOnboardingData({
       plantName: initialPlantNameFromConst,
       plantLocation: PLANT_LOCATION,
@@ -121,16 +141,13 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
       opcUaEndpointOffline: OPC_UA_ENDPOINT_OFFLINE.replace('opc.tcp://', ''),
       appName: APP_NAME,
     });
-    setConfiguredDataPoints(JSON.parse(JSON.stringify(sourceDefaultDataPoints)));
-    setCurrentStep(0);
-    setSaveStatus('idle');
-    toast.info("Onboarding configuration has been reset.");
-  // Removed `router` from dependency array as resetOnboarding doesn't use it directly for navigation itself.
-  // The page component handles navigation after reset if needed.
-  }, []);
+    setConfiguredDataPoints(JSON.parse(JSON.stringify(sourceDefaultDataPoints))); // Reset to deep copy of defaults
+    setCurrentStep(0); // Go back to the first step
+    setSaveStatus('idle'); // Reset save status
+    toast.info("Onboarding Reset", { description: "Configuration has been reset to defaults." });
+  }, []); // Dependencies for this reset are minimal as it uses constants and setters
 
   const contextValue = useMemo(() => ({
-    saveStatus,
     currentStep,
     setCurrentStep,
     onboardingData,
@@ -139,27 +156,48 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     nextStep,
     prevStep,
     completeOnboarding,
-    resetOnboarding,
-    defaultDataPoints: sourceDefaultDataPoints, // Pass the stable source defaults
+    resetOnboardingData: resetOnboardingDataInternal, // <--- CHANGED HERE (exported name)
+    defaultDataPoints: sourceDefaultDataPoints,
     configuredDataPoints,
     setConfiguredDataPoints,
-    setPlantDetails: (details: Partial<FullConfigFile>) => {
-      setOnboardingData(prev => {
-        return {
-          ...prev,
-          ...details,
-          configuredDataPoints: Array.isArray(details.configuredDataPoints)
-            ? (details.configuredDataPoints.filter(dp => dp && typeof dp.id === 'string') as DataPointConfig[])
-            : prev.configuredDataPoints,
-        };
-      });
-      toast.info("Plant details updated from file.");
-    },
+    saveStatus,
+    setPlantDetails: (details: Partial<FullConfigFile>) => { // Renamed for clarity
+        // When importing plant details, also update onboardingData for plant-specific fields
+        const { plantName, plantLocation, plantType, configuredDataPoints: importedPoints } = details;
+        const updatedOnboardingDetails: PartialOnboardingData = {};
+        if (plantName) updatedOnboardingDetails.plantName = plantName;
+        if (plantLocation) updatedOnboardingDetails.plantLocation = plantLocation;
+        if (plantType) updatedOnboardingDetails.plantType = plantType;
+        // Assuming capacity and opcUaEndpointOffline might not be in a simple plant config file.
+        // They could be if your `FullConfigFile` includes them.
 
+        setOnboardingData(prev => ({ ...prev, ...updatedOnboardingDetails }));
+
+        if (Array.isArray(importedPoints)) {
+          // Filter and map imported points to ensure they conform to DataPointConfig
+          // This example assumes direct casting, but you might need more robust mapping/validation
+          // based on how `PartialDataPointFromFile` relates to `DataPointConfig`
+          const validImportedPoints = importedPoints
+            .filter(dp => dp && typeof dp.id === 'string' && typeof dp.nodeId === 'string' && typeof dp.name === 'string' && typeof dp.dataType === 'string') // Add more checks as needed
+            .map(dp => {
+                // Attempt to find a matching actual default to get the icon function
+                const actualDefault = actualDefaultDataPointsFromConfig.find(actualDp => actualDp.id === dp.id);
+                return {
+                    ...actualDefault, // Base it on an actual default if found (for icon and other static properties)
+                    ...dp,           // Overlay with data from the file
+                    icon: actualDefault ? actualDefault.icon : Sparkles, // Fallback icon
+                } as DataPointConfig;
+            });
+          setConfiguredDataPoints(validImportedPoints);
+          toast.success("Plant Details & Data Points Updated", { description: `${validImportedPoints.length} data points loaded from file.`});
+        } else {
+            toast.info("Plant Details Updated", { description: "Data points were not found in the provided file or format."});
+        }
+    },
   }), [
-    saveStatus, currentStep, onboardingData, updateOnboardingData,
-    nextStep, prevStep, completeOnboarding, resetOnboarding, // totalSteps is stable
-    configuredDataPoints, // sourceDefaultDataPoints is stable
+    currentStep, onboardingData, updateOnboardingData, totalSteps,
+    nextStep, prevStep, completeOnboarding, resetOnboardingDataInternal, 
+    configuredDataPoints, saveStatus // sourceDefaultDataPoints is stable outside memo
   ]);
 
   return (

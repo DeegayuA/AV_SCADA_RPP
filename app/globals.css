@@ -265,3 +265,55 @@
   50% { opacity: 0.6; stroke-width: calc(inherit + 1px); } 
   100% { opacity: 1; stroke-width: inherit; }
 }
+/* Default React Flow MiniMap already has max-width: 200px, max-height: 150px */
+/* These styles will apply to the MiniMap container on small screens */
+
+@media (max-width: 768px) { /* Adjust breakpoint as needed, e.g., 600px for very small */
+  .react-flow__minimap {
+    /* Make the minimap container smaller */
+    max-width: 120px !important; /* Override default if necessary */
+    max-height: 80px !important; /* Override default if necessary */
+
+    /* Adjust shadow for smaller size */
+    --xy-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+
+    /* Adjust border radius for a tighter look */
+    --xy-border-radius: 0.125rem !important; /* 2px if base font-size is 16px */
+  }
+
+  /* Optionally, adjust padding from screen edges for different positions */
+  /* Example for BottomRight position (default for this component) */
+  .react-flow__minimap.bottom.right {
+    bottom: var(--xy-minimap-position-bottom, 10px) !important; /* Default is 20px */
+    right: var(--xy-minimap-position-right, 10px) !important;   /* Default is 20px */
+  }
+
+  /* Example for BottomLeft position */
+  .react-flow__minimap.bottom.left {
+    bottom: var(--xy-minimap-position-bottom, 10px) !important;
+    left: var(--xy-minimap-position-left, 10px) !important;
+  }
+  /* Add similar overrides for .top.left and .top.right if you use those positions */
+}
+
+
+/* In your global CSS */
+.shadow-text-lg { text-shadow: 0px 2px 4px rgba(0,0,0,0.5); }
+.shadow-text-md { text-shadow: 0px 1px 3px rgba(0,0,0,0.4); }
+
+
+/* In your global CSS file */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--border)); /* Or a subtle color */
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--ring)); /* Or a slightly darker/accent color */
+}

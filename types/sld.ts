@@ -1,6 +1,7 @@
 // types/sld.ts
 import type { Node, Edge } from 'reactflow';
 import type { LucideIcon } from 'lucide-react'; // Import LucideIcon type
+import { UserRole } from './auth';
 
 // --- Your DataPoint Definition ---
 export interface DataPoint {
@@ -81,7 +82,7 @@ export interface BreakerNodeData extends BaseNodeData { elementType: SLDElementT
 export interface MeterNodeData extends BaseNodeData { elementType: SLDElementType.Meter; }
 export interface BatteryNodeData extends BaseNodeData { elementType: SLDElementType.Battery; }
 export interface DataLabelNodeData extends BaseNodeData { elementType: SLDElementType.DataLabel; }
-export interface TextLabelNodeData extends BaseNodeData { elementType: SLDElementType.TextLabel; text: string; }
+export interface TextLabelNodeData extends BaseNodeData { elementType: SLDElementType.TextLabel; text?: string; }
 export interface GenericDeviceNodeData extends BaseNodeData { elementType: SLDElementType.GenericDevice; icon?: string; }
 
 
@@ -134,6 +135,8 @@ export interface PaletteCategory {
 export interface SLDWidgetProps {
   layoutId: string;
   isEditMode?: boolean; 
+  currentUserRole?: UserRole;
+
   // Optional prop to handle drilling down into a sub-layout
   onNavigateToLayout?: (layoutId: string) => void;
 }
@@ -150,4 +153,21 @@ export interface SLDState {
   isEditMode: boolean;
   currentUser: CurrentUser | null;
   // Actions defined in store
+}
+
+export interface TextNodeStyleConfig {
+  fontSize?: string; // e.g., '12px', '1.5em', 'xs', 'sm', 'lg' (if using Tailwind class names)
+  color?: string; // e.g., '#FF0000', 'rgba(0,0,0,0.8)'
+  fontWeight?: 'normal' | 'bold' | 'lighter' | 'bolder' | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900;
+  fontStyle?: 'normal' | 'italic';
+  textAlign?: 'left' | 'center' | 'right' | 'justify';
+  backgroundColor?: string; // Background for the text itself, e.g., 'rgba(255,255,0,0.5)'
+  padding?: string; // e.g., '2px 4px', '0.5rem'
+  // Potentially: fontFamily, textDecoration, letterSpacing, etc.
+}
+
+export interface TextLabelNodeData extends BaseNodeData {
+  elementType: SLDElementType.TextLabel;
+  text?: string;
+  styleConfig?: TextNodeStyleConfig; // ADD THIS
 }

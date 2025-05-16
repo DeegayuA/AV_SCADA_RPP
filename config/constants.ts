@@ -12,7 +12,7 @@ export const WS_URL = (() => {
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840"; // Local OPC UA endpoint for PLC
 // export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://opcuaserver.com:4840"; 
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://112.134.218.51:4840"; // Remote OPC UA endpoint for PLC
-export const VERSION = "1.1";
+export const VERSION = "1.2";
 export const PLANT_NAME= "Mini-Grid";
 export const PLANT_LOCATION = "Colombo, Sri Lanka"; // Location of the plant
 export const PLANT_TYPE = "Mini-Grid"; // Type of the plant

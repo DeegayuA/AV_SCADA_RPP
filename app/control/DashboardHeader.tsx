@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { PLANT_NAME } from '@/config/constants';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Settings, PlusCircle, Clock, Trash2, RotateCcw, Power, Check } from 'lucide-react'; // Added Power, Trash2, RotateCcw
+import { Settings, Pencil, Clock, Trash2, RotateCcw, Power, Check } from 'lucide-react'; // Added Power, Trash2, RotateCcw
 import {
     AlertDialog,
     AlertDialogAction,
@@ -79,9 +79,9 @@ const DashboardHeaderControl: React.FC<DashboardHeaderProps> = React.memo(
                                         onClick={onOpenConfigurator}
                                         title="Add new cards to the dashboard"
                                     >
-                                        <PlusCircle className="mr-1.5 h-4 w-4" />
-                                        <span className="hidden sm:inline">Add Cards</span>
-                                        <span className="sm:hidden">Add</span>
+                                        <Pencil className="mr-1.5 h-4 w-4" />
+                                        <span className="hidden sm:inline">Edit Cards</span>
+                                        <span className="sm:hidden">Edit</span>
                                     </Button>
                                 </motion.div>
 

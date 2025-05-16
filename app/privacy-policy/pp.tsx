@@ -216,13 +216,13 @@ export default function PrivacyPolicyPage() {
         </motion.aside>
         
         <main className="lg:pl-4"> {/* Adjusted for main content, ensure no overlap with ToC */}
-            <LegalSection id="introduction" title="1. Introduction: Our Commitment" icon={Info} iconColorClasses="text-sky-500 dark:text-sky-400" customDelayIndex={0}>
+            <LegalSection id="introduction" title="1. Introduction: Our Commitment" icon={Info} iconColorClasses="text-sky-500 dark:text-sky-400">
                 <p>{APP_AUTHOR} (referred to as "we", "us", or "our") operates the {APP_NAME} platform ("Service"). We are deeply committed to safeguarding your privacy and handling your data with transparency and responsibility. This Privacy Policy outlines how we collect, use, share, and protect your personal and operational information when you interact with our Service.</p>
                 <p>By accessing or using {APP_NAME}, you acknowledge that you have read, understood, and agree to the terms of this Privacy Policy and our accompanying <Link href="/tos">Terms of Service</Link>. If you do not agree with these terms, please refrain from using the Service.</p>
                 <p>This policy applies to all users of {APP_NAME}, including administrators, operators, and viewers. Our data practices are designed to comply with applicable data protection laws and regulations.</p>
             </LegalSection>
 
-            <LegalSection id="information-collected" title="2. Information We Gather" icon={Database} iconColorClasses="text-green-500 dark:text-green-400" customDelayIndex={1}>
+            <LegalSection id="information-collected" title="2. Information We Gather" icon={Database} iconColorClasses="text-green-500 dark:text-green-400">
                 <p>To provide and enhance our Service, we collect various types of information:</p>
                 <h4>A. Personal Identification Information (PII)</h4>
                   <p>This is information that can be used to identify you directly or indirectly. We collect PII when you:</p>
@@ -250,7 +250,7 @@ export default function PrivacyPolicyPage() {
                   </ul>
             </LegalSection>
 
-            <LegalSection id="how-we-use" title="3. Purpose of Using Your Information" icon={User} iconColorClasses="text-purple-500 dark:text-purple-400" customDelayIndex={2}>
+            <LegalSection id="how-we-use" title="3. Purpose of Using Your Information" icon={User} iconColorClasses="text-purple-500 dark:text-purple-400">
                 <p>We use the collected information for the following legitimate purposes:</p>
                 <ul>
                     <li><strong>Service Provision & Operation:</strong> To create and manage your account, authenticate users, enable core SCADA functionalities (monitoring, control, data logging), and ensure the Service operates as intended.</li>
@@ -265,35 +265,35 @@ export default function PrivacyPolicyPage() {
             </LegalSection>
             
             {/* Placeholder for actual legal text sections */}
-            <LegalSection id="data-sharing" title="4. Sharing Your Information" icon={Share2} iconColorClasses="text-orange-500 dark:text-orange-400" customDelayIndex={3}>
+            <LegalSection id="data-sharing" title="4. Sharing Your Information" icon={Share2} iconColorClasses="text-orange-500 dark:text-orange-400">
                 <p>[PLACEHOLDER: Confirm details with legal. E.g., We do not sell your personal information. We may share information under specific circumstances: (a) With your Organization: If your account is managed by your employer, they may have access to your account and usage data. (b) Service Providers: With third-party vendors (hosting, database, analytics, support tools) who help us operate the Service, under strict confidentiality agreements. (c) Legal Requirements: If required by law, subpoena, or other legal process. (d) To Protect Rights: To protect our rights, property, safety, or that of our users or the public. (e) Business Transfers: In connection with a merger, acquisition, or sale of assets. (f) With Your Explicit Consent.]</p>
             </LegalSection>
 
-            <LegalSection id="data-security" title="5. Our Security Measures" icon={ShieldCheck} iconColorClasses="text-teal-500 dark:text-teal-400" customDelayIndex={4}>
+            <LegalSection id="data-security" title="5. Our Security Measures" icon={ShieldCheck} iconColorClasses="text-teal-500 dark:text-teal-400">
                 <p>[PLACEHOLDER: E.g., We implement industry-standard technical and organizational security measures like encryption (data in transit with HTTPS/TLS, at rest where appropriate), access controls, multi-factor authentication (if offered), regular security audits, secure software development practices, and data minimization. However, no system is 100% impenetrable. You are responsible for securing your login credentials and reporting any suspected breaches.]</p>
             </LegalSection>
 
-            <LegalSection id="data-retention" title="6. Data Storage & Retention" icon={Clock} iconColorClasses="text-amber-500 dark:text-amber-400" customDelayIndex={5}>
+            <LegalSection id="data-retention" title="6. Data Storage & Retention" icon={Clock} iconColorClasses="text-amber-500 dark:text-amber-400">
                 <p>[PLACEHOLDER: E.g., Personal data is retained as long as your account is active or as needed to provide the Service. Operational data retention periods depend on system configuration, storage capacity, and contractual agreements with your organization (e.g., 1 year, 5 years, or longer for compliance). We will delete or anonymize information when no longer needed or upon a valid request, subject to legal or regulatory obligations.]</p>
             </LegalSection>
             
-            <LegalSection id="cookies" title="7. Cookies & Digital Fingerprints" icon={Cookie} iconColorClasses="text-rose-500 dark:text-rose-400" customDelayIndex={6}>
+            <LegalSection id="cookies" title="7. Cookies & Digital Fingerprints" icon={Cookie} iconColorClasses="text-rose-500 dark:text-rose-400">
                 <p>[PLACEHOLDER: E.g., We use essential cookies for session management, authentication, and security. We may also use analytics cookies (e.g., from a self-hosted Matomo or privacy-focused Plausible) to understand service usage – these do not track you across other sites. We do NOT use third-party advertising cookies. You can manage cookie preferences through your browser settings, but disabling essential cookies may impact Service functionality. Detail any other tracking technologies like localStorage (used for login state).]</p>
             </LegalSection>
 
-            <LegalSection id="your-rights" title="8. Your Rights & Choices" icon={UserCheck} iconColorClasses="text-indigo-500 dark:text-indigo-400" customDelayIndex={7}>
+            <LegalSection id="your-rights" title="8. Your Rights & Choices" icon={UserCheck} iconColorClasses="text-indigo-500 dark:text-indigo-400">
                 <p>[PLACEHOLDER: E.g., Depending on your jurisdiction, you may have rights to: access, rectify, erase, restrict processing of, or object to the processing of your personal data, and data portability. Explain how users or their organization's administrator can exercise these rights (e.g., through account settings or by contacting your DPO/privacy contact). Mention any limitations.]</p>
             </LegalSection>
             
-            <LegalSection id="childrens-privacy" title="9. Regarding Children's Privacy" icon={Users} iconColorClasses="text-pink-500 dark:text-pink-400" customDelayIndex={8}>
+            <LegalSection id="childrens-privacy" title="9. Regarding Children's Privacy" icon={Users} iconColorClasses="text-pink-500 dark:text-pink-400">
                 <p>Our Service is not directed to individuals under the age of 18 (or the relevant age of majority in your jurisdiction). We do not knowingly collect personal information from children. If we become aware that a child has provided us with personal information without parental consent, we will take steps to delete such information.</p>
             </LegalSection>
             
-            <LegalSection id="policy-changes" title="10. Policy Updates" icon={Edit3} iconColorClasses="text-slate-500 dark:text-slate-400" customDelayIndex={9}>
+            <LegalSection id="policy-changes" title="10. Policy Updates" icon={Edit3} iconColorClasses="text-slate-500 dark:text-slate-400">
                 <p>We may revise this Privacy Policy periodically. The "Last Updated" date at the top of this policy will indicate the latest revision. We will notify you of material changes through the Service or other means (e.g., email to account administrators). Your continued use of the Service after such changes constitutes your acceptance of the new Privacy Policy.</p>
             </LegalSection>
 
-            <LegalSection id="contact-pp" title="11. Contact Our Data Protection Team" icon={Mail} iconColorClasses="text-cyan-500 dark:text-cyan-400" customDelayIndex={10}>
+            <LegalSection id="contact-pp" title="11. Contact Our Data Protection Team" icon={Mail} iconColorClasses="text-cyan-500 dark:text-cyan-400">
                  <p>If you have any questions, concerns, or requests regarding this Privacy Policy or our data practices, please contact our Data Protection Officer at:</p>
                 <address className="not-italic mt-4 space-y-1 text-slate-600 dark:text-slate-300">
                     <strong>{APP_AUTHOR}</strong> (Data Protection Officer)<br />

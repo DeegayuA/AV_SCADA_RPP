@@ -1,20 +1,18 @@
+// NavUser.tsx (or your component file name)
 "use client"
 
 import * as React from "react"
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion"
 import {
-  // BadgeCheck, // Replaced by Settings for Account
   Bell,
   ChevronsUpDown,
-  // CreditCard, // Merged into Help/Billing
   LogOut,
-  // Sparkles, // Removed as "Upgrade to Pro" is now "Go to Home"
   LifeBuoy, 
   UserCircle, 
   Home,     
-  Settings, 
-  LogInIcon, // Renamed from LogIn for clarity to avoid conflict with function
+  Settings as SettingsIcon, // Renamed to avoid conflict with Settings type if any
+  LogInIcon,
 } from "lucide-react"
 
 import {
@@ -37,9 +35,13 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   useSidebar,
-} from "@/components/ui/sidebar"
+} from "@/components/ui/sidebar" // Assuming this is a custom or library component
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+// import { Button } from "@/components/ui/button"; // Button seems unused here, can be removed if not needed
+
+// Import Zustand store and user types
+import { useAppStore } from '@/stores/appStore';
+import { User as AuthUser } from '@/types/auth'; // Renamed to avoid conflict with component prop name
 
 const getInitials = (name: string): string => {
   if (!name) return "AV";
@@ -48,12 +50,13 @@ const getInitials = (name: string): string => {
   return (names[0][0] + names[names.length - 1][0]).toUpperCase();
 };
 
-interface UserData {
-  name: string
-  email: string
-  avatar?: string
-  role?: string
-}
+// The UserData prop is no longer needed as we'll get the user from the store.
+// interface UserData {
+//   name: string
+//   email: string
+//   avatar?: string
+//   role?: string
+// }
 
 const menuItemVariants = {
   initial: { opacity: 0, x: -10 },
@@ -61,11 +64,20 @@ const menuItemVariants = {
   exit: { opacity: 0, x: 10, transition: { duration: 0.15, ease: "easeIn" } },
 };
 
-export function NavUser({ user }: { user: UserData | null }) {
-  const { isMobile } = useSidebar();
+// Props might be empty now if no external data is passed to NavUser
+// export function NavUser({ user: userProp }: { user: UserData | null }) {
+export function NavUser() { // Removed userProp
+  const { isMobile } = useSidebar(); // Assuming useSidebar hook provides this
   const router = useRouter();
+
+  // Get user and logout action from Zustand store
+  const currentUser = useAppStore((state) => state.currentUser);
+  const logoutAction = useAppStore((state) => state.logout);
+  const storeHasHydrated = useAppStore.persist.hasHydrated();
+
+
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const [notificationCount, setNotificationCount] = React.useState(3); // Example state for badge
+  const [notificationCount, setNotificationCount] = React.useState(3);
 
   const handleNavigation = React.useCallback((path: string) => {
     router.push(path);
@@ -80,30 +92,29 @@ export function NavUser({ user }: { user: UserData | null }) {
   }, []);
 
   const handleLogout = React.useCallback(() => {
-    localStorage.removeItem('user');
-    toast.success("Logged out successfully!");
-    router.push('/login');
+    logoutAction(); // Call the logout action from the store
     setIsMenuOpen(false);
-  }, [router]);
+    // The redirect to /login should be handled by the auth guard on protected pages
+    // or you can explicitly redirect here if preferred.
+    router.push('/login'); 
+  }, [logoutAction, router]); // Added router to dependencies
 
-  // Define menu items with actions and shortcuts
+
   const menuItems = React.useMemo(() => [
-    { id: 'home', label: "Go to Home", icon: Home, action: () => handleNavigation('/'), shortcutKeys: { altKey: true, key: 'h' }, displayShortcut: "Alt+H" },
-    { id: 'account', label: "Account Settings", icon: Settings, action: () => handlePlaceholderAction('Account Settings'), shortcutKeys: { altKey: true, key: 'a' }, displayShortcut: "Alt+A" },
-    { id: 'help', label: "Help", icon: LifeBuoy, action: () => handleNavigation('/help'), shortcutKeys: { altKey: true, key: 'b' }, displayShortcut: "Alt+B" },
+    // Navigate to the user's designated home path or a general home
+    { id: 'home', label: "Go to Home", icon: Home, action: () => handleNavigation(currentUser?.redirectPath || '/'), shortcutKeys: { altKey: true, key: 'h' }, displayShortcut: "Alt+H" },
+    { id: 'account', label: "Account Settings", icon: SettingsIcon, action: () => handlePlaceholderAction('Account Settings'), shortcutKeys: { altKey: true, key: 'a' }, displayShortcut: "Alt+A" },
+    { id: 'help', label: "Help & Support", icon: LifeBuoy, action: () => handlePlaceholderAction('Help & Support'), shortcutKeys: { altKey: true, key: 'b' }, displayShortcut: "Alt+B" }, // Changed route to placeholder
     { id: 'notifications', label: "Notifications", icon: Bell, action: () => { handlePlaceholderAction('Notifications'); setNotificationCount(0); }, shortcutKeys: { altKey: true, key: 'n' }, displayShortcut: "Alt+N", badge: notificationCount },
-  ], [handleNavigation, handlePlaceholderAction, notificationCount]);
+  ], [handleNavigation, handlePlaceholderAction, notificationCount, currentUser?.redirectPath]);
 
 
-  // Keyboard shortcut handler
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isMenuOpen) return; // Only listen when menu is open for context
+      if (!isMenuOpen) return;
 
       const activeItem = menuItems.find(item => 
         item.shortcutKeys.altKey === event.altKey && 
-        // item.shortcutKeys.ctrlKey === event.ctrlKey && // Add if using Ctrl
-        // item.shortcutKeys.metaKey === event.metaKey && // Add if using Cmd
         item.shortcutKeys.key.toLowerCase() === event.key.toLowerCase()
       );
 
@@ -112,26 +123,42 @@ export function NavUser({ user }: { user: UserData | null }) {
         activeItem.action();
       }
 
-      // Logout shortcut - might want this to be more global or also contextual
       if (event.altKey && event.key.toLowerCase() === 'q') {
         event.preventDefault();
         handleLogout();
       }
     };
 
-    if (isMenuOpen) {
-      document.addEventListener("keydown", handleKeyDown);
-    } else {
-      document.removeEventListener("keydown", handleKeyDown);
-    }
+    if (isMenuOpen) document.addEventListener("keydown", handleKeyDown);
+    else document.removeEventListener("keydown", handleKeyDown);
+    
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isMenuOpen, menuItems, handleLogout]);
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMenuOpen, menuItems, handleLogout]); // Add handleLogout to dependencies
+  // Wait for store hydration before rendering user-specific UI
+  if (!storeHasHydrated) {
+    // Render a placeholder or null while store is hydrating
+    // This prevents flashing the "Guest" view if a user is logged in.
+    return (
+        <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton size="lg" className="group w-full animate-pulse">
+                    <Avatar className="h-8 w-8 rounded-lg border border-border/50 bg-muted"></Avatar>
+                    <div className="ml-2.5 grid flex-1 text-left">
+                        <div className="h-4 bg-muted rounded w-3/4 mb-1"></div>
+                        <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </div>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
+    );
+  }
 
+  // Check if currentUser is the default/guest user or truly not authenticated
+  // The defaultUser in appStore has 'guest@example.com'.
+  const isGuest = !currentUser || currentUser.email === 'guest@example.com';
 
-  if (!user) {
+  if (isGuest) {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
@@ -156,6 +183,8 @@ export function NavUser({ user }: { user: UserData | null }) {
     );
   }
 
+  // At this point, currentUser is an authenticated user (not the guest default)
+  const user = currentUser as AuthUser; // Type assertion for convenience
   const userInitials = getInitials(user.name);
 
   return (
@@ -211,7 +240,7 @@ export function NavUser({ user }: { user: UserData | null }) {
                       <div className="grid flex-1 text-left text-sm leading-tight">
                         <span className="truncate font-semibold text-slate-700 dark:text-slate-100">{user.name}</span>
                         <span className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</span>
-                        {user.role && (
+                        {user.role && ( // role comes from AuthUser type via Zustand
                            <span className="text-[10px] text-sky-600 dark:text-sky-400 uppercase font-medium tracking-wider mt-0.5">
                              {user.role.toUpperCase()}
                            </span>
@@ -230,9 +259,9 @@ export function NavUser({ user }: { user: UserData | null }) {
                         >
                           <item.icon className="mr-2.5 h-4 w-4 opacity-70 group-hover:opacity-100 group-focus:opacity-100 transition-opacity" />
                           <span>{item.label}</span>
-                          {item.badge && item.badge > 0 && (
+                          {item.badge != null && item.badge > 0 && ( // Ensure badge is not undefined/null before checking > 0
                             <motion.span 
-                              key={item.badge} // Animate badge change
+                              key={item.badge} 
                               initial={{scale:0.5, opacity:0}}
                               animate={{scale:1, opacity:1}}
                               exit={{scale:0.5, opacity:0}}

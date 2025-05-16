@@ -1,16 +1,19 @@
+// app/onboarding/page.tsx
 'use client';
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-// Dialog components from shadcn/ui are no longer used for the main onboarding flow
-// import { Dialog, DialogContent, DialogOverlay, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'; // Still useful
-import { Loader2, CheckCircle, XOctagon, Sparkles } from 'lucide-react';
-import { isOnboardingComplete, clearOnboardingData } from '@/lib/idb-store';
+import { Loader2, CheckCircle, XOctagon, Sparkles, UserCog, AlertTriangle, Lock } from 'lucide-react'; // Added UserCog, AlertTriangle, Lock
+import { toast } from 'sonner'; // Import toast from your UI components
+import { isOnboardingComplete, clearOnboardingData as clearIdbOnboardingDataOnly } from '@/lib/idb-store'; // Renamed for clarity
 import { Button } from '@/components/ui/button';
-import { APP_NAME } from '@/config/constants';
+import { APP_NAME } from '@/config/constants'; // Ensure this is the correct path
+import { useAppStore, useCurrentUser } from '@/stores/appStore'; // For auth check
+import { UserRole } from '@/types/auth'; // For role comparison
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden'; // Still useful
 
-import { OnboardingProvider, useOnboarding } from './OnboardingContext'; // Ensure this provides STABLE functions
+import { OnboardingProvider, useOnboarding } from './OnboardingContext';
 import WelcomeStep from './WelcomeStep';
 import PlantConfigStep from './PlantConfigStep';
 import DataPointConfigStep from './DataPointConfigStep';
@@ -19,216 +22,299 @@ import ReviewStep from './ReviewStep';
 import OnboardingProgressBar from './OnboardingProgressBar';
 import OnboardingNavigation from './OnboardingNavigation';
 
-// OnboardingPageContentInternal will render the content of our custom panel.
-// It no longer needs DialogTitle or DialogDescription from the Dialog component.
+// Animation variants for full page states
+const fullPageVariants = {
+  initial: { opacity: 0, scale: 0.98 },
+  animate: { opacity: 1, scale: 1, transition: { duration: 0.4, ease: "easeOut" } },
+  exit: { opacity: 0, scale: 0.98, transition: { duration: 0.3, ease: "easeIn" } }
+};
+const itemVariants = {
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 120, damping: 14 } },
+};
+
+// --- OnboardingPanelInternalContent (No major changes needed here) ---
 const OnboardingPanelInternalContent = React.memo(() => {
-  const { currentStep, completeOnboarding, nextStep: contextNextStep, prevStep: contextPrevStep } = useOnboarding();
-  const [direction, setDirection] = useState(1);
+  // ... (Keep your existing OnboardingPanelInternalContent code)
+  // ... (Ensure it uses the refined WelcomeStep etc.)
+    const { currentStep, completeOnboarding, nextStep: contextNextStep, prevStep: contextPrevStep } = useOnboarding();
+    const [direction, setDirection] = useState(1);
 
-  // Ensure these step components are well-behaved and don't cause issues themselves.
-  const stepComponents = [
-    <WelcomeStep key="welcome" />,
-    <PlantConfigStep key="plant" />,
-    <DataPointConfigStep key="datapoints" />,
-    <OpcuaTestStep key="opcua" />,
-    <ReviewStep key="review" />,
-  ];
+    const stepComponents = [
+        <WelcomeStep key="welcome" />,
+        <PlantConfigStep key="plant" />,
+        <DataPointConfigStep key="datapoints" />,
+        <OpcuaTestStep key="opcua" />,
+        <ReviewStep key="review" />,
+    ];
 
-  const stepSlideVariants = {
-    hidden: (dir: number) => ({ opacity: 0, x: dir > 0 ? "50%" : "-50%" }),
-    visible: { opacity: 1, x: "0%", transition: { type: "spring", stiffness: 350, damping: 35 } },
-    exit: (dir: number) => ({ opacity: 0, x: dir < 0 ? "50%" : "-50%", transition: { type: "spring", stiffness: 350, damping: 35 } }),
-  };
+    const stepSlideVariants = {
+        hidden: (dir: number) => ({ opacity: 0, x: dir > 0 ? "50%" : "-50%", filter: "blur(5px)" }),
+        visible: { opacity: 1, x: "0%", filter: "blur(0px)", transition: { type: "spring", stiffness: 300, damping: 30, mass:0.8 } },
+        exit: (dir: number) => ({ opacity: 0, x: dir < 0 ? "50%" : "-50%", filter: "blur(5px)", transition: { type: "spring", stiffness: 300, damping: 30, mass:0.8 } }),
+    };
 
-  const handleNext = useCallback(() => {
-    setDirection(1);
-    if (currentStep === 4) { // Review step is the last before finalizing
-      completeOnboarding(); // This function MUST BE STABLE from context
-    } else {
-      contextNextStep();    // This function MUST BE STABLE from context
-    }
-  }, [currentStep, completeOnboarding, contextNextStep]);
+    const handleNext = useCallback(() => {
+        setDirection(1);
+        if (currentStep === 4) { completeOnboarding(); } else { contextNextStep(); }
+    }, [currentStep, completeOnboarding, contextNextStep]);
 
-  const handlePrev = useCallback(() => {
-    setDirection(-1);
-    contextPrevStep();      // This function MUST BE STABLE from context
-  }, [contextPrevStep]);
+    const handlePrev = useCallback(() => {
+        setDirection(-1); contextPrevStep();
+    }, [contextPrevStep]);
 
-  return (
-    <>
-      {/* Visually hidden titles for accessibility, not Dialog specific */}
-      <VisuallyHidden>
-        <h2>Onboarding Setup Process for {APP_NAME}</h2>
-      </VisuallyHidden>
-      <VisuallyHidden>
-        <p>Follow the steps to configure your application.</p>
-      </VisuallyHidden>
-
-      {/* Header for the panel */}
-      <div className="p-6 border-b flex items-center space-x-3 bg-muted/30 sticky top-0 z-10">
-        <Sparkles className="h-7 w-7 text-primary shrink-0" />
-        <h2 className="text-xl sm:text-2xl font-semibold text-foreground truncate" id="onboarding-panel-header">
-          Configure Your {APP_NAME}
-        </h2>
-      </div>
-
-      {/* Progress Bar */}
-      {currentStep > 0 && currentStep < 5 && ( // Show for steps 1-4
-        <div className="px-6 pt-4 pb-2">
-          <OnboardingProgressBar />
-        </div>
-      )}
-
-      {/* Step Content */}
-      <div className="flex-grow overflow-y-auto p-6 pt-2 relative min-h-[200px] sm:min-h-[300px]">
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={currentStep}
-            custom={direction}
-            variants={stepSlideVariants}
-            initial="hidden"
-            animate="visible"
-            exit="exit"
-            className="w-full"
-          >
-            {stepComponents[currentStep]}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Navigation */}
-      <div className="p-6 border-t mt-auto bg-muted/30 sticky bottom-0 z-10">
-        <OnboardingNavigation onNext={handleNext} onPrev={handlePrev} />
-      </div>
-    </>
-  );
+    return (
+        <>
+            <VisuallyHidden><h2>Onboarding Setup Process for {APP_NAME}</h2></VisuallyHidden>
+            <div className="p-5 sm:p-6 border-b flex items-center space-x-3 bg-card/80 dark:bg-neutral-800/80 backdrop-blur-sm sticky top-0 z-10 rounded-t-lg">
+                <Sparkles className="h-6 w-6 sm:h-7 sm:w-7 text-primary shrink-0 animate-pulse" />
+                <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-foreground truncate" id="onboarding-panel-header">
+                    Configure Your {APP_NAME}
+                </h2>
+            </div>
+            {currentStep > 0 && currentStep < 5 && (
+                <div className="px-5 sm:px-6 pt-4 pb-2 border-b">
+                    <OnboardingProgressBar />
+                </div>
+            )}
+            <div className="flex-grow overflow-y-auto p-5 sm:p-6 pt-3 sm:pt-4 relative min-h-[250px] sm:min-h-[350px]">
+                <AnimatePresence initial={false} custom={direction} mode="wait">
+                    <motion.div key={currentStep} custom={direction} variants={stepSlideVariants} initial="hidden" animate="visible" exit="exit" className="w-full">
+                        {stepComponents[currentStep]}
+                    </motion.div>
+                </AnimatePresence>
+            </div>
+            <div className="p-5 sm:p-6 border-t mt-auto bg-card/80 dark:bg-neutral-800/80 backdrop-blur-sm sticky bottom-0 z-10 rounded-b-lg">
+                <OnboardingNavigation onNext={handleNext} onPrev={handlePrev} />
+            </div>
+        </>
+    );
 });
 OnboardingPanelInternalContent.displayName = 'OnboardingPanelInternalContent';
 
-
+// --- Main OnboardingPageContent ---
 const OnboardingPageContent = () => {
-  const { currentStep, resetOnboarding, saveStatus } = useOnboarding();
+  const { currentStep, resetOnboardingData, saveStatus, completeOnboarding: markContextOnboardingComplete } = useOnboarding(); // Renamed context method for clarity
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
-  const [isLoading, setIsLoading] = useState(true);
+  
+  const storeHasHydrated = useAppStore.persist.hasHydrated();
+  const currentUserFromStore = useAppStore((state) => state.currentUser); // Direct access to store value
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAllowedToOnboard, setIsAllowedToOnboard] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true); // General loading state for checks
+  const [onboardingWasComplete, setOnboardingWasComplete] = useState<boolean | null>(null);
 
-  // This useEffect is critical. `resetOnboarding` MUST BE STABLE (memoized in context).
+
   useEffect(() => {
-    let isMounted = true;
-    const checkStatus = async () => {
-      // setIsLoading(true); // Already true initially. Re-setting might be redundant unless this effect re-runs often.
+    console.log("[Onboarding Auth] Start | Hydrated:", storeHasHydrated, "| Direct Store User:", currentUserFromStore);
 
-      const completed = await isOnboardingComplete();
+    if (!storeHasHydrated) {
+      console.log("[Onboarding Auth] Waiting for Zustand hydration...");
+      return; // Wait for Zustand to hydrate
+    }
+    
+    setInitialLoading(true); // Start loading animation if not already
+    let isMounted = true;
+
+    const performChecks = async () => {
+      // 1. Check existing onboarding status from IDB
+      const idbOnboardingCompleted = await isOnboardingComplete();
       if (!isMounted) return;
+      setOnboardingWasComplete(idbOnboardingCompleted); // Store this for later logic
+      console.log("[Onboarding Auth] IDB Onboarding Complete Status:", idbOnboardingCompleted);
+
+      // 2. Evaluate current user from Zustand store (which is now hydrated)
+      const user = currentUserFromStore; // Use the direct store value after hydration
+      console.log("[Onboarding Auth] Current User from Store:", user);
 
       const wantsReset = searchParams.get('reset') === 'true';
+      console.log("[Onboarding Auth] Wants Reset:", wantsReset);
 
-      if (wantsReset) {
-        const newParams = new URLSearchParams(searchParams.toString());
-        newParams.delete('reset');
-        router.replace(`${pathname}?${newParams.toString()}`, { scroll: false }); // Clean URL
-
-        if (completed) await clearOnboardingData();
-        if (!isMounted) return;
-        await resetOnboarding(); // MUST BE STABLE
-      } else if (completed) {
+      // --- Decision Logic ---
+      if (!user || user.email === 'guest@example.com') {
+        // Scenario: No authenticated user
+        console.log("[Onboarding Auth] Action: No authenticated user. Redirecting to login.");
+        toast.error("Authentication Required", { description: "Please log in to proceed with setup."});
         router.replace('/login');
+        return; // Stop further processing
       }
-      // If !completed and !wantsReset, context's currentStep should take over.
+      
+      // Scenario: User is authenticated
+      if (user.role === UserRole.ADMIN) {
+        // Admin User
+        console.log("[Onboarding Auth] User is ADMIN.");
+        if (wantsReset) {
+          console.log("[Onboarding Auth] ADMIN wants reset. Clearing data and starting onboarding.");
+          if (idbOnboardingCompleted) await clearIdbOnboardingDataOnly();
+          if (!isMounted) return;
+          await resetOnboardingData(); // This resets OnboardingContext state
+          setIsAllowedToOnboard(true);
+          // Clean URL param
+          const newParams = new URLSearchParams(searchParams.toString());
+          newParams.delete('reset');
+          router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
 
-      if (isMounted) setIsLoading(false);
+        } else if (!idbOnboardingCompleted) {
+          console.log("[Onboarding Auth] ADMIN, onboarding not complete. Allowing onboarding.");
+          setIsAllowedToOnboard(true);
+        } else {
+          // Admin, onboarding IS complete, and no reset requested
+          console.log("[Onboarding Auth] ADMIN, onboarding already complete. Redirecting to dashboard/control.");
+          toast.info("Setup Already Complete", { description: "Redirecting to your dashboard."});
+          router.replace(user.redirectPath || '/dashboard'); // Or specific admin dashboard
+        }
+      } else {
+        // Non-Admin User
+        console.log("[Onboarding Auth] User is NON-ADMIN. Role:", user.role);
+        setIsAllowedToOnboard(false); // Non-admins cannot actively onboard
+        if (!idbOnboardingCompleted) {
+          console.log("[Onboarding Auth] NON-ADMIN, onboarding NOT complete. Showing 'Admin Required' message.");
+          // Stays on this page, will render the 'admin required' message.
+        } else {
+          // Non-admin, onboarding IS complete by an admin previously
+          console.log("[Onboarding Auth] NON-ADMIN, onboarding complete by admin. Redirecting to dashboard.");
+          toast.info("Welcome!", { description: "System configuration is complete." });
+          router.replace(user.redirectPath || '/dashboard');
+        }
+      }
+      
+      if(isMounted) setAuthChecked(true);
+      if(isMounted) setInitialLoading(false); // Finish initial loading screen
     };
 
-    checkStatus();
+    performChecks();
     return () => { isMounted = false; };
-  }, [router, resetOnboarding, pathname, searchParams]); // `resetOnboarding` is the most likely culprit for loops if not stable.
 
-  const shouldRenderOnboardingPanel = !isLoading && currentStep >= 0 && currentStep <= 4;
+  }, [storeHasHydrated, currentUserFromStore, router, resetOnboardingData, searchParams, pathname]);
 
-  if (isLoading) {
+
+  // ---- Render logic based on auth and onboarding state ----
+
+  // Full-screen Initial Loading state (covers hydration + initial auth checks)
+  if (initialLoading || (storeHasHydrated && !authChecked)) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 flex flex-col items-center justify-center bg-background z-[100]"
-      >
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading setup...</p>
+      <motion.div variants={fullPageVariants} initial="initial" animate="animate" exit="exit"
+        className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-neutral-900 text-slate-200 z-[100]">
+        <motion.div initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 150, damping: 12, delay: 0.1 } }}>
+          <Loader2 className="h-16 w-16 text-primary animate-spin mb-6" />
+        </motion.div>
+        <motion.p variants={itemVariants} className="text-xl font-medium text-slate-300">Loading Application Setup...</motion.p>
+        <motion.p variants={itemVariants} custom={1} className="text-sm text-slate-400 mt-2">Verifying configuration and session...</motion.p>
       </motion.div>
     );
   }
 
-  if (currentStep === 5) { // Finalizing/Completion screen
-    let iconToShow = <Loader2 className="h-16 w-16 animate-spin text-primary" />;
+  // Screen for Non-Admin when onboarding is NOT yet complete by anyone
+  if (authChecked && !isAllowedToOnboard && onboardingWasComplete === false) {
+    return (
+      <motion.div variants={fullPageVariants} initial="initial" animate="animate" exit="exit"
+        className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50 dark:from-neutral-900 dark:via-neutral-800 dark:to-gray-900 text-center p-6 z-[90]">
+        <motion.div variants={itemVariants}>
+            <UserCog className="h-20 w-20 text-amber-500 dark:text-amber-400 mx-auto mb-6 opacity-80" />
+        </motion.div>
+        <motion.h1 variants={itemVariants} custom={1} className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-gray-100 mb-3">
+            Administrator Setup Required
+        </motion.h1>
+        <motion.p variants={itemVariants} custom={2} className="text-base sm:text-lg text-gray-600 dark:text-gray-400 max-w-md mx-auto mb-8">
+            The initial configuration for {APP_NAME} needs to be completed by an administrator.
+            Please contact your system administrator to set up the application.
+        </motion.p>
+        <motion.div variants={itemVariants} custom={3}>
+            <Button onClick={() => router.push('/login')} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-8 py-3 text-base">
+                Go to Login
+            </Button>
+        </motion.div>
+      </motion.div>
+    );
+  }
+  
+  // Onboarding is complete or setup process is being finalized by admin
+  if (authChecked && isAllowedToOnboard && currentStep === 5) { 
+    let iconToShow = <Loader2 className="h-20 w-20 animate-spin text-primary" />;
     let titleText = "Finalizing Your Setup...";
-    let messageText = "Just a moment, saving your configurations...";
+    let messageText = "Saving configurations and preparing your dashboard...";
 
     if (saveStatus === 'success') {
-      iconToShow = <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { type: "spring", stiffness: 200, damping: 10 } }}><CheckCircle className="h-16 w-16 text-green-500" /></motion.div>;
-      titleText = "Setup Complete!";
-      messageText = `Welcome to ${APP_NAME}! You're all set.`;
+      iconToShow = <motion.div initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { type: "spring", stiffness: 180, damping: 10, delay:0.1 } }}><CheckCircle className="h-20 w-20 text-green-500" /></motion.div>;
+      titleText = "Setup Complete & Successful!";
+      messageText = `Welcome aboard! ${APP_NAME} is ready. You will be redirected shortly.`;
     } else if (saveStatus === 'error') {
-      iconToShow = <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}><XOctagon className="h-16 w-16 text-destructive" /></motion.div>;
+      iconToShow = <motion.div initial={{ rotate: -15, scale:0.8 }} animate={{ rotate: 0, scale:1 }}><XOctagon className="h-20 w-20 text-destructive" /></motion.div>;
       titleText = "Setup Error";
-      messageText = "An error occurred. You may need to try again or contact support.";
-      // TODO: Consider a button to retry or go back to review (e.g., by calling a context function like `goToStep(4)`)
+      messageText = "An issue occurred while saving. Please review your settings or contact support.";
+      // Option to go back or retry can be added here
     }
     return (
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-        className="fixed inset-0 flex flex-col items-center justify-center p-6 text-center bg-background z-[100]"
-      >
-        <div className="mb-6">{iconToShow}</div>
-        <h2 className="text-2xl md:text-3xl font-bold mb-3">{titleText}</h2>
-        <p className="text-muted-foreground max-w-md">{messageText}</p>
+      <motion.div variants={fullPageVariants} initial="initial" animate="animate" exit="exit"
+        className="fixed inset-0 flex flex-col items-center justify-center text-center p-6 bg-background z-[100]">
+        <div className="mb-8">{iconToShow}</div>
+        <motion.h2 variants={itemVariants} className="text-3xl sm:text-4xl font-bold text-foreground mb-4">{titleText}</motion.h2>
+        <motion.p variants={itemVariants} custom={1} className="text-base sm:text-lg text-muted-foreground max-w-md mx-auto">{messageText}</motion.p>
+        {/* Auto-redirect or button might go here */}
+        {saveStatus === 'success' && <motion.div variants={itemVariants} custom={2} className="mt-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground"/></motion.div>}
+         {saveStatus === 'error' && (
+            <motion.div variants={itemVariants} custom={2} className="mt-8">
+                <Button onClick={() => { /* Call context function to go to review step, e.g., goToStep(4) */ }} 
+                        variant="outline">Review Configuration</Button>
+            </motion.div>
+        )}
       </motion.div>
     );
   }
 
-  if (shouldRenderOnboardingPanel) {
+  // Admin is actively going through the onboarding steps
+  if (authChecked && isAllowedToOnboard && currentStep >= 0 && currentStep <= 4) {
     return (
-      // This is our custom "dialog-like" UI container
-      // 1. Full-screen overlay
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
-        {/* 2. Centered content panel/card */}
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-200 via-gray-200 to-slate-300 dark:from-neutral-900 dark:via-zinc-900 dark:to-gray-900 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto z-40 transition-colors duration-300">
         <motion.div
-          initial={{ opacity: 0, y: 30, scale: 0.98 }}
+          initial={{ opacity: 0, y: 20, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 30, scale: 0.98 }} // Optional: Add exit animation if desired
-          transition={{ type: "spring", stiffness: 260, damping: 25 }}
-          className="relative bg-card rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
-          // We are not a true modal, so ARIA roles like 'dialog' might be misleading
-          // unless full modal accessibility (focus trap, etc.) is implemented.
-          // For simplicity, we omit them here.
-          // aria-labelledby="onboarding-panel-header" (if OnboardingPanelInternalContent h2 has this id)
+          exit={{ opacity: 0, y: 20, scale: 0.97 }}
+          transition={{ type: "spring", stiffness: 260, damping: 25, mass: 0.9 }}
+          className="relative bg-card dark:bg-neutral-800/90 rounded-xl shadow-2xl w-full max-w-2xl md:max-w-3xl max-h-[95vh] flex flex-col overflow-hidden border border-border/70 dark:border-neutral-700/80"
         >
           <OnboardingPanelInternalContent />
-          
-          {/* Reset Button, positioned on our custom panel */}
           <Button
             variant="ghost"
             size="icon"
             onClick={async () => {
-              if (window.confirm("Are you sure you want to start over? All unsaved progress will be lost.")) {
-                await resetOnboarding(); // MUST BE STABLE
+              if (window.confirm("Are you sure you want to reset and start over? All progress in this session will be lost.")) {
+                await resetOnboardingData(); // Reset OnboardingContext data
               }
             }}
-            className="absolute top-3.5 right-3.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full z-20" // z-20 to be above sticky header
-            aria-label="Start Over or Reset Configuration"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full z-20 p-1.5 sm:p-2"
+            aria-label="Restart Onboarding"
+            title="Restart Onboarding"
           >
-            <XOctagon className="h-5 w-5" />
+            <XOctagon className="h-5 w-5 sm:h-6 sm:w-6" />
           </Button>
         </motion.div>
       </div>
     );
   }
 
-  // If not loading, not step 5, and panel shouldn't be rendered (e.g., if routing occurred)
-  return null;
+  // Fallback: If no condition is met (should ideally not happen if logic is exhaustive)
+  // Could be if authChecked is true, but no other render condition applies
+  // This might indicate user was redirected but component didn't unmount fast enough.
+  if (authChecked) {
+      console.warn("[Onboarding Auth] Fallback: Auth checked, but no specific render path matched. CurrentStep:", currentStep, "AllowedToOnboard:", isAllowedToOnboard);
+      return (
+           <motion.div variants={fullPageVariants} initial="initial" animate="animate" exit="exit"
+                className="fixed inset-0 flex flex-col items-center justify-center bg-background z-[100]">
+                <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+                <p className="text-muted-foreground">Preparing...</p>
+            </motion.div>
+      );
+  }
+
+  return null; // Or some default loading/error screen
 };
 
+
+// --- Onboarding (Provider Wrapper) ---
 export default function Onboarding() {
-  // CRITICAL REMINDER: OnboardingProvider MUST use useCallback/useMemo for its context values.
   return (
     <OnboardingProvider>
       <OnboardingPageContent />

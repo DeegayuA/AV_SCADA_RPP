@@ -15,7 +15,7 @@ export default function PlantConfigStep() {
   const { onboardingData, updateOnboardingData, nextStep } = useOnboarding();
 
   const form = useForm<PlantConfigFormData>({
-    resolver: zodResolver(plantConfigSchema),
+    resolver: zodResolver(plantConfigSchema) as any, // Type assertion to bypass the resolver type mismatch
     defaultValues: {
       plantName: onboardingData.plantName || PLANT_NAME,
       plantLocation: onboardingData.plantLocation || PLANT_LOCATION,

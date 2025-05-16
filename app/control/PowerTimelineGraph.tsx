@@ -1,7 +1,7 @@
 // components/PowerTimelineGraph.tsx
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
     LineChart,
     Line,
@@ -11,26 +11,67 @@ import {
     Tooltip,
     Legend,
     ResponsiveContainer,
-    ReferenceArea, // For potential future highlighting
 } from 'recharts';
-import { NodeData } from '@/app/DashboardData/dashboardInterfaces'; // Adjust path if needed
-import { DataPoint } from '@/config/dataPoints'; // Adjust path if needed
+import { motion, AnimatePresence } from 'framer-motion';
+import { NodeData } from '@/app/DashboardData/dashboardInterfaces'; // Assuming this path is correct
+import { DataPoint } from '@/config/dataPoints'; // Assuming this path is correct
 import { useTheme } from 'next-themes';
+// Ensure this path is correct for your project structure:
+import { generateDailySolarCurve, generateUsageData, getSimulatedHistoricalData, SimulatedPoint } from '../utils/solarDataGenerator';
 
-// Helper to get a color from the current theme (if using Tailwind CSS with custom theme colors)
-const getThemeColor = (colorName: string, resolvedTheme: string | undefined) => {
-    if (typeof window === 'undefined') return colorName; // Default for SSR
+const getThemeColor = (colorName: string, resolvedTheme: string | undefined): string => {
+    if (typeof window === 'undefined') {
+      // Fallback colors for SSR or if CSS variables are not available
+      const ssrFallbacks: Record<string, string> = {
+        'primary': '#3b82f6',
+        'muted-foreground': '#71717a',
+        'green-500': '#10B981',
+        'red-500': '#EF4444',
+        'orange-500': '#F59E0B',
+        'popover': '#ffffff',
+        'popover-foreground': '#020817',
+        'border': '#e2e8f0',
+      };
+      const darkSsrFallbacks: Record<string, string> = {
+        'primary': '#60a5fa',
+        'muted-foreground': '#a1a1aa',
+        'green-500': '#34D399', // Brighter green for dark
+        'red-500': '#F87171',   // Brighter red
+        'orange-500': '#FBBF24',// Brighter orange
+        'popover': '#0f172a', // Dark slate
+        'popover-foreground': '#e2e8f0',
+        'border': '#334155',
+      };
+      return (resolvedTheme === 'dark' ? darkSsrFallbacks[colorName] : ssrFallbacks[colorName]) || colorName;
+    }
+
     const style = getComputedStyle(document.documentElement);
-    const twColor = style.getPropertyValue(`--color-${colorName}`).trim();
-    if (twColor) return twColor;
+    // Attempt to get direct Tailwind color name if defined (e.g. --green-500 as a variable)
+    let twColorValue = style.getPropertyValue(`--${colorName}`).trim();
 
-    // Fallback for common colors if theme variables aren't set up this way
-    if (colorName === 'primary') return resolvedTheme === 'dark' ? '#60a5fa' : '#3b82f6'; // Example blue
-    if (colorName === 'muted-foreground') return resolvedTheme === 'dark' ? '#a1a1aa' : '#71717a';
-    return colorName;
+    if (twColorValue) {
+        if (twColorValue.split(" ").length === 3) return `hsl(${twColorValue})`; // HSL from ShadCN theme
+        return twColorValue; // Direct color string
+    }
+
+    // Fallbacks for common cases if full theme system not in place via CSS vars as assumed
+    // These specific colors might not be exactly what you get from Tailwind variables;
+    // it's better if Tailwind's CSS variables (like --primary, etc.) are correctly set.
+    const colorMapLight: Record<string,string> = {
+        'green-500': '#10B981', 'red-500': '#EF4444', 'orange-500': '#F59E0B',
+        'primary': '#3b82f6', 'muted-foreground': '#71717a',
+        'popover': 'white', 'popover-foreground': 'black', 'border': '#e5e7eb'
+    };
+    const colorMapDark: Record<string,string> = {
+        'green-500': '#34D399', 'red-500': '#F87171', 'orange-500': '#FBBF24',
+        'primary': '#60a5fa', 'muted-foreground': '#a1a1aa',
+        'popover': '#1f2937', 'popover-foreground': 'white', 'border': '#374151'
+    };
+    return (resolvedTheme === 'dark' ? colorMapDark[colorName] : colorMapLight[colorName]) || colorName;
 };
 
-interface PowerDataPoint {
+
+interface ChartDataPoint {
     timestamp: number;
     generation: number;
     usage: number;
@@ -45,16 +86,24 @@ interface PowerTimelineGraphProps {
     usageNodes: string[];
     timeScale: TimeScale;
     allPossibleDataPoints: DataPoint[];
-    isLive?: boolean; // Optional: set to false if you want to pause live updates
+    isLive?: boolean;
 }
 
-const timeScaleConfig: Record<TimeScale, { durationMs: number; tickIntervalMs: number; pointsToKeepRoughly: number }> = {
-    day:  { durationMs: 24 * 60 * 60 * 1000, tickIntervalMs: 2 * 60 * 60 * 1000, pointsToKeepRoughly: (24 * 60 * 60) / 30 }, // Every 30s
-    '6h': { durationMs: 6 * 60 * 60 * 1000,  tickIntervalMs: 1 * 60 * 60 * 1000, pointsToKeepRoughly: (6 * 60 * 60) / 15 },  // Every 15s
-    '1h': { durationMs: 1 * 60 * 60 * 1000,  tickIntervalMs: 10 * 60 * 1000,     pointsToKeepRoughly: (1 * 60 * 60) / 5  },   // Every 5s
-    '30m':{ durationMs: 30 * 60 * 1000,     tickIntervalMs: 5 * 60 * 1000,      pointsToKeepRoughly: (30 * 60) / 2   },     // Every 2s
-    '5m': { durationMs: 5 * 60 * 1000,      tickIntervalMs: 1 * 60 * 1000,      pointsToKeepRoughly: (5 * 60) / 1    },      // Every 1s
-    '1m': { durationMs: 1 * 60 * 1000,      tickIntervalMs: 10 * 1000,          pointsToKeepRoughly: (1 * 60) / 1    },      // Every 1s
+const SIMULATED_PEAK_SOLAR_KW = 50;
+const SIMULATED_BASE_USAGE_KW = 10;
+
+const timeScaleConfig: Record<TimeScale, { 
+    durationMs: number; 
+    tickIntervalMs: number; 
+    pointsToDisplay: number;
+    liveUpdateIntervalMs: number;
+}> = {
+    day:  { durationMs: 24 * 60 * 60 * 1000, tickIntervalMs: 2 * 60 * 60 * 1000, pointsToDisplay: 48,  liveUpdateIntervalMs: 10 * 60 * 1000 },
+    '6h': { durationMs: 6 * 60 * 60 * 1000,  tickIntervalMs: 1 * 60 * 60 * 1000, pointsToDisplay: 36,  liveUpdateIntervalMs: 5 * 60 * 1000 },
+    '1h': { durationMs: 1 * 60 * 60 * 1000,  tickIntervalMs: 10 * 60 * 1000,     pointsToDisplay: 60,  liveUpdateIntervalMs: 30 * 1000 },
+    '30m':{ durationMs: 30 * 60 * 1000,     tickIntervalMs: 5 * 60 * 1000,      pointsToDisplay: 60,  liveUpdateIntervalMs: 15 * 1000 },
+    '5m': { durationMs: 5 * 60 * 1000,      tickIntervalMs: 1 * 60 * 1000,      pointsToDisplay: 60,  liveUpdateIntervalMs: 5 * 1000 },
+    '1m': { durationMs: 1 * 60 * 1000,      tickIntervalMs: 10 * 1000,          pointsToDisplay: 60,  liveUpdateIntervalMs: 1 * 1000 },
 };
 
 const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
@@ -65,221 +114,303 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     allPossibleDataPoints,
     isLive = true,
 }) => {
-    const [data, setData] = useState<PowerDataPoint[]>([]);
+    const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const { resolvedTheme } = useTheme();
+    const liveUpdateTimer = useRef<NodeJS.Timeout | null>(null);
+    const [isLoadingInitial, setIsLoadingInitial] = useState(true);
+    const [animationKey, setAnimationKey] = useState(0); // To force re-render of motion.div
 
     const axisStrokeColor = useMemo(() => getThemeColor('muted-foreground', resolvedTheme), [resolvedTheme]);
     const gridStrokeColor = useMemo(() => resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)', [resolvedTheme]);
 
-    const getNodeName = useCallback((nodeId: string): string => {
-        const point = allPossibleDataPoints.find(dp => dp.nodeId === nodeId);
-        return point?.name || nodeId;
-    }, [allPossibleDataPoints]);
+    useEffect(() => {
+        setIsLoadingInitial(true);
+        setChartData([]); // Clear previous data on timescale change
+        setAnimationKey(prevKey => prevKey + 1); // Change key to ensure framer-motion re-animates
+        const now = new Date();
+        console.log(`[${timeScale}] Loading historical data up to:`, now.toISOString());
+        const { generation, usage } = getSimulatedHistoricalData(timeScale, now, SIMULATED_PEAK_SOLAR_KW, SIMULATED_BASE_USAGE_KW);
 
-    const generationNodeNames = useMemo(() => generationNodes.map(getNodeName).join(', ') || 'N/A', [generationNodes, getNodeName]);
-    const usageNodeNames = useMemo(() => usageNodes.map(getNodeName).join(', ') || 'N/A', [usageNodes, getNodeName]);
+        const mergedData: ChartDataPoint[] = generation.map(genPoint => {
+            const usagePoint = usage.find(u => u.timestamp === genPoint.timestamp) || { timestamp: genPoint.timestamp, value: generateUsageData(genPoint.timestamp, SIMULATED_BASE_USAGE_KW)};
+            return {
+                timestamp: genPoint.timestamp,
+                generation: genPoint.value,
+                usage: usagePoint.value,
+                net: parseFloat((genPoint.value - usagePoint.value).toFixed(2)),
+            };
+        }).sort((a,b) => a.timestamp - b.timestamp); // Ensure sorted
+        
+        console.log(`[${timeScale}] Historical data points:`, mergedData.length, mergedData.slice(0, 5));
+        setChartData(mergedData);
+        setIsLoadingInitial(false);
+
+    }, [timeScale]);
+
 
     useEffect(() => {
-        if (!isLive || generationNodes.length === 0 || usageNodes.length === 0) {
-            // Optionally clear data if not live or not configured, or just pause updates
-            // setData([]);
+        if (!isLive || isLoadingInitial) {
+            if(liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
             return;
         }
+        
+        const { durationMs, pointsToDisplay, liveUpdateIntervalMs } = timeScaleConfig[timeScale];
 
-        const { durationMs, pointsToKeepRoughly } = timeScaleConfig[timeScale];
-        const now = Date.now();
+        const updateData = () => {
+            const nowMs = Date.now();
+            let currentGeneration = 0;
+            let currentUsage = 0;
 
-        const totalGeneration = generationNodes.reduce((sum, nodeId) => {
-            const value = nodeValues[nodeId];
-            return sum + (typeof value === 'number' ? value : 0);
-        }, 0);
-
-        const totalUsage = usageNodes.reduce((sum, nodeId) => {
-            const value = nodeValues[nodeId];
-            return sum + (typeof value === 'number' ? Math.abs(value) : 0); // Ensure usage is positive
-        }, 0);
-
-        const netPower = totalGeneration - totalUsage;
-
-        setData(prevData => {
-            const newDataPoint: PowerDataPoint = {
-                timestamp: now,
-                generation: parseFloat(totalGeneration.toFixed(2)),
-                usage: parseFloat(totalUsage.toFixed(2)),
-                net: parseFloat(netPower.toFixed(2)),
-            };
-
-            // Filter out old data and limit array size
-            const cutoffTime = now - durationMs;
-            let updatedData = prevData.filter(d => d.timestamp >= cutoffTime);
-            updatedData.push(newDataPoint);
-
-            // To prevent excessive data points if updates are very frequent relative to scale
-            if (updatedData.length > pointsToKeepRoughly * 1.5 && updatedData.length > 50) { // *1.5 buffer
-                 // Heuristic to trim older data if exceeding expected points due to rapid updates
-                 // For '1m' scale, target 60 points (1 per sec). If we get >90, trim.
-                updatedData = updatedData.slice(-Math.floor(pointsToKeepRoughly * 1.2));
+            let useLiveNodeValues = false;
+            if (generationNodes.length > 0 && usageNodes.length > 0 && Object.keys(nodeValues).length > 0) {
+                const hasGenNode = generationNodes.some(n => typeof nodeValues[n] === 'number');
+                const hasUsageNode = usageNodes.some(n => typeof nodeValues[n] === 'number');
+                if (hasGenNode && hasUsageNode) { // Only use live if both types of nodes are present and numeric
+                    useLiveNodeValues = true;
+                }
             }
-            return updatedData;
-        });
+            
+            if (useLiveNodeValues) {
+                 currentGeneration = generationNodes.reduce((sum, nodeId) => {
+                    const value = nodeValues[nodeId];
+                    return sum + (typeof value === 'number' && isFinite(value) ? value : 0);
+                }, 0);
 
-    }, [nodeValues, generationNodes, usageNodes, timeScale, isLive, allPossibleDataPoints]); // Removed data from dependencies to avoid loop on setData
+                currentUsage = usageNodes.reduce((sum, nodeId) => {
+                    const value = nodeValues[nodeId];
+                    return sum + (typeof value === 'number' && isFinite(value) ? Math.abs(value) : 0);
+                }, 0);
+                console.log(`[${timeScale}] Live node values update: Gen=${currentGeneration}, Usage=${currentUsage}`);
+            } else {
+                const todaySolarCurve = generateDailySolarCurve(new Date(nowMs), SIMULATED_PEAK_SOLAR_KW, 60);
+                const closestGenerationPoint = todaySolarCurve.length > 0 ? todaySolarCurve.reduce((prev, curr) => 
+                    Math.abs(curr.timestamp - nowMs) < Math.abs(prev.timestamp - nowMs) ? curr : prev
+                ) : { timestamp: nowMs, value: 0 };
+                currentGeneration = closestGenerationPoint.value;
+                currentUsage = generateUsageData(nowMs, SIMULATED_BASE_USAGE_KW);
+                 // console.log(`[${timeScale}] Simulated live update: Gen=${currentGeneration}, Usage=${currentUsage}`);
+            }
+            
+            setChartData(prevData => {
+                const newDataPoint: ChartDataPoint = {
+                    timestamp: nowMs,
+                    generation: parseFloat(currentGeneration.toFixed(2)),
+                    usage: parseFloat(currentUsage.toFixed(2)),
+                    net: parseFloat((currentGeneration - currentUsage).toFixed(2)),
+                };
+
+                const cutoffTime = nowMs - durationMs;
+                // Filter out old data points
+                let updatedData = prevData.filter(d => d.timestamp >= cutoffTime);
+                // Add new data point
+                updatedData.push(newDataPoint);
+                // Sort to ensure timestamps are in order for the line chart
+                updatedData.sort((a, b) => a.timestamp - b.timestamp);
+                
+                // Trim if data grows too large (beyond pointsToDisplay * buffer)
+                if (updatedData.length > pointsToDisplay * 2 && updatedData.length > 30) { // Increased buffer for trimming
+                    updatedData = updatedData.slice(-Math.floor(pointsToDisplay * 1.5));
+                }
+                // console.log(`[${timeScale}] chartData updated, length:`, updatedData.length);
+                return updatedData;
+            });
+        };
+        
+        // Run initial update if chart is not empty, to append a "now" point quickly
+        // This depends if you want the live updates to start immediately or wait for the first interval.
+        // For now, let setInterval handle the first call for consistency.
+        
+        if(liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
+        liveUpdateTimer.current = setInterval(updateData, liveUpdateIntervalMs);
+
+        return () => {
+            if (liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
+        };
+    }, [nodeValues, generationNodes, usageNodes, timeScale, isLive, isLoadingInitial]); // Removed chartData from here to avoid self-triggering loops
 
 
     const currentValues = useMemo(() => {
-        if (data.length === 0) return { generation: 0, usage: 0, net: 0, timestamp: Date.now() };
-        return data[data.length - 1];
-    }, [data]);
+        if (chartData.length === 0) return { generation: 0, usage: 0, net: 0, timestamp: Date.now() };
+        return chartData[chartData.length - 1];
+    }, [chartData]);
 
     const netPowerColor = useMemo(() => {
-        if (data.length === 0) return axisStrokeColor; // Default color or gray
-        return currentValues.net >= 0 ? '#10B981' : '#EF4444'; // Green / Red from Tailwind
-    }, [data, currentValues, axisStrokeColor]);
+        if (chartData.length === 0) return axisStrokeColor;
+        // Using explicit colors for debugging initially
+        return currentValues.net >= 0 ? '#10B981' : '#EF4444';
+        // return currentValues.net >= 0 ? getThemeColor('green-500', resolvedTheme) : getThemeColor('red-500', resolvedTheme);
+    }, [chartData, currentValues, axisStrokeColor, resolvedTheme]);
+    
+    const generationColor = useMemo(() => '#34D399', []); // Explicit for debugging
+    const usageColor = useMemo(() => '#FBBF24', []); // Explicit for debugging
+    // const generationColor = useMemo(() => getThemeColor('green-500', resolvedTheme), [resolvedTheme]);
+    // const usageColor = useMemo(() => getThemeColor('orange-500', resolvedTheme), [resolvedTheme]);
 
     const formatTick = useCallback((timestamp: number) => {
         const date = new Date(timestamp);
         switch (timeScale) {
             case 'day':
-                return date.toLocaleTimeString([], { hour: '2-digit', minute: 'numeric', hour12: false });
+                const hours = date.getHours();
+                if (hours % 3 === 0) { 
+                     return date.toLocaleTimeString([], { hour: 'numeric', hour12: false }); // Simpler format
+                }
+                return '';
             case '6h':
             case '1h':
-                return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+                return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: false });
             case '30m':
             case '5m':
             case '1m':
-                return date.toLocaleTimeString([], { minute: '2-digit', second: '2-digit' });
             default:
-                return date.toLocaleTimeString();
+                return date.toLocaleTimeString([], { minute: '2-digit', second: '2-digit' });
         }
     }, [timeScale]);
 
-    const xTicks = useMemo(() => {
-        if (data.length === 0) return undefined;
-        const { durationMs, tickIntervalMs } = timeScaleConfig[timeScale];
-        const lastTimestamp = data[data.length-1]?.timestamp || Date.now();
-        const firstTimestamp = lastTimestamp - durationMs;
+    const xAxisDomain = useMemo((): [number | 'dataMin' | 'auto', number | 'dataMax' | 'auto'] => {
+        const { durationMs } = timeScaleConfig[timeScale];
+        if (chartData.length < 2 || timeScale === 'day') { 
+            // For day or insufficient data, let Recharts auto-determine based on full dataset range
+            return ['dataMin', 'dataMax'];
+        }
+        const lastTimestamp = chartData[chartData.length - 1].timestamp;
+        return [lastTimestamp - durationMs, lastTimestamp];
+    }, [timeScale, chartData]);
+
+
+    const yAxisDomain = useMemo((): [number | 'auto', number | 'auto'] => {
+        if (chartData.length === 0) return [-SIMULATED_BASE_USAGE_KW -10, SIMULATED_PEAK_SOLAR_KW + 10];
+
+        let minVal = 0; // Start min at 0 or slightly below if net can be negative
+        let maxVal = 0; // Start max at 0
         
-        const ticks: number[] = [];
-        let currentTick = Math.floor(firstTimestamp / tickIntervalMs) * tickIntervalMs + tickIntervalMs;
+        chartData.forEach(d => {
+            // Ensure values are finite numbers
+            const gen = isFinite(d.generation) ? d.generation : 0;
+            const usg = isFinite(d.usage) ? d.usage : 0;
+            const nt = isFinite(d.net) ? d.net : 0;
 
-        while(currentTick <= lastTimestamp) {
-            ticks.push(currentTick);
-            currentTick += tickIntervalMs;
-        }
-        if(ticks.length === 0 && data.length > 0) ticks.push(data[0].timestamp); // ensure at least one tick if data exists
-        if(ticks.length > 0 && data.length > 0 && ticks[ticks.length-1] < data[data.length-1].timestamp && ticks.length < 10) { // Ensure last tick or close to it
-            ticks.push(data[data.length-1].timestamp)
-        }
-
-        return ticks.filter((t, i, arr) => i === 0 || t > arr[i-1] + tickIntervalMs / 2); // Basic de-clutter
-
-    }, [data, timeScale]);
-
-
-    const yAxisDomain = useMemo(() => {
-        if (data.length < 2) return ['auto', 'auto']; // Need at least two points for meaningful auto domain sometimes
-
-        let min = Infinity;
-        let max = -Infinity;
-        data.forEach(d => {
-            min = Math.min(min, d.net);
-            max = Math.max(max, d.net);
+            minVal = Math.min(minVal, nt); // Net can be negative
+            maxVal = Math.max(maxVal, gen, usg, nt);
         });
 
-        if (min === Infinity || max === -Infinity || min === max) { // Handle single point or all same values
-            const val = min === Infinity ? 0 : min;
-            return [val - Math.abs(val * 0.1) - 5, val + Math.abs(val * 0.1) + 5]; // Add some padding
+        // If all values were 0 or not finite, set a default small range
+        if (minVal === 0 && maxVal === 0 && chartData.every(d => d.net === 0 && d.generation === 0 && d.usage === 0)) {
+            return [-10, 10];
+        }
+        
+        // If still at initial values due to all NaNs or Infinities (though filtered above)
+        if (minVal === Infinity && maxVal === -Infinity) {
+             return [-10, SIMULATED_PEAK_SOLAR_KW + 10];
         }
 
-        const padding = Math.max(Math.abs(max - min) * 0.1, 5); // Add 10% padding, at least 5 units
-        return [Math.floor(min - padding), Math.ceil(max + padding)];
-    }, [data]);
+
+        const padding = Math.max(Math.abs(maxVal - minVal) * 0.15, 15); // Increased padding
+        const finalMin = Math.floor(minVal - padding);
+        const finalMax = Math.ceil(maxVal + padding);
+
+        return [finalMin, finalMax];
+    }, [chartData]);
+
+    // DEBUGGING LOG:
+    useEffect(() => {
+      if (chartData.length > 0) {
+        // console.log("Current chartData:", JSON.stringify(chartData.slice(-5), null, 2));
+        // console.log("XAxis Domain:", xAxisDomain);
+        // console.log("YAxis Domain:", yAxisDomain);
+      }
+    }, [chartData, xAxisDomain, yAxisDomain]);
 
 
-    if (generationNodes.length === 0 && usageNodes.length === 0) {
-        return <div className="flex items-center justify-center h-full text-muted-foreground p-4">Please configure Generation and Usage nodes for the graph.</div>;
+    if (isLoadingInitial && chartData.length === 0){ // Only show full loading if data isn't even there yet
+        return <div className="flex items-center justify-center h-[340px] text-muted-foreground p-4">Loading graph data...</div>;
     }
-    if (generationNodes.length === 0) {
-        return <div className="flex items-center justify-center h-full text-muted-foreground p-4">Please configure Generation nodes for the graph.</div>;
-    }
-    if (usageNodes.length === 0) {
-        return <div className="flex items-center justify-center h-full text-muted-foreground p-4">Please configure Usage nodes for the graph.</div>;
+    if (generationNodes.length === 0 || usageNodes.length === 0) {
+        return <div className="flex items-center justify-center h-[340px] text-muted-foreground p-4">Please configure Generation and Usage nodes.</div>;
     }
 
 
     return (
         <div className="space-y-3">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
                 <div className="font-medium">
-                    Generation: <span className="text-green-500">{currentValues.generation.toFixed(2)} kW</span>
-                    <div className="text-xs text-muted-foreground truncate" title={generationNodeNames}>Nodes: {generationNodeNames}</div>
+                    Generation: <span style={{color: generationColor}}>{currentValues.generation.toFixed(2)} kW</span>
                 </div>
                 <div className="font-medium">
-                    Usage: <span className="text-orange-500">{currentValues.usage.toFixed(2)} kW</span>
-                    <div className="text-xs text-muted-foreground truncate" title={usageNodeNames}>Nodes: {usageNodeNames}</div>
+                    Usage: <span style={{color: usageColor}}>{currentValues.usage.toFixed(2)} kW</span>
                 </div>
                 <div className="font-medium">
                     Net Power: <span style={{ color: netPowerColor }}>{currentValues.net.toFixed(2)} kW</span>
-                    <div className="text-xs text-muted-foreground">Timestamp: {formatTick(currentValues.timestamp)}</div>
                 </div>
             </div>
-
-            <ResponsiveContainer width="100%" height={300}>
-                <LineChart
-                    data={data}
-                    margin={{ top: 5, right: 20, left: -20, bottom: 5 }} // Adjusted left margin for Y-axis values
+            <AnimatePresence mode="wait"> 
+                <motion.div
+                    key={animationKey} // Changed from timeScale to animationKey
+                    initial={{ opacity: 0.3 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0.3 }}
+                    transition={{ duration: 0.4 }}
+                    className="w-full h-[300px]"
                 >
-                    <CartesianGrid strokeDasharray="3 3" stroke={gridStrokeColor} />
-                    <XAxis
-                        dataKey="timestamp"
-                        type="number"
-                        domain={['dataMin', 'dataMax']}
-                        ticks={xTicks}
-                        tickFormatter={formatTick}
-                        stroke={axisStrokeColor}
-                        tick={{ fontSize: 10 }}
-                        axisLine={{ stroke: axisStrokeColor }}
-                    />
-                    <YAxis
-                        domain={yAxisDomain}
-                        stroke={axisStrokeColor}
-                        tick={{ fontSize: 10 }}
-                        tickFormatter={(value) => `${value.toFixed(0)}`} // Keep whole numbers for Y-axis
-                        allowDataOverflow={true}
-                         width={40} // Give Y-axis enough space
-                    />
-                    <Tooltip
-                        contentStyle={{
-                            backgroundColor: resolvedTheme === 'dark' ? 'rgba(30, 41, 59, 0.9)' : 'rgba(255, 255, 255, 0.9)', // slate-800 / white
-                            borderColor: resolvedTheme === 'dark' ? '#475569' : '#CBD5E1', // slate-600 / slate-300
-                            borderRadius: '0.375rem', // md
-                            color: resolvedTheme === 'dark' ? '#E2E8F0' : '#1E293B', // slate-200 / slate-800
-                        }}
-                        labelFormatter={(label) => `Time: ${formatTick(label as number)}`}
-                        formatter={(value: number, name: string) => {
-                            const unit = name.toLowerCase().includes('power') || name.toLowerCase().includes('generation') || name.toLowerCase().includes('usage') ? ' kW' : '';
-                            return [`${value.toFixed(2)}${unit}`, name];
-                        }}
-                    />
-                    <Legend wrapperStyle={{fontSize: "12px"}} />
-                    <Line
-                        type="monotone"
-                        dataKey="net"
-                        name="Net Power"
-                        stroke={netPowerColor}
-                        strokeWidth={2.5}
-                        dot={false}
-                        isAnimationActive={true} // Enable animation for new data
-                        animationDuration={300} // Smooth animation
-                        connectNulls={true} // Connects lines even if there are null data points (though we filter them)
-                    />
-                     {/* You can add more lines if needed, e.g., for separate Generation/Usage */}
-                    
-                    <Line type="monotone" dataKey="generation" name="Generation" stroke="#10B981" strokeWidth={1.5} dot={false} />
-                    <Line type="monotone" dataKey="usage" name="Usage" stroke="#F59E0B" strokeWidth={1.5} dot={false} />
-                   
-                </LineChart>
-            </ResponsiveContainer>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                            data={chartData}
+                            margin={{ top: 5, right: 30, left: 0, bottom: 5 }} // Adjusted margins
+                        >
+                            <CartesianGrid strokeDasharray="3 3" stroke={gridStrokeColor} />
+                            <XAxis
+                                dataKey="timestamp"
+                                type="number"
+                                domain={xAxisDomain}
+                                scale="time"
+                                tickFormatter={formatTick}
+                                stroke={axisStrokeColor}
+                                tick={{ fontSize: 10 }}
+                                interval="preserveStartEnd"
+                                // Consider adding specific ticks for 'day' view if general formatting isn't enough
+                                // ticks={timeScale === 'day' ? yourPredefinedDayTicksArray : undefined}
+                            />
+                            <YAxis
+                                yAxisId="left"
+                                domain={yAxisDomain}
+                                stroke={axisStrokeColor}
+                                tick={{ fontSize: 10 }}
+                                tickFormatter={(value) => `${value.toFixed(0)}`}
+                                // DEBUG: Set to true to see if domain is the issue
+                                allowDataOverflow={true} 
+                                width={40} // Increased width
+                            />
+                            <Tooltip
+                                contentStyle={{
+                                    backgroundColor: getThemeColor('popover', resolvedTheme),
+                                    borderColor: getThemeColor('border', resolvedTheme),
+                                    color: getThemeColor('popover-foreground', resolvedTheme),
+                                    borderRadius: '0.375rem',
+                                    boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)'
+                                }}
+                                labelFormatter={(label) => new Date(label as number).toLocaleString([], { dateStyle:'short', timeStyle: 'medium' })}
+                                formatter={(value: number, name: string) => [`${value.toFixed(2)} kW`, name]}
+                            />
+                            <Legend wrapperStyle={{fontSize: "12px", paddingTop: "10px"}} />
+                            <Line
+                                yAxisId="left" type="monotone" dataKey="net" name="Net Power"
+                                stroke={netPowerColor} strokeWidth={2.5} dot={false}
+                                isAnimationActive={true} animationDuration={300} connectNulls={false} 
+                                // hide={!chartData.some(d => d.net !== 0)} // Example: hide if all data is zero
+                            />
+                            <Line
+                                yAxisId="left" type="monotone" dataKey="generation" name="Generation"
+                                stroke={generationColor} strokeWidth={1.5} dot={false}
+                                isAnimationActive={true} animationDuration={300} connectNulls={false}
+                            />
+                            <Line
+                                yAxisId="left" type="monotone" dataKey="usage" name="Usage"
+                                stroke={usageColor} strokeWidth={1.5} dot={false}
+                                isAnimationActive={true} animationDuration={300} connectNulls={false}
+                            />
+                        </LineChart>
+                    </ResponsiveContainer>
+                </motion.div>
+            </AnimatePresence>
         </div>
     );
 };

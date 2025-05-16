@@ -5,6 +5,7 @@ import { ThreePhaseGroupInfo, NodeData } from './dashboardInterfaces';
 import DataPointCard from './DataPointCard'; // For individual points
 import ThreePhaseGroupCard from './ThreePhaseGroupCard'; // For 3-phase groups
 import { containerVariants } from '@/config/animationVariants'; // Needed for section variant
+import { UserRole } from '@/types/auth';
 
 type SectionItem = DataPointConfig | ThreePhaseGroupInfo;
 
@@ -21,6 +22,8 @@ interface DashboardSectionProps {
     onRemoveItem: (dataPointId: string) => void;
     allPossibleDataPoints: DataPoint[];
     isEditMode?: boolean;
+    currentUserRole?: UserRole;
+
 }
 
 const DashboardSection: React.FC<DashboardSectionProps> = React.memo(
@@ -46,8 +49,11 @@ const DashboardSection: React.FC<DashboardSectionProps> = React.memo(
                                 nodeValues={nodeValues}
                                 isDisabled={isDisabled}
                                 currentHoverEffect={currentHoverEffect}
+                                sendDataToWebSocket={sendDataToWebSocket}
                                 playNotificationSound={playNotificationSound}
                                 lastToastTimestamps={lastToastTimestamps}
+                                isEditMode={isEditMode ?? false}
+                                onRemoveItem={onRemoveItem}
                             />
                         ) : (
                             <DataPointCard

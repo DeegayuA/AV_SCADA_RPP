@@ -1,138 +1,135 @@
 // components/onboarding/WelcomeStep.tsx
 'use client';
 
-import { Button } from '@/components/ui/button';
-import { motion } from 'framer-motion';
-// Assuming OnboardingContext is in the path specified in your existing WelcomeStep
-import { useOnboarding } from './OnboardingContext'; 
-// Assuming constants are in this path as per your existing WelcomeStep
-import { APP_LOGO, APP_NAME } from '@/config/constants'; 
+import { useState } from 'react';
 import Image from 'next/image';
-import { Rocket, Sparkles } from 'lucide-react'; // Using lucide-react icons
+import { motion } from 'framer-motion';
+import { Sparkles, Upload, RotateCw, ShieldCheck } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { 
+    Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger
+} from '@/components/ui/dialog';
+import { useOnboarding } from './OnboardingContext'; 
+import { APP_LOGO, APP_NAME } from '@/config/constants'; 
 
-// AppLogo component definition (as provided in your snippet)
-// For next/image to work best with className for sizing, APP_LOGO might be an SVG,
-// or you might need to ensure the parent div correctly constrains the Image with layout="fill".
-// For raster images (PNG, JPG), explicit width & height props on <Image> are generally better.
-// Assuming for this example that your setup for AppLogo handles this.
+import { useCurrentUser, useAppStore } from '@/stores/appStore';
+import { UserRole } from '@/types/auth';
+// Ensure path is correct for your ImportBackupDialogContent
+import { ImportBackupDialogContent } from '@/app/onboarding/import_all'; // Updated to provided path
+
+
 const AppLogo = ({ className }: { className?: string }) => (
-  // Ensure APP_LOGO is a valid path like '/logo.png' or an imported image object
   <Image 
-    src={APP_LOGO} // e.g., "/logos/main-logo.svg" or an imported static image
+    src={APP_LOGO} // Ensure APP_LOGO is correctly sourced
     alt={`${APP_NAME} Logo`} 
     className={className || "h-10 w-auto"} 
-    width={80} // Added for better next/image handling if it's not SVG/fill
-    height={80} // Added for better next/image handling
-    priority // Important for LCP elements
+    width={100} // Adjusted for a slightly larger default if no class
+    height={100} // Adjusted
+    priority 
   />
 );
+
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0, y:10 },
+  visible: { opacity: 1, y:0, transition: { staggerChildren: 0.1, delayChildren: 0.05, ease:"circOut" } },
+  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } }
+};
+
+const itemVariants = (delay: number = 0) => ({
+  hidden: { opacity: 0, y: 15, filter: 'blur(3px)' },
+  visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { type: 'spring', stiffness: 150, damping: 18, delay, mass:0.8 } },
+});
+
+const buttonMotionConfig = (delay: number) => ({
+  variants: itemVariants(delay),
+  whileHover: { scale: 1.03, boxShadow: "0px 6px 20px hsla(var(--primary)/0.2)", transition: { type: "spring", stiffness: 300, damping: 10 } },
+  whileTap: { scale: 0.97 }
+});
 
 
 export default function WelcomeStep() {
   const { nextStep } = useOnboarding();
+  const currentUser = useCurrentUser(); // Assuming this hook gives the current user object from Zustand
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.2, // Stagger animation for children
-        delayChildren: 0.1,
-      },
-    },
-    exit: { 
-        opacity: 0,
-        y: -20, // Optional: slight move up on exit
-        transition: { duration: 0.3 }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        type: 'spring',
-        stiffness: 100,
-        damping: 12,
-      },
-    },
-  };
-
-  const buttonVariants = {
-    hidden: { opacity: 0, scale: 0.8 },
-    visible: {
-        opacity: 1,
-        scale: 1,
-        transition: {
-            type: 'spring',
-            stiffness: 150,
-            damping: 10,
-            delay: 0.6 // Extra delay for the button to pop
-        }
-    },
-    hover: {
-        scale: 1.05,
-        // Example: boxShadow: "0px 0px 12px rgba(var(--primary))" // If you have primary color CSS var
-        transition: { type: "spring", stiffness: 300, damping: 10 }
-    },
-    tap: {
-        scale: 0.95
-    }
-  }
+  // Critical: Check store hydration before relying on currentUser for isAdmin decision
+  const storeHasHydrated = useAppStore.persist.hasHydrated();
+  const isAdmin = storeHasHydrated && currentUser?.role === UserRole.ADMIN;
 
   return (
-    // The main div already handles initial entrance/exit for the whole step via parent AnimatePresence
-    // This internal container is for staggering children within this step
     <motion.div
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      exit="exit" // Use the main exit from parent if preferred, or custom like this
-      className="flex flex-col items-center justify-center h-full p-4 md:p-6 text-center"
+      exit="exit"
+      className="flex flex-col items-center justify-center h-full p-4 sm:p-6 text-center"
     >
-      <motion.div variants={itemVariants} className="mb-6 md:mb-8">
-        <AppLogo className="h-32 md:h-40 w-auto"/>
+      <motion.div variants={itemVariants(0)} className="mb-5 sm:mb-7">
+        <AppLogo className="h-24 w-24 sm:h-32 sm:w-32 drop-shadow-lg"/>
       </motion.div>
 
-      <motion.h1
-        variants={itemVariants}
-        className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-4"
-      >
-        Welcome to <span className="text-primary">{APP_NAME}!</span>
+      <motion.h1 variants={itemVariants(0.1)}
+        className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-800 dark:text-gray-100 mb-3">
+        Welcome to <span className="text-primary drop-shadow-sm">{APP_NAME}!</span>
       </motion.h1>
 
-      <motion.p
-        variants={itemVariants}
-        className="text-base sm:text-lg text-muted-foreground max-w-lg md:max-w-xl mb-8 md:mb-10"
-      >
-        Let's quickly personalize your solar minigrid dashboard. A few settings are all it takes to
-        unlock powerful monitoring and a tailored energy management experience.
+      <motion.p variants={itemVariants(0.2)}
+        className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md sm:max-w-lg mb-6 sm:mb-8">
+        Let's quickly set up your solar minigrid monitoring. Choose to start fresh or, if you are an administrator, restore a previous configuration.
       </motion.p>
 
-      <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
-        <Button
-          size="lg"
-          onClick={nextStep}
-          className="px-8 py-3 h-auto text-base md:text-lg font-semibold rounded-full group shadow-lg hover:shadow-primary/30 focus-visible:ring-primary/70"
-          // For a subtle glow on hover if you have CSS vars:
-          // style={{ boxShadow: "0 0 0px 0px rgba(var(--primary-rgb), 0.4)" }}
-          // onHoverStart={e => e.currentTarget.style.boxShadow = "0 0 15px 3px rgba(var(--primary-rgb), 0.4)"}
-          // onHoverEnd={e => e.currentTarget.style.boxShadow = "0 0 0px 0px rgba(var(--primary-rgb), 0.4)"}
-        >
-          <Sparkles className="mr-2.5 h-5 w-5 text-amber-400 transition-transform duration-300 ease-out group-hover:scale-125 group-hover:rotate-[15deg]" />
-          Begin Setup
-        </Button>
-      </motion.div>
+      <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full max-w-xs sm:max-w-md">
+        <motion.div {...buttonMotionConfig(0.3)} className="w-full">
+          <Button
+            size="lg"
+            onClick={nextStep}
+            className="w-full px-7 py-3 h-auto text-sm md:text-base font-semibold rounded-lg group shadow-lg hover:shadow-primary/25 focus-visible:ring-primary/50 bg-primary text-primary-foreground hover:bg-primary/90 transition-all duration-200"
+          >
+            <Sparkles className="mr-2.5 h-5 w-5 text-yellow-300 transition-transform duration-300 group-hover:scale-125 group-hover:rotate-[15deg]" />
+            Start New Configuration
+          </Button>
+        </motion.div>
+        
+        {isAdmin && (
+            <motion.div {...buttonMotionConfig(0.4)} className="w-full">
+            <Button
+                size="lg"
+                variant="outline"
+                onClick={() => setIsImportDialogOpen(true)}
+                className="w-full px-7 py-3 h-auto text-sm md:text-base font-semibold rounded-lg group shadow-lg hover:shadow-sky-500/20 focus-visible:ring-sky-500/50 border-sky-500/60 text-sky-600 dark:text-sky-400 dark:border-sky-500/50 dark:hover:border-sky-400 hover:border-sky-500 hover:bg-sky-500/10 transition-all duration-200"
+            >
+                <Upload className="mr-2.5 h-5 w-5 transition-transform duration-300 group-hover:animate-bounce group-hover:text-sky-500 dark:group-hover:text-sky-300" />
+                Import from Backup
+            </Button>
+            </motion.div>
+        )}
+      </div>
       
-      <motion.p 
-        variants={itemVariants}
-        className="text-xs text-muted-foreground mt-10 max-w-md"
-        style={{ transitionDelay: '0.6s' }} // manual delay to appear after button
-      >
-        This initial configuration ensures optimal performance and accuracy from the start.
+      <motion.p variants={itemVariants(0.5)}
+        className="text-xs text-gray-500 dark:text-gray-500 mt-8 max-w-sm">
+        <ShieldCheck className="inline h-3.5 w-3.5 mr-1 mb-px text-green-600 dark:text-green-500"/>
+        A correct setup ensures data accuracy and an optimal user experience.
       </motion.p>
+
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="sm:max-w-lg md:max-w-xl w-[95vw] p-0 max-h-[90vh] flex flex-col bg-card dark:bg-neutral-800 focus-visible:ring-primary/60 shadow-2xl rounded-xl">
+            <DialogHeader className="px-4 py-3.5 sm:px-6 sm:py-4 border-b border-border/70 dark:border-neutral-700 sticky top-0 bg-card/90 dark:bg-neutral-800/90 backdrop-blur-md z-10 rounded-t-xl">
+                <DialogTitle className="text-lg sm:text-xl font-semibold flex items-center text-gray-800 dark:text-gray-100">
+                    <RotateCw className="w-5 h-5 sm:w-6 sm:h-6 mr-3 text-primary shrink-0 animate-spin-slow" />
+                    Restore Configuration
+                </DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm text-muted-foreground">
+                  Import data from a valid <code className="text-xs bg-muted dark:bg-neutral-700 px-1.5 py-0.5 rounded-md">.json</code> backup. This overwrites local settings.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="flex-grow overflow-y-auto custom-scrollbar p-4 sm:p-6">
+                 {/* Important: The key on ImportBackupDialogContent ensures it re-mounts and resets its internal state
+                     if the dialog is closed and reopened, which is generally desired for an import flow. */}
+                {isImportDialogOpen && <ImportBackupDialogContent key={Date.now()} onDialogClose={() => setIsImportDialogOpen(false)} />}
+            </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
