@@ -707,7 +707,12 @@ const Dashboard: React.FC = () => {
                     availableIndividualPoints={individualPointsForConfig}
                     availableThreePhaseGroups={threePhaseGroupsForConfig}
                     currentDisplayedIds={displayedDataPointIds}
-                    onAddMultipleDataPoints={handleAddMultipleDataPoints} />
+                    onAddMultipleDataPoints={handleAddMultipleDataPoints}
+                    onSaveNewDataPoint={(data) => Promise.resolve({ success: false, error: "Adding new data points is not implemented in this version" })}
+                    allDefinedCategories={Array.from(new Set(allPossibleDataPoints.map(dp => dp.category || 'miscellaneous')))}
+                    allDefinedDataTypes={Array.from(new Set(allPossibleDataPoints.map(dp => dp.dataType)))}
+                    allDefinedUiTypes={Array.from(new Set(allPossibleDataPoints.map(dp => dp.uiType)))}
+                    allDefinedPhases={['a', 'b', 'c', 'x']} />
             )}
 
             {/* SLD Modal from ControlPage */}

@@ -97,7 +97,7 @@ export default function ResetApplicationPage() {
   // useCurrentUser hook is fine for UI elements after auth is settled
   const currentUserForUI = useCurrentUser(); 
   
-  const { sendJsonMessage, lastJsonMessage, isConnected, connectWebSocket } = useWebSocket();
+  const { sendJsonMessage, lastJsonMessage, isConnected, connect: connectWebSocket } = useWebSocket();
   const logoutUser = useAppStore((state) => state.logout);
 
   const zustandResetFn = useAppStore((state) => (state as any).resetToInitial);

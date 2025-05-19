@@ -145,7 +145,10 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
         currentValidationStatus = 'invalid';
       } else if (data.backupSchemaVersion !== EXPECTED_BACKUP_SCHEMA_VERSION) {
         issues.push(`Schema mismatch (File: ${data.backupSchemaVersion}, Expected: ${EXPECTED_BACKUP_SCHEMA_VERSION}). May cause issues.`);
-        currentValidationStatus = currentValidationStatus !== 'invalid' ? 'warning' : 'invalid';
+        // Set to warning if it's currently valid
+        if (currentValidationStatus === 'valid') {
+          currentValidationStatus = 'warning';
+        }
       }
       if (!data.application?.name) issues.push("Application metadata missing.");
       if (!data.browserStorage?.localStorage) {
@@ -314,8 +317,7 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
                 {uploadedFile ? `Selected: ${uploadedFile.name}` : "Upload Backup (.json)"}
                 </h3>
                 {uploadedFile && <p className="text-xs text-muted-foreground">({(uploadedFile.size / 1024).toFixed(2)} KB)</p>}
-                <input id="backup-file-input-modal" type="file" accept=".json" onChange={handleFileChange} className="sr-only"
-                    disabled={importStage === 'validating' || importStage === 'importing' || importStage === 'completed'} />
+                <input id="backup-file-input-modal" type="file" accept=".json" onChange={handleFileChange} className="sr-only" />
             </label>
             {importStage === 'error' && !parsedBackupData && validationIssues.length > 0 && (
                 <div className="mt-2 text-left text-xs px-1">

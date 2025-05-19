@@ -1,113 +1,146 @@
 // hooks/useWebSocketListener.ts
-import { useAppStore } from '@/stores/appStore'; // Ensure this path is correct
-import { RealTimeData, SLDElementType, SLDLayout, CustomNodeType } from '@/types/sld'; // Add CustomNodeType
-import { useState, useEffect, useCallback } from 'react';
+import { useAppStore } from '@/stores/appStore';
+import { RealTimeData } from '@/types/sld';
+import { WS_URL } from '@/config/constants'; // Ensure WS_URL is defined correctly
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { toast } from 'sonner'; // For notifications
 
-// Placeholder types - adjust to your actual message structure
-interface WebSocketMessage {
-    type: string;
-    payload?: any;
+// For messages sent TO the server, like commands or layout requests
+export interface WebSocketMessageToServer {
+  type: string; // e.g., 'get-layout', 'save-sld-widget-layout', 'send-command'
+  payload?: any;
+}
+
+// For messages received FROM the server
+interface WebSocketMessageFromServer {
+  type: string; // e.g., 'layout-data', 'layout-error', 'realtime-update', 'layout-saved-confirmation', 'command-ack'
+  payload: any; // Flexible payload
 }
 
 export const useWebSocket = () => {
-    const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessage | null>(null);
+    const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessageFromServer | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const ws = useRef<WebSocket | null>(null);
+    const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
+    const maxReconnectAttempts = 10; // Or Infinity if desired
+    const reconnectAttempts = useRef(0);
+    // const [isManuallyConnecting, setIsManuallyConnecting] = useState(false); // May not be needed if connect is called mostly internally
 
-    // --- MOCK IMPLEMENTATION ---
-    useEffect(() => {
-        // This effect should run once on mount to simulate connection setup
-        console.log("Mock WebSocket: Initializing connection simulation...");
+    const connect = useCallback(() => {
+        if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
+            console.log("WebSocket: Already connected or connecting.");
+            return;
+        }
 
-        const connectTimer = setTimeout(() => {
+        console.log(`WebSocket: Attempting to connect (Attempt ${reconnectAttempts.current + 1} to ${WS_URL})...`);
+        ws.current = new WebSocket(WS_URL); // WS_URL must be defined in your constants
+
+        ws.current.onopen = () => {
+            console.log("WebSocket: Connection established with", WS_URL);
+            toast.success("Real-time Sync Active", {id: "ws-connect", duration: 2000});
             setIsConnected(true);
-            console.log("Mock WebSocket: Connection established (simulated).");
-        }, 50); // Short delay
-
-        // Simulate receiving layout data slightly later
-        const layoutTimer = setTimeout(() => {
-            console.log("Mock WebSocket: Simulating send of layout-data for sld_main_plant");
-
-            // Define a source node for the edge
-             const sourcePanelNode: CustomNodeType = {
-                 id: 'panel-array-1', // Give it a valid ID
-                 type: SLDElementType.Panel, // Use appropriate type (assuming you have a PanelNode component)
-                 // If no PanelNode, use 'default' or another mapped type for visualization
-                 // type: 'default',
-                 position: { x: 50, y: 50 },
-                 data: {
-                    elementType: SLDElementType.Panel, // Important for data structure
-                    label: 'PV Array 1',
-                    // Add any other default data if needed
-                 }
-             };
-
-            const mockLayout: SLDLayout = {
-                layoutId: 'main_plant',
-                nodes: [
-                    sourcePanelNode, // Add the source node
-                    // Existing nodes:
-                    { id: 'inv-1', type: SLDElementType.Inverter, position: { x: 250, y: 50 }, data: { elementType: SLDElementType.Inverter, label: 'Inverter 1', dataPointLinks: [{ dataPointId: 'inv1_power', targetProperty: 'powerOutput', format: {type: 'number', precision: 1, suffix: ' kW'}}, { dataPointId: 'inv1_status', targetProperty: 'statusText', valueMapping: { type: 'exact', mapping: [{match: 'ON', value: 'Running'}, {match: 'OFF', value: 'Stopped'}, {match: 'ALARM', value: 'Alarm'}], defaultValue: 'Unknown'}}, { dataPointId: 'inv1_status', targetProperty: 'fillColor', valueMapping: { type: 'exact', mapping: [{match: 'ON', value: '#dcfce7'}, {match: 'OFF', value: '#f3f4f6'}, {match: 'ALARM', value: '#fee2e2'}], defaultValue: '#e0e7ff'}}] } },
-                    { id: 'dl-1', type: SLDElementType.DataLabel, position: { x: 250, y: 200 }, data: { elementType: SLDElementType.DataLabel, label: 'Total Power', dataPointLinks: [{dataPointId: 'total_power', targetProperty: 'value', format: { type: 'number', precision: 2, suffix: ' kW'}}] } },
-                    { id: 'tl-1', type: SLDElementType.TextLabel, position: { x: 50, y: 200 }, data: { elementType: SLDElementType.TextLabel, label: 'Plant A', text: 'Solar Plant Alpha\nSection 1' } },
-                ],
-                edges: [
-                    // Connect the new source node to the inverter
-                    { id: 'edge-panel-inv1', source: sourcePanelNode.id, target: 'inv-1', type: 'animatedFlow', data: { label: "DC Line", dataPointLinks: [{ dataPointId: 'line1_flow', targetProperty: 'flowDirection', valueMapping: {type: 'threshold', mapping: [{ threshold: 0.1, value: 'forward'}], defaultValue: 'none'} }]}}
-                ],
-                viewport: { x: 0, y: 0, zoom: 1 },
-            };
-
-             // Send the layout data with the correct key
-            setLastJsonMessage({ type: 'layout-data', payload: { key: `sld_main_plant`, layout: mockLayout } });
-        }, 1000); // Increased delay slightly to ensure connection happens first
-
-         // Simulate receiving real-time data updates
-        const dataInterval = setInterval(() => {
-            // Only update if connected
-             if(isConnected) {
-                 const updates: RealTimeData = {
-                    'inv1_power': Math.random() * 50,
-                    'inv1_status': ['ON', 'OFF', 'ALARM'][Math.floor(Math.random() * 3)],
-                    'total_power': Math.random() * 100 + 50, // Make total power higher
-                    'line1_flow': Math.random() > 0.2 ? (Math.random() * 10) : 0, // Simulate varying flow
-                 };
-                 // This should trigger an update in your Zustand store
-                useAppStore.getState().updateRealtimeData(updates);
-                 // console.log("Mock WebSocket: Simulating data update:", updates);
-             }
-        }, 2500); // Update interval
-
-        // Cleanup function
-        return () => {
-            console.log("Mock WebSocket: Cleaning up timers and connection state.");
-            clearTimeout(connectTimer);
-            clearTimeout(layoutTimer);
-            clearInterval(dataInterval);
-            setIsConnected(false); // Reset connection state on unmount
+            reconnectAttempts.current = 0;
+            if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
         };
-    // --- IMPORTANT: --- Remove dependencies like [isConnected] here.
-    // This effect should run ONLY ONCE on component mount to set up the simulation.
-    }, []);
 
-    // sendJsonMessage useCallback hook - this depends on isConnected state correctly
-    const sendJsonMessage = useCallback((message: WebSocketMessage) => {
-        if (isConnected) {
-            console.log("Mock WebSocket: Simulating send:", message);
-            if (message.type === 'get-layout') {
-                 console.log(`Mock WebSocket: Received request for layout key: ${message.payload?.key}. Response is handled by the main useEffect timer.`);
+        ws.current.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data as string);
+                
+                // Assuming your backend (route.ts) sends specific message types
+                // OR direct data batches. Let's handle both possibilities.
+                if (typeof data === 'object' && data !== null) {
+                    if (data.type && typeof data.type === 'string') {
+                        // Structured message (e.g., for layout data, confirmations)
+                        setLastJsonMessage(data as WebSocketMessageFromServer);
+                        // If the backend wraps real-time updates in a type, handle it here
+                        // Example: if (data.type === 'realtime-data-batch') {
+                        //   useAppStore.getState().updateRealtimeData(data.payload as RealTimeData);
+                        // }
+                    } else {
+                        // Assume it's a direct RealTimeData batch from the backend
+                        // This is what the provided route.ts implies for its periodic data send.
+                        useAppStore.getState().updateRealtimeData(data as RealTimeData);
+                        // Optionally, setLastJsonMessage for other components listening for generic updates
+                        setLastJsonMessage({ type: 'direct-data-update', payload: data });
+                    }
+                } else {
+                   console.warn("WebSocket: Received non-object data:", data);
+                }
+            } catch (e) {
+                console.error("WebSocket: Error parsing message:", e, "Raw data:", event.data);
+                setLastJsonMessage({ type: 'parse_error', payload: event.data as string } as any);
             }
-            // Simulate saving confirmation
-            if (message.type === 'save-sld-widget-layout') {
-                 setTimeout(() => {
-                    console.log(`Mock WebSocket: Simulating send of layout-saved confirmation for key: ${message.payload?.key}`);
-                    setLastJsonMessage({ type: 'layout-saved', payload: { key: message.payload?.key } });
-                 }, 500)
+        };
+
+        ws.current.onerror = (errorEvent) => {
+            console.error("WebSocket: Error event:", errorEvent);
+            // isConnected will be set to false in onclose
+            // No toast here, as onclose will handle more specific feedback.
+        };
+
+        ws.current.onclose = (event) => {
+            const reason = event.reason || (event.code === 1000 ? "Normal closure" : "Unknown reason");
+            console.log(`WebSocket: Connection closed. Code: ${event.code}, Reason: ${reason}, Clean: ${event.wasClean}`);
+            setIsConnected(false);
+            
+            if (event.code !== 1000 && event.code !== 1001) { // Not a user-initiated or normal closure
+                toast.error("Real-time Sync Lost", { id: "ws-disconnect", description: `Code: ${event.code}. Attempting to reconnect...` });
+                if (reconnectAttempts.current < maxReconnectAttempts) {
+                    reconnectAttempts.current++;
+                    const delay = Math.min(1000 * Math.pow(1.8, reconnectAttempts.current), 30000); // Exponential backoff
+                    console.log(`WebSocket: Reconnecting in ${delay / 1000}s...`);
+                    if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
+                    reconnectInterval.current = setTimeout(connect, delay); // Call connect which calls tryConnect
+                } else {
+                    console.error("WebSocket: Max reconnect attempts reached. Please check server and network.");
+                    toast.error("Connection Failed", {id:"ws-max-reconnect", description: "Max reconnect attempts reached. Manual intervention may be required."});
+                }
+            } else if (event.code === 1000 && event.wasClean) {
+                // Optionally provide a less alarming message for clean closures if needed
+                toast.info("Real-time Sync Disconnected", {id: "ws-disconnect-clean", duration: 2000});
+            }
+        };
+    }, [WS_URL]); // Added WS_URL, maxReconnectAttempts. `connect` itself becomes a dependency later.
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+           connect();
+        }
+        return () => {
+            if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
+            if (ws.current) {
+                console.log("WebSocket: Cleaning up connection on unmount.");
+                ws.current.onopen = null;
+                ws.current.onmessage = null;
+                ws.current.onerror = null;
+                ws.current.onclose = null;
+                if (ws.current.readyState === WebSocket.OPEN) {
+                    ws.current.close(1000, "Client unmounting");
+                }
+                ws.current = null;
+            }
+            reconnectAttempts.current = 0;
+            setIsConnected(false);
+        };
+    }, [connect]); // `connect` is now a stable useCallback dependency
+
+    const sendJsonMessage = useCallback((message: WebSocketMessageToServer) => {
+        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+            try {
+                ws.current.send(JSON.stringify(message));
+                // console.log("WebSocket: Sent message:", message);
+            } catch (error) {
+                console.error("WebSocket: Error sending message:", error, "Message:", message);
+                toast.error("Send Error", { description: "Failed to send message to server." });
             }
         } else {
-            // This warning is expected if the widget tries to send before the connectTimer fires
-            console.warn("Mock WebSocket: Attempted to send while not connected (simulated):", message);
+            console.warn("WebSocket: Attempted to send message while not connected:", message);
+            toast.warning("Cannot Send", { description: "Not connected to the real-time server."});
+            // Optionally, queue message or trigger a reconnect attempt if appropriate
+            if (!isConnected && !ws.current?.CONNECTING) connect();
         }
-    }, [isConnected]); // Dependency on isConnected is correct here
+    }, []); // `connect` removed as explicit dependency for send, relies on OPEN state
 
-    return { sendJsonMessage, lastJsonMessage, isConnected };
+    return { sendJsonMessage, lastJsonMessage, isConnected, connect }; // connect exposed for manual reconnect UI
 };

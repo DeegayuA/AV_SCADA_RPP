@@ -317,3 +317,50 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--ring)); /* Or a slightly darker/accent color */
 }
+
+
+/* Suggested for your global CSS file (e.g., globals.css or app.css) */
+.sld-loader-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  /* Use theme-aware text color if possible, or a neutral one */
+  color: #888; /* Fallback color */
+  /* Consider text-muted-foreground Tailwind class if applicable and working */
+}
+
+.sld-loader-svg {
+  width: 60px;
+  height: 60px;
+  animation: sld-rotate 2s linear infinite;
+  margin-bottom: 16px;
+}
+
+.sld-loader-path {
+  stroke: currentColor; /* Uses the color from .sld-loader-container */
+  stroke-linecap: round;
+  animation: sld-dash 1.5s ease-in-out infinite;
+}
+
+@keyframes sld-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sld-dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}

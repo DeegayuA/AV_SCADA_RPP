@@ -484,7 +484,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     </Tabs>
                 </ScrollArea>
 
-                <DialogFooter className="p-4 border-t border-border/60 flex-shrink-0 sticky bottom-0 bg-background/95 backdrop-blur-sm z-10">
+                <DialogFooter className="p-4 border-t border-border/60 flex-shrink-0 bottom-0 bg-background/95 backdrop-blur-sm z-10">
                     <DialogClose asChild>
                         <Button variant="outline" className="w-full sm:w-auto">Cancel</Button>
                     </DialogClose>

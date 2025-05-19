@@ -1,20 +1,16 @@
 // store/appStore.ts
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware'; // <-- IMPORT PERSIST
+import { persist, createJSONStorage } from 'zustand/middleware';
 import {
-    SLDState as SLDStateFromTypes,
     RealTimeData,
     DataPoint,
 } from '@/types/sld';
 import { User, UserRole } from '@/types/auth';
 
 import React, { forwardRef } from 'react';
-import { Cable as LucideCable, CircuitBoard as LucideCircuitBoard, BatteryCharging as LucideBatteryCharging, Gauge as LucideGauge, Zap as LucideZap, Rows as LucideRows } from 'lucide-react';
 import { toast } from 'sonner';
 import { dataPoints as rawDataPoints } from '@/config/dataPoints';
 
-
-// Icons (ensure React.createElement is used correctly if they are class components or need specific handling)
 const dataPointsWithIcons = rawDataPoints.map((dp) => ({
   ...dp,
   icon: dp.icon && typeof dp.icon === 'function'
@@ -37,7 +33,6 @@ interface AppState {
   currentUser: User | null;
 }
 
-// No change to initial state definition needed for persist, but know it will be overridden by localStorage if present.
 const initialState: AppState = {
   realtimeData: {},
   dataPoints: dataPointsWithIcons.reduce<Record<string, DataPoint>>((acc, dp) => {
@@ -53,20 +48,66 @@ interface SLDActions {
   setDataPoints: (dataPoints: Record<string, DataPoint>) => void;
   toggleEditMode: () => void;
   setCurrentUser: (user: User | null) => void;
-  logout: () => void; // <-- ADD LOGOUT ACTION
+  logout: () => void;
 }
 
-export const useAppStore = create<AppState & SLDActions>()( // <-- Note the structure change for middleware
+// Directly type the callback parameters for onRehydrateStorage
+const onRehydrateStorageCallback = (
+    hydratedState: AppState | undefined, // Zustand passes the fully hydrated store state
+    error?: Error | unknown
+) => {
+    if (error) {
+        console.error("Zustand (appStore): Failed to rehydrate state from storage:", error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        toast.error("Session Error", { description: `Could not restore your session. Details: ${errorMessage}` });
+    } else {
+        console.log("Zustand (appStore): Hydration finished from storage.");
+        if (hydratedState?.currentUser && hydratedState.currentUser.email !== defaultUser.email) {
+            console.log(
+                "Zustand (appStore): Store rehydrated. Current User:",
+                hydratedState.currentUser.email,
+                "Role:",
+                hydratedState.currentUser.role
+            );
+        } else {
+            console.log("Zustand (appStore): Store rehydrated with initial/default user or no user data found in storage.");
+        }
+    }
+};
+
+// Type for the Zustand setter and getter functions
+type SetState<T> = (
+  partial: T | Partial<T> | ((state: T) => T | Partial<T>),
+  replace?: boolean
+) => void;
+
+type GetState<T> = () => T;
+
+// Define interface for persist configuration
+interface PersistOptions<T> {
+  name: string;
+  storage: ReturnType<typeof createJSONStorage>;
+  partialize?: (state: T) => Partial<T>;
+  onRehydrateStorage?: (state?: T, error?: Error | unknown) => void;
+}
+
+export const useAppStore = create<AppState & SLDActions>()(
   persist(
-    (set, get) => ({
-      ...initialState, // Provide initial state for the first load if nothing is in localStorage
+    (set: SetState<AppState & SLDActions>, get: GetState<AppState & SLDActions>) => ({
+      ...initialState,
 
-      updateRealtimeData: (updates) =>
-        set((state) => ({
-          realtimeData: { ...state.realtimeData, ...updates },
-        })),
+      updateRealtimeData: (updates: RealTimeData) =>
+        set((state) => {
+          // Ensure updates is not overwriting, but merging with existing realtimeData
+          // And ensure 'updates' itself is treated as a Record<string, any>
+          if (typeof updates !== 'object' || updates === null) {
+            console.warn("updateRealtimeData received non-object:", updates);
+            return state; // No change
+          }
+          return { realtimeData: { ...state.realtimeData, ...updates }};
+        }),
 
-      setDataPoints: (dataPoints) => set({ dataPoints }),
+      setDataPoints: (dataPoints: Record<string, DataPoint>) => set({ dataPoints }),
 
       toggleEditMode: () => {
         const currentUser = get().currentUser;
@@ -78,42 +119,28 @@ export const useAppStore = create<AppState & SLDActions>()( // <-- Note the stru
         }
       },
 
-      setCurrentUser: (user) => set({ currentUser: user, isEditMode: user?.role === UserRole.ADMIN ? get().isEditMode : false }), // Reset edit mode if user is not admin
+      setCurrentUser: (user: User | null) => set((state) => ({
+        currentUser: user,
+        isEditMode: user?.role === UserRole.ADMIN ? state.isEditMode : false
+      })),
 
-      logout: () => { // <-- IMPLEMENT LOGOUT
-        set({ currentUser: defaultUser, isEditMode: false }); // Reset to default guest user, clear edit mode
-        // Optionally, clear other sensitive data from the store here if needed
+      logout: () => {
+        set({ currentUser: defaultUser, isEditMode: false });
         toast.info("Logged Out", { description: "You have been successfully logged out." });
-        // The redirect to /login should happen from the component that calls logout or from a route guard.
       },
     }),
     {
-      name: 'app-storage', // Name of the item in localStorage
-      storage: createJSONStorage(() => localStorage), // Use localStorage
-      partialize: (state) => ({ currentUser: state.currentUser, isEditMode: state.isEditMode }), // Persist only currentUser and isEditMode
-      // onRehydrateStorage might be useful for initial hydration logic if needed, but usually not for just user
-      onRehydrateStorage: (state) => { // Only accept the state parameter
-        return (persistedState, error) => { // persistedState is the hydrated state object
-          if (error) {
-            console.error("Zustand: Failed to rehydrate state from storage:", error);
-            // If rehydration fails, log the error but we can't reset state here directly
-            toast.error("Session Error", { description: "Could not restore your session. Please log in again." });
-          } else {
-            console.log("Zustand: Hydration finished.");
-            const hydratedCurrentUser = persistedState?.currentUser;
-            if (hydratedCurrentUser) {
-              console.log("Zustand: Rehydrated user:", hydratedCurrentUser.email, "Role:", hydratedCurrentUser.role);
-            } else {
-              console.log("Zustand: No user found in rehydrated state, will use initial default user.");
-            }
-          }
-        }
-      }      
+      name: 'app-storage',
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state: AppState & SLDActions): Partial<AppState> => ({
+        currentUser: state.currentUser,
+        isEditMode: state.isEditMode,
+      }),
+      onRehydrateStorage: onRehydrateStorageCallback,
     }
   )
 );
 
-// Selectors remain the same
 export const useIsEditMode = () => useAppStore((state) => state.isEditMode);
 export const useCurrentUser = () => useAppStore((state) => state.currentUser);
 export const useCurrentUserRole = () => useAppStore((state) => state.currentUser?.role);

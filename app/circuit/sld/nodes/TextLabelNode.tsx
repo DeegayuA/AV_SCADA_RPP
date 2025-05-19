@@ -1,13 +1,21 @@
 // components/sld/nodes/TextLabelNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position, useReactFlow } from 'reactflow';
-import { TextLabelNodeData, TextNodeStyleConfig, CustomNodeType, SLDElementType } from '@/types/sld';
-import { useAppStore } from '@/stores/appStore'; // For edit mode
-import { TextLabelConfigPopover } from '../ui/TextLabelConfigPopover'; // Import the popover
+import { NodeProps, Handle, Position, useReactFlow, Node } from 'reactflow'; // Added Node
+import { TextLabelNodeData, TextNodeStyleConfig, SLDElementType } from '@/types/sld';
+import { useAppStore } from '@/stores/appStore';
+import { TextLabelConfigPopover } from '../ui/TextLabelConfigPopover';
 
-const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({ data, selected, id, type }) => {
+const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({ 
+  data, 
+  selected, 
+  id, 
+  type,
+  xPos, // from NodeProps
+  yPos, // from NodeProps
+  // You can also destructure width, height if available and needed by popover
+}) => {
   const { setNodes } = useReactFlow();
-  const isEditMode = useAppStore((state) => state.isEditMode && state.currentUser?.role === 'admin'); // More specific check
+  const isEditMode = useAppStore((state) => state.isEditMode && state.currentUser?.role === 'admin');
 
   const nodeStyle = useMemo(() => {
     const styles: React.CSSProperties = {};
@@ -21,77 +29,101 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({ data, selected,
     return styles;
   }, [data.styleConfig]);
 
-  const handleUpdateStyle = (newStyleConfig: TextNodeStyleConfig | { text?: string, label?: string }) => {
+  // --- MODIFIED UPDATE HANDLERS ---
+  const handleStyleConfigUpdate = (newStyleConfig: TextNodeStyleConfig) => {
     setNodes((nds) =>
-      nds.map((node) => {
-        if (node.id === id) {
-          // Create a new data object to ensure React Flow detects the change
-          const updatedData: TextLabelNodeData = {
-            ...node.data, // existing data
-            label: 'label' in newStyleConfig && typeof newStyleConfig.label === 'string' ? newStyleConfig.label : node.data.label,
-            text: 'text' in newStyleConfig && typeof newStyleConfig.text === 'string' ? newStyleConfig.text : node.data.text,
-            styleConfig: { // Merge with existing or new style config
-              ...(node.data.styleConfig || {}),
-              ...('fontSize' in newStyleConfig ? newStyleConfig : {}), // a bit verbose to separate style props from text/label
-            },
+      nds.map((n) => {
+        if (n.id === id) {
+          const updatedNodeData: TextLabelNodeData = {
+            ...n.data,
+            styleConfig: { ...(n.data.styleConfig || {}), ...newStyleConfig },
           };
-          // More precise merge for styleConfig only if not label/text
-          if (!('text' in newStyleConfig) && !('label' in newStyleConfig)) {
-             updatedData.styleConfig = {
-                ...(node.data.styleConfig || {}),
-                ...newStyleConfig as TextNodeStyleConfig
-             }
-          }
-
-          return {
-            ...node,
-            data: updatedData,
-          };
+          return { ...n, data: updatedNodeData };
         }
-        return node;
+        return n;
       })
     );
   };
 
-  // The div that will trigger and anchor the popover
+  const handleLabelUpdate = (newLabel: string) => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === id) {
+          const updatedNodeData: TextLabelNodeData = {
+            ...n.data,
+            label: newLabel,
+          };
+          return { ...n, data: updatedNodeData };
+        }
+        return n;
+      })
+    );
+  };
+
+  const handleTextUpdate = (newText: string) => {
+    setNodes((nds) =>
+      nds.map((n) => {
+        if (n.id === id) {
+          const updatedNodeData: TextLabelNodeData = {
+            ...n.data,
+            text: newText,
+          };
+          return { ...n, data: updatedNodeData };
+        }
+        return n;
+      })
+    );
+  };
+  // --- END MODIFIED UPDATE HANDLERS ---
+
+  // Prepare the node object for the Popover
+  const nodeForPopover: Node<TextLabelNodeData> = {
+    id,
+    type, // This is the ReactFlow node type string, e.g., 'textLabel'
+    data, // This is TextLabelNodeData
+    position: { x: xPos, y: yPos }, // Actual position from NodeProps
+    selected, // Pass selection state
+    // You could also add width/height if node.dimensions is available and Popover needs it
+    // For instance, if NodeProps includes width and height:
+    // width: props.width, 
+    // height: props.height,
+  };
+
+
   const NodeContent = (
     <div
       className={`
         sld-node text-label-node
-        whitespace-pre-wrap leading-tight outline-none // leading-tight helps with padding
+        whitespace-pre-wrap leading-tight outline-none
         transition-all duration-150 ease-in-out
-        ${isEditMode ? 'cursor-pointer hover:ring-2 hover:ring-blue-400/70 focus:ring-2 focus:ring-blue-500' : ''}
-        ${selected && isEditMode ? 'ring-2 ring-blue-500 shadow-md' : ''}
-        ${selected && !isEditMode ? 'ring-1 ring-blue-300/50' : ''}
-        ${!data.styleConfig?.padding ? 'p-1' : ''} // Default padding if none set
-        ${!data.styleConfig?.fontSize ? 'text-sm' : ''} // Default font size if none set
+        ${isEditMode ? 'cursor-pointer hover:ring-1 hover:ring-blue-400/70 focus:ring-1 focus:ring-blue-500' : ''}
+        ${selected && isEditMode ? 'ring-1 ring-blue-500 shadow-sm' : ''}
+        ${selected && !isEditMode ? 'ring-1 ring-blue-300/30' : ''}
+        ${!data.styleConfig?.padding ? 'p-1' : ''} 
+        ${!data.styleConfig?.fontSize ? 'text-sm' : ''}
         ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''}
       `}
       style={nodeStyle}
-      tabIndex={isEditMode ? 0 : -1} // For keyboard focus
+      tabIndex={isEditMode ? 0 : -1}
     >
-      {/* Add handles if you want labels to be connectable - for text labels usually not needed */}
-      {isEditMode && <Handle type="target" position={Position.Top} className="!bg-teal-500 w-2 h-2" />}
-      {data.text || data.label || 'Text Label'}
-      {isEditMode && <Handle type="source" position={Position.Bottom} className="!bg-rose-500 w-2 h-2" />}
+      {/* Handles for connectability are optional for TextLabel, shown for completeness */}
+      {/* 
+      {isEditMode && <Handle type="target" position={Position.Top} className="!bg-teal-500 !w-1.5 !h-1.5" />}
+      */}
+      {data.text || data.label || 'Text Label'} {/* Display text or fallback */}
+      {/* 
+      {isEditMode && <Handle type="source" position={Position.Bottom} className="!bg-rose-500 !w-1.5 !h-1.5" />}
+      */}
     </div>
   );
 
-  // Text labels typically don't have functional handles for connections,
-  // but if they did, you'd manage their visibility in edit mode.
-  // For pure text, we remove handles completely or only show them contextually if needed.
-
   return (
     <TextLabelConfigPopover
-      node={{ 
-        id, 
-        data, 
-        type,
-        position: { x: 0, y: 0 } // Adding required position property
-      }}
-      elementType={SLDElementType.TextLabel} // Pass elementType as a separate prop
-      onUpdateNodeStyle={handleUpdateStyle}
-      isEditMode={!!isEditMode} // Ensure boolean
+      node={nodeForPopover} // Pass the constructed Node object
+      onUpdateNodeStyle={handleStyleConfigUpdate}
+      onUpdateNodeLabel={handleLabelUpdate}
+      onUpdateNodeText={handleTextUpdate}
+      isEditMode={!!isEditMode} // Ensure it's explicitly boolean
     >
       {NodeContent}
     </TextLabelConfigPopover>
