@@ -5,8 +5,10 @@ import { ArrowLeft, ArrowRight, CheckCircle } from 'lucide-react';
 import { useOnboarding } from './OnboardingContext';
 
 interface OnboardingNavigationProps {
-  onNext: () => void;
+  onNext: () => void | Promise<void>;
   onPrev: () => void;
+  currentStep: number;
+  totalSteps: number;
   isNextDisabled?: boolean;
 }
 

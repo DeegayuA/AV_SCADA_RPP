@@ -3,7 +3,8 @@
 
 import { useState, useEffect, useMemo, ForwardRefExoticComponent, RefAttributes, useCallback } from 'react';
 import Image, { StaticImageData } from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // Keep this
+// import { useSearchParams } from 'next/navigation'; // Example if you need query params
 import { useForm, UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,14 +13,14 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon, Zap, LucideProps, Settings2, ShieldCheck, KeyRound } from 'lucide-react'; // Added KeyRound
+import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon, Zap, LucideProps, Settings2, ShieldCheck, KeyRound, CircleDotDashed, CheckCircle } from 'lucide-react'; // Added CircleDotDashed, CheckCircle
 import { useTheme } from 'next-themes';
 
 import { isOnboardingComplete } from '@/lib/idb-store';
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
 import { User, UserRole } from '@/types/auth';
-import { useAppStore } from '@/stores/appStore'; // Keep this for setting user
+import { useAppStore } from '@/stores/appStore';
 import React from 'react';
 
 // Background images
@@ -38,19 +39,21 @@ const rotatingMessages = [
 const iconsMap: { [key: string]: React.ElementType } = { Zap, Lock, Settings2, Eye };
 
 
-const users: User[] = [
+const users: User[] = [ // Mock users
   { email: 'admin@av.lk', passwordHash: 'AVR&D490', role: UserRole.ADMIN, avatar: `https://avatar.vercel.sh/admin-av.png`, name: 'Admin SolarCtrl', redirectPath: '/control' },
   { email: 'operator@av.lk', passwordHash: 'operator123', role: UserRole.OPERATOR, avatar: `https://avatar.vercel.sh/operator-solar.png`, name: 'Operator Prime', redirectPath: '/control' },
   { email: 'viewer@av.lk', passwordHash: 'viewer123', role: UserRole.VIEWER, avatar: `https://avatar.vercel.sh/viewer-energy.png`, name: 'Guest Observer', redirectPath: '/dashboard' },
 ];
 
-const GoogleIcon = () => ( /* ... Existing GoogleIcon ... */ 
-    (<motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+// ... (GoogleIcon, loginSchema, columnVariants, imageVariants, formElementVariants, types remain the same)
+
+const GoogleIcon = () => (
+    <motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
       <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
       <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
       <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
       <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.994,36.076,44,30.54,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
-    </motion.svg>)
+    </motion.svg>
 );
 
 const loginSchema = z.object({
@@ -59,8 +62,16 @@ const loginSchema = z.object({
 });
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-const columnVariants = { /* ... */ };
-const imageVariants = { /* ... */ };
+const columnVariants = {
+  hidden: { opacity: 0, x: -40, },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1], }, },
+};
+
+const imageVariants = {
+  hidden: { opacity: 0, x: 40, },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.7, ease: [0.25, 0.1, 0.25, 1], delay: 0.1, }, },
+};
+
 const formElementVariants = (delayOffset: number = 0) => ({
   hidden: { opacity: 0, y: 15 },
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: (i * 0.07) + delayOffset + parseFloat(String(0.3)), duration: 0.4, ease: "easeOut" } }),
@@ -71,56 +82,93 @@ interface EmailFormItemConfig extends FormItemConfigBase { name: "email"; type: 
 interface PasswordFormItemConfig extends FormItemConfigBase { name: "password"; type: "text" | "password"; rightIcon: IconType; onRightIconClick: () => void; rightIconAriaLabel: string; }
 type FormItemConfig = EmailFormItemConfig | PasswordFormItemConfig;
 
+const RedirectingLoader = ({ userName, userRole }: { userName: string, userRole: string }) => (
+  <motion.div
+    key="redirecting-loader"
+    initial={{ opacity: 0 }}
+    animate={{ opacity: 1 }}
+    exit={{ opacity: 0 }}
+    className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/90 dark:bg-black/90 backdrop-blur-md text-white p-8 text-center"
+  >
+    <motion.div 
+      initial={{ scale: 0.8, opacity:0 }} 
+      animate={{ scale: 1, opacity:1, transition: { type: 'spring', stiffness:150, damping:15, delay:0.1 } }}
+    >
+      <CheckCircle className="h-16 w-16 sm:h-20 sm:w-20 text-green-400 mb-6" />
+    </motion.div>
+    <motion.h2 
+      initial={{ y: 10, opacity:0 }} 
+      animate={{ y: 0, opacity:1, transition: { delay:0.2 } }}
+      className="text-2xl sm:text-3xl font-semibold mb-2"
+    >
+      Welcome back, {userName}!
+    </motion.h2>
+    <motion.p 
+      initial={{ y: 10, opacity:0 }} 
+      animate={{ y: 0, opacity:1, transition: { delay:0.3 } }}
+      className="text-slate-300/90 dark:text-slate-400/90 mb-8 text-sm sm:text-base"
+    >
+      Signed in as {userRole}. Preparing your experience...
+    </motion.p>
+    <div className="flex items-center space-x-3 text-slate-200/80 dark:text-slate-300/80">
+        <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+        >
+            <CircleDotDashed className="h-8 w-8 sm:h-10 sm:w-10 opacity-80" />
+        </motion.div>
+        <motion.span 
+          initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.5, duration:0.5 }}}
+          className="text-lg sm:text-xl tracking-wide"
+        >
+          Loading Dashboard
+        </motion.span>
+    </div>
+  </motion.div>
+);
 
 
-// Main LoginPage Component
 export default function LoginPage() {
   const router = useRouter();
   const setCurrentUserInStore = useAppStore((state) => state.setCurrentUser);
   const directStoreUser = useAppStore((state) => state.currentUser);
-  // FIX for Error 1: Access hasHydrated via a selector state
+  
   const [isStoreHydrated, setIsStoreHydrated] = useState(false);
 
+  // ... (useEffect for store hydration - no changes)
   useEffect(() => {
-      // Zustand's persist middleware has a way to subscribe to hydration events.
-      // The `onRehydrateStorage` in your appStore.ts is one place, but for component-level
-      // knowledge, `useAppStore.persist.hasHydrated()` is the intended synchronous check
-      // *after* it has happened. The recommended way for components is to ensure they
-      // only render/access persisted state after hydration.
-      // For a component, we can set a local state once hydration is true.
-      const checkHydration = () => {
-        if (useAppStore.persist.hasHydrated()) {
-          setIsStoreHydrated(true);
-        }
-      };
-      
-      // Check immediately in case it's already hydrated
-      checkHydration();
+    const checkHydration = () => {
+      if (useAppStore.persist.hasHydrated()) {
+        setIsStoreHydrated(true);
+        return true;
+      }
+      return false;
+    };
 
-      // Subscribe to changes in hydration status (though `hasHydrated()` is usually checked once)
-      const unsubscribe = useAppStore.persist.onHydrate(() => {
-          console.log("[LoginPage] Zustand Store Hydrated (onHydrate event)");
-          setIsStoreHydrated(true);
-      });
-      // An alternative or supplement if `onHydrate` doesn't fire as expected in all scenarios:
-      // You could also poll `hasHydrated()` briefly or rely on its synchronous value later.
-      // A timeout for initial check:
-      const timer = setTimeout(() => {
-        if (!isStoreHydrated && useAppStore.persist.hasHydrated()) {
-          console.log("[LoginPage] Zustand Store Hydrated (timer check)");
-          setIsStoreHydrated(true);
-        }
-      }, 100); // Give it a moment
+    if (checkHydration()) return;
 
-      return () => {
-        unsubscribe();
-        clearTimeout(timer);
-      };
-  }, [isStoreHydrated]); // Re-check `isStoreHydrated` for safety but initial check and onHydrate should cover.
+    const unsubscribe = useAppStore.persist.onHydrate(() => {
+        setIsStoreHydrated(true);
+    });
+    
+    const timer = setTimeout(() => { 
+      if (!isStoreHydrated && useAppStore.persist.hasHydrated()) {
+        setIsStoreHydrated(true);
+      }
+    }, 250); 
+
+    return () => {
+      unsubscribe();
+      clearTimeout(timer);
+    };
+}, [isStoreHydrated]);
+
 
   const [pageState, setPageState] = useState<'loading' | 'onboarding_required' | 'login_form' | 'admin_login_for_setup'>('loading');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isRedirecting, setIsRedirecting] = useState(false); // NEW: State for redirect loader
+  const [redirectingUser, setRedirectingUser] = useState<User | null>(null); // NEW: To pass user info to loader
 
   const [currentImageIndex, setCurrentImageIndex] = useState(Math.floor(Math.random() * imageUrls.length));
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
@@ -134,32 +182,49 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' },
   });
 
-    const performLogin = useCallback(async (values: LoginFormValues, isAdminSetupLogin: boolean = false) => {
-    // ... (performLogin logic, no change from your latest good version needed for these error fixes) ...
+  const performLogin = useCallback(async (values: LoginFormValues, isAdminSetupLogin: boolean = false) => {
     if (!isAdminSetupLogin && pageState !== 'login_form') {
       toast.error("System Not Ready", { description: "Initial setup may be required by an administrator." });
       return;
     }
     setIsSubmitting(true); setLoginError(null);
-    await new Promise(r => setTimeout(r, 800));
+
+    // Simulate a brief API call
+    await new Promise(resolve => setTimeout(resolve, 500)); 
 
     const user = users.find((u) => u.email.toLowerCase() === values.email.toLowerCase() && u.passwordHash === values.password);
 
     if (user) {
+      setCurrentUserInStore(user); // Store user immediately
+      toast.success(
+        isAdminSetupLogin ? `Admin Verified: ${user.name}!` : `Welcome back, ${user.name}!`, 
+        { 
+          description: isAdminSetupLogin ? "Proceeding to system setup..." : `Signed in as ${user.role}. Redirecting...`,
+          duration: 2000 // Keep toast shorter as redirect loader takes over
+        }
+      );
+      
+      // Set state for redirect loader and then push route
+      setRedirectingUser(user);
+      setIsRedirecting(true); 
+      
+      // No setTimeout here, let the RedirectingLoader show while Next.js loads the new page
       if (isAdminSetupLogin) {
         if (user.role === UserRole.ADMIN) {
-          setCurrentUserInStore(user);
-          toast.success(`Admin Verified: ${user.name}!`, { description: "Proceeding to system setup..." });
-          setTimeout(() => router.push('/onboarding'), 500);
+          router.push('/onboarding');
         } else {
+          // This case shouldn't be hit if validation is robust but as a fallback:
+          setIsRedirecting(false); // Hide loader
+          setRedirectingUser(null);
           toast.error("Admin Privileges Required", { description: "Only an administrator can perform the initial setup." });
           adminSetupForm.setError("root.serverError", { message: "This account does not have admin rights." });
+          setIsSubmitting(false); // Re-enable form
+          return; 
         }
       } else { 
-        setCurrentUserInStore(user);
-        toast.success(`Welcome back, ${user.name}!`, { description: `Signed in as ${user.role}. Redirecting...` });
-        setTimeout(() => router.push(user.redirectPath), 500);
+        router.push(user.redirectPath);
       }
+
     } else {
       const msg = 'Invalid credentials. Please review your email and password.';
       toast.error("Login Failed", { description: msg });
@@ -169,13 +234,15 @@ export default function LoginPage() {
       } else {
         form.setError("root.serverError", { message: msg });
       }
+      setIsSubmitting(false); // Re-enable form on failure
     }
-    setIsSubmitting(false);
+    // Note: setIsSubmitting(false) is only called on failure here.
+    // On success, the component might unmount before it's set back, which is fine.
+    // If redirect is super fast, the loader won't stay.
   }, [router, setCurrentUserInStore, pageState, form, adminSetupForm]);
 
+  // ... (MemoizedLoginForm, useEffect for checkOnboardingAndUser, useEffect for image/message rotation, handlePlaceholderLinkClick remain the same)
 
-
-  // FIX for Error 2: Move useMemo hook to the top level, before conditional returns
   const MemoizedLoginForm = useMemo(() =>
     <LoginFormInternalContent
       form={form}
@@ -184,50 +251,59 @@ export default function LoginPage() {
       loginError={loginError}
       onGoogleLogin={() => toast.info("Google Sign-In feature under development.")}
     />,
-  [form, performLogin, isSubmitting, loginError]); // performLogin needs to be stable (useCallback)
+  [form, performLogin, isSubmitting, loginError]);
 
   useEffect(() => {
-    if (!isStoreHydrated) { // Use the local state for hydration check
-        console.log("[Login Page] Onboarding check: Store not hydrated yet, deferring check.");
-        setPageState('loading'); // Keep loading until store is ready
+    if (!isStoreHydrated) {
+        setPageState('loading');
         return;
     }
 
     const checkOnboardingAndUser = async () => {
-      console.log("[Login Page] Onboarding check: Store is hydrated. Current user from store:", directStoreUser);
-      setPageState('loading'); // Ensure loading state during async check
+      setPageState('loading');
       const completed = await isOnboardingComplete();
-      console.log("[Login Page] Onboarding Complete Status from IDB:", completed);
 
       if (!completed) {
-        console.log("[Login Page] Onboarding NOT complete.");
         if (directStoreUser && directStoreUser.role === UserRole.ADMIN && directStoreUser.email !== 'guest@example.com') {
-            toast.info("Initial Setup Required", { description: "Redirecting you to the setup wizard.", duration: 4000 });
+            toast.info("Initial Setup Required", { description: "Redirecting you to the setup wizard.", duration: 3000 });
             router.replace('/onboarding');
             return;
         }
         setPageState('onboarding_required');
       } else {
-        console.log("[Login Page] Onboarding is complete. Showing login form.");
         setPageState('login_form');
       }
     };
 
     checkOnboardingAndUser();
-  }, [router, isStoreHydrated, directStoreUser]); // Depend on isStoreHydrated local state
+  }, [router, isStoreHydrated, directStoreUser]); 
 
-  useEffect(() => { /* ... image and message rotation (no change) ... */ 
+  useEffect(() => { 
     const imageI = setInterval(() => setCurrentImageIndex((p) => (p + 1) % imageUrls.length), 7000);
     const messageI = setInterval(() => setCurrentMessageIndex((p) => (p + 1) % rotatingMessages.length), 5500);
     return () => { clearInterval(imageI); clearInterval(messageI); };
   }, []);
 
+  const handlePlaceholderLinkClick = (
+    event: React.MouseEvent<HTMLAnchorElement>, 
+    pageName: string,
+    url: string
+  ) => {
+    event.preventDefault();
+    toast.info(`${pageName} page (at ${url}) is currently a placeholder.`);
+  };
 
-  // --- Render Logic ---
-  if (pageState === 'loading' || !isStoreHydrated) { // Ensure store is hydrated before rendering anything else
-    return (
-      /* ... Existing Loading UI ... */
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+
+  // RENDER LOGIC
+
+  // NEW: Fullscreen Redirecting Loader
+  if (isRedirecting && redirectingUser) {
+    return <RedirectingLoader userName={redirectingUser.name} userRole={redirectingUser.role} />;
+  }
+
+  if (pageState === 'loading' || !isStoreHydrated) {
+    return ( /* ... Initializing Loader UI - no changes ... */ 
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-neutral-900 text-slate-200 z-50">
         <motion.div initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 150, damping: 12, delay: 0.1 } }}>
             <AppLogo className="h-16 w-16 sm:h-20 sm:w-20 text-primary animate-bounce-slow mb-6" />
@@ -241,168 +317,180 @@ export default function LoginPage() {
   }
 
   if (pageState === 'onboarding_required' || pageState === 'admin_login_for_setup') {
-    // ... (Your 'onboarding_required'/'admin_login_for_setup' UI, use performLogin for admin form submit)
-    return (
+    return ( /* ... Onboarding/Admin Setup UI - no changes ... */ 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-sky-600 via-blue-700 to-indigo-800 text-white text-center p-4 sm:p-6 z-50">
-            <motion.div 
-                initial={{ y: -20, opacity: 0, scale:0.95 }} 
-                animate={{ y: 0, opacity: 1, scale:1, transition: { type: 'spring', stiffness: 120, damping: 12, delay: 0.2 } }}
-                className="bg-white/10 dark:bg-black/20 p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl backdrop-blur-lg max-w-md lg:max-w-lg w-full">
-            <Settings2 className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 text-sky-300 opacity-90 animate-pulse" />
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 tracking-tight">Initial System Setup Required</h1>
-            <p className="text-xs sm:text-sm text-sky-100/80 max-w-md mx-auto mb-5">
-                {APP_NAME} is not yet configured. An administrator must complete the initial setup.
-            </p>
+        className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-sky-600 via-blue-700 to-indigo-800 text-white text-center p-4 sm:p-6 z-50">
+        <motion.div 
+            initial={{ y: -20, opacity: 0, scale:0.95 }} 
+            animate={{ y: 0, opacity: 1, scale:1, transition: { type: 'spring', stiffness: 120, damping: 12, delay: 0.2 } }}
+            className="bg-white/10 dark:bg-black/20 p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl backdrop-blur-lg max-w-md lg:max-w-lg w-full">
+        <Settings2 className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 text-sky-300 opacity-90 animate-pulse" />
+        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 tracking-tight">Initial System Setup Required</h1>
+        <p className="text-xs sm:text-sm text-sky-100/80 max-w-md mx-auto mb-5">
+            {APP_NAME} is not yet configured. An administrator must complete the initial setup.
+        </p>
 
-
-
-            {pageState === 'admin_login_for_setup' ? (
-                <Form {...adminSetupForm}>
-                <form onSubmit={adminSetupForm.handleSubmit(values => performLogin(values, true))} className="space-y-3 text-left">
-
-                                  {process.env.NODE_ENV === 'development' && (
-        <motion.div initial={{ opacity: 0, y:10 }} animate={{ opacity: 1, y:0, transition: { delay: 0.3 } }}
-          className="rounded-xl border border-primary/20 dark:border-primary/30 bg-primary/5 dark:bg-primary/10 p-3.5 sm:p-4 text-xs shadow-md">
-          <p className="mb-2.5 flex items-center text-sm font-semibold text-primary/90 dark:text-primary/80">
-            <Users className="mr-2 h-5 w-5" /> Development Logins
-          </p>
-          <div className="space-y-2">
-            {users.map((user, index) => (
-              <motion.div
-                key={user.email}
-                initial={{ opacity: 0, x: -15 }} 
-                animate={{ opacity: 1, x: 0, transition: { delay: 0.3 + (index * 0.05) } }}
-                className="flex items-center justify-between rounded-lg border border-slate-300/70 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 px-3 py-2.5 group hover:border-primary/70 dark:hover:border-primary/60 transition-all duration-150 shadow-sm hover:shadow-md"
-              >
-                <div className="truncate mr-2 flex-grow">
-                  <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 flex items-center">
-                    {user.name} 
-                    <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
-                      {user.role.toUpperCase()}
-                    </span>
-                  </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
-                  {/* DEV FEATURE: Show password */}
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
-                    <KeyRound size={10} className="mr-1 opacity-60"/> {user.passwordHash}
-                  </p>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto px-2.5 py-1.5 text-xs text-primary/90 dark:text-primary/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-primary/10 rounded-md"
-                  onClick={() => {
-                    adminSetupForm.setValue('email', user.email, { shouldValidate: true });
-                    adminSetupForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
-                    toast.info(`Credentials auto-filled for ${user.name}.`, {position: 'top-center'});
-                  }}
-                >
-                  Use
-                </Button>
-              </motion.div >
-            ))}
-          </div>
-        </motion.div>
-      )}
-                    {/* ... Admin Email Field ... */}
-                     <FormField control={adminSetupForm.control} name="email" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Email</FormLabel>
-                            <FormControl>
-                                <Input type="email" placeholder="admin@example.com" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm" autoComplete="username"/>
-                            </FormControl>
-                            <FormMessage className="text-red-300/90 text-xs pt-0.5" />
-                        </FormItem>
-                    )} />
-                    {/* ... Admin Password Field ... */}
-                    <FormField control={adminSetupForm.control} name="password" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Password</FormLabel>
-                            <div className="relative">
-                            <Input type={showAdminPasswordForSetup ? "text" : "password"} placeholder="Enter admin password" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm pr-10" autoComplete="current-password"/>
-                            <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-sky-200/60 hover:text-sky-100" onClick={()=>setShowAdminPasswordForSetup(!showAdminPasswordForSetup)}>
-                                {showAdminPasswordForSetup ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5"/> : <Eye className="h-4 w-4 sm:h-5 sm:w-5"/>}
-                            </Button>
+        {pageState === 'admin_login_for_setup' ? (
+            <Form {...adminSetupForm}>
+            <form onSubmit={adminSetupForm.handleSubmit(values => performLogin(values, true))} className="space-y-3 text-left">
+                {process.env.NODE_ENV === 'development' && (
+                    <motion.div initial={{ opacity: 0, y:10 }} animate={{ opacity: 1, y:0, transition: { delay: 0.3 } }}
+                    className="rounded-xl border border-primary/20 dark:border-primary/30 bg-primary/5 dark:bg-primary/10 p-3.5 sm:p-4 text-xs shadow-md">
+                    <p className="mb-2.5 flex items-center text-sm font-semibold text-primary/90 dark:text-primary/80">
+                        <Users className="mr-2 h-5 w-5" /> Development Logins
+                    </p>
+                    <div className="space-y-2">
+                        {users.map((user, index) => (
+                        <motion.div
+                            key={user.email}
+                            initial={{ opacity: 0, x: -15 }} 
+                            animate={{ opacity: 1, x: 0, transition: { delay: 0.3 + (index * 0.05) } }}
+                            className="flex items-center justify-between rounded-lg border border-slate-300/70 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 px-3 py-2.5 group hover:border-primary/70 dark:hover:border-primary/60 transition-all duration-150 shadow-sm hover:shadow-md"
+                        >
+                            <div className="truncate mr-2 flex-grow">
+                            <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 flex items-center">
+                                {user.name} 
+                                <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
+                                {user.role.toUpperCase()}
+                                </span>
+                            </p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
+                                <KeyRound size={10} className="mr-1 opacity-60"/> {user.passwordHash}
+                            </p>
                             </div>
-                            <FormMessage className="text-red-300/90 text-xs pt-0.5" />
-                        </FormItem>
-                    )} />
-                    {/* Error Message for Admin Form */}
-                    <AnimatePresence>
-                    {adminSetupForm.formState.errors.root?.serverError && (
-                        <motion.p initial={{opacity:0, height:0}} animate={{opacity:1, height:'auto'}} exit={{opacity:0, height:0}}
-                         className="text-xs text-red-300 bg-red-500/25 p-2 rounded-md flex items-center border border-red-400/50 mt-1!"><AlertCircle size={14} className="mr-1.5"/>{adminSetupForm.formState.errors.root.serverError.message}</motion.p>
-                    )}
-                    </AnimatePresence>
-                    {/* Submit and Cancel Buttons for Admin Form */}
-                    <div className="pt-2 space-y-2.5">
-                    <Button type="submit" size="lg" className="w-full bg-sky-400 hover:bg-sky-300 text-sky-900 shadow-lg font-semibold group py-2.5 h-auto text-sm rounded-md transition-transform hover:scale-[1.02]">
-                        {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />} Authenticate & Setup
-                    </Button>
-                    <Button variant="link" size="sm" onClick={() => {setPageState('onboarding_required'); adminSetupForm.reset(); setLoginError(null);}} className="w-full text-sky-200/70 hover:text-sky-100 text-xs !mt-1.5">
-                        Cancel Admin Login
-                    </Button>
+                            <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto px-2.5 py-1.5 text-xs text-primary/90 dark:text-primary/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-primary/10 rounded-md"
+                            onClick={() => {
+                                adminSetupForm.setValue('email', user.email, { shouldValidate: true });
+                                adminSetupForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
+                                toast.info(`Credentials auto-filled for ${user.name}.`, {position: 'top-center'});
+                            }}
+                            >
+                            Use
+                            </Button>
+                        </motion.div >
+                        ))}
                     </div>
-                </form>
-                </Form>
-            ) : (
-                <>
-                    <p className="text-xs text-sky-200/70 mb-4">If you are not an administrator, please ask one to perform the initial system configuration.</p>
-                    <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { delay: 0.3, type:'spring', stiffness:150 } }}>
-                        <Button onClick={() => setPageState('admin_login_for_setup')} size="lg" className="bg-white text-blue-700 hover:bg-sky-100 shadow-xl px-6 py-3 text-sm sm:text-base font-semibold group h-auto rounded-md transition-transform hover:scale-105">
-                            Log In as Administrator <ShieldCheck className="ml-2.5 h-5 w-5 transition-transform group-hover:scale-110 text-blue-600"/>
-                        </Button>
                     </motion.div>
-                </>
-            )}
-            </motion.div>
+                )}
+                <FormField control={adminSetupForm.control} name="email" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Email</FormLabel>
+                        <FormControl>
+                            <Input type="email" placeholder="admin@example.com" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm" autoComplete="username"/>
+                        </FormControl>
+                        <FormMessage className="text-red-300/90 text-xs pt-0.5" />
+                    </FormItem>
+                )} />
+                <FormField control={adminSetupForm.control} name="password" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Password</FormLabel>
+                        <div className="relative">
+                        <Input type={showAdminPasswordForSetup ? "text" : "password"} placeholder="Enter admin password" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm pr-10" autoComplete="current-password"/>
+                        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-sky-200/60 hover:text-sky-100" onClick={()=>setShowAdminPasswordForSetup(!showAdminPasswordForSetup)}>
+                            {showAdminPasswordForSetup ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5"/> : <Eye className="h-4 w-4 sm:h-5 sm:w-5"/>}
+                        </Button>
+                        </div>
+                        <FormMessage className="text-red-300/90 text-xs pt-0.5" />
+                    </FormItem>
+                )} />
+                <AnimatePresence>
+                {adminSetupForm.formState.errors.root?.serverError && (
+                    <motion.p initial={{opacity:0, height:0}} animate={{opacity:1, height:'auto'}} exit={{opacity:0, height:0}}
+                     className="text-xs text-red-300 bg-red-500/25 p-2 rounded-md flex items-center border border-red-400/50 mt-1!"><AlertCircle size={14} className="mr-1.5"/>{adminSetupForm.formState.errors.root.serverError.message}</motion.p>
+                )}
+                </AnimatePresence>
+                <div className="pt-2 space-y-2.5">
+                <Button type="submit" size="lg" className="w-full bg-sky-400 hover:bg-sky-300 text-sky-900 shadow-lg font-semibold group py-2.5 h-auto text-sm rounded-md transition-transform hover:scale-[1.02]">
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />} Authenticate & Setup
+                </Button>
+                <Button variant="link" size="sm" onClick={() => {setPageState('onboarding_required'); adminSetupForm.reset(); setLoginError(null);}} className="w-full text-sky-200/70 hover:text-sky-100 text-xs !mt-1.5">
+                    Cancel Admin Login
+                </Button>
+                </div>
+            </form>
+            </Form>
+        ) : (
+            <>
+                <p className="text-xs text-sky-200/70 mb-4">If you are not an administrator, please ask one to perform the initial system configuration.</p>
+                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { delay: 0.3, type:'spring', stiffness:150 } }}>
+                    <Button onClick={() => setPageState('admin_login_for_setup')} size="lg" className="bg-white text-blue-700 hover:bg-sky-100 shadow-xl px-6 py-3 text-sm sm:text-base font-semibold group h-auto rounded-md transition-transform hover:scale-105">
+                        Log In as Administrator <ShieldCheck className="ml-2.5 h-5 w-5 transition-transform group-hover:scale-110 text-blue-600"/>
+                    </Button>
+                </motion.div>
+            </>
+        )}
         </motion.div>
+    </motion.div>
     );
   }
   
   const RotatingMessageIcon = iconsMap[rotatingMessages[currentMessageIndex].iconName] || Zap;
 
-  // --- Render the main login form if pageState === 'login_form' ---
-  return (
-    /* ... Your main login form UI from previous response (that uses MemoizedLoginForm)... */
+  return ( /* ... Main Login Form UI with two columns - no changes in structure ... */ 
     <div className="grid min-h-svh w-full lg:grid-cols-2 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
-      <motion.div variants={columnVariants} initial="hidden" animate="visible" 
-         className="flex min-h-screen items-center justify-center p-4 sm:p-8 md:p-10 lg:p-12 relative overflow-hidden" >
+        <motion.div 
+            variants={columnVariants} 
+            initial="hidden" 
+            animate="visible" 
+            className="flex min-h-screen items-center justify-center p-4 sm:p-8 md:p-10 lg:p-12 relative overflow-hidden" >
         <div className="mx-auto flex w-full max-w-sm sm:max-w-md flex-col gap-y-6 sm:gap-y-8 z-10">
-          <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.5, ease: "circOut" } }}
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.5, ease: "circOut" } }}
             className="flex flex-col items-center text-center" >
             <AppLogo className="h-14 w-14 sm:h-16 sm:w-16 mb-3 text-primary" />
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-800 dark:text-gray-100">
-              {APP_NAME}
+                {APP_NAME}
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">
-              Smart Energy Management, Simplified for You.
+                Smart Energy Management, Simplified for You.
             </p>
-          </motion.div>
-          <hr className="border-slate-300 dark:border-slate-700/60" />
-          {MemoizedLoginForm} 
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.9, duration: 0.5 } }}
-            className="text-center text-xs text-slate-500 dark:text-slate-500" >
+            </motion.div>
+            <hr className="border-slate-300 dark:border-slate-700/60" />
+            {MemoizedLoginForm} 
+            <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0, transition: { delay: 0.9, duration: 0.5 } }}
+            className="text-center text-xs text-slate-500 dark:text-slate-500" 
+            >
             © {new Date().getFullYear()} {APP_AUTHOR}. Advanced Solar Solutions.
             <div className="mt-1.5">
-              <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Terms</a> | <a href="#" onClick={(e) => e.preventDefault()} className="hover:text-primary transition-colors">Privacy</a>
+                <a 
+                href="/terms-of-service" 
+                onClick={(e) => handlePlaceholderLinkClick(e, "Terms of Service", "/terms-of-service")} 
+                className="hover:text-primary transition-colors"
+                >
+                Terms
+                </a> 
+                <span className="mx-1">|</span>
+                <a 
+                href="/privacy-policy" 
+                onClick={(e) => handlePlaceholderLinkClick(e, "Privacy Policy", "/privacy-policy")} 
+                className="hover:text-primary transition-colors"
+                >
+                Privacy
+                </a>
             </div>
-          </motion.div>
+            </motion.div>
         </div>
-      </motion.div>
-      <motion.div variants={imageVariants} initial="hidden" animate="visible" 
+        </motion.div>
+        <motion.div 
+        variants={imageVariants} 
+        initial="hidden" 
+        animate="visible" 
         className="relative hidden lg:flex flex-col items-center justify-center bg-slate-900 overflow-hidden" >
         <AnimatePresence mode="sync">
-          <motion.div key={currentImageIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1, transition: { duration: 1.8, ease: [0.22, 1, 0.36, 1] } }}
+            <motion.div key={currentImageIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1, transition: { duration: 1.8, ease: [0.22, 1, 0.36, 1] } }}
             exit={{ opacity: 0, scale: 1.05, transition: { duration: 0.9, ease: "easeIn" } }} className="absolute inset-0" >
             <Image src={imageUrls[currentImageIndex]} alt="Advanced solar panel technology" fill style={{ objectFit: 'cover' }} quality={75} priority={currentImageIndex === 0} className="brightness-[0.55] dark:brightness-[0.4] saturate-100"/>
-          </motion.div>
+            </motion.div>
         </AnimatePresence>
         <div className="absolute inset-0 bg-gradient-to-br from-sky-900/40 via-transparent to-slate-900/60 dark:from-sky-950/60 dark:to-slate-950/80" />
         <div className="relative z-10 text-center p-8 max-w-lg pointer-events-none">
             <motion.div className="mb-6 flex items-center justify-center text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight shadow-text-lg">
-                 <AnimatePresence mode="wait">
+                    <AnimatePresence mode="wait">
                     <motion.div key={currentMessageIndex} initial={{ opacity: 0, y: 30, filter: "blur(8px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.6, delay:0.1, ease: [0.22, 1, 0.36, 1] } }}
                         exit={{ opacity: 0, y: -25, filter: "blur(8px)", transition: { duration: 0.4, ease: "easeIn" } }} className="flex items-center" >
                         <RotatingMessageIcon className="mr-3 inline-block h-7 w-7 sm:h-8 sm:w-8 text-sky-300 opacity-80" />
@@ -415,12 +503,12 @@ export default function LoginPage() {
             </motion.p>
         </div>
         <ThemeToggleButton />
-      </motion.div>
+        </motion.div>
     </div>
   );
 }
 
-
+// ... (LoginFormInternalContent - no changes needed for this specific request)
 const LoginFormInternalContent = React.memo(({
   form: rhForm, onSubmit, isSubmitting, loginError, onGoogleLogin
 }: {
@@ -433,7 +521,6 @@ const LoginFormInternalContent = React.memo(({
   const [showPassword, setShowPassword] = useState(false);
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
   
-  // Recalculate based on number of visible users
   const devUsersCount = process.env.NODE_ENV === 'development' ? users.length : 0;
   const formElementDelayOffset = devUsersCount * 0.03 + (devUsersCount > 0 ? 0.1 : 0) ;
 
@@ -478,7 +565,6 @@ const LoginFormInternalContent = React.memo(({
                     </span>
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
-                  {/* DEV FEATURE: Show password */}
                   <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
                     <KeyRound size={10} className="mr-1 opacity-60"/> {user.passwordHash}
                   </p>
@@ -566,6 +652,8 @@ const LoginFormInternalContent = React.memo(({
 });
 LoginFormInternalContent.displayName = 'LoginFormInternalContent';
 
+
+// ... (ThemeToggleButton - no changes needed)
 const ThemeToggleButton = React.memo(() => {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);

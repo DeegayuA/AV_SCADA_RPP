@@ -21,20 +21,33 @@ interface FullConfigFile {
     configuredDataPoints: PartialDataPointFromFile[];
 }
 
-interface OnboardingContextType {
+export interface OnboardingConfigData {
+  plantName?: string;
+  plantLocation?: string;
+  plantType?: string;
+  plantCapacity?: string;
+  opcUaEndpointOffline?: string;
+  appName?: string;
+  configuredDataPoints?: DataPointConfig[];
+}
+
+export interface OnboardingContextType {
   currentStep: OnboardingStep;
-  setCurrentStep: Dispatch<SetStateAction<OnboardingStep>>;
-  onboardingData: PartialOnboardingData;
-  updateOnboardingData: (data: PartialOnboardingData) => void;
-  totalSteps: number;
   nextStep: () => void;
   prevStep: () => void;
+  goToStep: (step: number) => void;
+  saveStatus: SaveStatus;
   completeOnboarding: () => Promise<void>;
-  resetOnboardingData: () => Promise<void>; // <--- CHANGED HERE
+  resetOnboardingData: () => Promise<void>;
+  configData: OnboardingConfigData;
+  updateConfigData: (partialData: Partial<OnboardingConfigData>) => void;
+  isLoading: boolean;
+  totalSteps: number;
+  onboardingData: PartialOnboardingData;
+  updateOnboardingData: (data: PartialOnboardingData) => void;
   defaultDataPoints: DataPointConfig[];
   configuredDataPoints: DataPointConfig[];
   setConfiguredDataPoints: Dispatch<SetStateAction<DataPointConfig[]>>;
-  saveStatus: SaveStatus;
   setPlantDetails: (details: Partial<FullConfigFile>) => void;
 }
 
@@ -147,6 +160,12 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     toast.info("Onboarding Reset", { description: "Configuration has been reset to defaults." });
   }, []); // Dependencies for this reset are minimal as it uses constants and setters
 
+  const goToStep = useCallback((step: number) => {
+    if (step >= 0 && step <= totalSteps) {
+      setCurrentStep(step as OnboardingStep);
+    }
+  }, [totalSteps]);
+
   const contextValue = useMemo(() => ({
     currentStep,
     setCurrentStep,
@@ -155,12 +174,30 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     totalSteps,
     nextStep,
     prevStep,
+    goToStep,
     completeOnboarding,
     resetOnboardingData: resetOnboardingDataInternal, // <--- CHANGED HERE (exported name)
     defaultDataPoints: sourceDefaultDataPoints,
     configuredDataPoints,
     setConfiguredDataPoints,
     saveStatus,
+    isLoading: saveStatus === 'saving',
+    configData: {
+      plantName: onboardingData.plantName,
+      plantLocation: onboardingData.plantLocation,
+      plantType: onboardingData.plantType,
+      plantCapacity: onboardingData.plantCapacity,
+      opcUaEndpointOffline: onboardingData.opcUaEndpointOffline,
+      appName: onboardingData.appName,
+      configuredDataPoints
+    },
+    updateConfigData: (partialData: Partial<OnboardingConfigData>) => {
+      const { configuredDataPoints: newDataPoints, ...rest } = partialData;
+      if (newDataPoints) {
+        setConfiguredDataPoints(newDataPoints);
+      }
+      updateOnboardingData(rest);
+    },
     setPlantDetails: (details: Partial<FullConfigFile>) => { // Renamed for clarity
         // When importing plant details, also update onboardingData for plant-specific fields
         const { plantName, plantLocation, plantType, configuredDataPoints: importedPoints } = details;
@@ -189,15 +226,12 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
                 } as DataPointConfig;
             });
           setConfiguredDataPoints(validImportedPoints);
-          toast.success("Plant Details & Data Points Updated", { description: `${validImportedPoints.length} data points loaded from file.`});
-        } else {
-            toast.info("Plant Details Updated", { description: "Data points were not found in the provided file or format."});
         }
     },
   }), [
     currentStep, onboardingData, updateOnboardingData, totalSteps,
-    nextStep, prevStep, completeOnboarding, resetOnboardingDataInternal, 
-    configuredDataPoints, saveStatus // sourceDefaultDataPoints is stable outside memo
+    nextStep, prevStep, goToStep, completeOnboarding, resetOnboardingDataInternal, 
+    configuredDataPoints, setConfiguredDataPoints, saveStatus, setOnboardingData
   ]);
 
   return (

@@ -116,6 +116,7 @@ function SidebarProvider({
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
+      isCollapsed: state === "collapsed",
       state,
       open,
       setOpen,

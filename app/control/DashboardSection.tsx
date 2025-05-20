@@ -4,7 +4,13 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { XCircle } from 'lucide-react';
 import { DataPoint } from '@/config/dataPoints'; // This is for individual items
-import { NodeData, ThreePhaseGroupInfo } from '../DashboardData/dashboardInterfaces';
+import { NodeData, ThreePhaseGroupInfo as BaseThreePhaseGroupInfo } from '../DashboardData/dashboardInterfaces';
+
+// Extended interface to include missing properties
+interface ThreePhaseGroupInfo extends BaseThreePhaseGroupInfo {
+    average?: DataPoint;
+    total?: DataPoint;
+}
 import DataPointCard from '../DashboardData/DataPointCard';
 import ValueDisplayContent from '../DashboardData/ValueDisplayContent';
 import { UserRole } from '@/types/auth';

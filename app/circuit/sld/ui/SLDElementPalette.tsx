@@ -17,7 +17,7 @@ import { motion } from 'framer-motion';
 import {
     BatteryCharging, Rows3, Cable, CircuitBoard, PlugZap, Zap, DatabaseZap, Thermometer,
     SlidersHorizontal, FileText, TextCursorInput, Cpu, ToyBrick, Workflow, GitFork, BoxSelect,
-    Unplug, ShieldAlert, ListFilter, SearchCode // Added more icons
+    Unplug, ShieldAlert, ListFilter, SearchCode
 } from 'lucide-react';
 
 // Adjust the import path if SearchableSelect is not directly in ./
@@ -25,7 +25,6 @@ import { SearchableSelect, ComboboxOption } from './SearchableSelect';
 
 
 export const categorizedComponents: PaletteCategory[] = [
-  // ... (your categorizedComponents definition remains the same)
   {
     name: 'Sources & Storage',
     components: [
@@ -89,16 +88,16 @@ export const categorizedComponents: PaletteCategory[] = [
   },
 ];
 
+
 interface SLDElementPaletteProps {}
 
 const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
-  const [searchTerm, setSearchTerm] = useState<string>(""); // For the SearchableSelect (represents selected element type)
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(categorizedComponents.map(c => c.name));
   const elementRefs = useRef<Record<string, HTMLLIElement | null>>({});
 
-
-  const onDragStart = (event: React.DragEvent, component: PaletteComponent) => {
-    // ... (onDragStart logic remains the same)
+  // Correctly typed for native HTML DragEvent
+  const handleNativeDragStart = (event: React.DragEvent<HTMLLIElement>, component: PaletteComponent) => {
     const elementTypeString = component.type as string;
     const nodeInitialData = {
       elementType: component.type,
@@ -123,28 +122,23 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  // Prepare options for the SearchableSelect - now individual components
   const allComponentOptions: ComboboxOption[] = useMemo(() => {
     const options: ComboboxOption[] = [];
     categorizedComponents.forEach(category => {
       category.components.forEach(component => {
         options.push({
-          // Use a unique value, e.g., categoryName + componentType, or just componentType if globally unique
-          value: component.type, // SLDElementType should be unique
-          label: `${component.label} (${category.name})`, // Show label and category for context
-          description: category.name, // Store category name for finding it later
+          value: component.type,
+          label: `${component.label} (${category.name})`,
+          description: category.name,
         });
       });
     });
     return [{ value: "", label: "Search all components..." }, ...options];
-  }, []); // This depends only on categorizedComponents, so runs once
+  }, []);
 
-  // Handle selection from SearchableSelect
   const handleElementSelect = (selectedElementType: SLDElementType | string) => {
     setSearchTerm(selectedElementType);
-
     if (selectedElementType) {
-      // Find the category of the selected element
       let categoryNameOfSelectedElement: string | undefined;
       for (const category of categorizedComponents) {
         if (category.components.some(comp => comp.type === selectedElementType)) {
@@ -152,38 +146,24 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
           break;
         }
       }
-
       if (categoryNameOfSelectedElement) {
-        setOpenAccordionItems(prev => {
-          // Open the category if not already open, keep others as they are
-          // or just open this one and close others if preferred.
-          // For simplicity, let's ensure only this one is open.
-          return [categoryNameOfSelectedElement!];
-        });
-
-        // Scroll to the element (requires refs and useEffect)
-        // This will run after the component re-renders and accordion potentially opens
+        setOpenAccordionItems([categoryNameOfSelectedElement!]);
         setTimeout(() => {
           const elementKey = `${categoryNameOfSelectedElement}-${selectedElementType}`;
           const elementNode = elementRefs.current[elementKey];
           elementNode?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-           // Add a temporary highlight
            if(elementNode){
             elementNode.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-300');
             setTimeout(() => {
                 elementNode.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
             }, 2000);
            }
-        }, 100); // Timeout allows accordion to open
-
-
+        }, 100);
       }
     } else {
-      // If "Search all components..." is re-selected, open all categories
       setOpenAccordionItems(categorizedComponents.map(c => c.name));
     }
   };
-
 
   return (
     <Card className="h-full flex flex-col border-r border-border bg-background shadow-lg">
@@ -207,7 +187,7 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
           <Accordion
             type="multiple"
             value={openAccordionItems}
-            onValueChange={setOpenAccordionItems} // Allow user to manually open/close
+            onValueChange={setOpenAccordionItems}
             className="w-full"
           >
             {categorizedComponents.map((category) => (
@@ -216,7 +196,6 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                   className="text-xs px-2.5 py-2 hover:no-underline bg-muted/60 dark:bg-neutral-700/40 hover:bg-muted dark:hover:bg-neutral-700/60 rounded-md font-medium text-foreground/90 transition-colors duration-150"
                 >
                    <div className="flex items-center gap-2">
-                     {/* Could show a different icon if this category contains the searchTerm element */}
                      <ListFilter size={12} className={openAccordionItems.includes(category.name) ? "text-primary" : "text-muted-foreground"}/>
                      <span>{category.name}</span>
                    </div>
@@ -226,11 +205,14 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                     {category.components.map((component) => {
                       const elementKey = `${category.name}-${component.type}`;
                       return (
-                      <motion.li
+                      // Use a standard <li> for native HTML drag-and-drop
+                      // Keep motion.div for animations if desired, but attach D&D to the <li>
+                      <li
                         key={elementKey}
-                        ref={el => { elementRefs.current[elementKey] = el; }} // Assign ref
-                        draggable
-                        onDragStart={(e: React.DragEvent<HTMLLIElement>) => onDragStart(e, component)}
+                        ref={el => { elementRefs.current[elementKey] = el; }}
+                        draggable // Native HTML draggable
+                        onDragStart={(e) => handleNativeDragStart(e, component)} // Use correctly typed handler
+                        title={`Drag to add ${component.label}`}
                         className={`
                           group/palette-item cursor-grab p-2.5
                           bg-card dark:bg-neutral-700/20
@@ -241,25 +223,28 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                           text-center text-[11px] font-medium text-foreground/80 dark:text-neutral-300
                           flex flex-col items-center justify-center gap-1.5 min-h-[60px]
                           transition-all duration-200 ease-out
-                          ${searchTerm === component.type ? 'ring-2 ring-primary ring-offset-1' : ''} // Highlight if selected
+                          ${searchTerm === component.type ? 'ring-2 ring-primary ring-offset-1' : ''}
                         `}
-                        title={`Drag to add ${component.label}`}
-                        variants={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.98 } }}
-                        whileHover="hover"
-                        whileTap="tap"
                       >
-                         {component.icon &&
+                        <motion.div // You can still use motion for internal layout or hover effects
+                           variants={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.98 } }}
+                           whileHover="hover"
+                           whileTap="tap"
+                           className="flex flex-col items-center justify-center gap-1.5 w-full h-full" // Ensure motion div fills the li
+                        >
+                          {component.icon &&
                            <span className={`
-                             ${searchTerm === component.type ? "text-primary-darker" : "text-primary dark:text-sky-400"} 
+                             ${searchTerm === component.type ? "text-primary-darker" : "text-primary dark:text-sky-400"}
                              group-hover/palette-item:text-primary-darker transition-colors duration-150
                            `}>
-                             {React.cloneElement(component.icon as React.ReactElement<{size?: number}>, { size: 18 })}
+                             {React.cloneElement(component.icon as React.ReactElement<{ size?: number }>, { size: 18 })}
                            </span>
-                         }
-                         <span className="block leading-tight group-hover/palette-item:text-foreground dark:group-hover/palette-item:text-neutral-100 transition-colors duration-150">
-                           {component.label}
-                         </span>
-                      </motion.li>
+                          }
+                          <span className="block leading-tight group-hover/palette-item:text-foreground dark:group-hover/palette-item:text-neutral-100 transition-colors duration-150">
+                            {component.label}
+                          </span>
+                        </motion.div>
+                      </li>
                     );
                     })}
                   </ul>

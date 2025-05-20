@@ -36,7 +36,7 @@ const ThreePhaseGroupCard: React.FC<ThreePhaseGroupCardProps> = React.memo(
         onRemoveItem // Destructure the new prop
     }) => {
 
-        const colSpanClass = group.uiType === 'gauge' ? 'col-span-2 md:col-span-3' : 'col-span-1 md:col-span-2';
+        const colSpanClass = (group.uiType as string) === 'gauge' ? 'col-span-2 md:col-span-3' : 'col-span-1 md:col-span-2';
 
         let content;
         if (group.uiType === 'display') {
@@ -52,18 +52,13 @@ const ThreePhaseGroupCard: React.FC<ThreePhaseGroupCardProps> = React.memo(
                     isEditMode={isEditMode}
                 />
             );
-        } else if (group.uiType === 'gauge') {
+        } else if ((group.uiType as string) === 'gauge') {
             content = (
                 <ThreePhaseGaugeGroup
                     group={group}
                     nodeValues={nodeValues}
                     isDisabled={isDisabled}
                     currentHoverEffect={currentHoverEffect}
-                    // If ThreePhaseGaugeGroup needs to show errors or interact, pass relevant props
-                    // playNotificationSound={playNotificationSound}
-                    // lastToastTimestamps={lastToastTimestamps}
-                    // sendDataToWebSocket={sendDataToWebSocket}
-                    // isEditMode={isEditMode}
                 />
             );
         } else {

@@ -79,31 +79,36 @@ const onRehydrateStorageCallback = (
 };
 
 // Define the storage explicitly to handle potential SSR issues if localStorage isn't available immediately
-const safeLocalStorage: StateStorage = {
-  getItem: (name) => {
-    try {
-      return localStorage.getItem(name);
-    } catch (error) {
-      console.warn(`Zustand (appStore): localStorage.getItem failed for '${name}'.`, error);
-      return null;
+const safeLocalStorage: StateStorage = typeof window !== 'undefined'
+  ? {
+      getItem: (name) => {
+        try {
+          return localStorage.getItem(name);
+        } catch (error) {
+          console.warn(`Zustand (appStore): localStorage.getItem failed for '${name}'.`, error);
+          return null;
+        }
+      },
+      setItem: (name, value) => {
+        try {
+          localStorage.setItem(name, value);
+        } catch (error) {
+          console.warn(`Zustand (appStore): localStorage.setItem failed for '${name}'.`, error);
+        }
+      },
+      removeItem: (name) => {
+        try {
+          localStorage.removeItem(name);
+        } catch (error) {
+          console.warn(`Zustand (appStore): localStorage.removeItem failed for '${name}'.`, error);
+        }
+      },
     }
-  },
-  setItem: (name, value) => {
-    try {
-      localStorage.setItem(name, value);
-    } catch (error) {
-      console.warn(`Zustand (appStore): localStorage.setItem failed for '${name}'.`, error);
-    }
-  },
-  removeItem: (name) => {
-    try {
-      localStorage.removeItem(name);
-    } catch (error) {
-      console.warn(`Zustand (appStore): localStorage.removeItem failed for '${name}'.`, error);
-    }
-  },
-};
-
+  : {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+    };
 export const useAppStore = create<AppState & SLDActions>()(
   persist(
     (set, get) => ({
