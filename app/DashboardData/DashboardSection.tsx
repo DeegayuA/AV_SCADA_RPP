@@ -1,27 +1,33 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { DataPoint as DataPointConfig } from '@/config/dataPoints';
+import { DataPoint, DataPoint as DataPointConfig } from '@/config/dataPoints';
 import { ThreePhaseGroupInfo, NodeData } from './dashboardInterfaces';
 import DataPointCard from './DataPointCard'; // For individual points
 import ThreePhaseGroupCard from './ThreePhaseGroupCard'; // For 3-phase groups
 import { containerVariants } from '@/config/animationVariants'; // Needed for section variant
+import { UserRole } from '@/types/auth';
 
 type SectionItem = DataPointConfig | ThreePhaseGroupInfo;
 
 interface DashboardSectionProps {
     title: string;
-    gridCols: string; // Tailwind grid class like 'grid-cols-1 md:grid-cols-2'
-    items: SectionItem[]; // Can contain individual points or groups
+    gridCols: string;
+    items: (DataPoint | ThreePhaseGroupInfo)[];
     nodeValues: NodeData;
     isDisabled: boolean;
-    currentHoverEffect: any;
+    currentHoverEffect: object;
     sendDataToWebSocket: (nodeId: string, value: boolean | number | string) => void;
-     playNotificationSound: (type: 'success' | 'error' | 'warning' | 'info') => void;
+    playNotificationSound: (type: 'success' | 'error' | 'warning' | 'info') => void;
     lastToastTimestamps: React.MutableRefObject<Record<string, number>>;
+    onRemoveItem: (dataPointId: string) => void;
+    allPossibleDataPoints: DataPoint[];
+    isEditMode?: boolean;
+    currentUserRole?: UserRole;
+
 }
 
 const DashboardSection: React.FC<DashboardSectionProps> = React.memo(
-    ({ title, gridCols, items, nodeValues, isDisabled, currentHoverEffect, sendDataToWebSocket, playNotificationSound, lastToastTimestamps }) => {
+    ({ title, gridCols, items, nodeValues, isDisabled, currentHoverEffect, sendDataToWebSocket, playNotificationSound, lastToastTimestamps, onRemoveItem, isEditMode }) => {
 
         // Check if an item is a ThreePhaseGroupInfo
         const isThreePhaseGroup = (item: SectionItem): item is ThreePhaseGroupInfo => {
@@ -36,28 +42,29 @@ const DashboardSection: React.FC<DashboardSectionProps> = React.memo(
                 <motion.div className={`grid ${gridCols} gap-3 md:gap-4`} variants={containerVariants}> {/* Apply containerVariants here too for inner staggering */}
                     {items.map((item) => (
                         // Delegate rendering based on item type
-                        isThreePhaseGroup(item) ? (
-                            <ThreePhaseGroupCard
-                                key={item.groupKey} // Use groupKey as the key
-                                group={item}
-                                nodeValues={nodeValues}
-                                isDisabled={isDisabled}
-                                currentHoverEffect={currentHoverEffect}
-                                playNotificationSound={playNotificationSound}
-                                lastToastTimestamps={lastToastTimestamps}
-                            />
-                        ) : (
-                            <DataPointCard
-                                key={item.id} // Use point id as the key
-                                point={item}
-                                nodeValues={nodeValues}
-                                isDisabled={isDisabled}
-                                currentHoverEffect={currentHoverEffect}
-                                sendDataToWebSocket={sendDataToWebSocket}
-                                playNotificationSound={playNotificationSound}
-                                lastToastTimestamps={lastToastTimestamps}
-                            />
-                        )
+                        (isThreePhaseGroup(item) ? (<ThreePhaseGroupCard
+                            key={item.groupKey} // Use groupKey as the key
+                            group={item}
+                            nodeValues={nodeValues}
+                            isDisabled={isDisabled}
+                            currentHoverEffect={currentHoverEffect}
+                            sendDataToWebSocket={sendDataToWebSocket}
+                            playNotificationSound={playNotificationSound}
+                            lastToastTimestamps={lastToastTimestamps}
+                            isEditMode={isEditMode ?? false}
+                            onRemoveItem={onRemoveItem}
+                        />) : (<DataPointCard
+                            key={item.id} // Use point id as the key
+                            point={item}
+                            nodeValues={nodeValues}
+                            isDisabled={isDisabled}
+                            currentHoverEffect={currentHoverEffect}
+                            sendDataToWebSocket={sendDataToWebSocket}
+                            playNotificationSound={playNotificationSound}
+                            lastToastTimestamps={lastToastTimestamps}
+                            isEditMode={isEditMode ?? false} 
+                            onRemoveItem={onRemoveItem}
+                        />))
                     ))}
                 </motion.div>
             </motion.section>

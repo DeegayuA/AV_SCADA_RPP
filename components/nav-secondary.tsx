@@ -11,6 +11,8 @@ import {
 
 export function NavSecondary({
   items,
+  activeSection,
+  activeAccents,
   ...props
 }: {
   items: {
@@ -18,6 +20,8 @@ export function NavSecondary({
     url: string
     icon: LucideIcon
   }[]
+  activeSection: string
+  activeAccents: Record<string, string>
 } & React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
   return (
     <SidebarGroup {...props}>

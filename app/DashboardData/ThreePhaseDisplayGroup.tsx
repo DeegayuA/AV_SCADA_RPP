@@ -1,6 +1,5 @@
-'use client';
-
 // src/components/dashboard/ThreePhaseDisplayGroup.tsx
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,19 +11,22 @@ import {
 } from '@/components/ui/tooltip';
 import { ThreePhaseGroupInfo, NodeData } from './dashboardInterfaces';
 import { HelpCircle } from 'lucide-react'; // Default icon
-import ValueDisplayContent from './ValueDisplayContent';
+import ValueDisplayContent from './ValueDisplayContent'; // Ensure this path is correct
 
 interface ThreePhaseDisplayGroupProps {
     group: ThreePhaseGroupInfo;
     nodeValues: NodeData;
     isDisabled: boolean;
     currentHoverEffect: any;
-     playNotificationSound: (type: 'success' | 'error' | 'warning' | 'info') => void;
+    playNotificationSound: (type: 'success' | 'error' | 'warning' | 'info') => void;
     lastToastTimestamps: React.MutableRefObject<Record<string, number>>;
+    // Add missing props that ValueDisplayContent needs
+    sendDataToWebSocket: (nodeId: string, value: any) => void;
+    isEditMode: boolean;
 }
 
 const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo(
-    ({ group, nodeValues, isDisabled, currentHoverEffect, playNotificationSound, lastToastTimestamps }) => {
+    ({ group, nodeValues, isDisabled, currentHoverEffect, playNotificationSound, lastToastTimestamps, sendDataToWebSocket, isEditMode }) => {
         const RepresentativeIcon = group.icon || HelpCircle;
 
         return (
@@ -56,10 +58,14 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
                                                 <div key={`${group.groupKey}-${phase}`} className="text-center pt-1 min-h-[28px] flex items-center justify-center text-base md:text-lg">
                                                     {point ? (
                                                         <ValueDisplayContent
-                                                            value={nodeValues[point.nodeId]}
-                                                            config={point}
+                                                            // Corrected and added props:
+                                                            item={point} // Changed from config={point}
+                                                            nodeValues={nodeValues} // Added
+                                                            isDisabled={isDisabled} // Added
+                                                            sendDataToWebSocket={sendDataToWebSocket} // Added
                                                             playNotificationSound={playNotificationSound}
                                                             lastToastTimestamps={lastToastTimestamps}
+                                                            isEditMode={isEditMode} // Added
                                                         />
                                                     ) : (
                                                         <span className="text-gray-400 dark:text-gray-600">-</span>

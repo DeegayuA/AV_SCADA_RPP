@@ -33,6 +33,7 @@ const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContextProps = {
+  isCollapsed: any
   state: "expanded" | "collapsed"
   open: boolean
   setOpen: (open: boolean) => void
@@ -115,6 +116,7 @@ function SidebarProvider({
 
   const contextValue = React.useMemo<SidebarContextProps>(
     () => ({
+      isCollapsed: state === "collapsed",
       state,
       open,
       setOpen,

@@ -705,7 +705,7 @@ export async function GET(req: NextRequest) {
   const shouldRedirect = req.nextUrl.pathname === '/api/opcua' || req.nextUrl.pathname === '/api/opcua/'; // Check if accessing the API route directly via GET
   if (shouldRedirect) {
     // Redirect to the main dashboard page instead of showing "OPC UA Service Ready"
-    const dashboardUrl = new URL('/dashboard', origin); // Construct the absolute URL
+    const dashboardUrl = new URL('/control', origin); // Construct the absolute URL
     console.log(`Redirecting API GET request from ${req.url} to ${dashboardUrl.toString()}`);
     return NextResponse.redirect(dashboardUrl.toString(), { status: 302 });
   }

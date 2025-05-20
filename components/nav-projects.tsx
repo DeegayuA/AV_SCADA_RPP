@@ -27,12 +27,16 @@ import {
 
 export function NavProjects({
   projects,
+  activeSection,
+  activeAccents,
 }: {
   projects: {
     name: string
     url: string
     icon: LucideIcon
   }[]
+  activeSection: string
+  activeAccents: Record<string, string>
 }) {
   const { isMobile } = useSidebar()
 
