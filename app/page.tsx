@@ -1,71 +1,111 @@
+// app/dashboard/page.tsx
 'use client';
-
-import { motion } from 'framer-motion';
-import { ArrowRight, Sun } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { useEffect, useState } from 'react';
+import { useEffect, useState }  from 'react';
 import { useRouter } from 'next/navigation';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // CardContent is not used for the WelcomeExperience card anymore
+import { clearOnboardingData } from '@/lib/idb-store'; // For the reset button
+import { toast } from 'sonner';
+import WelcomeExperience from './WelcomeExperience';
 
-export default function Home() {
-  const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false); // Initialize isLoading state
+interface User {
+    email: string;
+    avatar?: string;
+    name?: string; // Optional name for personalization
+}
 
-  useEffect(() => {
-    const hasVisitedBefore = localStorage.getItem('hasVisitedBefore');
+export default function DashboardPage() {
+    const router = useRouter();
+    const [user, setUser] = useState<User | null>(null);
 
-    if (hasVisitedBefore) {
-      router.push('/dashboard'); // Change to your actual dashboard route
-    } else {
-      localStorage.setItem('hasVisitedBefore', 'true');
-      // Optionally, you can add a delay or other logic here before potentially redirecting
-      // For now, the user will see the landing page on their first visit.
-      // If you want to redirect new users as well, you can add router.push('/dashboard'); here.
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            setUser(JSON.parse(storedUser));
+        } else {
+            router.replace('/login');
+        }
+    }, [router]);
+
+    const handleLogout = () => {
+        localStorage.removeItem('user');
+        setUser(null);
+        router.push('/login');
+        toast.success("Logged out successfully.");
+    };
+
+    const handleResetApp = async () => {
+        if (window.confirm("Are you sure you want to reset all application data and go through onboarding again? This cannot be undone.")) {
+            await clearOnboardingData();
+            localStorage.removeItem('user');
+            toast.success("Application reset. Redirecting to onboarding...");
+            router.push('/onboarding?reset=true');
+        }
+    };
+
+    const handleExploreDashboard = () => {
+        // Example: Navigate to a specific part of the dashboard or just acknowledge
+        toast.info("Let's get started!", { description: "Check out your system status below."});
+        router.push('/control');
+        // You might scroll to a specific section or enable a tour, etc.
+        // For now, it can be a no-op if the welcome is just visual.
+    };
+
+    if (!user) {
+        return <div className="flex items-center justify-center min-h-screen">Loading user data...</div>;
     }
-  }, [router]); // Add router to the dependency array
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="max-w-2xl w-full"
-      >
-        <Card className="p-8 space-y-6">
-          <div className="flex items-center gap-3">
-            <Sun className="w-8 h-8 text-yellow-500" />
-            <h1 className="text-3xl font-bold text-foreground">AV Mini-Grid Control Panel & Monitor</h1>
-          </div>
-
-          <p className="text-muted-foreground text-lg">
-            Welcome to the Solar Mini-Grid Monitoring System. This dashboard enables both offline and online real-time monitoring and intelligent control of your AI-powered solar installation. Designed for ultra-low-latency data fetching (max 1000ms delay), it integrates seamlessly with PLCs like the Siemens S7-1214 via OPC UA, ensuring smart grid management and automation—regardless of connectivity.
+    <div className="container mx-auto p-4 md:p-8">
+      <header className="flex justify-between items-center mb-8">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <div className="flex items-center gap-4">
+            {user.avatar && <img src={user.avatar} alt="User Avatar" className="h-10 w-10 rounded-full" />}
+            <span>{user.email}</span>
+            <Button variant="outline" onClick={handleLogout}>Logout</Button>
+        </div>
+      </header>
+      
+      {/* UPDATED WELCOME SECTION */}
+      {/* The outer Card can be kept for consistent sectioning or removed if WelcomeExperience handles its own bg/padding */}
+      <Card className="overflow-hidden"> 
+        {/* CardHeader might not be needed if WelcomeExperience has its own title logic, or adjust as needed */}
+     
+        <CardHeader>
+          <CardTitle>Welcome Aboard!</CardTitle> 
+        </CardHeader>
+   
+        {/* CardContent is replaced by WelcomeExperience. The component manages its own padding. */}
+        <WelcomeExperience 
+          userName={user.name || user.email.split('@')[0]} // Pass user name for personalization
+          onGetStarted={handleExploreDashboard} 
+        />
+      </Card>
+      
+      {/* Other placeholder for actual dashboard content - THIS IS WHERE YOUR COMPLEX DASHBOARD (like UnifiedDashboardPage content) would go */}
+      <Card className="mt-8">
+        <CardHeader><CardTitle>System Overview</CardTitle></CardHeader>
+        <CardContent>
+          <p className="text-muted-foreground">
+            (Placeholder: Your main dashboard components like graphs, SLD, data cards would be rendered here, potentially the content from your `UnifiedDashboardPage` if this `DashboardPage` is just a wrapper.)
           </p>
+        </CardContent>
+      </Card>
 
-          <div className="space-y-4">
-            <h2 className="text-xl font-semibold">Key Features:</h2>
-            <ul className="list-disc list-inside space-y-2 text-muted-foreground">
-              <li>Real-time data fetching: typically &lt;2s latency, occasional &gt;2s.</li>
-              <li>Not only offline first and also online dual-mode support for robust reliability</li>
-              <li>Intelligent control queue with auto-retry and failover mechanisms</li>
-              <li>All time connectivity indicators for both PLC and WebSocket</li>
-              <li><s>AI-powered energy optimization and load balancing</s></li>
-              <li>Easy integration with new systems by just editing one file (DataPoints.ts)</li>
-              <li>Direct Data fetching from PLC via NodeS7 & OPC UA</li>
-              <li>Modular architecture for future extensibility</li>
-              <li>Dark and light mode support for better user accessibility</li>
-            </ul>
-          </div>
 
-          <Link href="/dashboard" className="block">
-            <Button className="w-full group" size="lg">
-              Go to Dashboard
-              <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </Button>
-          </Link>
-        </Card>
-      </motion.div>
+      <Card className="mt-8">
+          <CardHeader>
+              <CardTitle>Application Settings</CardTitle>
+          </CardHeader>
+          <CardContent>
+              <p className="text-muted-foreground mb-4">
+                  This will clear all stored configuration (plant details, data points) and your session, then take you back to the initial setup wizard.
+              </p>
+              <Button variant="destructive" onClick={handleResetApp}>
+                  Reset Application & Start Onboarding Over
+              </Button>
+          </CardContent>
+      </Card>
     </div>
   );
 }

@@ -8,29 +8,35 @@ import SoundToggle from './SoundToggle';
 import { itemVariants } from '@/config/animationVariants'; // Assuming variants are moved here
 import { TooltipTrigger } from '@radix-ui/react-tooltip';
 import { Tooltip, TooltipContent, TooltipProvider } from '@/components/ui/tooltip';
+import { PLANT_NAME } from '@/config/constants';
+import { usePathname } from 'next/navigation';
 
 interface DashboardHeaderProps {
-    plcStatus: 'online' | 'offline' | 'disconnected';
+    plcStatus: "online" | "offline" | "disconnected";
     isConnected: boolean;
     connectWebSocket: () => void;
     soundEnabled: boolean;
-    setSoundEnabled: (enabled: boolean) => void;
-    currentTime: string; // Include clock time for display
-    delay: number; // Include lag for display
-    version: string; // Include version for display
+    setSoundEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+    currentTime: string;
+    delay: number;
+    version: string;
+    onOpenConfigurator: () => void;
+    isEditMode: boolean;
 }
 
 const DashboardHeader: React.FC<DashboardHeaderProps> = React.memo(
     ({ plcStatus, isConnected, connectWebSocket, soundEnabled, setSoundEnabled, currentTime, delay, version }) => {
+        const pathname = usePathname();
+        const header = pathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '';
         return (
             <><motion.div
-                className="flex flex-col sm:flex-row justify-between items-center mb-6 md:mb-8 gap-4"
+                className="flex flex-col sm:flex-row justify-between items-center mb-2 md:mb-4 gap-4"
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
             >
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left">
-                    Mini-Grid Dashboard
+                   {PLANT_NAME} {header}
                 </h1>
                 <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center"> {/* Removed motion.div here as itemVariants are applied to children */}
                     <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
@@ -39,7 +45,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = React.memo(
                     <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
                 </div>
             </motion.div>
-                <motion.div className="text-xs text-muted-foreground mb-6 flex flex-col sm:flex-row justify-between items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }}>
+                <motion.div className="text-xs text-muted-foreground mb-2 flex flex-col sm:flex-row justify-between items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2, duration: 0.5 }}>
                     <div className="flex items-center gap-2">
                         {/* Clock Display */}
                         {/* Assuming Clock icon is available or imported if needed */}

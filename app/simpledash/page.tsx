@@ -143,4 +143,3 @@ export default Dashboard;
 function setData(arg0: (prevData: any) => any) {
   throw new Error("Function not implemented.");
 }
-

@@ -35,7 +35,7 @@ const SoundToggle: React.FC<SoundToggleProps> = React.memo(({ soundEnabled, setS
                     >
                         <motion.button
                             className={`transition-colors rounded-full ${
-                                soundEnabled
+                                !soundEnabled
                                     ? 'text-red-700 hover:text-red-800 dark:text-red-300 dark:hover:text-red-200'
                                     : 'text-green-700 hover:text-green-800 dark:text-green-300 dark:hover:text-green-200'
                             }`}

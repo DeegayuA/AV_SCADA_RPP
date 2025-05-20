@@ -239,3 +239,138 @@
 .animate-pulse-glow {
   animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+@layer utilities {
+  @keyframes dashdraw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+}
+
+.animated-flow {
+  stroke-dasharray: 5;
+  stroke-dashoffset: 1000;
+  animation: dashdraw 30s linear infinite;
+}
+
+.animated-flow-reverse {
+    stroke-dasharray: 5;
+    stroke-dashoffset: -1000; 
+    animation: dashdraw 30s linear infinite reverse; 
+}
+
+@keyframes faultPulse {
+  0% { opacity: 1; stroke-width: inherit; } 
+  50% { opacity: 0.6; stroke-width: calc(inherit + 1px); } 
+  100% { opacity: 1; stroke-width: inherit; }
+}
+/* Default React Flow MiniMap already has max-width: 200px, max-height: 150px */
+/* These styles will apply to the MiniMap container on small screens */
+
+@media (max-width: 768px) { /* Adjust breakpoint as needed, e.g., 600px for very small */
+  .react-flow__minimap {
+    /* Make the minimap container smaller */
+    max-width: 120px !important; /* Override default if necessary */
+    max-height: 80px !important; /* Override default if necessary */
+
+    /* Adjust shadow for smaller size */
+    --xy-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+
+    /* Adjust border radius for a tighter look */
+    --xy-border-radius: 0.125rem !important; /* 2px if base font-size is 16px */
+  }
+
+  /* Optionally, adjust padding from screen edges for different positions */
+  /* Example for BottomRight position (default for this component) */
+  .react-flow__minimap.bottom.right {
+    bottom: var(--xy-minimap-position-bottom, 10px) !important; /* Default is 20px */
+    right: var(--xy-minimap-position-right, 10px) !important;   /* Default is 20px */
+  }
+
+  /* Example for BottomLeft position */
+  .react-flow__minimap.bottom.left {
+    bottom: var(--xy-minimap-position-bottom, 10px) !important;
+    left: var(--xy-minimap-position-left, 10px) !important;
+  }
+  /* Add similar overrides for .top.left and .top.right if you use those positions */
+}
+
+
+/* In your global CSS */
+.shadow-text-lg { text-shadow: 0px 2px 4px rgba(0,0,0,0.5); }
+.shadow-text-md { text-shadow: 0px 1px 3px rgba(0,0,0,0.4); }
+
+
+/* In your global CSS file */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--border)); /* Or a subtle color */
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--ring)); /* Or a slightly darker/accent color */
+}
+
+
+/* Suggested for your global CSS file (e.g., globals.css or app.css) */
+.sld-loader-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  /* Use theme-aware text color if possible, or a neutral one */
+  color: #888; /* Fallback color */
+  /* Consider text-muted-foreground Tailwind class if applicable and working */
+}
+
+.sld-loader-svg {
+  width: 60px;
+  height: 60px;
+  animation: sld-rotate 2s linear infinite;
+  margin-bottom: 16px;
+}
+
+.sld-loader-path {
+  stroke: currentColor; /* Uses the color from .sld-loader-container */
+  stroke-linecap: round;
+  animation: sld-dash 1.5s ease-in-out infinite;
+}
+
+@keyframes sld-rotate {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sld-dash {
+  0% {
+    stroke-dasharray: 1, 150;
+    stroke-dashoffset: 0;
+  }
+  50% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -35;
+  }
+  100% {
+    stroke-dasharray: 90, 150;
+    stroke-dashoffset: -124;
+  }
+}
+.sld-handle-style {
+  @apply !opacity-0 group-hover:!opacity-100 transition-opacity duration-150 ease-in-out;
+  /* Default colors can be set here, but specific node handles override them */
+  /* e.g. @apply !bg-slate-300 dark:!bg-slate-600 !border-slate-400 dark:!border-slate-500; */
+}
+.reactflow-node.selected .sld-handle-style,
+.reactflow-node:focus .sld-handle-style, /* if you make nodes focusable */
+.reactflow-node:focus-within .sld-handle-style { /* if elements inside node are focused */
+    @apply !opacity-80; /* Make handles more visible on selected/focused node */
+}
