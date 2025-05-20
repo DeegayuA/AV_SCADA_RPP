@@ -228,9 +228,9 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                       return (
                       <motion.li
                         key={elementKey}
-                        ref={el => elementRefs.current[elementKey] = el} // Assign ref
+                        ref={el => { elementRefs.current[elementKey] = el; }} // Assign ref
                         draggable
-                        onDragStart={(e) => onDragStart(e, component)}
+                        onDragStart={(e: React.DragEvent<HTMLLIElement>) => onDragStart(e, component)}
                         className={`
                           group/palette-item cursor-grab p-2.5
                           bg-card dark:bg-neutral-700/20
@@ -253,7 +253,7 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                              ${searchTerm === component.type ? "text-primary-darker" : "text-primary dark:text-sky-400"} 
                              group-hover/palette-item:text-primary-darker transition-colors duration-150
                            `}>
-                             {React.cloneElement(component.icon as React.ReactElement, { size: 18 })}
+                             {React.cloneElement(component.icon as React.ReactElement<{size?: number}>, { size: 18 })}
                            </span>
                          }
                          <span className="block leading-tight group-hover/palette-item:text-foreground dark:group-hover/palette-item:text-neutral-100 transition-colors duration-150">
