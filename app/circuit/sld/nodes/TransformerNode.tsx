@@ -13,7 +13,7 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = ({ data, selec
   }));
 
   const isNodeEditable = useMemo(() =>
-    isEditMode && (currentUser?.role === 'admin' || currentUser?.role === 'editor'),
+    isEditMode && (currentUser?.role === 'admin'),
     [isEditMode, currentUser]
   );
 

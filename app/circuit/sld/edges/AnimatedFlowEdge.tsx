@@ -32,7 +32,7 @@ export default function AnimatedFlowEdge({
   id, sourceX, sourceY, targetX, targetY,
   sourcePosition, targetPosition,
   style = {}, markerEnd, data, selected,
-}: EdgeProps<CustomFlowEdgeData & { status?: string }>) { // Allow optional status prop if needed directly, though usually in data
+}: EdgeProps<CustomFlowEdgeData & { status?: string; currentLoad?: number }>) { // Allow optional status and currentLoad props
   
   const realtimeData = useAppStore((state) => state.realtimeData);
 

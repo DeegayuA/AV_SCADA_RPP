@@ -1,85 +1,89 @@
 // components/sld/ui/SLDElementPalette.tsx
-import React from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { PaletteCategory, PaletteComponent, SLDElementType, TextLabelNodeData, GenericDeviceNodeData, ContactorNodeData } from '@/types/sld';
+import {
+    PaletteCategory,
+    PaletteComponent,
+    SLDElementType,
+    TextLabelNodeData,
+    ContactorNodeData,
+    FuseNodeData,
+    IsolatorNodeData,
+    JunctionBoxNodeData,
+} from '@/types/sld';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { motion } from 'framer-motion'; // For item hover effect
-import { 
-    BatteryCharging, Rows, Cable, CircuitBoard, PlugZap, Zap, DatabaseZap, Thermometer, 
-    SlidersHorizontal, FileText, TextCursorInput, Cpu, ToyBrick, Workflow, GitBranchPlus, BoxSelect
-} from 'lucide-react'; // Added some more icons
+import { motion } from 'framer-motion';
+import {
+    BatteryCharging, Rows3, Cable, CircuitBoard, PlugZap, Zap, DatabaseZap, Thermometer,
+    SlidersHorizontal, FileText, TextCursorInput, Cpu, ToyBrick, Workflow, GitFork, BoxSelect,
+    Unplug, ShieldAlert, ListFilter, SearchCode // Added more icons
+} from 'lucide-react';
 
-// --- Define Component Categories & Default Data (Improved) ---
-// This structure helps define sensible defaults directly with the palette items.
-// Ensure these SLDElementType values align with your types/sld.ts enum and SLDWidget.tsx nodeTypes
+// Adjust the import path if SearchableSelect is not directly in ./
+import { SearchableSelect, ComboboxOption } from './SearchableSelect';
+
+
 export const categorizedComponents: PaletteCategory[] = [
+  // ... (your categorizedComponents definition remains the same)
   {
     name: 'Sources & Storage',
     components: [
-      { type: SLDElementType.Panel, label: 'PV Array', icon: <Rows size={16}/>, 
+      { type: SLDElementType.Panel, label: 'PV Array', icon: <Rows3 size={16}/>,
         defaultData: { label: 'PV Array', status: 'producing' } },
-      { type: SLDElementType.Battery, label: 'Battery', icon: <BatteryCharging size={16}/>, 
+      { type: SLDElementType.Battery, label: 'Battery', icon: <BatteryCharging size={16}/>,
         defaultData: { label: 'Battery Bank', status: 'nominal', config: { capacityAh: 100, voltageNominalV: 48} } },
-      { type: SLDElementType.Grid, label: 'Grid Source', icon: <Cable size={16}/>, 
+      { type: SLDElementType.Grid, label: 'Grid Source', icon: <Cable size={16}/>,
         defaultData: { label: 'Utility Grid', status: 'connected', config: {voltageLevel: "11kV"} } },
-      { type: SLDElementType.Generator, label: 'Generator', icon: <Zap size={16}/>, 
+      { type: SLDElementType.Generator, label: 'Generator', icon: <Zap size={16}/>,
         defaultData: { label: 'Backup Gen', status: 'offline', config: {fuelType: "Diesel", ratingKVA: "150"} } },
     ],
   },
   {
     name: 'Conversion & Switching',
     components: [
-      { type: SLDElementType.Inverter, label: 'Inverter', icon: <CircuitBoard size={16}/>, 
+      { type: SLDElementType.Inverter, label: 'Inverter', icon: <CircuitBoard size={16}/>,
         defaultData: { label: 'Inverter', status: 'nominal', config: { ratedPower: 100} } },
-      { type: SLDElementType.Transformer, label: 'Transformer', icon: <GitBranchPlus size={16}/>, // More fitting icon for XFMR
+      { type: SLDElementType.Transformer, label: 'Transformer', icon: <GitFork size={16}/>,
         defaultData: { label: 'Transformer', status: 'nominal', config: {ratingMVA: "1", primaryVoltage: "11kV", secondaryVoltage: "0.4kV" } } },
-      { type: SLDElementType.Breaker, label: 'Breaker', icon: <PlugZap size={16}/>, 
+      { type: SLDElementType.Breaker, label: 'Breaker', icon: <PlugZap size={16}/>,
         defaultData: { label: 'CB', status: 'closed', config: { type: "MCCB" } } },
-      { type: SLDElementType.Contactor, label: 'Contactor', icon: <Zap size={16}/>, 
+      { type: SLDElementType.Contactor, label: 'Contactor', icon: <Zap size={16} className="opacity-80"/>,
         defaultData: { label: 'K1', status: 'open', config: { normallyOpen: true } } as Partial<ContactorNodeData> },
-      { type: SLDElementType.Fuse, label: 'Fuse', icon: <Zap size={16} className="rotate-90 opacity-70"/>, // Simple Zap variation for Fuse
-        defaultData: { label: 'F1', status: 'nominal' } },
-      { type: SLDElementType.Isolator, label: 'Isolator', icon: <PlugZap size={16} className="opacity-70"/>, // Similar to Breaker icon but can differ in node
-        defaultData: { label: 'QS1', status: 'open' } },
+      { type: SLDElementType.Fuse, label: 'Fuse', icon: <ShieldAlert size={16}/>,
+        defaultData: { label: 'F1', status: 'nominal', config: {ratingAmps: 10} } as Partial<FuseNodeData> },
+      { type: SLDElementType.Isolator, label: 'Isolator', icon: <Unplug size={16}/>,
+        defaultData: { label: 'QS1', status: 'open', config: {poles: 3} } as Partial<IsolatorNodeData> },
     ],
   },
   {
     name: 'Distribution & Loads',
     components: [
-      { type: SLDElementType.Busbar, label: 'Busbar', icon: <Workflow size={16}/>, 
+      { type: SLDElementType.Busbar, label: 'Busbar', icon: <Workflow size={16}/>,
         defaultData: { label: 'Main Bus', status: 'energized', config: { width: 120, height: 10 } } },
-      { type: SLDElementType.Meter, label: 'Meter', icon: <DatabaseZap size={16}/>, 
+      { type: SLDElementType.Meter, label: 'Meter', icon: <DatabaseZap size={16}/>,
         defaultData: { label: 'Energy Meter', status: 'reading' } },
-      { type: SLDElementType.Load, label: 'Generic Load', icon: <SlidersHorizontal size={16}/>, 
+      { type: SLDElementType.Load, label: 'Generic Load', icon: <SlidersHorizontal size={16}/>,
         defaultData: { label: 'Load Center', status: 'active' } },
-      { type: SLDElementType.Motor, label: 'Motor Load', icon: <Zap size={16} className="animate-spin animation-duration-2000 opacity-80"/>, 
-        defaultData: { label: 'M1', status: 'running' } },
-      { type: SLDElementType.JunctionBox, label: 'Junction Box', icon: <ToyBrick size={16}/>, 
-        defaultData: { label: 'JB-1', status: 'nominal' } as Partial<GenericDeviceNodeData>},
+      { type: SLDElementType.JunctionBox, label: 'Junction Box', icon: <ToyBrick size={16}/>,
+        defaultData: { label: 'JB-1', status: 'nominal', config: {numberOfStrings: 4} } as Partial<JunctionBoxNodeData>},
     ],
   },
   {
     name: 'Measurement & Control',
     components: [
-      { type: SLDElementType.Sensor, label: 'Temp Sensor', icon: <Thermometer size={16}/>, 
-        defaultData: { label: 'Ambient Temp', status: 'nominal', config: { sensorType: 'Temperature'} } },
-      { type: SLDElementType.CT, label: 'Current TX', icon: <BoxSelect size={16}/>, // Generic box representing CT/PT
-        defaultData: { label: 'CT-1', status: 'nominal'} },
-      { type: SLDElementType.PT, label: 'Potential TX', icon: <BoxSelect size={16} className="opacity-70"/>, 
-        defaultData: { label: 'PT-1', status: 'nominal'} },
-      { type: SLDElementType.PLC, label: 'PLC', icon: <Cpu size={16}/>, 
+      { type: SLDElementType.Sensor, label: 'Sensor', icon: <Thermometer size={16}/>,
+        defaultData: { label: 'Sensor', status: 'reading', config: { sensorType: 'Temperature'} } },
+      { type: SLDElementType.PLC, label: 'PLC', icon: <Cpu size={16}/>,
         defaultData: { label: 'Main PLC', status: 'running' } },
-      { type: SLDElementType.Relay, label: 'Control Relay', icon: <Zap size={16} className="opacity-60" />, 
-        defaultData: { label: 'KCR1', status: 'nominal', config: { deviceType: 'ControlRelay' } } as Partial<GenericDeviceNodeData>},
     ],
    },
   {
     name: 'Annotations',
     components: [
-      { type: SLDElementType.DataLabel, label: 'Data Display', icon: <FileText size={16}/>, 
+      { type: SLDElementType.DataLabel, label: 'Data Display', icon: <FileText size={16}/>,
         defaultData: { label: 'Value:', status: 'nominal' } },
-      { type: SLDElementType.TextLabel, label: 'Text Box', icon: <TextCursorInput size={16}/>, 
+      { type: SLDElementType.TextLabel, label: 'Text Box', icon: <TextCursorInput size={16}/>,
         defaultData: { label: 'Info Label', text: 'Your text here', status: 'nominal', styleConfig: { fontSize: '10px', padding: '3px 5px', color: 'var(--muted-foreground)' } } as Partial<TextLabelNodeData> },
     ],
   },
@@ -88,28 +92,30 @@ export const categorizedComponents: PaletteCategory[] = [
 interface SLDElementPaletteProps {}
 
 const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
+  const [searchTerm, setSearchTerm] = useState<string>(""); // For the SearchableSelect (represents selected element type)
+  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(categorizedComponents.map(c => c.name));
+  const elementRefs = useRef<Record<string, HTMLLIElement | null>>({});
+
 
   const onDragStart = (event: React.DragEvent, component: PaletteComponent) => {
-    const elementTypeString = component.type as string; 
-
-    // Ensure elementType is part of defaultData structure for consistency
+    // ... (onDragStart logic remains the same)
+    const elementTypeString = component.type as string;
     const nodeInitialData = {
-      elementType: component.type, // This is crucial!
-      label: component.label,      // Default label from palette
-      status: 'nominal',           // Sensible default status
-      ...(component.defaultData || {}), // Spread specific defaults, overwriting label/status if provided
+      elementType: component.type,
+      label: component.defaultData?.label || component.label,
+      status: component.defaultData?.status || 'nominal',
+      ...(component.defaultData || {}),
     };
-    
-    // Specific handling for TextLabel's `text` and `styleConfig` if not in defaultData
-    if (component.type === SLDElementType.TextLabel && !nodeInitialData.text) {
-      (nodeInitialData as TextLabelNodeData).text = 'New Text Label';
+
+    if (component.type === SLDElementType.TextLabel && !(nodeInitialData as TextLabelNodeData).text) {
+      (nodeInitialData as TextLabelNodeData).text = 'New Text';
     }
-    if (component.type === SLDElementType.TextLabel && !nodeInitialData.styleConfig) {
+    if (component.type === SLDElementType.TextLabel && !(nodeInitialData as TextLabelNodeData).styleConfig) {
       (nodeInitialData as TextLabelNodeData).styleConfig = { fontSize: '12px', color: 'var(--foreground)', padding: '4px 6px' };
     }
 
     if (process.env.NODE_ENV === 'development') {
-        console.log(`SLDElementPalette onDragStart - Type: ${elementTypeString}, Data: ${JSON.stringify(nodeInitialData)}`);
+        console.log(`SLDElementPalette onDragStart - Type: ${elementTypeString}, Initial Node Data: ${JSON.stringify(nodeInitialData)}`);
     }
 
     event.dataTransfer.setData('application/reactflow-palette-item', elementTypeString);
@@ -117,48 +123,136 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  // Prepare options for the SearchableSelect - now individual components
+  const allComponentOptions: ComboboxOption[] = useMemo(() => {
+    const options: ComboboxOption[] = [];
+    categorizedComponents.forEach(category => {
+      category.components.forEach(component => {
+        options.push({
+          // Use a unique value, e.g., categoryName + componentType, or just componentType if globally unique
+          value: component.type, // SLDElementType should be unique
+          label: `${component.label} (${category.name})`, // Show label and category for context
+          description: category.name, // Store category name for finding it later
+        });
+      });
+    });
+    return [{ value: "", label: "Search all components..." }, ...options];
+  }, []); // This depends only on categorizedComponents, so runs once
+
+  // Handle selection from SearchableSelect
+  const handleElementSelect = (selectedElementType: SLDElementType | string) => {
+    setSearchTerm(selectedElementType);
+
+    if (selectedElementType) {
+      // Find the category of the selected element
+      let categoryNameOfSelectedElement: string | undefined;
+      for (const category of categorizedComponents) {
+        if (category.components.some(comp => comp.type === selectedElementType)) {
+          categoryNameOfSelectedElement = category.name;
+          break;
+        }
+      }
+
+      if (categoryNameOfSelectedElement) {
+        setOpenAccordionItems(prev => {
+          // Open the category if not already open, keep others as they are
+          // or just open this one and close others if preferred.
+          // For simplicity, let's ensure only this one is open.
+          return [categoryNameOfSelectedElement!];
+        });
+
+        // Scroll to the element (requires refs and useEffect)
+        // This will run after the component re-renders and accordion potentially opens
+        setTimeout(() => {
+          const elementKey = `${categoryNameOfSelectedElement}-${selectedElementType}`;
+          const elementNode = elementRefs.current[elementKey];
+          elementNode?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+           // Add a temporary highlight
+           if(elementNode){
+            elementNode.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-300');
+            setTimeout(() => {
+                elementNode.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+            }, 2000);
+           }
+        }, 100); // Timeout allows accordion to open
+
+
+      }
+    } else {
+      // If "Search all components..." is re-selected, open all categories
+      setOpenAccordionItems(categorizedComponents.map(c => c.name));
+    }
+  };
+
+
   return (
     <Card className="h-full flex flex-col border-r border-border bg-background shadow-lg">
-      <CardHeader className="p-3 border-b border-border">
-        <CardTitle className="text-sm font-semibold text-center text-foreground">
-          SLD Components
+      <CardHeader className="p-3 border-b border-border space-y-2">
+        <CardTitle className="text-sm font-semibold text-center text-foreground flex items-center justify-center gap-2">
+          <SearchCode size={16} />
+          <span>SLD Components</span>
         </CardTitle>
+        <SearchableSelect
+            options={allComponentOptions}
+            value={searchTerm}
+            onChange={handleElementSelect}
+            placeholder="Find component..."
+            searchPlaceholder="Type to search..."
+            className="w-full text-xs"
+            popoverContentClassName="text-xs"
+        />
       </CardHeader>
       <ScrollArea className="flex-grow" type="auto">
         <CardContent className="p-1.5">
-          <Accordion type="multiple" defaultValue={categorizedComponents.map(c => c.name)} className="w-full">
+          <Accordion
+            type="multiple"
+            value={openAccordionItems}
+            onValueChange={setOpenAccordionItems} // Allow user to manually open/close
+            className="w-full"
+          >
             {categorizedComponents.map((category) => (
               <AccordionItem value={category.name} key={category.name} className="border-none mb-1.5 last:mb-0">
-                <AccordionTrigger 
+                <AccordionTrigger
                   className="text-xs px-2.5 py-2 hover:no-underline bg-muted/60 dark:bg-neutral-700/40 hover:bg-muted dark:hover:bg-neutral-700/60 rounded-md font-medium text-foreground/90 transition-colors duration-150"
                 >
-                  {category.name}
+                   <div className="flex items-center gap-2">
+                     {/* Could show a different icon if this category contains the searchTerm element */}
+                     <ListFilter size={12} className={openAccordionItems.includes(category.name) ? "text-primary" : "text-muted-foreground"}/>
+                     <span>{category.name}</span>
+                   </div>
                 </AccordionTrigger>
                 <AccordionContent className="p-1.5 pt-2">
                   <ul className="grid grid-cols-2 gap-2">
-                    {category.components.map((component) => (
+                    {category.components.map((component) => {
+                      const elementKey = `${category.name}-${component.type}`;
+                      return (
                       <motion.li
-                        key={`${category.name}-${component.type}-${component.label}`}
+                        key={elementKey}
+                        ref={el => elementRefs.current[elementKey] = el} // Assign ref
                         draggable
                         onDragStart={(e) => onDragStart(e, component)}
-                        className="
-                          group/palette-item cursor-grab p-2.5 
-                          bg-card dark:bg-neutral-700/20 
+                        className={`
+                          group/palette-item cursor-grab p-2.5
+                          bg-card dark:bg-neutral-700/20
                           shadow-sm hover:shadow-md dark:hover:shadow-neutral-900/50
-                          rounded-md 
+                          rounded-md
                           border border-border dark:border-neutral-700/50
                           hover:border-primary/70 dark:hover:border-primary/70
                           text-center text-[11px] font-medium text-foreground/80 dark:text-neutral-300
                           flex flex-col items-center justify-center gap-1.5 min-h-[60px]
                           transition-all duration-200 ease-out
-                        "
+                          ${searchTerm === component.type ? 'ring-2 ring-primary ring-offset-1' : ''} // Highlight if selected
+                        `}
                         title={`Drag to add ${component.label}`}
                         variants={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.98 } }}
                         whileHover="hover"
                         whileTap="tap"
                       >
-                         {component.icon && 
-                           <span className="text-primary dark:text-sky-400 group-hover/palette-item:text-primary-darker transition-colors duration-150">
+                         {component.icon &&
+                           <span className={`
+                             ${searchTerm === component.type ? "text-primary-darker" : "text-primary dark:text-sky-400"} 
+                             group-hover/palette-item:text-primary-darker transition-colors duration-150
+                           `}>
                              {React.cloneElement(component.icon as React.ReactElement, { size: 18 })}
                            </span>
                          }
@@ -166,7 +260,8 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                            {component.label}
                          </span>
                       </motion.li>
-                    ))}
+                    );
+                    })}
                   </ul>
                 </AccordionContent>
               </AccordionItem>

@@ -566,12 +566,7 @@ const UnifiedDashboardPage: React.FC = () => {
                 <SLDWidget
                   layoutId={sldLayoutId}
                   isEditMode={sldSpecificEditMode}
-                  // The SLDWidget internal dropdown for layout switching is only enabled 
-                  // if `onLayoutIdChange` is passed AND it is in edit mode.
-                  // However, since we now have an explicit config button above,
-                  // we'll let *that* manage changing `sldLayoutId` and keep the SLDWidget simpler
-                  // by not passing `onLayoutIdChange`. It will still reflect `isEditMode`.
-                  onLayoutIdChange={sldSpecificEditMode ? setSldLayoutId : undefined} 
+
                 />
               </div>
             </CardContent>

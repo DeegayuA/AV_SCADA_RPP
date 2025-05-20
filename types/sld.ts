@@ -1,45 +1,44 @@
-// types/sld.ts
 import type { Node, Edge } from 'reactflow';
 import type { LucideIcon } from 'lucide-react';
 import { UserRole } from './auth'; // Assuming this path and type are correct
 
 export interface DataPoint {
-  label: string;        // User-friendly display label for UI lists, configs etc.
-  id: string;           // Unique kebab-case identifier (e.g., 'inverter-1-power-output')
-  name: string;         // Human-readable name (e.g., 'Inverter 1 Power Output')
-  nodeId: string;       // OPC UA Node ID or other system identifier
+  label: string;
+  id: string;
+  name: string;
+  nodeId: string;
   dataType:
   | 'Boolean' | 'Float' | 'Double' | 'Int16' | 'Int32' | 'UInt16' | 'UInt32'
   | 'String' | 'DateTime' | 'ByteString' | 'Guid' | 'Byte' | 'SByte'
-  | 'Int64' | 'UInt64' | 'StatusCode' | 'LocalizedText'; // Added common OPC types
-  uiType?: 'display' | 'button' | 'switch' | 'gauge' | 'input'; // UI rendering hint
-  icon?: LucideIcon | React.FC<React.SVGProps<SVGSVGElement>>; // Allow functional components for icons
-  unit?: string;         // Physical unit (V, A, W, kWh, %, Hz, °C, etc.)
-  min?: number;          // For validation, gauges, inputs
-  max?: number;          // For validation, gauges, inputs
-  description?: string;  // Tooltip or additional info
-  category?: string;     // Grouping (e.g., 'Battery', 'Grid', 'Inverter', 'Control')
-  factor?: number;       // Multiplier for raw value display (e.g., 0.001 for kW from W)
-  precision?: number;    // Default number of decimal places for display
-  isWritable?: boolean;  // Can this data point be written back to the source?
-  enumSet?: Record<number | string, string>; // For Int types that represent an enumeration
+  | 'Int64' | 'UInt64' | 'StatusCode' | 'LocalizedText';
+  uiType?: 'display' | 'button' | 'switch' | 'gauge' | 'input';
+  icon?: LucideIcon | React.FC<React.SVGProps<SVGSVGElement>>;
+  unit?: string;
+  min?: number;
+  max?: number;
+  description?: string;
+  category?: string;
+  factor?: number;
+  precision?: number;
+  isWritable?: boolean;
+  enumSet?: Record<number | string, string>;
 }
 
-export type RealTimeData = Record<string, any>; // Keyed by DataPoint.id, value is the actual data
+export type RealTimeData = Record<string, any>;
 
 export interface DataPointLink {
   dataPointId: string;
-  targetProperty: string; 
+  targetProperty: string;
   valueMapping?: {
-    type?: 'exact' | 'range' | 'threshold' | 'boolean' | string; 
+    type?: 'exact' | 'range' | 'threshold' | 'boolean' | string;
     mapping: Array<{
-      match?: any;       
-      min?: number;       
-      max?: number;       
-      threshold?: number;  
-      value: any;          
+      match?: any;
+      min?: number;
+      max?: number;
+      threshold?: number;
+      value: any;
     }>;
-    defaultValue?: any;   
+    defaultValue?: any;
   };
   format?: {
     type: 'number' | 'boolean' | 'dateTime' | 'string';
@@ -48,80 +47,80 @@ export interface DataPointLink {
     suffix?: string;
     trueLabel?: string;
     falseLabel?: string;
-    dateTimeFormat?: string; 
+    dateTimeFormat?: string;
   };
 }
 
 // --- Base Node Data (Common to all custom nodes) ---
 export interface BaseNodeData {
-  label: string;                   
-  elementType: SLDElementType;     
-  status?: 'nominal' | 'warning' | 'alarm' | 'offline' | 'producing' | 'running' | 'reading' | 'connected' | 'closed' | 'open' | 'active' | 'charging' | 'discharging' | string; 
-  config?: Record<string, any>;     
-  dataPointLinks?: DataPointLink[]; 
-  isDrillable?: boolean;            
-  subLayoutId?: string;             
-  notes?: string; // Optional notes field for any node
-  assetId?: string; // Optional asset identifier
+  label: string;
+  elementType: SLDElementType;
+  status?: 'nominal' | 'warning' | 'alarm' | 'offline' | 'producing' | 'running' | 'reading' | 'connected' | 'closed' | 'open' | 'active' | 'charging' | 'discharging' | string;
+  config?: Record<string, any>;
+  dataPointLinks?: DataPointLink[];
+  isDrillable?: boolean;
+  subLayoutId?: string;
+  notes?: string;
+  assetId?: string;
 }
 
 // --- Text Node Specific Styling ---
 export interface TextNodeStyleConfig {
-  fontSize?: string; 
-  color?: string; 
+  fontSize?: string;
+  color?: string;
   fontWeight?: 'normal' | 'bold' | 'lighter' | 'bolder' | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | string;
   fontStyle?: 'normal' | 'italic';
   textAlign?: 'left' | 'center' | 'right' | 'justify';
-  backgroundColor?: string; 
+  backgroundColor?: string;
   padding?: string;
   fontFamily?: string;
+  borderRadius?: string;
 }
 
 // --- Specific Node Data Types (Extending BaseNodeData) ---
-export interface TextLabelNodeData extends BaseNodeData {
-  elementType: SLDElementType.TextLabel;
-  text?: string;                       
-  styleConfig?: TextNodeStyleConfig;   
-}
-
 export interface TextLabelNodeData extends BaseNodeData {
   elementType: SLDElementType.TextLabel;
   text?: string;
   styleConfig?: TextNodeStyleConfig;
 }
 
+export interface DataLabelNodeData extends BaseNodeData {
+  elementType: SLDElementType.DataLabel;
+  styleConfig?: TextNodeStyleConfig;
+}
+
 export interface InverterNodeData extends BaseNodeData {
   elementType: SLDElementType.Inverter;
-  config?: BaseNodeData['config'] & { 
+  config?: BaseNodeData['config'] & {
     ratedPower?: number; // kW
     efficiency?: number; // %
   };
 }
-export interface PanelNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Panel; 
+export interface PanelNodeData extends BaseNodeData {
+    elementType: SLDElementType.Panel;
     config?: BaseNodeData['config'] & {
         technology?: 'Mono-Si' | 'Poly-Si' | 'Thin-film';
         powerRatingWp?: number; // Watts-peak
     };
 }
-export interface BreakerNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Breaker; 
+export interface BreakerNodeData extends BaseNodeData {
+    elementType: SLDElementType.Breaker;
     config?: BaseNodeData['config'] & {
         type?: 'MCB' | 'MCCB' | 'ACB' | 'VCB' | 'SF6' | string; // Breaker type
         tripRatingAmps?: number;
         interruptingCapacitykA?: number;
-        normallyOpen?: boolean; // Typically breakers are designed to be closed, this might apply more to switches/isolators
+        normallyOpen?: boolean;
     };
 }
-export interface MeterNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Meter; 
+export interface MeterNodeData extends BaseNodeData {
+    elementType: SLDElementType.Meter;
     config?: BaseNodeData['config'] & {
         meterType?: 'Energy' | 'PowerQuality' | 'SubMeter';
         accuracyClass?: string;
     };
 }
-export interface BatteryNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Battery; 
+export interface BatteryNodeData extends BaseNodeData {
+    elementType: SLDElementType.Battery;
     config?: BaseNodeData['config'] & {
         technology?: 'Li-ion' | 'Lead-Acid' | 'Flow';
         capacityAh?: number;
@@ -129,31 +128,31 @@ export interface BatteryNodeData extends BaseNodeData {
         dodPercentage?: number; // Depth of Discharge
     };
 }
-export interface ContactorNodeData extends BaseNodeData { 
+export interface ContactorNodeData extends BaseNodeData {
     elementType: SLDElementType.Contactor;
     config?: BaseNodeData['config'] & {
         normallyOpen?: boolean; // true for NO, false for NC
         coilVoltage?: string; // e.g., '24VDC', '230VAC'
     };
 }
-export interface GridNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Grid; 
+export interface GridNodeData extends BaseNodeData {
+    elementType: SLDElementType.Grid;
     config?: BaseNodeData['config'] & {
         voltageLevel?: string; // e.g., '11kV', '33kV', '400V'
         frequencyHz?: 50 | 60;
         faultLevelMVA?: number;
     };
 }
-export interface LoadNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Load; 
+export interface LoadNodeData extends BaseNodeData {
+    elementType: SLDElementType.Load;
     config?: BaseNodeData['config'] & {
         loadType?: 'Resistive' | 'Inductive' | 'Capacitive' | 'Motor' | 'Lighting';
         ratedPowerkW?: number;
         powerFactor?: number;
     };
 }
-export interface BusbarNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Busbar; 
+export interface BusbarNodeData extends BaseNodeData {
+    elementType: SLDElementType.Busbar;
     config?: BaseNodeData['config'] & {
         material?: 'Copper' | 'Aluminum';
         currentRatingAmps?: number;
@@ -165,10 +164,10 @@ export interface BusbarNodeData extends BaseNodeData {
 export interface TransformerNodeData extends BaseNodeData {
     elementType: SLDElementType.Transformer;
     config?: BaseNodeData['config'] & {
-        ratingMVA?: string; // Changed to string to support values like "2.5MVA"
-        primaryVoltage?: string; // e.g. "11kV"
-        secondaryVoltage?: string; // e.g. "0.4kV"
-        vectorGroup?: string; // e.g. "Dyn11"
+        ratingMVA?: string;
+        primaryVoltage?: string;
+        secondaryVoltage?: string;
+        vectorGroup?: string;
         impedancePercentage?: number;
     };
 }
@@ -177,7 +176,7 @@ export interface GeneratorNodeData extends BaseNodeData {
     elementType: SLDElementType.Generator;
     config?: BaseNodeData['config'] & {
         fuelType?: 'Diesel' | 'Gas' | 'Hydro' | 'Wind';
-        ratingKVA?: string; // Changed to string to support "100kVA"
+        ratingKVA?: string;
         outputVoltage?: string;
     };
 }
@@ -198,11 +197,47 @@ export interface SensorNodeData extends BaseNodeData {
     };
 }
 
-export interface GenericDeviceNodeData extends BaseNodeData { 
+export interface GenericDeviceNodeData extends BaseNodeData {
     elementType: SLDElementType.GenericDevice;
     config?: BaseNodeData['config'] & {
-        deviceType?: string; // e.g. 'JunctionBox', 'Relay', 'TransferSwitch'
-        iconName?: string; 
+        deviceType?: string;
+        iconName?: string;
+    };
+}
+
+export interface IsolatorNodeData extends BaseNodeData {
+    elementType: SLDElementType.Isolator;
+    config?: BaseNodeData['config'] & {
+        poles?: number;
+        loadBreak?: boolean;
+        manualOrMotorized?: 'manual' | 'motorized';
+    };
+}
+
+export interface ATSNodeData extends BaseNodeData {
+    elementType: SLDElementType.ATS;
+    config?: BaseNodeData['config'] & {
+        transferTimeMs?: number;
+        numPoles?: number;
+    };
+}
+
+export interface JunctionBoxNodeData extends BaseNodeData {
+    elementType: SLDElementType.JunctionBox;
+    config?: BaseNodeData['config'] & {
+        material?: string;
+        ipRating?: string;
+        numberOfStrings?: number;
+    };
+}
+
+export interface FuseNodeData extends BaseNodeData { // <<<--- ADDED THIS DEFINITION
+    elementType: SLDElementType.Fuse;
+    config?: BaseNodeData['config'] & {
+        ratingAmps?: number;
+        voltageRating?: string; // e.g., "400V", "690V"
+        fuseType?: 'Cartridge' | 'HRC' | 'Rewireable' | 'Semiconductor' | string; // High Rupturing Capacity
+        breakingCapacitykA?: number;
     };
 }
 
@@ -211,34 +246,35 @@ export type CustomNodeData =
   | TextLabelNodeData | DataLabelNodeData | InverterNodeData | PanelNodeData
   | BreakerNodeData | MeterNodeData | BatteryNodeData | ContactorNodeData
   | GridNodeData | LoadNodeData | BusbarNodeData | GenericDeviceNodeData
-  | TransformerNodeData | GeneratorNodeData | PLCNodeData | SensorNodeData; // Added new types
+  | TransformerNodeData | GeneratorNodeData | PLCNodeData | SensorNodeData
+  | IsolatorNodeData | ATSNodeData | JunctionBoxNodeData | FuseNodeData; // <<<--- ADDED FuseNodeData to UNION
 
 
 // --- Edge Data ---
 export interface CustomFlowEdgeData {
-  label?: string;                    
-  dataPointLinks?: DataPointLink[];  
-  flowType?: 'AC' | 'DC' | 'CONTROL_SIGNAL' | 'DATA_BUS' | 'NEUTRAL' | 'EARTH' | 'OFFLINE' | 'FAULT' | string; // Added Neutral, Earth
-  voltageLevel?: 'HV' | 'MV' | 'LV' | 'ELV' | string; 
-  currentRatingAmps?: number; // For cable sizing / ampacity
-  cableType?: string; // e.g. "2x(4cx300) XLPE/Al"
-  isEnergized?: boolean;             
-  status?: 'nominal' | 'warning' | 'fault' | string; 
+  label?: string;
+  dataPointLinks?: DataPointLink[];
+  flowType?: 'AC' | 'DC' | 'CONTROL_SIGNAL' | 'DATA_BUS' | 'NEUTRAL' | 'EARTH' | 'OFFLINE' | 'FAULT' | string;
+  voltageLevel?: 'HV' | 'MV' | 'LV' | 'ELV' | string;
+  currentRatingAmps?: number;
+  cableType?: string;
+  isEnergized?: boolean;
+  status?: 'nominal' | 'warning' | 'fault' | string;
 }
 
 // --- React Flow Element Types ---
-export type CustomNodeType = Node<CustomNodeData, SLDElementType | string>; 
+export type CustomNodeType = Node<CustomNodeData, SLDElementType | string>;
 export type CustomFlowEdge = Edge<CustomFlowEdgeData>;
 
 // --- SLD Layout Structure ---
 export interface SLDLayout {
-  layoutId: string;                  
+  layoutId: string;
   nodes: CustomNodeType[];
   edges: CustomFlowEdge[];
-  viewport?: { x: number; y: number; zoom: number; }; 
-  meta?: {                           
+  viewport?: { x: number; y: number; zoom: number; };
+  meta?: {
     description?: string;
-    lastModified?: string; 
+    lastModified?: string;
     version?: string;
     author?: string;
   }
@@ -247,61 +283,59 @@ export interface SLDLayout {
 // --- SLD Element Types Enum ---
 export enum SLDElementType {
   // Electrical Power Generation & Sources
-  Panel = 'panel', 
-  Generator = 'generator', // e.g., Diesel, Gas Turbine
-  Grid = 'grid', // Utility Grid Connection Point
-  
+  Panel = 'panel',
+  Generator = 'generator',
+  Grid = 'grid',
+
   // Storage
-  Battery = 'battery', 
-  
+  Battery = 'battery',
+
   // Conversion & Transformation
-  Inverter = 'inverter', 
-  Transformer = 'transformer', // Power Transformer
-  // Add Rectifier, VFD if needed
-  
+  Inverter = 'inverter',
+  Transformer = 'transformer',
+
   // Switching & Protection
-  Breaker = 'breaker',     // Generic Breaker (can be detailed by config.type)
-  Contactor = 'contactor', 
-  Fuse = 'fuse',           // Added Fuse
-  Isolator = 'isolator',   // Added Isolator/Disconnect Switch
-  ATS = 'ats',             // Automatic Transfer Switch (often a GenericDevice or own type)
+  Breaker = 'breaker',
+  Contactor = 'contactor',
+  Fuse = 'fuse',
+  Isolator = 'isolator',
+  ATS = 'ats',
 
   // Distribution & Connection
-  Busbar = 'busbar', 
-  JunctionBox = 'junctionBox', // Could be a GenericDevice or specific type
-  Cable = 'cable',             // For representing distinct cable runs if needed, though often just edges
-  
+  Busbar = 'busbar',
+  JunctionBox = 'junctionBox',
+  Cable = 'cable',
+
   // Loads
-  Load = 'load',           // Generic Electrical Load
-  Motor = 'motor',         // Specific Motor Load
-  
+  Load = 'load',
+  Motor = 'motor',
+
   // Measurement & Metering
-  Meter = 'meter',         // Energy Meter, Power Analyzer
-  Sensor = 'sensor',       // Generic Sensor (temp, pressure, flow, irradiance etc.)
-  CT = 'ct',               // Current Transformer
-  PT = 'pt',               // Potential (Voltage) Transformer
-  
+  Meter = 'meter',
+  Sensor = 'sensor',
+  CT = 'ct',
+  PT = 'pt',
+
   // Control & Automation
-  PLC = 'plc',             // Programmable Logic Controller
-  Relay = 'relay',         // Protective or Control Relay (could be GenericDevice)
-  // Add HMI, ControlPanel etc.
-  
+  PLC = 'plc',
+  Relay = 'relay',
+
   // Annotations & Labels
-  DataLabel = 'dataLabel', 
-  TextLabel = 'textLabel', 
-  
+  DataLabel = 'dataLabel',
+  TextLabel = 'textLabel',
+
   // Generic / Grouping
-  GenericDevice = 'genericDevice', // Fallback or for diverse non-specific items
-  Group = 'group',                 // For visual grouping if React Flow's grouping is used
+  GenericDevice = 'genericDevice',
+  Group = 'group',
 }
 
 // --- Palette Configuration ---
 export interface PaletteComponent {
   type: SLDElementType;
   label: string;
-  defaultData?: Partial<CustomNodeData>; 
-  icon?: React.ReactNode;                
-  description?: string;                  
+  defaultData?: Partial<CustomNodeData>;
+  icon?: React.ReactNode;
+  description?: string;
 }
 
 export interface PaletteCategory {
@@ -311,17 +345,15 @@ export interface PaletteCategory {
 
 // --- Component Props for SLDWidget ---
 export interface SLDWidgetProps {
-  layoutId: string | null; 
-  isEditMode?: boolean; 
-  currentUserRole?: UserRole; 
-  onNavigateToLayout?: (layoutId: string) => void; 
+  layoutId: string | null;
+  isEditMode?: boolean;
+  currentUserRole?: UserRole;
+  onNavigateToLayout?: (layoutId: string) => void;
 }
 
-// (CurrentUser and SLDState interfaces might be better in more specific auth/state files,
-// but included here for completeness based on original file structure.)
-export interface CurrentUser { 
+export interface CurrentUser {
   id: string;
-  role: 'admin' | 'operator' | 'viewer' | string; 
+  role: 'admin' | 'operator' | 'viewer' | string;
 }
 
 export interface SLDState {

@@ -1,5 +1,6 @@
 // components/sld/nodes/nodeUtils.ts
 import { DataPointLink, RealTimeData, DataPoint, CustomFlowEdgeData, BaseNodeData } from '@/types/sld'; // Added DataPoint for dataType context
+import { format as formatDate } from 'date-fns'; // Import date-fns for date formatting
 
 // Helper to get a data point value safely
 export function getDataPointValue(
@@ -161,10 +162,8 @@ export function formatDisplayValue(
                     // For complex patterns (format.dateTimeFormat), a library like date-fns is needed.
                     // Example with toLocaleString if no specific format string:
                     if (!format.dateTimeFormat) return date.toLocaleString(); 
-                    
-                    // Placeholder for library-based formatting:
-                    if (format.dateTimeFormat && typeof formatDateWithLibrary === 'function') {
-                       return formatDateWithLibrary(date, format.dateTimeFormat);
+                    if (format.dateTimeFormat) {
+                       return formatDate(date, format.dateTimeFormat);
                     }
                     console.warn("dateTimeFormat pattern usage requires a date formatting library (e.g., date-fns). Using basic ISO substring.");
                     return date.toISOString().substring(0,19).replace("T", " ");
@@ -192,12 +191,17 @@ export interface NodeDataForStyle extends BaseNodeData { // More generic to fit 
 
 
 // Helper to get derived styles based on dataPointLinks
+// Extended type to allow CSS custom properties
+interface ExtendedCSSProperties extends React.CSSProperties {
+  [key: `--${string}`]: string;
+}
+
 export function getDerivedStyle(
   data: NodeDataForStyle | CustomFlowEdgeData, // Accept both node and edge data
   realtimeData: RealTimeData,
   dataPointsMetadatas: Record<string, DataPoint> // Pass all DP metadata
-): React.CSSProperties {
-  const derivedStyle: React.CSSProperties = {};
+): ExtendedCSSProperties {
+  const derivedStyle: ExtendedCSSProperties = {};
   if (!data.dataPointLinks) return derivedStyle;
 
   data.dataPointLinks.forEach(link => {

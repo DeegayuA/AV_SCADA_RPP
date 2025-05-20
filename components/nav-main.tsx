@@ -35,7 +35,7 @@ export function NavMain({
   activeAccents: ActiveAccents;
 }) {
   const sidebar = useSidebar(); // Get sidebar context
-  const isCollapsed = sidebar.collapsed; // Access the correct property name
+  const isCollapsed = sidebar.isCollapsed; // Access the correct property name
   const pathname = usePathname();
   const [openSubmenus, setOpenSubmenus] = React.useState<Record<string, boolean>>({});
 

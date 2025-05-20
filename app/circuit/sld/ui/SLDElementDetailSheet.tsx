@@ -65,8 +65,11 @@ const SLDElementDetailSheet: React.FC<SLDElementDetailSheetProps> = ({
           }
       }
 
-       // Format the potentially mapped or raw value
-        const formattedValue = formatDisplayValue(displayValue, { ...link, format: link.format ?? { type: dpDefinition.dataType as any, suffix: dpDefinition.unit } });
+      // Format the potentially mapped or raw value
+        const formattedValue = formatDisplayValue(displayValue, { 
+          ...link, 
+          ...(link.format ?? { type: dpDefinition.dataType as any, suffix: dpDefinition.unit }) 
+        });
 
 
       return {
