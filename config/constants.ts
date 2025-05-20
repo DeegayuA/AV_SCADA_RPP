@@ -1,20 +1,21 @@
-export const WS_PORT = 8080;
+// config/constants.ts
+
+import logo from "@/AV_logo.png"; // Ensure these paths are correct if this file is in a different dir
+import logo2 from "@/av_logo.svg";
+
+export const WS_PORT = 8888;
 export const WS_URL = (() => {
     if (typeof window !== 'undefined') {
-        const isSecure = window.location.protocol === 'https:';
-        const wsProtocol = isSecure ? 'wss' : 'ws';
-        return `${wsProtocol}://${window.location.hostname}:${WS_PORT}`;
+        return `ws://${window.location.hostname}:${WS_PORT}`;
     }
-    // Fallback for environments without window (e.g., Node.js)
     return `ws://localhost:${WS_PORT}`;
 })();
-
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://112.134.218.51:4840";
 export const VERSION = "1.4.0";
 export const PLANT_NAME= "Mini-Grid";
 export const PLANT_LOCATION = "Colombo, Sri Lanka";
-export const PLANT_TYPE = "Mini-Grid";
+export const PLANT_TYPE = "Mini-Grid";z
 export const PLANT_CAPACITY = "100 kW";
 
 export const APP_NAME = "Mini-Grid Control Panel";
@@ -36,4 +37,3 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = ['main_plant', 'secondary_plan
 
 export const USER = "viewer";
 // export const USER = "admin";
-
