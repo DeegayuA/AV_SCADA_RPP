@@ -571,7 +571,7 @@ const UnifiedDashboardPage: React.FC = () => {
                   // However, since we now have an explicit config button above,
                   // we'll let *that* manage changing `sldLayoutId` and keep the SLDWidget simpler
                   // by not passing `onLayoutIdChange`. It will still reflect `isEditMode`.
-                  // onLayoutIdChange={sldSpecificEditMode ? setSldLayoutId : undefined} // Let external button handle this
+                  onLayoutIdChange={sldSpecificEditMode ? setSldLayoutId : undefined} 
                 />
               </div>
             </CardContent>
@@ -601,22 +601,17 @@ const UnifiedDashboardPage: React.FC = () => {
         {!hasAnyDynamicCardContent && currentlyDisplayedDataPoints.length > 0 && (<div className="text-center py-16 text-muted-foreground min-h-[100px] flex flex-col items-center justify-center"> <InfoIconLucide className="w-12 h-12 mb-4 text-gray-400" /><h3 className="text-xl font-semibold mb-2">No items match current section filters.</h3> <p>Selected data points might not fit into the configured dynamic sections.</p> {(isGlobalEditMode && currentUserRole === UserRole.ADMIN) && <p className="mt-2">Try adding or changing data point types/categories.</p>} </div>)}
         {!hasAnyDynamicCardContent && currentlyDisplayedDataPoints.length === 0 && (<RenderingComponent sections={[]} {...commonRenderingProps} />)}
       </div>
-      {(isConfiguratorOpen && currentUserRole === UserRole.ADMIN) && (<DashboardItemConfigurator
-        isOpen={isConfiguratorOpen}
-        onClose={() => setIsConfiguratorOpen(false)}
-        availableIndividualPoints={individualPointsForConfig}
-        availableThreePhaseGroups={threePhaseGroupsForConfig}
-        currentDisplayedIds={displayedDataPointIds}
-        onAddMultipleDataPoints={handleAddMultipleDataPoints}
-        allDefinedCategories={Array.from(new Set(allPossibleDataPoints.map(dp => dp.category)))}
-        allDefinedDataTypes={Array.from(new Set(allPossibleDataPoints.map(dp => dp.dataType)))}
-        allDefinedUiTypes={Array.from(new Set(allPossibleDataPoints.map(dp => dp.uiType)))}
-        allDefinedPhases={Array.from(new Set(allPossibleDataPoints.filter(dp => dp.phase).map(dp => dp.phase!)))}
-        onSaveNewDataPoint={(data) => {
-          toast.info("Custom data point creation not implemented");
-          return Promise.resolve({ success: false, error: "Custom data point creation not implemented" });
-        }} />)}
-
+   {(isConfiguratorOpen && currentUserRole === UserRole.ADMIN) && (<DashboardItemConfigurator
+      isOpen={isConfiguratorOpen}
+      onClose={() => setIsConfiguratorOpen(false)}
+      availableIndividualPoints={individualPointsForConfig}
+      availableThreePhaseGroups={threePhaseGroupsForConfig}
+      currentDisplayedIds={displayedDataPointIds}
+      onAddMultipleDataPoints={handleAddMultipleDataPoints}
+      onSaveNewDataPoint={(data) => {
+        toast.info("Custom data point creation not implemented");
+        return Promise.resolve({ success: false, error: "Custom data point creation not implemented" });
+      }} />)}
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
         <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
           <DialogHeader className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">

@@ -66,15 +66,12 @@ const WelcomeExperience: React.FC<WelcomeExperienceProps> = ({ userName, onGetSt
       >
         <Zap className="h-16 w-16 md:h-20 md:w-20 text-primary" />
       </motion.div>
-
       <motion.h2 variants={itemVariants} className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
         Welcome{userName ? `, ${userName}` : ''}!
       </motion.h2>
-
       <motion.p variants={itemVariants} className="text-lg text-muted-foreground mb-8 max-w-2xl">
         You're now connected to the Solar Minigrid Command Center. Monitor, control, and optimize your energy system with precision.
       </motion.p>
-
       {/* Optional Feature Highlights Section */}
       <motion.div 
         variants={itemVariants}
@@ -96,7 +93,6 @@ const WelcomeExperience: React.FC<WelcomeExperienceProps> = ({ userName, onGetSt
           <p className="text-xs text-muted-foreground">Ensure peak efficiency.</p>
         </motion.div>
       </motion.div>
-      
       {onGetStarted && (
         <motion.div variants={itemVariants}>
           <Button size="lg" onClick={onGetStarted} className="group">
@@ -106,11 +102,9 @@ const WelcomeExperience: React.FC<WelcomeExperienceProps> = ({ userName, onGetSt
         </motion.div>
       )}
       {!onGetStarted && ( // Fallback if no primary action provided for this context
-         <motion.p variants={itemVariants} className="text-sm text-muted-foreground mt-4">
-            Navigate using the sidebar or header options to access system features.
-         </motion.p>
+         (<motion.p variants={itemVariants} className="text-sm text-muted-foreground mt-4">Navigate using the sidebar or header options to access system features.
+                    </motion.p>)
       )}
-
     </motion.div>
   );
 };

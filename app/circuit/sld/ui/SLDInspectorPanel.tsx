@@ -415,267 +415,265 @@ const SLDInspectorPanel: React.FC<SLDInspectorPanelProps> = ({
 
 
   return (
-    <Card className="h-full flex flex-col border-l dark:border-gray-700 shadow-md">
-      <CardHeader className="p-3 flex-row justify-between items-center border-b dark:border-gray-700">
-        <CardTitle className="text-base font-semibold">Inspector: {elementType}</CardTitle>
-         <Button variant="ghost" size="icon" onClick={handleDelete} title="Delete Element" className="h-7 w-7">
-            <Trash2 className="h-4 w-4 text-destructive"/>
-        </Button>
-      </CardHeader>
+      <Card className="h-full flex flex-col border-l dark:border-gray-700 shadow-md">
+          <CardHeader className="p-3 flex-row justify-between items-center border-b dark:border-gray-700">
+            <CardTitle className="text-base font-semibold">Inspector: {elementType}</CardTitle>
+             <Button variant="ghost" size="icon" onClick={handleDelete} title="Delete Element" className="h-7 w-7">
+                <Trash2 className="h-4 w-4 text-destructive"/>
+            </Button>
+          </CardHeader>
+          <ScrollArea className="flex-grow">
+            <Tabs defaultValue="properties" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 h-9 rounded-none">
+                    <TabsTrigger value="properties" className="text-xs">Properties</TabsTrigger>
+                    <TabsTrigger value="data_linking" className="text-xs">Data Linking</TabsTrigger>
+                </TabsList>
 
-      <ScrollArea className="flex-grow">
-        <Tabs defaultValue="properties" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 h-9 rounded-none">
-                <TabsTrigger value="properties" className="text-xs">Properties</TabsTrigger>
-                <TabsTrigger value="data_linking" className="text-xs">Data Linking</TabsTrigger>
-            </TabsList>
-
-            {/* --- General Properties Tab --- */}
-            <TabsContent value="properties" className="mt-0 p-3 space-y-4">
-                <p className="text-xs text-muted-foreground">ID: {selectedElement.id}</p>
-                 {/* Common Label Field */}
-                <div className="space-y-1">
-                    <Label htmlFor="label" className="text-xs">Label</Label>
-                    <Input
-                        id="label" name="label"
-                        value={formData.label || ''}
-                        onChange={handleInputChange} className="h-8 text-sm"
-                    />
-                </div>
-
-                {/* Type-Specific Fields */}
-                {isNode(selectedElement) && currentElementType === SLDElementType.TextLabel && (
+                {/* --- General Properties Tab --- */}
+                <TabsContent value="properties" className="mt-0 p-3 space-y-4">
+                    <p className="text-xs text-muted-foreground">ID: {selectedElement.id}</p>
+                     {/* Common Label Field */}
                     <div className="space-y-1">
-                        <Label htmlFor="text" className="text-xs">Static Text</Label>
-                        <Input // Or Textarea for multiline
-                        id="text" name="text"
-                        // Use type assertion here as formData is a broad partial union
-                        value={(formData as Partial<TextLabelNodeData>).text || ''}
-                        onChange={handleInputChange} className="h-8 text-sm"
+                        <Label htmlFor="label" className="text-xs">Label</Label>
+                        <Input
+                            id="label" name="label"
+                            value={formData.label || ''}
+                            onChange={handleInputChange} className="h-8 text-sm"
                         />
                     </div>
-                )}
 
-                 {isNode(selectedElement) && currentElementType === SLDElementType.Contactor && (
-                    <div className="space-y-1">
-                        <Label htmlFor="config.normallyOpen" className="text-xs">Contact Type</Label>
-                         <Select
-                             name="config.normallyOpen"
-                             // Use type assertion and provide default for safety
-                             value={String((formData as Partial<ContactorNodeData>).config?.normallyOpen ?? true)}
-                             onValueChange={(val) => handleSelectChange("config.normallyOpen", val === 'true')}
-                         >
-                             <SelectTrigger className="h-8 text-sm">
-                                 <SelectValue placeholder="Select type..." />
-                             </SelectTrigger>
-                             <SelectContent>
-                                 <SelectItem value="true">Normally Open (NO)</SelectItem>
-                                 <SelectItem value="false">Normally Closed (NC)</SelectItem>
-                             </SelectContent>
-                         </Select>
-                    </div>
-                 )}
-
-                  {isNode(selectedElement) && currentElementType === SLDElementType.Inverter && (
-                    <div className="space-y-1">
-                      <Label htmlFor="config.ratedPower" className="text-xs">Rated Power (kW)</Label>
-                      <Input
-                         type="number" id="config.ratedPower" name="config.ratedPower"
-                          // Use type assertion
-                         value={(formData as Partial<InverterNodeData>).config?.ratedPower || ''}
-                         onChange={handleInputChange} className="h-8 text-sm"
-                         placeholder="e.g., 5" step="0.1"
-                      />
-                    </div>
-                  )}
-                {/* Add more config fields based on elementType here */}
-
-            </TabsContent>
-
-            {/* --- Data Linking Tab --- */}
-            <TabsContent value="data_linking" className="mt-0 p-3 space-y-3">
-                 {dataLinks.map((link, index) => (
-                    <Card key={index} className="p-3 space-y-3 bg-muted/40 border dark:border-gray-700 shadow-sm">
-                        <div className="flex justify-between items-center mb-1">
-                            <p className="text-xs font-medium text-muted-foreground">Link {index + 1}</p>
-                            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeDataLink(index)} title="Remove Link">
-                                <MinusCircle className="h-3.5 w-3.5 text-destructive"/>
-                            </Button>
-                        </div>
-
-                        {/* Data Point Selection */}
+                    {/* Type-Specific Fields */}
+                    {isNode(selectedElement) && currentElementType === SLDElementType.TextLabel && (
                         <div className="space-y-1">
-                            <Label htmlFor={`dp-select-${index}`} className="text-xs">Data Point</Label>
-                             <SearchableSelect
-                                 options={dataPointOptions}
-                                 value={link.dataPointId}
-                                 onChange={(value) => handleDataLinkChange(index, 'dataPointId', value)}
-                                 placeholder="Select Data Point..."
-                                 searchPlaceholder="Search Name/ID/Category..."
-                                 notFoundText="No matching data point."
-                             />
+                            <Label htmlFor="text" className="text-xs">Static Text</Label>
+                            <Input // Or Textarea for multiline
+                            id="text" name="text"
+                            // Use type assertion here as formData is a broad partial union
+                            value={(formData as Partial<TextLabelNodeData>).text || ''}
+                            onChange={handleInputChange} className="h-8 text-sm"
+                            />
                         </div>
+                    )}
 
-                        {/* Target Property Selection */}
+                     {isNode(selectedElement) && currentElementType === SLDElementType.Contactor && (
                         <div className="space-y-1">
-                            <Label htmlFor={`target-prop-${index}`} className="text-xs">Target Property</Label>
-                             <SearchableSelect
-                                 options={targetPropertiesOptions}
-                                 value={link.targetProperty}
-                                 onChange={(value) => handleDataLinkChange(index, 'targetProperty', value)}
-                                 placeholder="Select Target Property..."
-                                 searchPlaceholder="Search property..."
-                                 notFoundText="No matching property."
-                             />
+                            <Label htmlFor="config.normallyOpen" className="text-xs">Contact Type</Label>
+                             <Select
+                                 name="config.normallyOpen"
+                                 // Use type assertion and provide default for safety
+                                 value={String((formData as Partial<ContactorNodeData>).config?.normallyOpen ?? true)}
+                                 onValueChange={(val) => handleSelectChange("config.normallyOpen", val === 'true')}
+                             >
+                                 <SelectTrigger className="h-8 text-sm">
+                                     <SelectValue placeholder="Select type..." />
+                                 </SelectTrigger>
+                                 <SelectContent>
+                                     <SelectItem value="true">Normally Open (NO)</SelectItem>
+                                     <SelectItem value="false">Normally Closed (NC)</SelectItem>
+                                 </SelectContent>
+                             </Select>
                         </div>
+                     )}
 
-                         <Separator className="my-3 dark:bg-gray-600"/>
+                      {isNode(selectedElement) && currentElementType === SLDElementType.Inverter && (
+                        <div className="space-y-1">
+                          <Label htmlFor="config.ratedPower" className="text-xs">Rated Power (kW)</Label>
+                          <Input
+                             type="number" id="config.ratedPower" name="config.ratedPower"
+                              // Use type assertion
+                             value={(formData as Partial<InverterNodeData>).config?.ratedPower || ''}
+                             onChange={handleInputChange} className="h-8 text-sm"
+                             placeholder="e.g., 5" step="0.1"
+                          />
+                        </div>
+                      )}
+                    {/* Add more config fields based on elementType here */}
 
-                         {/* --- Value Mapping Section --- */}
-                         <div className="space-y-2">
-                         <Label className="text-xs flex justify-between items-center">
-                                Value Mapping
-                                 <Select
-                                     value={link.valueMapping?.type ?? '_none_'} // Default to '_none_'
-                                     onValueChange={(value) => handleMappingTypeChange(index, value)}
-                                 >
-                                     <SelectTrigger className="h-7 w-[120px] text-xs">
-                                         <SelectValue placeholder="Map Type..." />
-                                     </SelectTrigger>
-                                     <SelectContent>
-                                         {/* *** MODIFICATION 4: Update SelectItem value *** */}
-                                         <SelectItem value="_none_">None</SelectItem>
-                                         <SelectItem value="exact">Exact Match</SelectItem>
-                                         <SelectItem value="range">Range</SelectItem>
-                                         <SelectItem value="threshold">Threshold</SelectItem>
-                                         <SelectItem value="boolean">Boolean</SelectItem>
-                                     </SelectContent>
-                                 </Select>
-                             </Label>
+                </TabsContent>
 
-                             {link.valueMapping && link.valueMapping.mapping.map((mapEntry, mapIdx) => (
-                                <div key={mapIdx} className="flex gap-2 items-center pl-2">
-                                     {link.valueMapping?.type === 'exact' && (
-                                         <>
-                                            <Input placeholder="Match Value" value={mapEntry.match ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'match', e.target.value)} className="h-7 text-xs"/>
-                                            <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
-                                         </>
-                                     )}
-                                    {link.valueMapping?.type === 'range' && (
-                                        <>
-                                            <Input type="number" placeholder="Min" value={mapEntry.min ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'min', parseFloat(e.target.value) || 0)} className="h-7 text-xs w-16"/>
-                                            <Input type="number" placeholder="Max" value={mapEntry.max ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'max', parseFloat(e.target.value) || 0)} className="h-7 text-xs w-16"/>
-                                            <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
-                                        </>
-                                    )}
-                                     {link.valueMapping?.type === 'threshold' && (
-                                        <>
-                                            <Input type="number" placeholder="Threshold >=" value={mapEntry.threshold ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'threshold', parseFloat(e.target.value) || 0)} className="h-7 text-xs w-24"/>
-                                            <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
-                                        </>
-                                    )}
-                                     {link.valueMapping?.type === 'boolean' && mapIdx === 0 && (
-                                        <>
-                                            <span className="text-xs font-medium w-16 shrink-0">If True:</span>
-                                            <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
-                                        </>
-                                    )}
-                                     {link.valueMapping?.type === 'boolean' && mapIdx === 1 && (
-                                        <>
-                                            <span className="text-xs font-medium w-16 shrink-0">If False:</span>
-                                            <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
-                                        </>
-                                    )}
+                {/* --- Data Linking Tab --- */}
+                <TabsContent value="data_linking" className="mt-0 p-3 space-y-3">
+                     {dataLinks.map((link, index) => (
+                        <Card key={index} className="p-3 space-y-3 bg-muted/40 border dark:border-gray-700 shadow-sm">
+                            <div className="flex justify-between items-center mb-1">
+                                <p className="text-xs font-medium text-muted-foreground">Link {index + 1}</p>
+                                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeDataLink(index)} title="Remove Link">
+                                    <MinusCircle className="h-3.5 w-3.5 text-destructive"/>
+                                </Button>
+                            </div>
 
-                                     {link.valueMapping?.type !== 'boolean' && (
-                                         <Button size="icon" variant="ghost" className="h-6 w-6 flex-shrink-0" onClick={()=>removeMappingEntry(index, mapIdx)} title="Remove Mapping Entry">
-                                             <MinusCircle className="h-3 w-3 text-destructive"/>
-                                         </Button>
-                                     )}
-                                </div>
-                             ))}
-                              {link.valueMapping && link.valueMapping?.type !== 'boolean' && (
-                                 <Button size="sm" variant="outline" onClick={()=>addMappingEntry(index)} className="text-xs h-7 mt-1 ml-2">
-                                     <PlusCircle className="h-3 w-3 mr-1"/> Add Map Entry
-                                 </Button>
-                             )}
-                         </div>
+                            {/* Data Point Selection */}
+                            <div className="space-y-1">
+                                <Label htmlFor={`dp-select-${index}`} className="text-xs">Data Point</Label>
+                                 <SearchableSelect
+                                     options={dataPointOptions}
+                                     value={link.dataPointId}
+                                     onChange={(value) => handleDataLinkChange(index, 'dataPointId', value)}
+                                     placeholder="Select Data Point..."
+                                     searchPlaceholder="Search Name/ID/Category..."
+                                     notFoundText="No matching data point."
+                                 />
+                            </div>
 
-                         <Separator className="my-3 dark:bg-gray-600"/>
+                            {/* Target Property Selection */}
+                            <div className="space-y-1">
+                                <Label htmlFor={`target-prop-${index}`} className="text-xs">Target Property</Label>
+                                 <SearchableSelect
+                                     options={targetPropertiesOptions}
+                                     value={link.targetProperty}
+                                     onChange={(value) => handleDataLinkChange(index, 'targetProperty', value)}
+                                     placeholder="Select Target Property..."
+                                     searchPlaceholder="Search property..."
+                                     notFoundText="No matching property."
+                                 />
+                            </div>
 
-                         {/* --- Formatting Section --- */}
-                         <div className="space-y-2">
-                            <Label className="text-xs">Formatting (Optional)</Label>
-                             {/* Conditionally render formatting based on inferred type */}
-                             { link.format?.type === 'number' && (
-                               <div className="grid grid-cols-2 gap-2 pl-2">
-                                  <div className="space-y-1">
-                                      <Label htmlFor={`format-prefix-${index}`} className="text-[10px]">Prefix</Label>
-                                      <Input id={`format-prefix-${index}`} placeholder="e.g., '$'" value={link.format?.prefix ?? ''} onChange={(e) => handleFormatChange(index, 'prefix', e.target.value)} className="h-7 text-xs"/>
-                                  </div>
-                                  <div className="space-y-1">
-                                      <Label htmlFor={`format-suffix-${index}`} className="text-[10px]">Suffix</Label>
-                                      <Input id={`format-suffix-${index}`} placeholder="e.g., 'kW'" value={link.format?.suffix ?? ''} onChange={(e) => handleFormatChange(index, 'suffix', e.target.value)} className="h-7 text-xs"/>
-                                  </div>
-                                  <div className="space-y-1">
-                                      <Label htmlFor={`format-precision-${index}`} className="text-[10px]">Precision</Label>
-                                      <Input type="number" id={`format-precision-${index}`} placeholder="e.g., 2" value={link.format?.precision ?? ''}
-                                            onChange={(e) => handleFormatChange(index, 'precision', e.target.value === '' ? undefined : parseInt(e.target.value))}
-                                            min="0" step="1" className="h-7 text-xs"/>
-                                  </div>
-                              </div>
-                             )}
-                             { link.format?.type === 'boolean' && (
-                               <div className="grid grid-cols-2 gap-2 pl-2">
-                                  <div className="space-y-1">
-                                      <Label htmlFor={`format-true-${index}`} className="text-[10px]">True Label</Label>
-                                      <Input id={`format-true-${index}`} placeholder="e.g., 'ON'" value={link.format?.trueLabel ?? ''} onChange={(e) => handleFormatChange(index, 'trueLabel', e.target.value)} className="h-7 text-xs"/>
-                                  </div>
-                                   <div className="space-y-1">
-                                      <Label htmlFor={`format-false-${index}`} className="text-[10px]">False Label</Label>
-                                      <Input id={`format-false-${index}`} placeholder="e.g., 'OFF'" value={link.format?.falseLabel ?? ''} onChange={(e) => handleFormatChange(index, 'falseLabel', e.target.value)} className="h-7 text-xs"/>
-                                  </div>
-                               </div>
-                             )}
-                             { link.format?.type === 'dateTime' && (
-                               <div className="pl-2">
-                                  <div className="space-y-1">
-                                      <Label htmlFor={`format-datetime-${index}`} className="text-[10px]">Date/Time Format</Label>
-                                      <Input id={`format-datetime-${index}`} placeholder="e.g., 'YYYY-MM-DD HH:mm'" value={link.format?.dateTimeFormat ?? ''} onChange={(e) => handleFormatChange(index, 'dateTimeFormat', e.target.value)} className="h-7 text-xs"/>
-                                      {/* Add link to formatting options documentation? */}
-                                  </div>
-                               </div>
-                             )}
-                              { link.format?.type === 'string' && ( // Allow prefix/suffix for string too
-                               <div className="grid grid-cols-2 gap-2 pl-2">
-                                  <div className="space-y-1">
-                                      <Label htmlFor={`format-prefix-${index}`} className="text-[10px]">Prefix</Label>
-                                      <Input id={`format-prefix-${index}`} placeholder="e.g., 'Status: '" value={link.format?.prefix ?? ''} onChange={(e) => handleFormatChange(index, 'prefix', e.target.value)} className="h-7 text-xs"/>
-                                  </div>
-                                  <div className="space-y-1">
-                                      <Label htmlFor={`format-suffix-${index}`} className="text-[10px]">Suffix</Label>
-                                      <Input id={`format-suffix-${index}`} placeholder="e.g., '!'" value={link.format?.suffix ?? ''} onChange={(e) => handleFormatChange(index, 'suffix', e.target.value)} className="h-7 text-xs"/>
-                                  </div>
-                                </div>
-                              )}
-                              {/* Show a placeholder if no format type is determined yet */}
-                              { !link.format?.type && (
-                                <p className="text-xs text-muted-foreground pl-2 italic">Select a Data Point to enable formatting options based on its type.</p>
-                              )}
-                         </div>
-                    </Card>
-                ))}
-                <Button variant="outline" size="sm" onClick={addDataLink} className="w-full">
-                    <PlusCircle className="h-4 w-4 mr-1"/> Add Data Link
-                </Button>
-            </TabsContent>
-        </Tabs>
-      </ScrollArea>
+                             <Separator className="my-3 dark:bg-gray-600"/>
 
-      <CardFooter className="p-3 border-t dark:border-gray-700">
-        <Button onClick={handleSaveChanges} className="w-full h-9">Apply Changes</Button>
-      </CardFooter>
-    </Card>
+                             {/* --- Value Mapping Section --- */}
+                             <div className="space-y-2">
+                             <Label className="text-xs flex justify-between items-center">
+                                    Value Mapping
+                                     <Select
+                                         value={link.valueMapping?.type ?? '_none_'} // Default to '_none_'
+                                         onValueChange={(value) => handleMappingTypeChange(index, value)}
+                                     >
+                                         <SelectTrigger className="h-7 w-[120px] text-xs">
+                                             <SelectValue placeholder="Map Type..." />
+                                         </SelectTrigger>
+                                         <SelectContent>
+                                             {/* *** MODIFICATION 4: Update SelectItem value *** */}
+                                             <SelectItem value="_none_">None</SelectItem>
+                                             <SelectItem value="exact">Exact Match</SelectItem>
+                                             <SelectItem value="range">Range</SelectItem>
+                                             <SelectItem value="threshold">Threshold</SelectItem>
+                                             <SelectItem value="boolean">Boolean</SelectItem>
+                                         </SelectContent>
+                                     </Select>
+                                 </Label>
+
+                                 {link.valueMapping && link.valueMapping.mapping.map((mapEntry, mapIdx) => (
+                                    <div key={mapIdx} className="flex gap-2 items-center pl-2">
+                                         {link.valueMapping?.type === 'exact' && (
+                                             <>
+                                                <Input placeholder="Match Value" value={mapEntry.match ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'match', e.target.value)} className="h-7 text-xs"/>
+                                                <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
+                                             </>
+                                         )}
+                                        {link.valueMapping?.type === 'range' && (
+                                            <>
+                                                <Input type="number" placeholder="Min" value={mapEntry.min ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'min', parseFloat(e.target.value) || 0)} className="h-7 text-xs w-16"/>
+                                                <Input type="number" placeholder="Max" value={mapEntry.max ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'max', parseFloat(e.target.value) || 0)} className="h-7 text-xs w-16"/>
+                                                <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
+                                            </>
+                                        )}
+                                         {link.valueMapping?.type === 'threshold' && (
+                                            <>
+                                                <Input type="number" placeholder="Threshold >=" value={mapEntry.threshold ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'threshold', parseFloat(e.target.value) || 0)} className="h-7 text-xs w-24"/>
+                                                <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
+                                            </>
+                                        )}
+                                         {link.valueMapping?.type === 'boolean' && mapIdx === 0 && (
+                                            <>
+                                                <span className="text-xs font-medium w-16 shrink-0">If True:</span>
+                                                <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
+                                            </>
+                                        )}
+                                         {link.valueMapping?.type === 'boolean' && mapIdx === 1 && (
+                                            <>
+                                                <span className="text-xs font-medium w-16 shrink-0">If False:</span>
+                                                <Input placeholder="Set Property To" value={mapEntry.value ?? ''} onChange={(e) => handleMappingEntryChange(index, mapIdx, 'value', e.target.value)} className="h-7 text-xs"/>
+                                            </>
+                                        )}
+
+                                         {link.valueMapping?.type !== 'boolean' && (
+                                             <Button size="icon" variant="ghost" className="h-6 w-6 flex-shrink-0" onClick={()=>removeMappingEntry(index, mapIdx)} title="Remove Mapping Entry">
+                                                 <MinusCircle className="h-3 w-3 text-destructive"/>
+                                             </Button>
+                                         )}
+                                    </div>
+                                 ))}
+                                  {link.valueMapping && link.valueMapping?.type !== 'boolean' && (
+                                     <Button size="sm" variant="outline" onClick={()=>addMappingEntry(index)} className="text-xs h-7 mt-1 ml-2">
+                                         <PlusCircle className="h-3 w-3 mr-1"/> Add Map Entry
+                                     </Button>
+                                 )}
+                             </div>
+
+                             <Separator className="my-3 dark:bg-gray-600"/>
+
+                             {/* --- Formatting Section --- */}
+                             <div className="space-y-2">
+                                <Label className="text-xs">Formatting (Optional)</Label>
+                                 {/* Conditionally render formatting based on inferred type */}
+                                 { link.format?.type === 'number' && (
+                                   <div className="grid grid-cols-2 gap-2 pl-2">
+                                      <div className="space-y-1">
+                                          <Label htmlFor={`format-prefix-${index}`} className="text-[10px]">Prefix</Label>
+                                          <Input id={`format-prefix-${index}`} placeholder="e.g., '$'" value={link.format?.prefix ?? ''} onChange={(e) => handleFormatChange(index, 'prefix', e.target.value)} className="h-7 text-xs"/>
+                                      </div>
+                                      <div className="space-y-1">
+                                          <Label htmlFor={`format-suffix-${index}`} className="text-[10px]">Suffix</Label>
+                                          <Input id={`format-suffix-${index}`} placeholder="e.g., 'kW'" value={link.format?.suffix ?? ''} onChange={(e) => handleFormatChange(index, 'suffix', e.target.value)} className="h-7 text-xs"/>
+                                      </div>
+                                      <div className="space-y-1">
+                                          <Label htmlFor={`format-precision-${index}`} className="text-[10px]">Precision</Label>
+                                          <Input type="number" id={`format-precision-${index}`} placeholder="e.g., 2" value={link.format?.precision ?? ''}
+                                                onChange={(e) => handleFormatChange(index, 'precision', e.target.value === '' ? undefined : parseInt(e.target.value))}
+                                                min="0" step="1" className="h-7 text-xs"/>
+                                      </div>
+                                  </div>
+                                 )}
+                                 { link.format?.type === 'boolean' && (
+                                   <div className="grid grid-cols-2 gap-2 pl-2">
+                                      <div className="space-y-1">
+                                          <Label htmlFor={`format-true-${index}`} className="text-[10px]">True Label</Label>
+                                          <Input id={`format-true-${index}`} placeholder="e.g., 'ON'" value={link.format?.trueLabel ?? ''} onChange={(e) => handleFormatChange(index, 'trueLabel', e.target.value)} className="h-7 text-xs"/>
+                                      </div>
+                                       <div className="space-y-1">
+                                          <Label htmlFor={`format-false-${index}`} className="text-[10px]">False Label</Label>
+                                          <Input id={`format-false-${index}`} placeholder="e.g., 'OFF'" value={link.format?.falseLabel ?? ''} onChange={(e) => handleFormatChange(index, 'falseLabel', e.target.value)} className="h-7 text-xs"/>
+                                      </div>
+                                   </div>
+                                 )}
+                                 { link.format?.type === 'dateTime' && (
+                                   <div className="pl-2">
+                                      <div className="space-y-1">
+                                          <Label htmlFor={`format-datetime-${index}`} className="text-[10px]">Date/Time Format</Label>
+                                          <Input id={`format-datetime-${index}`} placeholder="e.g., 'YYYY-MM-DD HH:mm'" value={link.format?.dateTimeFormat ?? ''} onChange={(e) => handleFormatChange(index, 'dateTimeFormat', e.target.value)} className="h-7 text-xs"/>
+                                          {/* Add link to formatting options documentation? */}
+                                      </div>
+                                   </div>
+                                 )}
+                                  { link.format?.type === 'string' && ( // Allow prefix/suffix for string too
+                                   (<div className="grid grid-cols-2 gap-2 pl-2">
+                                       <div className="space-y-1">
+                                           <Label htmlFor={`format-prefix-${index}`} className="text-[10px]">Prefix</Label>
+                                           <Input id={`format-prefix-${index}`} placeholder="e.g., 'Status: '" value={link.format?.prefix ?? ''} onChange={(e) => handleFormatChange(index, 'prefix', e.target.value)} className="h-7 text-xs"/>
+                                       </div>
+                                       <div className="space-y-1">
+                                           <Label htmlFor={`format-suffix-${index}`} className="text-[10px]">Suffix</Label>
+                                           <Input id={`format-suffix-${index}`} placeholder="e.g., '!'" value={link.format?.suffix ?? ''} onChange={(e) => handleFormatChange(index, 'suffix', e.target.value)} className="h-7 text-xs"/>
+                                       </div>
+                                   </div>)
+                                  )}
+                                  {/* Show a placeholder if no format type is determined yet */}
+                                  { !link.format?.type && (
+                                    <p className="text-xs text-muted-foreground pl-2 italic">Select a Data Point to enable formatting options based on its type.</p>
+                                  )}
+                             </div>
+                        </Card>
+                    ))}
+                    <Button variant="outline" size="sm" onClick={addDataLink} className="w-full">
+                        <PlusCircle className="h-4 w-4 mr-1"/> Add Data Link
+                    </Button>
+                </TabsContent>
+            </Tabs>
+          </ScrollArea>
+          <CardFooter className="p-3 border-t dark:border-gray-700">
+            <Button onClick={handleSaveChanges} className="w-full h-9">Apply Changes</Button>
+          </CardFooter>
+      </Card>
   );
 };
 

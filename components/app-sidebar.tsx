@@ -250,7 +250,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </motion.div>
-
       <SidebarContent className="py-2.5 transition-opacity duration-150" style={{ opacity: isCollapsed ? 0.3 : 1 }}>
         <NavMain
           items={navData.navMain}
@@ -271,7 +270,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           className="mt-auto pt-2.5 border-t border-border/20 dark:border-slate-700/50"
         />
       </SidebarContent>
-
       <SidebarFooter className={cn(
         "border-t border-border/20 dark:border-slate-700/50 p-2.5 hover:bg-slate-100/40 dark:hover:bg-slate-800/40 transition-all duration-200",
         isCollapsed && "!py-2"
@@ -281,5 +279,5 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <NavUser />
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

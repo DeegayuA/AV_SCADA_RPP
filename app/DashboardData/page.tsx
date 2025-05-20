@@ -683,7 +683,7 @@ const Dashboard: React.FC = () => {
                             </div>
                         </div>
                         {(graphGenerationNodes.length > 0 || graphUsageNodes.length > 0) ? ( // Check if either has nodes
-                             <PowerTimelineGraph nodeValues={nodeValues} generationNodes={graphGenerationNodes} usageNodes={graphUsageNodes} timeScale={graphTimeScale} allPossibleDataPoints={allPossibleDataPoints} isLive={isConnected && plcStatus === 'online'} />
+                             (<PowerTimelineGraph nodeValues={nodeValues} generationNodes={graphGenerationNodes} usageNodes={graphUsageNodes} timeScale={graphTimeScale} allPossibleDataPoints={allPossibleDataPoints} isLive={isConnected && plcStatus === 'online'} />)
                         ) : (
                              <div className="flex items-center justify-center h-[300px] text-muted-foreground"> <p>Timeline graph not configured. {(isGlobalEditMode && currentUserRole === UserRole.ADMIN) ? "Select data points in the configurator." : (currentUserRole === UserRole.ADMIN ? "Enable Edit Mode to configure." : "Contact an administrator.")}</p> </div>
                         )}
@@ -698,7 +698,6 @@ const Dashboard: React.FC = () => {
                 {!hasAnyDynamicCardContent && currentlyDisplayedDataPoints.length === 0 && ( <RenderingComponent sections={[]} {...commonRenderingProps} /> )}
 
             </div>
-
             {/* Configurator Modal from ControlPage */}
             {(isConfiguratorOpen && currentUserRole === UserRole.ADMIN) && (
                 <DashboardItemConfigurator
@@ -714,7 +713,6 @@ const Dashboard: React.FC = () => {
                     allDefinedUiTypes={Array.from(new Set(allPossibleDataPoints.map(dp => dp.uiType)))}
                     allDefinedPhases={['a', 'b', 'c', 'x']} />
             )}
-
             {/* SLD Modal from ControlPage */}
             <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
                 <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">

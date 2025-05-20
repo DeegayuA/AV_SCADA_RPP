@@ -154,9 +154,9 @@ const DashboardHeaderControl: React.FC<DashboardHeaderProps> = React.memo(
                                             onClick={() => setIsEditMode(!isEditMode)}
                                         >
                                             {isEditMode ? (
-                                                <Check className="h-5 w-5" /> // Icon when in edit mode (Done)
+                                                (<Check className="h-5 w-5" />) // Icon when in edit mode (Done)
                                             ) : (
-                                                <Settings className="h-5 w-5" /> // Icon when not in edit mode (Edit)
+                                                (<Settings className="h-5 w-5" />) // Icon when not in edit mode (Edit)
                                             )}
                                             <span className="sr-only">
                                                 {isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}

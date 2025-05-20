@@ -241,9 +241,9 @@ export function NavUser() { // Removed userProp
                         <span className="truncate font-semibold text-slate-700 dark:text-slate-100">{user.name}</span>
                         <span className="truncate text-xs text-slate-500 dark:text-slate-400">{user.email}</span>
                         {user.role && ( // role comes from AuthUser type via Zustand
-                           <span className="text-[10px] text-sky-600 dark:text-sky-400 uppercase font-medium tracking-wider mt-0.5">
+                           (<span className="text-[10px] text-sky-600 dark:text-sky-400 uppercase font-medium tracking-wider mt-0.5">
                              {user.role.toUpperCase()}
-                           </span>
+                           </span>)
                         )}
                       </div>
                     </div>
@@ -260,15 +260,15 @@ export function NavUser() { // Removed userProp
                           <item.icon className="mr-2.5 h-4 w-4 opacity-70 group-hover:opacity-100 group-focus:opacity-100 transition-opacity" />
                           <span>{item.label}</span>
                           {item.badge != null && item.badge > 0 && ( // Ensure badge is not undefined/null before checking > 0
-                            <motion.span 
+                            (<motion.span 
                               key={item.badge} 
                               initial={{scale:0.5, opacity:0}}
                               animate={{scale:1, opacity:1}}
                               exit={{scale:0.5, opacity:0}}
                               className="ml-auto mr-2 text-xs bg-sky-500 text-white rounded-full w-5 h-5 flex items-center justify-center font-semibold"
                             >
-                                {item.badge}
-                            </motion.span>
+                              {item.badge}
+                            </motion.span>)
                           )}
                           {item.displayShortcut && <DropdownMenuShortcut className="opacity-50 group-hover:opacity-80 group-focus:opacity-80">{item.displayShortcut}</DropdownMenuShortcut>}
                         </DropdownMenuItem>
@@ -295,5 +295,5 @@ export function NavUser() { // Removed userProp
         </DropdownMenu>
       </SidebarMenuItem>
     </SidebarMenu>
-  )
+  );
 }

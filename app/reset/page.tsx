@@ -336,14 +336,15 @@ export default function ResetApplicationPage() {
   }
 
   if (authStatus !== 'admin') {
-    return ( // This fallback is for the very brief moment before router.replace kicks in.
-        <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-red-900 via-red-800 to-rose-900 text-rose-100 p-6 text-center z-50">
-            <motion.div initial={{ opacity: 0, y: -20, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale:1, transition:{ type:'spring', stiffness:150, damping: 10, delay: 0.1 }}}>
-                <AlertTriangle className="h-16 w-16 sm:h-20 sm:w-20 text-rose-300 mb-4 animate-pulse" />
-                <h1 className="text-2xl sm:text-3xl font-bold mb-2">Access Restricted</h1>
-                <p className="text-rose-200 text-sm sm:text-base">Redirecting to a safe place...</p>
-            </motion.div>
-        </div>
+    return (
+      // This fallback is for the very brief moment before router.replace kicks in.
+      <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-red-900 via-red-800 to-rose-900 text-rose-100 p-6 text-center z-50">
+        <motion.div initial={{ opacity: 0, y: -20, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale:1, transition:{ type:'spring', stiffness:150, damping: 10, delay: 0.1 }}}>
+            <AlertTriangle className="h-16 w-16 sm:h-20 sm:w-20 text-rose-300 mb-4 animate-pulse" />
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">Access Restricted</h1>
+            <p className="text-rose-200 text-sm sm:text-base">Redirecting to a safe place...</p>
+        </motion.div>
+      </div>
     );
   }
 

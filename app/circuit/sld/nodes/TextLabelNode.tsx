@@ -107,13 +107,13 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({
       tabIndex={isEditMode ? 0 : -1}
     >
       {/* Handles for connectability are optional for TextLabel, shown for completeness */}
-      {/* 
+      
       {isEditMode && <Handle type="target" position={Position.Top} className="!bg-teal-500 !w-1.5 !h-1.5" />}
-      */}
+     
       {data.text || data.label || 'Text Label'} {/* Display text or fallback */}
-      {/* 
+      
       {isEditMode && <Handle type="source" position={Position.Bottom} className="!bg-rose-500 !w-1.5 !h-1.5" />}
-      */}
+     
     </div>
   );
 

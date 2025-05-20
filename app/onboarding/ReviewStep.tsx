@@ -36,7 +36,6 @@ export default function ReviewStep() {
         Please review all your configured settings below. If everything looks correct,
         click "Confirm & Save Settings" to finalize the setup.
       </p>
-
       <Card>
         <CardHeader>
           <CardTitle>Plant & Application Details</CardTitle>
@@ -49,7 +48,6 @@ export default function ReviewStep() {
           <p><strong>Application Name:</strong> {onboardingData.appName || onboardingData.plantName || 'Not set'}</p>
         </CardContent>
       </Card>
-
       <Card>
         <CardHeader>
           <CardTitle>OPC UA Endpoints</CardTitle>
@@ -59,7 +57,6 @@ export default function ReviewStep() {
           <p><strong>Online Endpoint:</strong> {onboardingData.opcUaEndpointOnline ? `opc.tcp://${onboardingData.opcUaEndpointOnline}`: 'Not set (Optional)'}</p>
         </CardContent>
       </Card>
-      
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
             <div>
@@ -77,10 +74,10 @@ export default function ReviewStep() {
             {configuredDataPoints.length > 0 ? (
                 <div className="max-h-60 overflow-y-auto space-y-1 text-xs border p-2 rounded-md">
                     {configuredDataPoints.slice(0, 10).map((dp: DataPointConfig) => ( // Show first 10 as preview
-                        <div key={dp.id} className="flex justify-between items-center p-1 hover:bg-muted/50 rounded">
-                            <span>{dp.name} ({dp.id})</span>
-                            <span className="text-muted-foreground">{dp.nodeId}</span>
-                        </div>
+                        (<div key={dp.id} className="flex justify-between items-center p-1 hover:bg-muted/50 rounded">
+                          <span>{dp.name} ({dp.id})</span>
+                          <span className="text-muted-foreground">{dp.nodeId}</span>
+                        </div>)
                     ))}
                     {configuredDataPoints.length > 10 && <p className="text-center text-muted-foreground p-1">...and {configuredDataPoints.length - 10} more.</p>}
                 </div>
@@ -89,7 +86,7 @@ export default function ReviewStep() {
             )}
         </CardContent>
       </Card>
-       {/* "Confirm & Save Settings" is handled by the global OnboardingNavigation */}
+      {/* "Confirm & Save Settings" is handled by the global OnboardingNavigation */}
     </div>
   );
 }

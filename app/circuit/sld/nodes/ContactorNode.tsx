@@ -1,56 +1,87 @@
 // components/sld/nodes/ContactorNode.tsx
-import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from 'reactflow';
+import React, { memo, useMemo } from 'react';
+import { NodeProps, Handle, Position } from 'reactflow';
+import { motion } from 'framer-motion';
 import { ContactorNodeData } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
-import { getDerivedStyle, getDerivedDisplayText } from './nodeUtils';
-import { Zap, ToggleLeft, ToggleRight } from 'lucide-react'; // Icons for state
+import { ToggleLeftIcon, ToggleRightIcon, AlertTriangleIcon, PowerIcon, PowerOffIcon } from 'lucide-react'; // Or custom SVG for contactor symbol
 
-const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = ({ data, selected }) => {
-  const realtimeData = useAppStore((state) => state.realtimeData);
-  const derivedStyle = getDerivedStyle(data, realtimeData);
+const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = ({ data, selected, isConnectable }) => {
+  const { isEditMode, currentUser } = useAppStore(state => ({
+    isEditMode: state.isEditMode,
+    currentUser: state.currentUser,
+  }));
 
-  // Example: Get state based on a linked data point (e.g., 'contactor-k1-state')
-  const stateLink = data.dataPointLinks?.find(link => link.targetProperty === 'state');
-  const stateValue = stateLink ? getDerivedDisplayText(data, realtimeData, 'state') : null; // Use helper
-  const isClosed = stateValue === 'true' || stateValue === '1' || stateValue === 'closed' || stateValue === 'on'; // Interpret state
+  const isNodeEditable = useMemo(() =>
+    isEditMode && (currentUser?.role === 'admin'),
+    [isEditMode, currentUser]
+  );
 
-  // Determine icon based on state (and potentially normally open/closed config)
-  const normallyOpen = data.config?.normallyOpen ?? true;
-  const Icon = isClosed ? ToggleRight : ToggleLeft;
-  const iconColor = isClosed ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+  const isClosed = data.status === 'closed' || data.status === 'energized'; // Or map from a datapoint if provided
+  const isOpen = data.status === 'open' || data.status === 'offline' || !isClosed;
 
+  const statusStyles = useMemo(() => {
+    if (data.status === 'fault' || data.status === 'alarm') 
+      return { border: 'border-destructive', bg: 'bg-destructive/10', text: 'text-destructive', Icon: PowerOffIcon };
+    if (data.status === 'warning') 
+      return { border: 'border-yellow-500', bg: 'bg-yellow-500/10', text: 'text-yellow-500', Icon: AlertTriangleIcon };
+    if (isClosed) 
+      return { border: 'border-green-600', bg: 'bg-green-600/10', text: 'text-green-600', Icon: PowerIcon }; // Closed (Energized path)
+    // Open or default
+    return { border: 'border-neutral-400 dark:border-neutral-600', bg: 'bg-muted/30', text: 'text-muted-foreground', Icon: PowerOffIcon };
+  }, [data.status, isClosed]);
+  
+  const contactorSymbolColor = isClosed ? "currentColor" : "currentColor"; // Can adjust based on theme
 
   return (
-    <div
-      className={`sld-node contactor-node p-2 border-2 rounded-md shadow-sm w-20 ${
-        selected ? 'ring-2 ring-offset-1 ring-blue-600 dark:ring-sky-500 outline-none' : ''
-      } ${ derivedStyle.backgroundColor ? '' : 'bg-gray-100 dark:bg-gray-700' } ${ derivedStyle.borderColor ? '' : 'border-gray-400 dark:border-gray-600' }`}
-      style={derivedStyle}
-      title={data.label || 'Contactor'}
+    <motion.div
+      className={`
+        sld-node contactor-node group w-[60px] h-[80px] rounded-md shadow-md
+        flex flex-col items-center justify-between p-1
+        border-2 ${statusStyles.border} ${statusStyles.bg}
+        bg-card dark:bg-neutral-800
+        transition-all duration-150
+        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
+        ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+      `}
+      variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
+      whileHover="hover" initial="initial"
+      transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
-      {/* Input Handle */}
-      <Handle type="target" position={Position.Top} id="in" className="!bg-red-500 !w-2 !h-2" isConnectable={true} />
-      {/* Output Handle */}
-      <Handle type="source" position={Position.Bottom} id="out" className="!bg-red-500 !w-2 !h-2" isConnectable={true} />
-       {/* Optional: Coil handles */}
-      <Handle type="target" position={Position.Left} id="coil-a1" className="!top-1/3 !bg-blue-500 !w-2 !h-2" isConnectable={true} title="Coil A1"/>
-      <Handle type="target" position={Position.Left} id="coil-a2" className="!top-2/3 !bg-blue-500 !w-2 !h-2" isConnectable={true} title="Coil A2"/>
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
 
-
-      <div className="flex flex-col items-center text-center">
-         {/* State Icon */}
-         <Icon size={20} className={`mb-1 ${iconColor}`} />
-
-        {/* Label */}
-        <div className="text-[10px] font-semibold leading-tight truncate px-1">
-          {data.label || 'Contactor'}
-        </div>
-        <div className="text-[9px] text-muted-foreground">
-            {normallyOpen ? '(NO)' : '(NC)'} {isClosed ? 'Closed' : 'Open'}
-        </div>
-      </div>
-    </div>
+      <p className={`text-[9px] font-semibold text-center truncate w-full ${statusStyles.text}`} title={data.label}>
+        {data.label}
+      </p>
+      
+      {/* Simplified Contactor SVG Symbol */}
+      <svg viewBox="0 0 24 24" width="30" height="30" className={`${statusStyles.text} transition-colors duration-200`}>
+        <circle cx="6" cy="8" r="2" fill={contactorSymbolColor} /> 
+        <circle cx="18" cy="8" r="2" fill={contactorSymbolColor} />
+        <line x1="6" y1="8" x2="18" y2="8" stroke={contactorSymbolColor} strokeWidth="1.5" /> {/* Top bar */}
+        
+        {/* Contacts: If normally open, they show gapped by default, closed when status indicates */}
+        {/* Assume NO contactor for this visual: show closed if status is 'closed'/'energized' */}
+        {isClosed ? (
+          <>
+            <line x1="6" y1="10" x2="6" y2="16" stroke={contactorSymbolColor} strokeWidth="1.5" />
+            <line x1="18" y1="10" x2="18" y2="16" stroke={contactorSymbolColor} strokeWidth="1.5" />
+          </>
+        ) : (
+          <>
+            <line x1="6" y1="10" x2="6" y2="13" stroke={contactorSymbolColor} strokeWidth="1.5" />
+            <line x1="6" y1="13" x2="8" y2="15" stroke={contactorSymbolColor} strokeWidth="1.5" /> {/* Angled contact for NO */}
+            <line x1="18" y1="10" x2="18" y2="16" stroke={contactorSymbolColor} strokeWidth="1.5" />
+          </>
+        )}
+        <rect x="4" y="16" width="16" height="3" rx="1" fill={contactorSymbolColor} className="opacity-70"/> {/* Coil/Base */}
+      </svg>
+      
+      <p className={`text-[9px] font-bold ${statusStyles.text}`}>
+        {isOpen ? 'OPEN' : 'CLOSED'}
+      </p>
+    </motion.div>
   );
 };
 

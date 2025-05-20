@@ -35,7 +35,7 @@ export function NavMain({
   activeAccents: ActiveAccents;
 }) {
   const sidebar = useSidebar(); // Get sidebar context
-  const isCollapsed = sidebar.isCollapsed; // Access the correct property name
+  const isCollapsed = sidebar.collapsed; // Access the correct property name
   const pathname = usePathname();
   const [openSubmenus, setOpenSubmenus] = React.useState<Record<string, boolean>>({});
 
@@ -53,7 +53,7 @@ export function NavMain({
 
         return (
           <React.Fragment key={item.title + index}>
-            <Link href={item.url} passHref legacyBehavior>
+            <Link href={item.url} passHref>
               <motion.a
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-in-out group",
@@ -100,7 +100,7 @@ export function NavMain({
                             {item.items?.map(subItem => {
                                 const isSubActive = subItem.url && (pathname === subItem.url || pathname.startsWith(subItem.url + "/"));
                                 return (
-                                <Link key={subItem.title} href={subItem.url} passHref legacyBehavior>
+                                <Link key={subItem.title} href={subItem.url} passHref>
                                     <motion.a 
                                         className={cn(
                                             "block rounded-md px-3 py-1.5 text-xs transition-colors",
