@@ -8,11 +8,7 @@ export const WS_URL = (() => {
     // Fallback for environments without window (e.g., Node.js)
     return `ws://localhost:${WS_PORT}`;
 })();
-<<<<<<< Updated upstream
-export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840"; // Local OPC UA endpoint for PLC
-export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://112.134.218.51:4840"; // Remote OPC UA endpoint for PLC
-export const VERSION = "1.0.1";
-=======
+
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://112.134.218.51:4840";
 export const VERSION = "1.4.0";
@@ -40,4 +36,4 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = ['main_plant', 'secondary_plan
 
 export const USER = "viewer";
 // export const USER = "admin";
->>>>>>> Stashed changes
+
