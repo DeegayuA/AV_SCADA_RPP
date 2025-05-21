@@ -3,7 +3,7 @@
 import logo from "@/AV_logo.png"; // Ensure these paths are correct if this file is in a different dir
 import logo2 from "@/av_logo.svg";
 
-export const WS_PORT = 8888;
+export const WS_PORT = 2001;
 export const WS_URL = (() => {
     if (typeof window !== 'undefined') {
         return `ws://${window.location.hostname}:${WS_PORT}`;
