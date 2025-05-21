@@ -16,7 +16,7 @@ export const VERSION = "1.4.0";
 export const PLANT_NAME= "Mini-Grid";
 export const PLANT_LOCATION = "Colombo, Sri Lanka";
 export const PLANT_TYPE = "Mini-Grid";
-export const PLANT_CAPACITY = "100 kW";
+export const PLANT_CAPACITY = "25 kW";
 
 export const APP_NAME = "Mini-Grid Control Panel";
 export const APP_URL = "https://yourwebsite.com";
