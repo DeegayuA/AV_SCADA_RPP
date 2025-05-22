@@ -4,16 +4,22 @@ import logo from "@/AV_logo.png"; // Ensure these paths are correct if this file
 import logo2 from "@/av_logo.svg";
 
 export const WS_PORT = 2001;
+export const WS_API_PATH = "/api/opcua"; // This is your existing API route
 export const WS_URL = (() => {
-    // This code will only run in the browser (client-side)
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const hostname = window.location.hostname;
-        const wsUrl = `${protocol}//${hostname}:${WS_PORT}`;
-        // console.log(`WebSocket URL: ${wsUrl}`);
-        return wsUrl;
+
+        if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.')) { // Better check for local/dev
+            // For local development, connect to hostname:port
+            return `${protocol}//${hostname}:${WS_PORT}`;
+        } else {
+            // For deployed environments (like Vercel), connect to hostname/path (standard port 443 for wss)
+            return `${protocol}//${hostname}${WS_API_PATH}`;
+        }
     }
-    return `ws://localhost:${WS_PORT}`; // A sensible default for backend contexts.
+    // Fallback for server-side or non-browser environments (local default)
+    return `ws://localhost:${WS_PORT}`;
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.166.112:4840";
