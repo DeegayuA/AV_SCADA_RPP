@@ -5,9 +5,10 @@ import { useRouter, usePathname } from 'next/navigation';
 import { motion, Variants, TargetAndTransition } from 'framer-motion';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
-import { Settings, PlusCircle, Clock, Trash2, RotateCcw, Power, AlertTriangle, Check, ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList } from 'lucide-react'; // Added Maximize2, X, Pencil, LayoutList
+import { Settings, PlusCircle, Clock, Trash2, RotateCcw, Power, AlertTriangle, Check, ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from "@/components/ui/card";
+import { ensureAppConfigIsSaved, initDB, updateDataPoint, queueControlAction, getControlQueue, clearControlQueue } from '@/lib/db'; 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
@@ -32,7 +33,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"; 
 import { dataPoints as allPossibleDataPointsConfig, DataPoint } from '@/config/dataPoints';
-import { WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants'; // Assuming AVAILABLE_SLD_LAYOUT_IDS is here
+import { WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants';
 import { containerVariants, itemVariants } from '@/config/animationVariants';
 import { playSound } from '@/lib/utils';
 import { NodeData, ThreePhaseGroupInfo } from '../DashboardData/dashboardInterfaces';
@@ -280,7 +281,7 @@ const RenderingComponent: React.FC<RenderingComponentProps> = ({ sections, isEdi
 RenderingComponent.displayName = 'RenderingComponent';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
-const DEFAULT_SLD_LAYOUT_ID_KEY = `userSldLayoutId_${PLANT_NAME.replace(/\s+/g, '_')}`; // For saving selected SLD layout
+const DEFAULT_SLD_LAYOUT_ID_KEY = `userSldLayoutId_${PLANT_NAME.replace(/\s+/g, '_')}`;
 const DEFAULT_DISPLAY_COUNT = 6;
 const CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD = 4;
 const OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD = 4;
@@ -292,6 +293,15 @@ const UnifiedDashboardPage: React.FC = () => {
   const isGlobalEditMode = useIsEditMode();
   const storeHasHydrated = useAppStore.persist.hasHydrated();
   const [authCheckComplete, setAuthCheckComplete] = useState(false);
+
+  useEffect(() => {
+    initDB().then(() => {
+      console.log("Database initialized successfully by UnifiedDashboardPage.");
+    }).catch((error) => {
+      console.error("Error initializing database from UnifiedDashboardPage:", error);
+    });
+    ensureAppConfigIsSaved();
+  }, []); 
 
   useEffect(() => {
     if (!storeHasHydrated) return;
@@ -320,6 +330,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const [soundEnabled, setSoundEnabled] = useState<boolean>(() => typeof window !== 'undefined' ? localStorage.getItem('dashboardSoundEnabled') === 'true' : false);
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
   const [isSldModalOpen, setIsSldModalOpen] = useState(false); 
+  const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
 
   const currentUserRole = currentUser?.role;
   const [sldLayoutId, setSldLayoutId] = useState<string>(() => {
@@ -329,12 +340,208 @@ const UnifiedDashboardPage: React.FC = () => {
             return savedSldId;
         }
       }
-      return AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'; // Fallback
+      return AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant';
   });
   
   const allPossibleDataPoints = useMemo(() => allPossibleDataPointsConfig, []);
 
-  // Save SLD Layout ID to localStorage when it changes
+  const playNotificationSound = useCallback((type: 'success' | 'error' | 'warning' | 'info') => {
+    if (!soundEnabled) return;
+    const soundMap = { success: '/sounds/success.mp3', error: '/sounds/error.mp3', warning: '/sounds/warning.mp3', info: '/sounds/info.mp3' };
+    const volumeMap = { success: 0.99, error: 0.6, warning: 0.5, info: 0.3 };
+    if (typeof playSound === 'function') playSound(soundMap[type], volumeMap[type]); else console.warn("playSound utility not found.");
+  }, [soundEnabled]);
+
+
+  const processControlActionQueue = useCallback(async () => {
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+      console.warn("WebSocket not open. Cannot process control queue.");
+      return;
+    }
+    console.log("Processing control action queue...");
+    const queuedActions = await getControlQueue();
+    if (queuedActions.length > 0) {
+      toast.info("Processing Queued Actions", { description: `Found ${queuedActions.length} pending command(s).`});
+      let allSentSuccessfully = true;
+      for (const action of queuedActions) {
+        try {
+          const pointConfig = allPossibleDataPoints.find(p => p.nodeId === action.nodeId);
+          const payload = JSON.stringify({ [action.nodeId]: action.value });
+          ws.current.send(payload);
+          console.log(`Sent queued action: ${action.nodeId} = ${action.value}`);
+          // Individual item removal would be more robust. For now, clear all after.
+        } catch (e) {
+          allSentSuccessfully = false;
+          console.error(`Failed to send queued action ${action.nodeId}:`, e);
+          toast.error("Queued Action Failed", { description: `Could not send command for ${action.nodeId || 'unknown item'} from queue.`});
+        }
+      }
+      await clearControlQueue(); 
+      if (allSentSuccessfully && queuedActions.length > 0) {
+          toast.success("Queued Actions Processed", { description: "All pending commands sent." });
+      } else if (queuedActions.length > 0) {
+          toast.warning("Queue Processing Incomplete", { description: "Some queued commands may not have been sent." });
+      }
+    } else {
+      console.log("Control action queue is empty.");
+    }
+  }, [allPossibleDataPoints]); // ws.current is a ref, its change doesn't trigger re-render/re-callback
+
+
+  const connectWebSocket = useCallback(() => {
+    if (!authCheckComplete) return;
+    const opcuaRedirectedFlag = 'opcuaRedirected', reloadingFlag = 'reloadingDueToDelay', redirectingFlag = 'redirectingDueToExtremeDelay';
+    if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
+    if (typeof window !== 'undefined' && (sessionStorage.getItem(opcuaRedirectedFlag) || sessionStorage.getItem(reloadingFlag) || sessionStorage.getItem(redirectingFlag))) return;
+    setIsConnected(false); 
+    const delayMs = Math.min(1000 + 2000 * Math.pow(1.5, reconnectAttempts.current), 60000); 
+    if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
+    
+    reconnectInterval.current = setTimeout(() => {
+      if (typeof window === 'undefined') return; 
+      ws.current = new WebSocket(WS_URL);
+      
+      ws.current.onopen = () => { 
+        console.log("WS Connected"); 
+        setIsConnected(true); 
+        setNodeValues({}); 
+        setLastUpdateTime(Date.now()); 
+        reconnectAttempts.current = 0; 
+        if (reconnectInterval.current) { clearTimeout(reconnectInterval.current); reconnectInterval.current = null; } 
+        toast.success('WebSocket Connected', { description: 'Successfully connected to the backend.', duration: 3000 }); 
+        playNotificationSound('success'); 
+        if (typeof window !== 'undefined') { [opcuaRedirectedFlag, reloadingFlag, redirectingFlag].forEach(flag => sessionStorage.removeItem(flag)); }
+        processControlActionQueue(); // Process queue on successful connection
+      };
+      
+      ws.current.onmessage = (event) => { 
+        try { 
+          const receivedData = JSON.parse(event.data as string); 
+          if (typeof receivedData === 'object' && receivedData !== null) { 
+            setNodeValues(prev => ({ ...prev, ...receivedData })); 
+            setLastUpdateTime(Date.now()); 
+            Object.entries(receivedData).forEach(([nodeId, value]) => {
+              if (typeof value === 'number' || typeof value === 'boolean') {
+                updateDataPoint(nodeId, value);
+              } else {
+                console.warn(`Received non-primitive value for nodeId ${nodeId} via WebSocket. Type: ${typeof value}. Value:`, value);
+              }
+            });
+          } else {
+            console.warn("Received non-object data on WS:", receivedData);
+          }
+        } catch (e) { 
+          console.error("WS parse error:", e, "Data:", event.data); 
+          toast.error('Data Error', { description: 'Received invalid data format.' }); 
+          playNotificationSound('error'); 
+        } 
+      };
+      
+      ws.current.onerror = (event) => { 
+        console.error("WebSocket error event:", event); 
+        if (typeof window !== 'undefined' && !sessionStorage.getItem(opcuaRedirectedFlag)) { 
+          toast.error('Connection Error', { description: 'Redirecting for status check.' }); 
+          playNotificationSound('error'); 
+          sessionStorage.setItem(opcuaRedirectedFlag, 'true'); 
+          window.location.href = new URL('/api/opcua', window.location.origin).href; 
+        } else { 
+          if (ws.current) ws.current.close(ws.current.readyState === WebSocket.OPEN ? 1011 : undefined); 
+        } 
+      };
+      
+      ws.current.onclose = (event) => { 
+        console.log(`WS disconnected. Code: ${event.code}, Reason: ${event.reason || 'N/A'}, Clean: ${event.wasClean}`); 
+        setIsConnected(false); 
+        setNodeValues({}); 
+        if (typeof window !== 'undefined' && (sessionStorage.getItem(opcuaRedirectedFlag) || sessionStorage.getItem(reloadingFlag) || sessionStorage.getItem(redirectingFlag))) return; 
+        if (event.code !== 1000 && event.code !== 1001 && reconnectAttempts.current < maxReconnectAttempts) { 
+          reconnectAttempts.current++; 
+          connectWebSocket(); 
+        } else if (reconnectAttempts.current >= maxReconnectAttempts) { 
+          toast.error('Connection Failed', { description: 'Max reconnect attempts reached.' }); 
+          playNotificationSound('error'); 
+        } else if (event.code === 1000) { /* Potential info toast here */ } 
+      };
+    }, delayMs);
+  }, [authCheckComplete, playNotificationSound, maxReconnectAttempts, WS_URL, processControlActionQueue]);
+
+
+  const sendDataToWebSocket = useCallback(async (nodeId: string, value: boolean | number | string) => {
+    if (currentUserRole === UserRole.VIEWER) { 
+      toast.warning("Action Restricted", { description: "Viewers cannot send commands." }); 
+      playNotificationSound('warning'); 
+      return; 
+    }
+
+    const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId);
+    let v: number | boolean | string = value; // Keep original string type for parsing if needed
+    let coercedValueForQueue: number | boolean | undefined = undefined;
+
+    if (pointConfig?.dataType.includes('Int')) { 
+      let parsedNum: number;
+      if (typeof value === 'boolean') parsedNum = value ? 1 : 0; 
+      else if (typeof value === 'string') parsedNum = parseInt(value, 10); 
+      else parsedNum = value as number; // Assume it's already a number
+      
+      if (isNaN(parsedNum)) { 
+        toast.error('Send Error', { description: 'Invalid integer value.' }); return; 
+      }
+      v = parsedNum;
+      coercedValueForQueue = parsedNum;
+    } else if (pointConfig?.dataType === 'Boolean') { 
+      let parsedBool: boolean;
+      if (typeof value === 'number') parsedBool = value !== 0; 
+      else if (typeof value === 'string') parsedBool = value.toLowerCase() === 'true' || value === '1'; 
+      else parsedBool = value as boolean; // Assume it's already a boolean
+      v = parsedBool;
+      coercedValueForQueue = parsedBool;
+    } else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') { 
+      let parsedFloat: number;
+      if (typeof value === 'string') parsedFloat = parseFloat(value); 
+      else parsedFloat = value as number; // Assume it's already a number
+
+      if (isNaN(parsedFloat)) { 
+        toast.error('Send Error', { description: 'Invalid number value.' }); return; 
+      }
+      v = parsedFloat;
+      coercedValueForQueue = parsedFloat;
+    }
+
+    if (typeof v === 'number' && !isFinite(v)) { 
+      toast.error('Send Error', { description: 'Invalid number value (Infinite or NaN).' }); 
+      playNotificationSound('error'); 
+      return; 
+    }
+
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      try { 
+        const payload = JSON.stringify({ [nodeId]: v }); 
+        ws.current.send(payload); 
+        toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(v)}` }); 
+        playNotificationSound('info'); 
+      } catch (e) { 
+        console.error("WS send error:", e); 
+        toast.error('Send Error', { description: 'Failed to send command directly. Queuing action.' }); 
+        playNotificationSound('error');
+        if (coercedValueForQueue !== undefined) {
+          await queueControlAction(nodeId, coercedValueForQueue);
+        } else {
+            toast.error('Queue Error', { description: `Cannot queue uncoerced value for ${nodeId}.`});
+        }
+      }
+    } else {
+      toast.warning('Connection Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` });
+      playNotificationSound('warning');
+      if (coercedValueForQueue !== undefined) {
+        await queueControlAction(nodeId, coercedValueForQueue);
+      } else {
+         toast.error('Queue Error', { description: `Cannot queue uncoerced value for ${nodeId}.`});
+      }
+      if (!isConnected && authCheckComplete) connectWebSocket(); // Attempt reconnect if auth is complete
+    }
+  }, [isConnected, connectWebSocket, allPossibleDataPoints, playNotificationSound, currentUserRole, authCheckComplete]);
+
+
   useEffect(() => {
     if (typeof window !== 'undefined' && authCheckComplete) {
         localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId);
@@ -385,13 +592,9 @@ const UnifiedDashboardPage: React.FC = () => {
 
   useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('dashboardSoundEnabled', String(soundEnabled)); }, [soundEnabled]);
   const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
-  const playNotificationSound = useCallback((type: 'success' | 'error' | 'warning' | 'info') => {
-    if (!soundEnabled) return;
-    const soundMap = { success: '/sounds/success.mp3', error: '/sounds/error.mp3', warning: '/sounds/warning.mp3', info: '/sounds/info.mp3' };
-    const volumeMap = { success: 0.99, error: 0.6, warning: 0.5, info: 0.3 };
-    if (typeof playSound === 'function') playSound(soundMap[type], volumeMap[type]); else console.warn("playSound utility not found.");
-  }, [soundEnabled]);
+  
   useEffect(() => { const updateClock = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); updateClock(); const interval = setInterval(updateClock, 1000); return () => clearInterval(interval); }, []);
+  
   useEffect(() => {
     if (!authCheckComplete) return;
     const lagCheckInterval = setInterval(() => {
@@ -403,23 +606,30 @@ const UnifiedDashboardPage: React.FC = () => {
       else if (currentDelay < 30000 && typeof window !== 'undefined') { if (sessionStorage.getItem(reloadingFlag)) sessionStorage.removeItem(reloadingFlag); if (sessionStorage.getItem(redirectingFlag)) sessionStorage.removeItem(redirectingFlag); }
     }, 2000); return () => clearInterval(lagCheckInterval);
   }, [lastUpdateTime, isConnected, playNotificationSound, authCheckComplete]);
+  
   const checkPlcConnection = useCallback(async () => { if (!authCheckComplete) return; try { const res = await fetch('/api/opcua/status'); if (!res.ok) throw new Error(`API Error: ${res.status}`); const data = await res.json(); const newStatus = data.connectionStatus; if (newStatus && ['online', 'offline', 'disconnected'].includes(newStatus)) setPlcStatus(newStatus); else { console.error("Invalid PLC status:", data); if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (err) { console.warn("Failed to check PLC status:", err); if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } }, [plcStatus, authCheckComplete]);
+  
   useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcInterval = setInterval(checkPlcConnection, 10000); return () => clearInterval(plcInterval); }, [checkPlcConnection, authCheckComplete]);
-  const connectWebSocket = useCallback(() => {
-    if (!authCheckComplete) return;
-    const opcuaRedirectedFlag = 'opcuaRedirected', reloadingFlag = 'reloadingDueToDelay', redirectingFlag = 'redirectingDueToExtremeDelay';
-    if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
-    if (typeof window !== 'undefined' && (sessionStorage.getItem(opcuaRedirectedFlag) || sessionStorage.getItem(reloadingFlag) || sessionStorage.getItem(redirectingFlag))) return;
-    setIsConnected(false); const delayMs = Math.min(1000 + 2000 * Math.pow(1.5, reconnectAttempts.current), 60000); if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
-    reconnectInterval.current = setTimeout(() => {
-      if (typeof window === 'undefined') return; ws.current = new WebSocket(WS_URL);
-      ws.current.onopen = () => { console.log("WS Connected"); setIsConnected(true); setNodeValues({}); setLastUpdateTime(Date.now()); reconnectAttempts.current = 0; if (reconnectInterval.current) { clearTimeout(reconnectInterval.current); reconnectInterval.current = null; } toast.success('WebSocket Connected', { description: 'Successfully connected to the backend.', duration: 3000 }); playNotificationSound('success'); if (typeof window !== 'undefined') { [opcuaRedirectedFlag, reloadingFlag, redirectingFlag].forEach(flag => sessionStorage.removeItem(flag)); } };
-      ws.current.onmessage = (event) => { try { const receivedData = JSON.parse(event.data as string); if (typeof receivedData === 'object' && receivedData !== null) { setNodeValues(prev => ({ ...prev, ...receivedData })); setLastUpdateTime(Date.now()); } else console.warn("Received non-object data on WS:", receivedData); } catch (e) { console.error("WS parse error:", e, "Data:", event.data); toast.error('Data Error', { description: 'Received invalid data format.' }); playNotificationSound('error'); } };
-      ws.current.onerror = (event) => { console.error("WebSocket error event:", event); if (typeof window !== 'undefined' && !sessionStorage.getItem(opcuaRedirectedFlag)) { toast.error('Connection Error', { description: 'Redirecting for status check.' }); playNotificationSound('error'); sessionStorage.setItem(opcuaRedirectedFlag, 'true'); window.location.href = new URL('/api/opcua', window.location.origin).href; } else { if (ws.current) ws.current.close(ws.current.readyState === WebSocket.OPEN ? 1011 : undefined); } };
-      ws.current.onclose = (event) => { console.log(`WS disconnected. Code: ${event.code}, Reason: ${event.reason || 'N/A'}, Clean: ${event.wasClean}`); setIsConnected(false); setNodeValues({}); if (typeof window !== 'undefined' && (sessionStorage.getItem(opcuaRedirectedFlag) || sessionStorage.getItem(reloadingFlag) || sessionStorage.getItem(redirectingFlag))) return; if (event.code !== 1000 && event.code !== 1001 && reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); } else if (reconnectAttempts.current >= maxReconnectAttempts) { toast.error('Connection Failed', { description: 'Max reconnect attempts reached.' }); playNotificationSound('error'); } else if (event.code === 1000) { /* toast.info('Disconnected', { description: 'Connection closed cleanly.' }) */ } };
-    }, delayMs);
-  }, [playNotificationSound, maxReconnectAttempts, WS_URL, authCheckComplete]);
-  useEffect(() => { if (!authCheckComplete) return () => { }; if (typeof window === 'undefined') return;['opcuaRedirected', 'reloadingDueToDelay', 'redirectingDueToExtremeDelay'].forEach(flag => sessionStorage.removeItem(flag)); reconnectAttempts.current = 0; connectWebSocket(); return () => { if (reconnectInterval.current) clearTimeout(reconnectInterval.current); if (ws.current && ws.current.readyState !== WebSocket.CLOSED) { ws.current.onopen = null; ws.current.onmessage = null; ws.current.onerror = null; ws.current.onclose = null; ws.current.close(1000, 'Component Unmounted'); ws.current = null; } }; }, [connectWebSocket, authCheckComplete]);
+    
+  useEffect(() => { 
+    if (!authCheckComplete) return () => { }; 
+    if (typeof window === 'undefined') return;
+    ['opcuaRedirected', 'reloadingDueToDelay', 'redirectingDueToExtremeDelay'].forEach(flag => sessionStorage.removeItem(flag)); 
+    reconnectAttempts.current = 0; 
+    connectWebSocket(); 
+    return () => { 
+      if (reconnectInterval.current) clearTimeout(reconnectInterval.current); 
+      if (ws.current && ws.current.readyState !== WebSocket.CLOSED) { 
+        ws.current.onopen = null; 
+        ws.current.onmessage = null; 
+        ws.current.onerror = null; 
+        ws.current.onclose = null; 
+        ws.current.close(1000, 'Component Unmounted'); 
+        ws.current = null; 
+      } 
+    }; 
+  }, [connectWebSocket, authCheckComplete]);
+
   const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
   const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch'), [individualPoints]);
   const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
@@ -431,12 +641,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const cardHoverEffect = useMemo(() => (resolvedTheme === 'dark' ? { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } } : { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } }), [resolvedTheme]);
   const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaultIds = getSmartDefaults(); setDisplayedDataPointIds(smartDefaultIds.length > 0 ? smartDefaultIds : getHardcodedDefaultDataPointIds()); toast.info("Dashboard reset to default layout."); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole]);
   const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; setDisplayedDataPointIds([]); toast.info("All data points removed from layout."); }, [currentUserRole]);
-  const sendDataToWebSocket = useCallback((nodeId: string, value: boolean | number | string) => {
-    if (currentUserRole === UserRole.VIEWER) { toast.warning("Action Restricted", { description: "Viewers cannot send commands." }); playNotificationSound('warning'); return; }
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      try { const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId); let v = value; if (pointConfig?.dataType.includes('Int')) { if (typeof value === 'boolean') v = value ? 1 : 0; else if (typeof value === 'string') v = parseInt(value, 10); if (typeof v === 'number' && isNaN(v)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; } } else if (pointConfig?.dataType === 'Boolean') { if (typeof value === 'number') v = value !== 0; else if (typeof value === 'string') v = value.toLowerCase() === 'true' || value === '1'; } else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') { if (typeof value === 'string') v = parseFloat(value); if (typeof v === 'number' && isNaN(v)) { toast.error('Send Error', { description: 'Invalid number value.' }); return; } } if (typeof v === 'number' && !isFinite(v)) { toast.error('Send Error', { description: 'Invalid number value (Infinite or NaN).' }); playNotificationSound('error'); return; } const payload = JSON.stringify({ [nodeId]: v }); ws.current.send(payload); toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(v)}` }); playNotificationSound('info'); } catch (e) { console.error("WS send error:", e); toast.error('Send Error', { description: 'Failed to send command.' }); playNotificationSound('error'); }
-    } else { toast.error('Connection Error', { description: 'Cannot send. WebSocket disconnected.' }); playNotificationSound('error'); if (!isConnected) connectWebSocket(); }
-  }, [isConnected, connectWebSocket, allPossibleDataPoints, playNotificationSound, currentUserRole]);
+    
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
     if (currentUserRole !== UserRole.ADMIN) return; const currentDisplayedSet = new Set(displayedDataPointIds);
     const trulyNewIds = selectedIds.filter(id => !currentDisplayedSet.has(id));
@@ -444,6 +649,7 @@ const UnifiedDashboardPage: React.FC = () => {
     if (trulyNewIds.length > 0) { setDisplayedDataPointIds(prevIds => Array.from(new Set([...prevIds, ...trulyNewIds]))); toast.success(`${trulyNewIds.length} new data point${trulyNewIds.length > 1 ? 's' : ''} added.`); }
     setIsConfiguratorOpen(false);
   }, [displayedDataPointIds, currentUserRole]);
+
   const handleRemoveItem = useCallback((dataPointIdToRemove: string) => {
     if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dataPointIdToRemove);
     if (pointToRemove?.threePhaseGroup) {
@@ -452,6 +658,7 @@ const UnifiedDashboardPage: React.FC = () => {
       toast.info(`${pointToRemove.threePhaseGroup} group removed.`);
     } else { setDisplayedDataPointIds(prevIds => prevIds.filter(id => id !== dataPointIdToRemove)); toast.info("Data point removed."); }
   }, [allPossibleDataPoints, currentUserRole]);
+  
   const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => { const groups: Record<string, ConfiguratorThreePhaseGroup> = {}; const individuals: DataPoint[] = []; const currentDisplayedSet = new Set(displayedDataPointIds); allPossibleDataPoints.forEach(dp => { if (dp.threePhaseGroup && dp.phase && ['a', 'b', 'c', 'x', 'total'].includes(dp.phase)) { if (!groups[dp.threePhaseGroup]) { let repName = dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig, '').trim().replace(/ \([ABCX]\)$/i, '').trim(); groups[dp.threePhaseGroup] = { name: dp.threePhaseGroup, representativeName: repName || dp.threePhaseGroup, ids: [], category: dp.category }; } groups[dp.threePhaseGroup].ids.push(dp.id); } else if (!dp.threePhaseGroup) { individuals.push(dp); } }); const allGroupIdsAsArray = Array.from(new Set(Object.values(groups).flatMap(g => g.ids))); const trulyIndividualPoints = individuals.filter(ind => !allGroupIdsAsArray.includes(ind.id)); const currentDisplayedArray = Array.from(currentDisplayedSet); return { threePhaseGroupsForConfig: Object.values(groups).filter(g => g.ids.some(id => !currentDisplayedArray.includes(id))).sort((a, b) => a.representativeName.localeCompare(b.representativeName)), individualPointsForConfig: trulyIndividualPoints.filter(dp => !currentDisplayedArray.includes(dp.id)).sort((a, b) => a.name.localeCompare(b.name)) }; }, [allPossibleDataPoints, displayedDataPointIds]);
   
   const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
@@ -469,10 +676,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const [graphGenerationNodes, setGraphGenerationNodes] = useState<string[]>(['inverter-output-total-power']);
   const [graphUsageNodes, setGraphUsageNodes] = useState<string[]>(['grid-total-active-power-side-to-side']);
   const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>('day');
-
-  // State for SLD Layout configuration popover/dialog
   const [isSldConfigOpen, setIsSldConfigOpen] = useState(false);
-
 
   if (!storeHasHydrated || !authCheckComplete) {
     return (
@@ -484,14 +688,9 @@ const UnifiedDashboardPage: React.FC = () => {
   }
 
   const handleSldLayoutSelect = (newLayoutId: string) => {
-    // This function could eventually involve checking for unsaved changes
-    // in the SLDWidget itself if it were to become more complex,
-    // but for now, it just updates the parent's state.
-    // The SLDWidget's own onLayoutIdChange handles internal isDirty checks.
     setSldLayoutId(newLayoutId);
-    setIsSldConfigOpen(false); // Close the selector dialog/popover
+    setIsSldConfigOpen(false); 
   };
-
 
   return (
     <div className="bg-background text-foreground px-3 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
@@ -546,7 +745,7 @@ const UnifiedDashboardPage: React.FC = () => {
                             </DialogContent>
                         </Dialog>
                     )}
-                    {!sldSpecificEditMode && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {sldLayoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>}
+                    {!sldSpecificEditMode && sldLayoutId && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {sldLayoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>}
                 </div>
                 <TooltipProvider delayDuration={100}>
                   <Tooltip>
@@ -610,7 +809,50 @@ const UnifiedDashboardPage: React.FC = () => {
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
         <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
           <DialogHeader className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
-            <DialogTitle>Plant Layout View - {sldLayoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</DialogTitle>
+            <div className="flex items-center gap-2">
+                <DialogTitle>
+                    Plant Layout View
+                    {!sldSpecificEditMode && sldLayoutId && ` : ${sldLayoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}
+                </DialogTitle>
+                {sldSpecificEditMode && (
+                    <Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}>
+                        <DialogTrigger asChild>
+                            <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                                <LayoutList className="h-3.5 w-3.5 mr-1.5"/>
+                                Layout: {sldLayoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[425px]">
+                            <DialogHeader>
+                                <DialogTitle>Select SLD Layout</DialogTitle>
+                            </DialogHeader>
+                            <div className="py-4">
+                                <Select 
+                                    onValueChange={(newLayoutId) => {
+                                        setSldLayoutId(newLayoutId);
+                                        setIsModalSldLayoutConfigOpen(false);
+                                    }} 
+                                    value={sldLayoutId}
+                                >
+                                    <SelectTrigger className="w-full mb-2">
+                                        <SelectValue placeholder="Choose a layout..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {AVAILABLE_SLD_LAYOUT_IDS.filter(Boolean).map((id) => 
+                                            <SelectItem key={id} value={String(id)}>
+                                                {String(id).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
+                                            </SelectItem>
+                                        )}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-sm text-muted-foreground mt-2">
+                                    Select which Single Line Diagram to display and edit. Changes made are client-side until saved within the SLD editor.
+                                </p>
+                            </div>
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </div>
             <DialogClose asChild>
               <Button variant="ghost" size="icon" className="rounded-full">
                 <X className="h-5 w-5" />
@@ -621,7 +863,7 @@ const UnifiedDashboardPage: React.FC = () => {
           <div className="flex-grow p-2 sm:p-4 overflow-hidden">
             <SLDWidget
               layoutId={sldLayoutId}
-              isEditMode={false} // Modal is view-only
+              isEditMode={sldSpecificEditMode}
             />
           </div>
         </DialogContent>

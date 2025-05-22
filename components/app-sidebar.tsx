@@ -104,8 +104,8 @@ const navData = {
     { title: "Report Issue", url: "/report-issue", icon: Send, sectionId: "Report Issue", colorKey: "report" },
   ] as NavSecondaryItemProps[],
   projects: [
-    { name: "Main Plant Status", url: "/projects/main-plant", icon: Frame, sectionId: "Main Plant Status", colorKey: "projects" },
-    { name: "Substation Alpha Metrics", url: "/projects/substation-alpha", icon: PieChart, sectionId: "Substation Alpha Metrics", colorKey: "projects" },
+    // { name: "Main Plant Status", url: "/projects/main-plant", icon: Frame, sectionId: "Main Plant Status", colorKey: "projects" },
+    // { name: "Substation Alpha Metrics", url: "/projects/substation-alpha", icon: PieChart, sectionId: "Substation Alpha Metrics", colorKey: "projects" },
   ] as NavProjectItemProps[],
 };
 

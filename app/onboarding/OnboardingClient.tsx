@@ -1,4 +1,4 @@
-// app/onboarding/page.tsx
+// app/onboarding/OnboardingClient.tsx (or page.tsx)
 'use client';
 
 import React, { useEffect, useState, useCallback, Suspense } from 'react';
@@ -15,7 +15,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { APP_NAME } from '@/config/constants';
 import { useAppStore } from '@/stores/appStore';
-import { UserRole } from '@/types/auth';
+import { User, UserRole } from '@/types/auth'; // Assuming User type is imported or define it based on your store
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 import { OnboardingProvider, useOnboarding, OnboardingContextType, OnboardingStep } from './OnboardingContext';
@@ -25,7 +25,7 @@ import DataPointConfigStep from './DataPointConfigStep';
 import OpcuaTestStep from './OpcuaTestStep';
 import ReviewStep from './ReviewStep';
 
-// Animation variants
+// Animation variants (ensure itemVariants is defined before SuccessRedirector if used)
 const pageTransitionVariants = { /* ... same ... */
   initial: { opacity: 0 },
   animate: { opacity: 1, transition: { duration: 0.5, ease: "anticipate" } },
@@ -55,7 +55,8 @@ const iconPulseVariants = { /* ... same ... */
     pulse: { scale: [1, 1.15, 1], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } }
 };
 
-// --- OnboardingProgressBar (Internalized) ---
+// --- OnboardingProgressBarInternal (Internalized) ---
+// ... (Existing component code remains the same)
 interface OnboardingProgressBarInternalProps {
   currentStep: number; // 0-indexed
   totalSteps: number;
@@ -80,7 +81,8 @@ const OnboardingProgressBarInternal: React.FC<OnboardingProgressBarInternalProps
 });
 OnboardingProgressBarInternal.displayName = "OnboardingProgressBarInternal";
 
-// --- OnboardingNavigation (Internalized & UPDATED) ---
+// --- OnboardingNavigationInternal (Internalized & UPDATED) ---
+// ... (Existing component code remains the same)
 interface OnboardingNavigationInternalProps {
   onNext: () => void;
   onPrev: () => void;
@@ -127,14 +129,39 @@ const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> 
 });
 OnboardingNavigationInternal.displayName = "OnboardingNavigationInternal";
 
+// --- NEW COMPONENT: SuccessRedirector ---
+interface SuccessRedirectorProps {
+  currentUser: User | null; // Or: typeof useAppStore extends (selector: (state: any) => infer R) => R ? ReturnType<typeof useAppStore(state => state.currentUser)> : any;
+  redirectDelay?: number;
+}
+
+const SuccessRedirector: React.FC<SuccessRedirectorProps> = React.memo(({ currentUser, redirectDelay = 3500 }) => {
+    const router = useRouter();
+    
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            router.replace(currentUser?.redirectPath || '/dashboard');
+        }, redirectDelay);
+        return () => clearTimeout(timer);
+    }, [router, currentUser, redirectDelay]); // Dependencies
+
+    return (
+        <motion.div variants={itemVariants} className="mt-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground"/>
+        </motion.div>
+    );
+});
+SuccessRedirector.displayName = "SuccessRedirector";
+
+
 // --- OnboardingPanelInternalContent ---
+// ... (Existing component code remains the same)
 const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     const context = useOnboarding();
     if (!context) throw new Error("useOnboarding must be used within OnboardingProvider");
     const { currentStep, completeOnboarding, nextStep, prevStep, isLoading } = context as Required<OnboardingContextType>;
     
     const [direction, setDirection] = useState(1);
-    // const searchParams = useSearchParams(); // Only if actively debugging URL step display here
 
     const stepsConfig = [
         { component: <WelcomeStep key="welcome" />, name: "Welcome" },
@@ -144,13 +171,13 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
 
-    const stepSlideVariants = { /* ... same ... */
+    const stepSlideVariants = {
         hidden: (dir: number) => ({ opacity: 0, x: dir > 0 ? "30px" : "-30px", scale: 0.99, filter: "blur(2px)" }),
         visible: { opacity: 1, x: "0px", scale: 1, filter: "blur(0px)", transition: { type: "spring", stiffness: 260, damping: 28 } },
         exit: (dir: number) => ({ opacity: 0, x: dir < 0 ? "30px" : "-30px", scale: 0.99, filter: "blur(2px)", transition: { type: "tween", duration: 0.15, ease:"easeIn" } }),
     };
 
-    const handleNext = useCallback(async () => { /* ... same ... */
+    const handleNext = useCallback(async () => {
         setDirection(1);
         if (currentStep === stepsConfig.length - 1) {
             await completeOnboarding();
@@ -159,20 +186,18 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
         }
     }, [currentStep, completeOnboarding, nextStep, stepsConfig.length]);
 
-    const handlePrev = useCallback(() => { /* ... same ... */
+    const handlePrev = useCallback(() => {
         setDirection(-1);
         if (prevStep) {
             prevStep();
         }
     }, [prevStep]);
 
-    // const urlStepDebug = process.env.NODE_ENV === 'development' ? searchParams.get('step') : null;
 
     return (
         <>
             <VisuallyHidden><h2>Onboarding Setup Process for {APP_NAME}</h2></VisuallyHidden>
             <CardHeader className="p-4 sm:p-5 border-b sticky top-0 z-10 bg-card/80 backdrop-blur-sm rounded-t-xl">
-                {/* ... CardHeader content same ... */}
                 <div className="flex items-center space-x-3">
                     <motion.div variants={iconPulseVariants} animate="pulse">
                         <Sparkles className="h-7 w-7 text-primary shrink-0" />
@@ -183,8 +208,6 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
                 </div>
             </CardHeader>
 
-            {/* {urlStepDebug && ( ... debug display same ... )} */}
-
             {currentStep < stepsConfig.length && (
                 <CardContent className="p-0 border-b">
                    <div className="px-4 sm:px-6 py-3">
@@ -194,7 +217,6 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
             )}
 
             <CardContent className="flex-grow overflow-y-auto p-4 sm:p-6 relative min-h-[350px] sm:min-h-[450px]">
-                {/* ... AnimatePresence content same ... */}
                 <AnimatePresence initial={false} custom={direction} mode="wait">
                     <motion.div
                         key={currentStep} 
@@ -226,8 +248,9 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
 });
 OnboardingPanelInternalContent.displayName = 'OnboardingPanelInternalContent';
 
+
 // --- Main OnboardingPageContentInternal ---
-const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
+const OnboardingPageContentInternal: React.FC = () => {
     const context = useOnboarding();
     if (!context) throw new Error("OnboardingPageContentInternal must be used within OnboardingProvider");
     const { currentStep, resetOnboardingData, saveStatus, goToStep, isLoading } = context as Required<OnboardingContextType>;
@@ -242,10 +265,9 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
     const [pageState, setPageState] = useState<'loading' | 'auth_required' | 'admin_setup_pending' | 'onboarding_active' | 'finalizing' | 'error_state'>('loading');
     const [hasSyncedUrlToContext, setHasSyncedUrlToContext] = useState(false);
 
-
     const totalFunctionalSteps = 5;
 
-    useEffect(() => { /* ... auth performChecks logic same ... */
+    useEffect(() => {
         if (!storeHasHydrated) {
             console.log("[OnboardingPage] Waiting for Zustand hydration...");
             setPageState('loading');
@@ -305,7 +327,7 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
         return () => { isMounted = false; };
     }, [storeHasHydrated, currentUserFromStore, router, resetOnboardingData, searchParams, pathname]); 
 
-    useEffect(() => { /* ... URL Sync logic same ... */
+    useEffect(() => {
         if (pageState !== 'onboarding_active' && pageState !== 'finalizing') return;
         if (!goToStep) return; 
 
@@ -338,7 +360,7 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
 
     }, [pageState, currentStep, searchParams, pathname, router, goToStep, totalFunctionalSteps, hasSyncedUrlToContext]);
 
-    useEffect(() => { /* ... Finalizing state logic same ... */
+    useEffect(() => {
         if (pageState === 'onboarding_active' && currentStep >= totalFunctionalSteps) {
             setPageState('finalizing');
         } else if (pageState === 'finalizing' && currentStep < totalFunctionalSteps) {
@@ -349,7 +371,7 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
 
     return (
         <AnimatePresence mode="wait">
-            {pageState === 'loading' && ( /* ... Loading screen same ... */
+            {pageState === 'loading' && (
                 <motion.div key="loading" {...pageTransitionVariants} className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-neutral-900 text-slate-200 z-[100]"
                     variants={itemVariantsStagger} initial="initial" animate="animate">
                     <motion.div variants={itemVariants}><Loader2 className="h-16 w-16 text-primary animate-spin mb-6" /></motion.div>
@@ -357,7 +379,7 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
                     <motion.p variants={itemVariants} className="text-sm text-slate-400 mt-2">Verifying your session and configuration.</motion.p>
                 </motion.div>
             )}
-            {pageState === 'admin_setup_pending' && ( /* ... Admin Pending screen same ... */ 
+            {pageState === 'admin_setup_pending' && ( 
                 <motion.div key="admin_pending" {...pageTransitionVariants} className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-100 dark:from-neutral-900 dark:via-neutral-800 dark:to-gray-900 text-center p-6 z-[90]"
                     variants={itemVariantsStagger} initial="initial" animate="animate">
                     <motion.div variants={itemVariants}><UserCog className="h-20 w-20 text-amber-500 dark:text-amber-400 mx-auto mb-6 opacity-80" /></motion.div>
@@ -368,9 +390,9 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
                     <motion.div variants={itemVariants}><Button onClick={() => router.push('/login')} className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg px-8 py-3 text-base">Go to Login</Button></motion.div>
                 </motion.div>
             )}
-            {pageState === 'finalizing' && ( /* ... Finalizing screen same ... */
+            {pageState === 'finalizing' && (
                  <motion.div key="finalizing" {...pageTransitionVariants} className="fixed inset-0 flex flex-col items-center justify-center text-center p-6 bg-background z-[100]"
-                    variants={itemVariantsStagger} initial="initial" animate="animate">
+                    variants={itemVariantsStagger} initial="initial" animate="animate"> {/* This variants is for the overall div, which is fine */}
                     <motion.div variants={itemVariants} className="mb-8">
                         {saveStatus === 'saving' && isLoading && <Loader2 className="h-20 w-20 animate-spin text-primary" />}
                         {saveStatus === 'success' && !isLoading && <motion.div initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 180, damping: 12, delay:0.1 }}><CheckCircle className="h-20 w-20 text-green-500" /></motion.div>}
@@ -386,12 +408,9 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
                         {saveStatus === 'success' && !isLoading && `${APP_NAME} is now ready. You'll be redirected shortly.`}
                         {saveStatus === 'error' && !isLoading && "Something went wrong while saving. Please review your settings or contact support."}
                     </motion.p>
+                    {/* MODIFIED SECTION: Use the new SuccessRedirector component */}
                     {saveStatus === 'success' && !isLoading && (
-                        useEffect(() => {
-                            const timer = setTimeout(() => router.replace(currentUserFromStore?.redirectPath || '/dashboard'), 3500);
-                            return () => clearTimeout(timer);
-                        }, []), 
-                        <motion.div variants={itemVariants} className="mt-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground"/></motion.div>
+                        <SuccessRedirector currentUser={currentUserFromStore} />
                     )}
                     {saveStatus === 'error' && !isLoading && goToStep && (
                         <motion.div variants={itemVariants} className="mt-8 flex gap-3">
@@ -401,7 +420,7 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
                     )}
                 </motion.div>
             )}
-            {pageState === 'onboarding_active' && ( /* ... Active Onboarding Panel screen same ... */ 
+            {pageState === 'onboarding_active' && ( 
                 <motion.div key="onboarding_active" className="fixed inset-0 bg-gradient-to-br from-slate-100 via-gray-100 to-slate-200 dark:from-neutral-950 dark:via-zinc-900 dark:to-gray-950 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto z-40">
                     <motion.div
                         variants={panelVariants} initial="initial" animate="animate" exit="exit"
@@ -424,7 +443,7 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
                     </motion.div>
                 </motion.div>
             )}
-             {pageState === 'error_state' && ( /* ... Error screen same ... */
+             {pageState === 'error_state' && (
                 <motion.div key="error_state" {...pageTransitionVariants} className="fixed inset-0 flex flex-col items-center justify-center bg-red-50 dark:bg-red-900/50 text-center p-6 z-[90]"
                     variants={itemVariantsStagger} initial="initial" animate="animate">
                     <motion.div variants={itemVariants}><AlertTriangle className="h-20 w-20 text-destructive mx-auto mb-6 opacity-80" /></motion.div>
@@ -438,13 +457,16 @@ const OnboardingPageContentInternal: React.FC = () => { /* ... same ... */
         </AnimatePresence>
     );
 };
+OnboardingPageContentInternal.displayName = 'OnboardingPageContentInternal';
+
 
 // Main export for the page route (app/onboarding/page.tsx)
 export default function OnboardingRoutePage() {
   return (
     <OnboardingProvider>
-      <OnboardingPageContentInternal />
+        <Suspense fallback={<div>Loading Onboarding Experience...</div>}> {/* Added Suspense as a good practice if any part of Onboarding relies on it, check if searchParams or other hooks need it higher up though. If not used here, you can omit */}
+            <OnboardingPageContentInternal />
+        </Suspense>
     </OnboardingProvider>
   );
 }
-

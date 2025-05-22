@@ -1,5 +1,40 @@
-import { openDB, DBSchema } from 'idb';
-import { DataPoint } from '@/config/dataPoints';
+// lib/db.ts
+import { openDB, DBSchema, IDBPDatabase } from 'idb';
+import { DataPoint } from '@/config/dataPoints'; // Assuming this is used elsewhere or for future plans
+import { toast } from 'sonner'; // Import toast for notifications
+
+// Import constants to be saved
+import {
+  VERSION, PLANT_NAME, PLANT_LOCATION, PLANT_TYPE, PLANT_CAPACITY,
+  APP_NAME, APP_URL, APP_KEYWORDS, APP_DESCRIPTION, APP_FAVICON,
+  APP_AUTHOR, APP_AUTHOR_URL, APP_COPYRIGHT, APP_COPYRIGHT_URL,
+  APP_PRIVACY_POLICY, APP_TERMS_OF_SERVICE, AVAILABLE_SLD_LAYOUT_IDS, USER
+  // Note: WS_PORT, WS_URL, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE are typically
+  // environment-dependent or dynamically calculated, so storing their initial values might
+  // not be ideal. APP_LOGO and APP_LOGO2 are module imports, not simple strings suitable for IDB.
+} from '@/config/constants';
+
+// Interface for the application configuration data
+interface AppConfigValue {
+  VERSION: string;
+  PLANT_NAME: string;
+  PLANT_LOCATION: string;
+  PLANT_TYPE: string;
+  PLANT_CAPACITY: string;
+  APP_NAME: string;
+  APP_URL: string;
+  APP_KEYWORDS: string;
+  APP_DESCRIPTION: string;
+  APP_FAVICON: string;
+  APP_AUTHOR: string;
+  APP_AUTHOR_URL: string;
+  APP_COPYRIGHT: string;
+  APP_COPYRIGHT_URL: string;
+  APP_PRIVACY_POLICY: string;
+  APP_TERMS_OF_SERVICE: string;
+  AVAILABLE_SLD_LAYOUT_IDS: string[];
+  USER: string;
+}
 
 interface SolarDB extends DBSchema {
   dataPoints: {
@@ -17,70 +52,232 @@ interface SolarDB extends DBSchema {
       timestamp: number;
     };
   };
+  appConfig: { // New object store for application configuration
+    key: string; // We'll use a single key like 'mainConfiguration'
+    value: AppConfigValue;
+  };
 }
 
 const DB_NAME = 'solar-minigrid';
-const DB_VERSION = 1;
+const DB_VERSION = 2; // Incremented version due to new object store
+const APP_CONFIG_KEY = 'mainConfiguration'; // Key for the single config object
 
-export async function initDB() {
+let dbPromise: Promise<IDBPDatabase<SolarDB> | null> | null = null;
+
+export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
   if (typeof window === 'undefined') {
-    // This code runs on the server side, where IndexedDB is not available.
     console.error("IndexedDB is not available on the server.");
-    return null; // Or handle server-side case differently
+    // toast.error("Offline Storage Unavailable", { description: "Cannot initialize local database on server." }); // Toast won't work on server
+    return null;
+  }
+
+  if (dbPromise) {
+    return dbPromise;
+  }
+
+  dbPromise = (async () => {
+    try {
+      console.log("Initializing database...");
+      const db = await openDB<SolarDB>(DB_NAME, DB_VERSION, {
+        upgrade(dbInstance, oldVersion, newVersion, transaction) {
+          console.log(`Upgrading database from version ${oldVersion} to ${newVersion}...`);
+          
+          // Create 'dataPoints' store if it doesn't exist (from version < 1)
+          if (oldVersion < 1) {
+            if (!dbInstance.objectStoreNames.contains('dataPoints')) {
+              dbInstance.createObjectStore('dataPoints');
+              console.log("Created 'dataPoints' object store.");
+            }
+            if (!dbInstance.objectStoreNames.contains('controlQueue')) {
+              dbInstance.createObjectStore('controlQueue');
+              console.log("Created 'controlQueue' object store.");
+            }
+          }
+
+          // Create 'appConfig' store if it doesn't exist (from version < 2)
+          if (oldVersion < 2) {
+            if (!dbInstance.objectStoreNames.contains('appConfig')) {
+              dbInstance.createObjectStore('appConfig');
+              console.log("Created 'appConfig' object store.");
+            }
+          }
+        },
+        blocked() {
+          console.error('IndexedDB blocked. Please close other tabs using this database.');
+          toast.error("Database Blocked", { description: "Please close other instances of this app and refresh."});
+        },
+        blocking() {
+          console.warn('IndexedDB blocking. Other tabs might be outdated.');
+          toast.warning("Database Update Pending", { description: "A new version of the app needs to update the database. Please refresh other open tabs."});
+        },
+        terminated() {
+          console.error('IndexedDB connection terminated unexpectedly.');
+          toast.error("Database Connection Lost", { description: "Local storage connection was terminated."});
+          dbPromise = null; // Reset promise to allow re-initialization
+        },
+      });
+      console.log("Database initialized successfully");
+      toast.success("Local Storage Ready", { description: "Offline capabilities enabled."});
+      return db;
+    } catch (error) {
+      console.error("Error initializing the database:", error);
+      toast.error("Database Initialization Failed", { description: error instanceof Error ? error.message : "Could not initialize local storage." });
+      dbPromise = null; // Reset promise on error
+      return null; 
+    }
+  })();
+  return dbPromise;
+}
+
+// --- App Configuration Functions ---
+
+export async function saveAppConfig() {
+  if (typeof window === 'undefined') {
+    // This might be called during SSR or pre-rendering where window is not available.
+    // console.warn("Cannot save app config: IndexedDB is not available on the server.");
+    return;
+  }
+
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Failed to save app configuration." });
+    return;
+  }
+
+  const configData: AppConfigValue = {
+    VERSION, PLANT_NAME, PLANT_LOCATION, PLANT_TYPE, PLANT_CAPACITY,
+    APP_NAME, APP_URL, APP_KEYWORDS, APP_DESCRIPTION, APP_FAVICON,
+    APP_AUTHOR, APP_AUTHOR_URL, APP_COPYRIGHT, APP_COPYRIGHT_URL,
+    APP_PRIVACY_POLICY, APP_TERMS_OF_SERVICE, AVAILABLE_SLD_LAYOUT_IDS, USER
+  };
+
+  try {
+    await db.put('appConfig', configData, APP_CONFIG_KEY);
+    toast.success("App Configuration Saved", { description: `Version ${VERSION} settings stored locally.`});
+    console.log("App configuration saved to IndexedDB:", configData);
+  } catch (error) {
+    console.error("Error saving app configuration:", error);
+    toast.error("Configuration Save Failed", { description: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+export async function getAppConfig(): Promise<AppConfigValue | null> {
+   if (typeof window === 'undefined') {
+    console.warn("Cannot get app config: IndexedDB is not available on the server.");
+    return null;
+  }
+  const db = await initDB();
+  if (!db) {
+    // Not showing toast here as this might be called frequently or on startup.
+    console.error("Database not ready, cannot retrieve app configuration.");
+    return null;
   }
 
   try {
-    console.log("Initializing database...");
-    const db = await openDB<SolarDB>(DB_NAME, DB_VERSION, {
-      upgrade(db) {
-        console.log("Upgrading database schema...");
-        db.createObjectStore('dataPoints');
-        db.createObjectStore('controlQueue');
-      },
-    });
-    console.log("Database initialized successfully");
-    return db;
+    const config = await db.get('appConfig', APP_CONFIG_KEY);
+    if (config) {
+      console.log("App configuration loaded from IndexedDB:", config);
+      toast.info("App configuration loaded locally."); // Potentially too verbose
+      return config;
+    } else {
+      console.warn("No app configuration found in IndexedDB.");
+      toast.warning("Local Configuration Missing", { description: "No app settings found in local storage." });
+      return null;
+    }
   } catch (error) {
-    console.error("Error initializing the database:", error);
-    throw error; // Rethrow the error to handle it in the calling code
+    console.error("Error retrieving app configuration:", error);
+    toast.error("Configuration Load Failed", { description: error instanceof Error ? error.message : String(error) });
+    return null;
   }
 }
+
+
+// --- Existing Functions (modified for consistency with initDB pattern) ---
+
 export async function updateDataPoint(nodeId: string, value: number | boolean) {
   const db = await initDB();
   if (!db) {
-    console.error("Database is not initialized.");
+    toast.error("Database Not Ready", { description: "Cannot update data point." });
     return;
   }
-  await db.put('dataPoints', {
-    timestamp: Date.now(),
-    value,
-  }, nodeId);
+  try {
+    await db.put('dataPoints', {
+      timestamp: Date.now(),
+      value,
+    }, nodeId);
+    // console.log(`DataPoint ${nodeId} updated in IDB.`);
+  } catch (error) {
+    console.error(`Error updating DataPoint ${nodeId} in IDB:`, error);
+    toast.error("Data Point Update Failed", { description: `Could not save ${nodeId} locally.`});
+  }
 }
 
-// Update getDataPoint in /lib/db.ts
-export const getDataPoint = async (nodeId: string) => {
+// Update getDataPoint in /lib/db.ts - This function doesn't use IndexedDB
+// It seems to be a WebSocket fetcher. Keep as is.
+export const getDataPoint = async (nodeId: string): Promise<{ value: any, timestamp?: number } | { value: string, error?: any }> => {
   return new Promise((resolve, reject) => {
-    const ws = new WebSocket(`ws://${window.location.hostname}:${window.location.port}/opcua/data`);
+    if (typeof window === 'undefined') {
+      // Handle server-side or WebSocket unavailable scenarios
+      console.warn('WebSocket is not available in this environment.');
+      return reject({ value: 'Error Fetching Data', error: 'WebSocket unavailable' });
+    }
+    // Note: window.location.port might not be correct if your WS server is on a different port than HTTP server.
+    // Assuming WS_PORT from constants is more reliable for the actual WebSocket server.
+    // If the WS server runs on the same port as HTTP, window.location.port is fine.
+    // Using a fixed WS_PORT here or dynamically figuring out the right port is crucial.
+    // For now, sticking to user's code.
+    const wsUrl = `ws://${window.location.hostname}:${window.location.port}/opcua/data`; 
+    // Consider using WS_URL from constants if it's configured correctly for your setup.
+
+    let ws: WebSocket;
+    try {
+       ws = new WebSocket(wsUrl);
+    } catch (e) {
+        console.error('WebSocket connection failed to initialize:', e);
+        return reject({ value: 'Error Fetching Data', error: 'WebSocket initialization failed' });
+    }
+    
+    const timeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CLOSING) {
+            console.error('WebSocket connection timed out for', nodeId);
+            ws.close(); // Attempt to close before rejecting
+            reject({ value: 'Error Fetching Data', error: 'Connection timeout' });
+        }
+    }, 5000); // 5-second timeout
 
     ws.onopen = () => {
       ws.send(JSON.stringify({ nodeId }));
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      if (data.error) {
-        console.error('WebSocket error:', data.error);
-        reject({ value: 'Error Fetching Data' });
-      } else {
-        resolve(data);
+      clearTimeout(timeout);
+      try {
+        const data = JSON.parse(event.data as string);
+        if (data.error) {
+          console.error(`WebSocket error for ${nodeId}:`, data.error);
+          reject({ value: 'Error Fetching Data', error: data.error });
+        } else {
+          resolve(data);
+        }
+      } catch (e) {
+        console.error(`Error parsing WebSocket message for ${nodeId}:`, e);
+        reject({ value: 'Error Fetching Data', error: 'Invalid data format' });
+      } finally {
+        if (ws.readyState === WebSocket.OPEN) ws.close();
       }
-      ws.close();
     };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
-      reject({ value: 'Error Fetching Data' });
-      ws.close();
+      clearTimeout(timeout);
+      console.error(`WebSocket error for ${nodeId}:`, error);
+      reject({ value: 'Error Fetching Data', error });
+       if (ws.readyState !== WebSocket.CLOSED) ws.close();
+    };
+
+    ws.onclose = (event) => {
+        clearTimeout(timeout);
+        console.log(`WebSocket connection closed for ${nodeId}. Code: ${event.code}, Reason: ${event.reason}`);
+        // Rejection/resolution should have happened in onmessage/onerror typically
     };
   });
 };
@@ -88,30 +285,67 @@ export const getDataPoint = async (nodeId: string) => {
 export async function queueControlAction(nodeId: string, value: number | boolean) {
   const db = await initDB();
   if (!db) {
-    console.error("Database is not initialized.");
+    toast.error("Database Not Ready", { description: "Cannot queue control action." });
     return;
   }
-  await db.put('controlQueue', {
-    nodeId,
-    value,
-    timestamp: Date.now(),
-  }, `${nodeId}-${Date.now()}`);
+  const actionKey = `${nodeId}-${Date.now()}`;
+  try {
+    await db.put('controlQueue', {
+      nodeId,
+      value,
+      timestamp: Date.now(),
+    }, actionKey);
+    toast.info("Control Action Queued", { description: `${nodeId} will be set to ${value} when online.`});
+  } catch (error) {
+     console.error(`Error queuing control action ${actionKey} in IDB:`, error);
+    toast.error("Control Action Queue Failed", { description: `Could not queue ${nodeId}.`});
+  }
 }
 
 export async function getControlQueue() {
   const db = await initDB();
   if (!db) {
-    console.error("Database is not initialized.");
+    console.error("Database not ready, cannot retrieve control queue.");
     return [];
   }
-  return db.getAll('controlQueue');
+  try {
+    return await db.getAll('controlQueue');
+  } catch (error) {
+    console.error(`Error retrieving control queue from IDB:`, error);
+    toast.error("Failed to Get Control Queue", { description: error instanceof Error ? error.message : String(error) });
+    return [];
+  }
 }
 
 export async function clearControlQueue() {
   const db = await initDB();
-  if (db) {
+  if (!db) {
+    console.error("Database not ready, cannot clear control queue.");
+    return;
+  }
+  try {
     await db.clear('controlQueue');
+    toast.success("Control Queue Cleared", { description: "All pending offline actions have been removed."});
+  } catch (error) {
+    console.error(`Error clearing control queue in IDB:`, error);
+    toast.error("Failed to Clear Control Queue", { description: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+// Optional: A function to call on app startup to ensure config is saved
+// You might want to call this in your main _app.tsx or a layout component useEffect.
+export async function ensureAppConfigIsSaved() {
+  if (typeof window === 'undefined') return;
+
+  const storedConfig = await getAppConfig();
+  if (!storedConfig || storedConfig.VERSION !== VERSION) {
+    console.log(
+      !storedConfig 
+        ? "No local app configuration found, saving current." 
+        : `Local app configuration version (${storedConfig.VERSION}) outdated, updating to ${VERSION}.`
+    );
+    await saveAppConfig();
   } else {
-    console.error("Database is not initialized.");
+    console.log("Local app configuration is up-to-date.");
   }
 }
