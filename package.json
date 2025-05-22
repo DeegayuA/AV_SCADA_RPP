@@ -6,7 +6,8 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "docs": "typedoc"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.0.0",
@@ -95,6 +96,9 @@
     "@types/react-window": "^1.8.8",
     "@types/ws": "^8.18.1",
     "postcss": "^8.5.3",
-    "postcss-loader": "^8.1.1"
+    "postcss-loader": "^8.1.1",
+    "typedoc": "^0.28.4",
+    "typedoc-plugin-markdown": "^4.6.3",
+    "typedoc-theme-hierarchy": "^6.0.0"
   }
 }

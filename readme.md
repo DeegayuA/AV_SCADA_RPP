@@ -13,24 +13,31 @@ A key feature of this project is its **dynamically generated UI**. The dashboard
 
 ## Table of Contents
 
-1.  [Key Features](#1-key-features)
-2.  [Architecture Overview](#2-architecture-overview)
-3.  [Prerequisites](#3-prerequisites)
-4.  [Getting Started (User Setup)](#4-getting-started-user-setup)
-5.  [Running as a Desktop App (PWA)](#5-running-as-a-desktop-app-pwa)
-6.  [Adapting for a New Project (Dynamic UI Configuration)](#6-adapting-for-a-new-project-dynamic-ui-configuration)
-7.  [Advanced Setup & Automation (Windows)](#7-advanced-setup--automation-windows)
+1.  [Technical Documentation](#technical-documentation)
+2.  [Key Features](#2-key-features)
+3.  [Architecture Overview](#3-architecture-overview)
+4.  [Prerequisites](#4-prerequisites)
+5.  [Getting Started (User Setup)](#5-getting-started-user-setup)
+6.  [Running as a Desktop App (PWA)](#6-running-as-a-desktop-app-pwa)
+7.  [Adapting for a New Project (Dynamic UI Configuration)](#7-adapting-for-a-new-project-dynamic-ui-configuration)
+8.  [Advanced Setup & Automation (Windows)](#8-advanced-setup--automation-windows)
     *   [Creating a Start Script (`.bat`)](#creating-a-start-script-bat)
     *   [Converting `.bat` to `.exe` (Optional)](#converting-bat-to-exe-optional)
     *   [Using the Windows Installer Scripts](#using-the-windows-installer-scripts)
-8.  [Troubleshooting](#8-troubleshooting)
-9.  [Contributing](#9-contributing)
-10. [License](#10-license)
-11. [Acknowledgments](#11-acknowledgments)
+9.  [Troubleshooting](#9-troubleshooting)
+10. [Contributing](#10-contributing)
+11. [License](#11-license)
+12. [Acknowledgments](#12-acknowledgments)
 
 ---
 
-## 1. Key Features
+## Technical Documentation
+
+For detailed technical documentation of the codebase, including modules, components, and functions, please see the [TypeDoc generated documentation](./docs/typedoc/README.md).
+
+---
+
+## 2. Key Features
 
 *   **Local Control & Monitoring:** Access your solar system data directly on your local network.
 *   **Offline Capability:** Designed to run without constant internet access after initial setup.
@@ -43,7 +50,7 @@ A key feature of this project is its **dynamically generated UI**. The dashboard
 
 ---
 
-## 2. Architecture Overview
+## 3. Architecture Overview
 
 This application is built using:
 
@@ -56,7 +63,7 @@ This application is built using:
 
 ---
 
-## 3. Prerequisites
+## 4. Prerequisites
 
 Before starting, make sure you have the following installed:
 
@@ -66,7 +73,7 @@ Before starting, make sure you have the following installed:
 
 ---
 
-## 4. Getting Started (User Setup)
+## 5. Getting Started (User Setup)
 
 Follow these steps to set up and run the application locally:
 
@@ -102,7 +109,7 @@ Follow these steps to set up and run the application locally:
 
 ---
 
-## 5. Running as a Desktop App (PWA)
+## 6. Running as a Desktop App (PWA)
 
 For a more integrated desktop experience, you can install the running web application as a PWA:
 
@@ -114,7 +121,7 @@ For a more integrated desktop experience, you can install the running web applic
 
 ---
 
-## 6. Adapting for a New Project (Dynamic UI Configuration)
+## 7. Adapting for a New Project (Dynamic UI Configuration)
 
 This dashboard is designed to be adaptable. The user interface elements are generated dynamically based on the configuration defined in the `src/config/dataPoints.ts` file. To adapt this dashboard for a different solar system, generator, or any device exposing data via OPC UA, follow these steps:
 
@@ -159,7 +166,7 @@ This dashboard is designed to be adaptable. The user interface elements are gene
 
 ---
 
-## 7. Advanced Setup & Automation (Windows)
+## 8. Advanced Setup & Automation (Windows)
 
 These steps provide ways to automate the startup process, primarily for Windows environments.
 
@@ -216,7 +223,7 @@ For developers or administrators deploying on Windows, the repository may includ
 
 ---
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 If you encounter issues:
 
@@ -228,7 +235,7 @@ If you encounter issues:
 
 ---
 
-## 9. Contributing
+## 10. Contributing
 
 Contributions are welcome! If you have suggestions, bug reports, or want to contribute code:
 
@@ -237,13 +244,13 @@ Contributions are welcome! If you have suggestions, bug reports, or want to cont
 
 ---
 
-## 10. License
+## 11. License
 
 This project is licensed under the [MIT License](LICENSE). See the `LICENSE` file for details.
 
 ---
 
-## 11. Acknowledgments
+## 12. Acknowledgments
 
 This project leverages the power of open-source software. We extend our gratitude to the developers and communities behind these key libraries and frameworks:
 
