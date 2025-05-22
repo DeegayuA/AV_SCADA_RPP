@@ -9,6 +9,7 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { WS_URL } from '@/config/constants';
 
 
 interface WebSocketStatusProps {
@@ -17,7 +18,7 @@ interface WebSocketStatusProps {
 }
 
 const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, connectFn }) => {
-    const wsAddress = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
+    const wsAddress = WS_URL;
     const title = isConnected
         ? `WebSocket Connected (Live Data)\n${wsAddress}`
         : `WebSocket Disconnected. Click to attempt reconnect.\n${wsAddress}`;
