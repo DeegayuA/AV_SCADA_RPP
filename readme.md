@@ -38,7 +38,6 @@ For detailed technical documentation of the codebase, including modules, compone
 ---
 
 ## 2. Key Features
-## 2. Key Features
 
 *   **Local Control & Monitoring:** Access your solar system data directly on your local network.
 *   **Offline Capability:** Designed to run without constant internet access after initial setup.
