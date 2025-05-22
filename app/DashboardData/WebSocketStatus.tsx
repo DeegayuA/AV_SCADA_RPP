@@ -17,7 +17,10 @@ interface WebSocketStatusProps {
 }
 
 const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, connectFn }) => {
-    const title = isConnected ? "WebSocket Connected (Live Data)" : "WebSocket Disconnected. Click to attempt reconnect.";
+    const wsAddress = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
+    const title = isConnected
+        ? `WebSocket Connected (Live Data)\n${wsAddress}`
+        : `WebSocket Disconnected. Click to attempt reconnect.\n${wsAddress}`;
     const pulseVariants = { pulse: { scale: [1, 1.15, 1], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } } };
 
     return (
@@ -43,7 +46,9 @@ const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnecte
                          </span>
                     </motion.div>
                 </TooltipTrigger>
-                <TooltipContent><p>{title}</p></TooltipContent>
+                <TooltipContent>
+                    <p className="whitespace-pre-line">{title}</p>
+                </TooltipContent>
             </Tooltip>
         </TooltipProvider>
     );

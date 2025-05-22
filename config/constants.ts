@@ -9,7 +9,9 @@ export const WS_URL = (() => {
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const hostname = window.location.hostname;
-        return `${protocol}//${hostname}:${WS_PORT}`;
+        const wsUrl = `${protocol}//${hostname}:${WS_PORT}`;
+        // console.log(`WebSocket URL: ${wsUrl}`);
+        return wsUrl;
     }
     return `ws://localhost:${WS_PORT}`; // A sensible default for backend contexts.
 })();
