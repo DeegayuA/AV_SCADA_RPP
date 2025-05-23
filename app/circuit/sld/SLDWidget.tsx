@@ -64,6 +64,7 @@ import SLDElementDetailSheet from './ui/SLDElementDetailSheet';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import SLDDrillDownDialog from './ui/SLDDrillDownDialog';
+import FuseNode from './nodes/FuseNode';
 
 interface WebSocketMessageFromServer {
   type: string;
@@ -77,6 +78,7 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.Panel]: PanelNode,
     // Uncomment and ensure you have the component files if you use these types:
     [SLDElementType.Breaker]: BreakerNode,
+    [SLDElementType.Fuse]: FuseNode, // Assuming same as Breaker for now
     [SLDElementType.Meter]: MeterNode,    
     [SLDElementType.Battery]: BatteryNode, 
     [SLDElementType.Contactor]: ContactorNode, 
@@ -88,6 +90,7 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.Generator]: GeneratorNode,
     [SLDElementType.PLC]: PLCNode,
     [SLDElementType.Sensor]: SensorNode,
+
 };
 const edgeTypes: EdgeTypes = { animatedFlow: AnimatedFlowEdge };
 const defaultEdgeOptions = { type: 'animatedFlow', style: { strokeWidth: 3 }, data: {} as CustomFlowEdgeData };

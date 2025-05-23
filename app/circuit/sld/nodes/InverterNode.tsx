@@ -144,7 +144,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
           animate={isDeviceRunning && StatusIcon === RefreshCwIcon ? { rotate: 360 } : { rotate: 0 }}
           transition={isDeviceRunning && StatusIcon === RefreshCwIcon ? { loop: Infinity, ease: "linear", duration: 4 } : { duration: 0.5 }}
         >
-          <StatusIcon size={18} className={statusStyles.iconColor} style={{ color: derivedNodeStyles.iconColor || derivedNodeStyles.color || statusStyles.iconColor }} />
+          <StatusIcon size={18} className={statusStyles.iconColor} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} />
         </motion.div>
       </div>
       <p className="text-[10px] font-semibold leading-tight mt-auto text-center truncate w-full" title={data.label} style={{ color: derivedNodeStyles.color || statusStyles.textColor }}>

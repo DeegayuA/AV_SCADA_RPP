@@ -42,7 +42,14 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected,
     return data.config?.ratingKVA ? `${data.config.ratingKVA} kVA (rated)` : 'N/A';
   }, [data.dataPointLinks, data.config?.ratingKVA, realtimeData, dataPoints]);
 
-  const { StatusIcon, statusText, statusClasses, animationClass } = useMemo(() => {
+  interface StatusInfo {
+    StatusIcon: typeof CogIcon;
+    statusText: string;
+    statusClasses: string;
+    animationClass: string;
+  }
+
+  const { StatusIcon, statusText, statusClasses, animationClass } = useMemo<StatusInfo>((): StatusInfo => {
     let icon = CogIcon;
     let text = String(processedStatus).toUpperCase();
     let sClasses = 'border-neutral-400 dark:border-neutral-600 bg-muted/20 text-muted-foreground';

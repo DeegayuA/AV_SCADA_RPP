@@ -1,6 +1,6 @@
 // components/sld/ui/SLDInspectorDialog.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Node, Edge, isEdge } from 'reactflow';
+import { Node, Edge, isEdge as isReactFlowEdge } from 'reactflow';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -86,9 +86,9 @@ function isNode(element: any): element is CustomNodeType {
     return element && 'position' in element && 'data' in element && 'id' in element;
 }
 
-// function isEdge(element: any): element is CustomFlowEdge { // Already defined, assuming correct
-//     return element && 'source' in element && 'target' in element && 'id' in element;
-// }
+function isEdge(element: any): element is CustomFlowEdge { // Already defined, assuming correct
+    return element && 'source' in element && 'target' in element && 'id' in element;
+}
 
 const getElementTypeName = (element: CustomNodeType | CustomFlowEdge | null): string => {
     if (!element) return 'Element';
