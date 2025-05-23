@@ -2,14 +2,17 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { GeneratorNodeData } from '@/types/sld';
+import { GeneratorNodeData, DataPointLink, DataPoint } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
-import { ZapIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon } from 'lucide-react'; // Cog for 'G'
+import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
+import { ZapIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon } from 'lucide-react';
 
 const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    realtimeData: state.realtimeData,
+    dataPoints: state.dataPoints,
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -17,84 +20,153 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected,
     [isEditMode, currentUser]
   );
 
-  const { StatusIcon, statusText, styleClasses } = useMemo(() => {
-    let icon = CogIcon; // Default for G inside circle
-    let text = data.status || 'Standby';
-    let classes = 'border-neutral-400 dark:border-neutral-600 bg-muted/20 text-muted-foreground';
+  const processedStatus = useMemo(() => {
+    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
+    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
+      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+      return applyValueMapping(rawValue, statusLink);
+    }
+    return data.status || 'offline'; // Default status
+  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
 
-    switch (data.status) {
+  const powerOutput = useMemo(() => {
+    const powerLink = data.dataPointLinks?.find(
+      link => link.targetProperty === 'powerOutput' || link.targetProperty === 'activePower'
+    );
+    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+      const dpMeta = dataPoints[powerLink.dataPointId];
+      const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+      const mappedValue = applyValueMapping(rawValue, powerLink);
+      return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
+    }
+    return data.config?.ratingKVA ? `${data.config.ratingKVA} kVA (rated)` : 'N/A';
+  }, [data.dataPointLinks, data.config?.ratingKVA, realtimeData, dataPoints]);
+
+  const { StatusIcon, statusText, statusClasses, animationClass } = useMemo(() => {
+    let icon = CogIcon;
+    let text = String(processedStatus).toUpperCase();
+    let sClasses = 'border-neutral-400 dark:border-neutral-600 bg-muted/20 text-muted-foreground';
+    let animClass = '';
+
+    switch (String(processedStatus).toLowerCase()) {
       case 'fault': case 'alarm':
         icon = XCircleIcon; text = 'FAULT';
-        classes = 'border-destructive bg-destructive/10 text-destructive'; break;
+        sClasses = 'border-destructive bg-destructive/10 text-destructive'; break;
       case 'warning':
-        icon = AlertTriangleIcon; text = 'Warning';
-        classes = 'border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'; break;
+        icon = AlertTriangleIcon; text = 'WARNING';
+        sClasses = 'border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'; break;
       case 'running': case 'producing': case 'online':
-        icon = CheckCircleIcon; text = data.status === 'producing' ? "PROD" : "RUN"; // Shorter for display
-        classes = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400 animate-pulse animation-duration-2000'; break; // Pulse when running
+        icon = CheckCircleIcon; text = (processedStatus === 'producing' || processedStatus === 'online') ? "PROD" : "RUN";
+        sClasses = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400'; 
+        animClass = 'animate-pulse'; break;
       case 'starting':
-        icon = CogIcon; text = 'Starting';
-        classes = 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400 animate-spin animation-duration-1000'; break;
+        icon = CogIcon; text = 'STARTING';
+        sClasses = 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400'; 
+        animClass = 'animate-spin'; break;
       case 'stopping':
-        icon = CogIcon; text = 'Stopping';
-        classes = 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400 animate-spin animation-duration-3000 animation-direction-reverse'; break;
+        icon = CogIcon; text = 'STOPPING';
+        sClasses = 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400'; 
+        animClass = 'animate-spin animation-direction-reverse'; break;
       case 'offline': case 'standby':
-        icon = ZapIcon; text = data.status?.toUpperCase() || 'OFF'; // Could also use PowerOffIcon
-        classes = 'border-neutral-500 bg-neutral-500/10 text-neutral-500 opacity-80'; break;
+        icon = PowerIcon; text = String(processedStatus).toUpperCase();
+        sClasses = 'border-neutral-500 bg-neutral-500/10 text-neutral-500 opacity-80'; break;
+      default: // Unknown status
+        icon = ZapIcon; text = text || 'UNKNOWN';
+        sClasses = 'border-gray-400 bg-gray-400/10 text-gray-500'; break;
     }
-    return { StatusIcon: icon, statusText: text, styleClasses: classes };
-  }, [data.status]);
+    return { StatusIcon: icon, statusText: text, statusClasses: sClasses, animationClass };
+  }, [processedStatus]);
   
-  // Generator Symbol SVG (Circle with 'G' or Sine Wave)
-  const generatorSymbolSVG = (
-    <svg viewBox="0 0 24 24" width="32" height="32" className={`transition-colors ${styleClasses.includes('text-muted-foreground') ? 'opacity-60' : '' }`}>
-        <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-        {/* Option 1: Letter G (simplified) */}
-        <text x="12" y="16" fontSize="12" textAnchor="middle" fontWeight="bold" fill="currentColor">G</text>
-        {/* Option 2: Sine Wave (common for AC generator) */}
-        <path d="M6 12 Q9 6 12 12 T18 12" stroke="currentColor" strokeWidth="1.5" fill="none"/>
-    </svg>
+  const derivedNodeStyles = useMemo(() => 
+    getDerivedStyle(data, realtimeData, dataPoints),
+    [data, realtimeData, dataPoints]
   );
+
+  // Generator Symbol SVG (Circle with 'G' or Sine Wave)
+  const GeneratorSymbolSVG = ({ className, isSpinning }: {className?: string, isSpinning?: boolean}) => {
+    const variants = {
+      spinning: { rotate: 360 },
+      still: { rotate: 0 },
+    };
+    const transition = isSpinning ? { loop: Infinity, ease: "linear", duration: 5 } : { duration: 0.5 };
+
+    return (
+      <motion.svg 
+        viewBox="0 0 24 24" 
+        width="32" 
+        height="32" 
+        className={className}
+        variants={variants}
+        animate={isSpinning ? "spinning" : "still"}
+        transition={transition}
+      >
+          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.5" fill="none"/>
+          <text x="12" y="16" fontSize="12" textAnchor="middle" fontWeight="bold" fill="currentColor">G</text>
+          {/* <path d="M6 12 Q9 6 12 12 T18 12" stroke="currentColor" strokeWidth="1.5" fill="none"/> */}
+      </motion.svg>
+    );
+  };
+
+  const isGeneratorRunning = useMemo(() => 
+    ['running', 'producing', 'online'].includes(String(processedStatus).toLowerCase()),
+    [processedStatus]
+  );
+
+  // Merge styles: derivedNodeStyles override class-based styles
+  const componentStyle: React.CSSProperties = {
+    borderColor: derivedNodeStyles.borderColor,
+    backgroundColor: derivedNodeStyles.backgroundColor,
+    color: derivedNodeStyles.color, 
+  };
+  const mainDivClasses = `
+    sld-node generator-node group w-[85px] h-[90px] rounded-lg shadow-lg
+    flex flex-col items-center justify-between p-2
+    border-2 ${derivedNodeStyles.borderColor ? '' : statusClasses.split(' ')[0]} 
+    ${derivedNodeStyles.backgroundColor ? '' : statusClasses.split(' ')[1]}
+    ${derivedNodeStyles.color ? '' : statusClasses.split(' ')[2]}
+    bg-card dark:bg-neutral-800
+    transition-all duration-150
+    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
+    ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
+    ${animationClass && !isGeneratorRunning ? animationClass : ''} 
+  `;
+  // Apply main animationClass (like pulse for running) to the whole node if not using individual SVG spin for running.
+  // Or, remove 'animate-pulse' from statusClasses for 'running' if GeneratorSymbolSVG handles its own spinning.
+  // For this example, let's assume GeneratorSymbolSVG's spin is the primary "running" animation.
+  // So, we remove 'animate-pulse' from statusClasses if it was there for running state.
+  // And the mainDivClasses will use `animationClass` only for non-running transitional states like starting/stopping.
+
+  const iconColorClass = derivedNodeStyles.color ? '' : statusClasses.split(' ')[2];
 
 
   return (
     <motion.div
-      className={`
-        sld-node generator-node group w-[85px] h-[90px] rounded-lg shadow-lg
-        flex flex-col items-center justify-between p-2
-        border-2 ${styleClasses} 
-        bg-card dark:bg-neutral-800
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
-      `}
+      className={mainDivClasses}
+      style={componentStyle}
       variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
-      {/* Generators are typically sources */}
       <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Output"/>
-      {/* Optional Top Handle for control signals or fuel input if modeled */}
-       <Handle type="target" position={Position.Top} id="top_control_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-purple-400 !border-purple-500" title="Control/Fuel"/>
+      <Handle type="target" position={Position.Top} id="top_control_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-purple-400 !border-purple-500" title="Control/Fuel"/>
 
-
-      <p className="text-[9px] font-semibold text-center truncate w-full" style={{color: 'var(--foreground)'}} title={data.label}>
+      <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
         {data.label}
       </p>
       
       <div className="my-0.5 pointer-events-none">
-        {generatorSymbolSVG}
+        <GeneratorSymbolSVG className={`transition-colors ${iconColorClass}`} isSpinning={isGeneratorRunning} />
       </div>
       
-      <div className="flex items-center justify-center gap-1">
-        <StatusIcon size={10} className={`${styleClasses.includes('text-muted-foreground') ? 'opacity-60' : ''}`} />
-        <p className="text-[8px] font-medium text-center truncate leading-tight" style={{color: 'var(--foreground)'}}>
+      <div className="flex items-center justify-center gap-1" style={{ color: derivedNodeStyles.color }}>
+        <StatusIcon size={10} className={`${iconColorClass} ${animationClass && (StatusIcon === CogIcon || StatusIcon === XCircleIcon || StatusIcon === AlertTriangleIcon || StatusIcon === PowerIcon) ? animationClass : ''}`} />
+        <p className={`text-[8px] font-medium text-center truncate leading-tight ${iconColorClass}`}>
           {statusText}
         </p>
       </div>
-       {data.config?.ratingKVA && (
-            <p className="text-[7px] text-muted-foreground/90 leading-none">{data.config.ratingKVA} kVA</p>
-        )}
+      <p className={`text-[7px] leading-none ${derivedNodeStyles.color ? '' : 'text-muted-foreground/90'}`} title={`Power: ${powerOutput}`}>
+          {powerOutput}
+      </p>
     </motion.div>
   );
 };

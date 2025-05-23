@@ -2,14 +2,17 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { InverterNodeData, CustomNodeData } from '@/types/sld';
+import { InverterNodeData, DataPointLink, DataPoint } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
-import { ZapIcon, RefreshCwIcon } from 'lucide-react'; // Example icons
+import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
+import { ZapIcon, RefreshCwIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react'; // Example icons
 
 const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    realtimeData: state.realtimeData,
+    dataPoints: state.dataPoints,
   }));
   
   const isNodeEditable = useMemo(() => 
@@ -17,36 +20,88 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
     [isEditMode, currentUser]
   );
 
+  const processedStatus = useMemo(() => {
+    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
+    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
+      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+      return applyValueMapping(rawValue, statusLink);
+    }
+    return data.status || 'offline'; // Fallback to static status or default
+  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+
+  const powerOutput = useMemo(() => {
+    const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput');
+    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+      const dpMeta = dataPoints[powerLink.dataPointId];
+      const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+      const mappedValue = applyValueMapping(rawValue, powerLink);
+      // Assuming power is a number, format it. Add unit if not in format.
+      // The formatDisplayValue can take a default unit from dpMeta if not in link.format.suffix
+      return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
+    }
+    return data.config?.ratedPower ? `${data.config.ratedPower} kW (rated)` : 'N/A';
+  }, [data.dataPointLinks, data.config?.ratedPower, realtimeData, dataPoints]);
+
   const statusStyles = useMemo(() => {
-    // Simplified example - expand with specific colors for each status
-    if (data.status === 'fault' || data.status === 'alarm') {
+    // Base styling on processedStatus
+    if (processedStatus === 'fault' || processedStatus === 'alarm') {
       return {
         borderColor: 'var(--destructive)',
         backgroundColor: 'hsla(var(--destructive-hsl)/0.1)',
         iconColor: 'text-destructive',
+        textColor: 'text-destructive-foreground', // Example: ensure text is readable on colored bg
       };
     }
-    if (data.status === 'warning') {
+    if (processedStatus === 'warning') {
       return {
-        borderColor: 'var(--warning)', // Define --warning in CSS
-        backgroundColor: 'hsla(var(--warning-hsl)/0.1)', // Define --warning-hsl
+        borderColor: 'var(--warning)',
+        backgroundColor: 'hsla(var(--warning-hsl)/0.1)',
         iconColor: 'text-yellow-500 dark:text-yellow-400',
+        textColor: 'text-yellow-600 dark:text-yellow-300',
       };
     }
-     if (data.status === 'running' || data.status === 'nominal') {
+    if (processedStatus === 'running' || processedStatus === 'nominal' || processedStatus === 'online') {
       return {
-        borderColor: 'var(--success)', // Define --success in CSS
-        backgroundColor: 'hsla(var(--success-hsl)/0.1)', // Define --success-hsl
+        borderColor: 'var(--success)',
+        backgroundColor: 'hsla(var(--success-hsl)/0.1)',
         iconColor: 'text-green-500 dark:text-green-400',
+        textColor: 'text-green-700 dark:text-green-300',
       };
     }
-    return { // Offline or default
+    // Default for 'offline', 'standby', or unknown status
+    return { 
       borderColor: 'var(--border)',
       backgroundColor: 'var(--muted)',
       iconColor: 'text-muted-foreground',
+      textColor: 'text-muted-foreground',
     };
-  }, [data.status]);
+  }, [processedStatus]);
 
+  const derivedNodeStyles = useMemo(() => 
+    getDerivedStyle(data, realtimeData, dataPoints),
+    [data, realtimeData, dataPoints]
+  );
+
+  // Choose icon based on status
+  const StatusIcon = useMemo(() => {
+    if (processedStatus === 'fault' || processedStatus === 'alarm') return AlertTriangleIcon;
+    if (processedStatus === 'warning') return AlertTriangleIcon;
+    if (processedStatus === 'running' || processedStatus === 'nominal' || processedStatus === 'online') return RefreshCwIcon; 
+    return ZapIcon; 
+  }, [processedStatus]);
+
+  const isDeviceRunning = useMemo(() => 
+    ['running', 'nominal', 'online'].includes(String(processedStatus).toLowerCase()),
+    [processedStatus]
+  );
+
+  // Merged styles: derivedNodeStyles can override statusStyles if they target the same CSS properties
+  const componentStyle = {
+    borderColor: derivedNodeStyles.borderColor || statusStyles.borderColor,
+    backgroundColor: derivedNodeStyles.backgroundColor || statusStyles.backgroundColor,
+    color: derivedNodeStyles.color || statusStyles.textColor, // For text within the node
+    // any other style props...
+  };
 
   return (
     <motion.div
@@ -54,16 +109,12 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
         sld-node inverter-node group w-[90px] h-[70px] rounded-lg shadow-sm
         flex flex-col items-center justify-between p-2
         border-2 
-        text-foreground dark:text-neutral-200
         transition-all duration-150
         ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-neutral-900' : 
           selected ? 'ring-1 ring-accent dark:ring-offset-neutral-900' : ''}
         ${isNodeEditable ? 'cursor-pointer hover:shadow-lg' : 'cursor-default'}
       `}
-      style={{ 
-        borderColor: statusStyles.borderColor, 
-        backgroundColor: statusStyles.backgroundColor 
-      }}
+      style={componentStyle} // Apply combined dynamic styles
       variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
       whileHover="hover"
       initial="initial"
@@ -89,16 +140,20 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
       />
 
       <div className="flex items-center justify-center pointer-events-none mt-0.5">
-        <RefreshCwIcon size={18} className={statusStyles.iconColor} />
+        <motion.div
+          animate={isDeviceRunning && StatusIcon === RefreshCwIcon ? { rotate: 360 } : { rotate: 0 }}
+          transition={isDeviceRunning && StatusIcon === RefreshCwIcon ? { loop: Infinity, ease: "linear", duration: 4 } : { duration: 0.5 }}
+        >
+          <StatusIcon size={18} className={statusStyles.iconColor} style={{ color: derivedNodeStyles.iconColor || derivedNodeStyles.color || statusStyles.iconColor }} />
+        </motion.div>
       </div>
-      <p className="text-[10px] font-semibold leading-tight mt-auto text-center truncate w-full" title={data.label}>
+      <p className="text-[10px] font-semibold leading-tight mt-auto text-center truncate w-full" title={data.label} style={{ color: derivedNodeStyles.color || statusStyles.textColor }}>
         {data.label}
       </p>
-      {data.config?.ratedPower && (
-        <p className="text-[8px] text-muted-foreground leading-tight text-center truncate w-full">
-            {data.config.ratedPower} kW
-        </p>
-      )}
+      
+      <p className="text-[8px] leading-tight text-center truncate w-full" style={{ color: derivedNodeStyles.color || statusStyles.textColor }} title={`Power: ${powerOutput}`}>
+          {powerOutput}
+      </p>
     </motion.div>
   );
 };
