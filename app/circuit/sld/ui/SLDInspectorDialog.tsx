@@ -1,6 +1,6 @@
 // components/sld/ui/SLDInspectorDialog.tsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Node, Edge, isEdge } from 'reactflow';
+import { Node, Edge, isEdge as isReactFlowEdge } from 'reactflow';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,7 +29,10 @@ import {
     CustomNodeData, CustomFlowEdgeData, DataPoint,
     DataPointLink, SLDElementType, CustomNodeType, CustomFlowEdge,
     TextLabelNodeData, TextNodeStyleConfig,
-    ContactorNodeData, InverterNodeData, // Add others if specific fields are needed
+    ContactorNodeData, InverterNodeData, PanelNodeData, BreakerNodeData, MeterNodeData,
+    BatteryNodeData, GridNodeData, LoadNodeData, BusbarNodeData, TransformerNodeData,
+    GeneratorNodeData, PLCNodeData, SensorNodeData, GenericDeviceNodeData, IsolatorNodeData,
+    ATSNodeData, JunctionBoxNodeData, FuseNodeData,
     BaseNodeData, // Import BaseNodeData for common properties
 } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
@@ -83,9 +86,9 @@ function isNode(element: any): element is CustomNodeType {
     return element && 'position' in element && 'data' in element && 'id' in element;
 }
 
-// function isEdge(element: any): element is CustomFlowEdge { // Already defined, assuming correct
-//     return element && 'source' in element && 'target' in element && 'id' in element;
-// }
+function isEdge(element: any): element is CustomFlowEdge { // Already defined, assuming correct
+    return element && 'source' in element && 'target' in element && 'id' in element;
+}
 
 const getElementTypeName = (element: CustomNodeType | CustomFlowEdge | null): string => {
     if (!element) return 'Element';
@@ -102,7 +105,15 @@ const getElementTypeName = (element: CustomNodeType | CustomFlowEdge | null): st
             case SLDElementType.Grid: return 'Grid Connection';
             case SLDElementType.Load: return 'Electrical Load';
             case SLDElementType.Busbar: return 'Busbar';
+            case SLDElementType.Transformer: return 'Transformer';
+            case SLDElementType.Generator: return 'Generator';
+            case SLDElementType.PLC: return 'PLC';
+            case SLDElementType.Sensor: return 'Sensor';
             case SLDElementType.GenericDevice: return 'Generic Device';
+            case SLDElementType.Isolator: return 'Isolator';
+            case SLDElementType.ATS: return 'ATS';
+            case SLDElementType.JunctionBox: return 'Junction Box';
+            case SLDElementType.Fuse: return 'Fuse';
             default: 
                 const typeName = (element.data as BaseNodeData)?.elementType || 'Unknown Node';
                 return typeName.charAt(0).toUpperCase() + typeName.slice(1) + ' Component';
@@ -118,43 +129,42 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
 }) => {
     const { dataPoints } = useAppStore((state) => ({ dataPoints: state.dataPoints }));
     
-    // FormData includes all possible fields from BaseNodeData, specific node types, and edge data.
-    // It's a superset. Only relevant fields are used when saving.
     const [formData, setFormData] = useState<Partial<CustomNodeData & CustomFlowEdgeData & { styleConfig?: TextNodeStyleConfig }>>({});
     const [dataLinks, setDataLinks] = useState<DataPointLink[]>([]);
     const [activeTab, setActiveTab] = useState<string>("properties");
 
     useEffect(() => {
         if (isOpen && selectedElement) {
-            // Deep clone to prevent unintended mutations of reactflow state. Nullish coalescing for data.
             const elementDataCopy = JSON.parse(JSON.stringify(selectedElement.data ?? {}));
             
-            // Initialize formData with all fields from elementDataCopy
-            // And ensure type-specific structures like styleConfig or config are objects if they exist
             const initialFormData: Partial<CustomNodeData & CustomFlowEdgeData & { styleConfig?: TextNodeStyleConfig }> = {
                 ...elementDataCopy,
-                label: elementDataCopy.label || '', // Ensure label is at least an empty string
+                label: elementDataCopy.label || '',
             };
 
             if (isNode(selectedElement)) {
-                initialFormData.elementType = selectedElement.data.elementType; // Ensure this is set for nodes
+                initialFormData.elementType = selectedElement.data.elementType;
                 if (selectedElement.data.elementType === SLDElementType.TextLabel) {
                     (initialFormData as Partial<TextLabelNodeData>).text = (elementDataCopy as TextLabelNodeData).text || '';
                     initialFormData.styleConfig = (elementDataCopy as TextLabelNodeData).styleConfig || {};
                 }
-                 // Ensure config is an object if it exists, for other node types (Contactor, Inverter etc)
-                if ((elementDataCopy as BaseNodeData).config && typeof (elementDataCopy as BaseNodeData).config !== 'object') {
-                    initialFormData.config = {};
-                } else if (!(elementDataCopy as BaseNodeData).config) {
-                     initialFormData.config = {}; // Initialize if undefined
-                }
+                // Ensure config is an object for all node types
+                initialFormData.config = elementDataCopy.config && typeof elementDataCopy.config === 'object' 
+                                         ? elementDataCopy.config 
+                                         : {};
+            } else if (isEdge(selectedElement)) {
+                 // For edges, ensure specific properties are initialized if not present
+                initialFormData.flowType = elementDataCopy.flowType || '';
+                initialFormData.voltageLevel = elementDataCopy.voltageLevel || '';
+                initialFormData.currentRatingAmps = elementDataCopy.currentRatingAmps ?? '';
+                initialFormData.cableType = elementDataCopy.cableType || '';
             }
+
 
             setFormData(initialFormData);
             setDataLinks(elementDataCopy.dataPointLinks ?? []);
-            setActiveTab("properties"); // Reset to properties tab
+            setActiveTab("properties");
         } else if (!isOpen) {
-            // Clear form data when dialog closes to prevent stale data on reopen with different element
             setFormData({});
             setDataLinks([]);
         }
@@ -168,30 +178,28 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
         })).sort((a, b) => a.label.localeCompare(b.label)),
         [dataPoints]);
 
-    // --- Handler Functions ---
     const handleInputChange = useCallback((event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value, type } = event.target;
-        const checked = (event.target as HTMLInputElement).checked; // For checkboxes
+        const checked = (event.target as HTMLInputElement).checked;
 
         setFormData(prev => {
-            const newState = JSON.parse(JSON.stringify(prev)); // Deep clone for nested updates
+            const newState = JSON.parse(JSON.stringify(prev)); 
             const keys = name.split('.'); 
             let currentLevel: any = newState;
 
             for (let i = 0; i < keys.length - 1; i++) {
                 if (!currentLevel[keys[i]] || typeof currentLevel[keys[i]] !== 'object') {
-                    currentLevel[keys[i]] = {}; // Initialize parent if not object
+                    currentLevel[keys[i]] = {}; 
                 }
                 currentLevel = currentLevel[keys[i]];
             }
             
             let parsedValue: string | number | boolean = value;
             if (type === 'checkbox') parsedValue = checked;
-            // Attempt to parse numbers, but only if it's a valid number string and not empty
             else if (type === 'number') {
-                if (value === '') parsedValue = ''; // Allow clearing number fields
+                if (value === '') parsedValue = ''; 
                 else parsedValue = parseFloat(value); 
-                if (isNaN(parsedValue as number) && value !== '') parsedValue = value; // Revert to string if NaN but not empty
+                if (isNaN(parsedValue as number) && value !== '') parsedValue = value; 
             }
             
             currentLevel[keys[keys.length - 1]] = parsedValue;
@@ -201,7 +209,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
 
     const handleSelectChange = useCallback((name: string, value: string | boolean | number | null | undefined) => {
         setFormData(prev => {
-            const newState = JSON.parse(JSON.stringify(prev)); // Deep clone
+            const newState = JSON.parse(JSON.stringify(prev)); 
             const keys = name.split('.');
             let currentLevel: any = newState;
 
@@ -216,7 +224,6 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
         });
     }, []);
     
-    // Data Link Management
     const handleDataLinkChange = useCallback((index: number, field: keyof DataPointLink, value: any) => {
         setDataLinks(prevLinks => {
             const newLinks = prevLinks.map((link, i) => {
@@ -225,7 +232,6 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     if (field === 'dataPointId') {
                         const selectedDp = dataPoints[value as string];
                         if (selectedDp) {
-                            // Auto-populate format type and suffix (unit)
                             let inferredType: NonNullable<DataPointLink['format']>['type'] = 'string';
                             if (['Float', 'Double', 'Int16', 'Int32', 'UInt16', 'UInt32', 'Byte', 'SByte', 'Int64', 'UInt64'].includes(selectedDp.dataType)) inferredType = 'number';
                             else if (selectedDp.dataType === 'Boolean') inferredType = 'boolean';
@@ -234,14 +240,14 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                             updatedLink.format = { 
                                 ...(updatedLink.format || {}), 
                                 type: inferredType,
-                                suffix: selectedDp.unit || updatedLink.format?.suffix // Preserve existing suffix if no new unit
+                                suffix: selectedDp.unit || updatedLink.format?.suffix 
                             };
                             if (inferredType === 'boolean' && updatedLink.format) {
-                               delete updatedLink.format.suffix; // No suffix for booleans
+                               delete updatedLink.format.suffix; 
                                delete updatedLink.format.precision;
                             }
-                        } else { // Data point deselected or invalid
-                            if (updatedLink.format) { // Keep format type, clear others potentially
+                        } else { 
+                            if (updatedLink.format) { 
                                 delete updatedLink.format.suffix;
                                 delete updatedLink.format.precision;
                             }
@@ -270,7 +276,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     valueMapping: { 
                         ...(link.valueMapping || {}), 
                         type: newMappingType, 
-                        mapping: newMappingType === 'boolean' ? [{value: ''},{value: ''}] : [] // Initial structure for boolean
+                        mapping: newMappingType === 'boolean' ? [{value: ''},{value: ''}] : [] 
                     } 
                 };
             }
@@ -319,18 +325,15 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
 
     const handleSaveChangesAndClose = useCallback(() => {
         if (!selectedElement) return;
-
-        // Filter out incomplete data links (missing dataPointId or targetProperty)
         const validDataLinks = dataLinks.filter(link => link.dataPointId && link.targetProperty);
         
         let updatedElementData: CustomNodeData | CustomFlowEdgeData;
 
         if (isNode(selectedElement)) {
-            // Common properties for all nodes derived from BaseNodeData
             const commonNodeData: Partial<BaseNodeData> = {
                 label: formData.label || selectedElement.data?.label || 'Unnamed Element',
-                elementType: selectedElement.data.elementType, // This should not change via inspector
-                dataPointLinks: validDataLinks.length > 0 ? validDataLinks : undefined, // Store undefined if empty
+                elementType: selectedElement.data.elementType,
+                dataPointLinks: validDataLinks.length > 0 ? validDataLinks : undefined,
                 config: formData.config && Object.keys(formData.config).length > 0 ? formData.config : undefined,
                 isDrillable: !!formData.isDrillable,
                 subLayoutId: formData.isDrillable ? formData.subLayoutId : undefined,
@@ -339,34 +342,28 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
             if (selectedElement.data.elementType === SLDElementType.TextLabel) {
                 updatedElementData = {
                     ...commonNodeData,
-                    elementType: SLDElementType.TextLabel, // Explicitly set for type assertion
+                    elementType: SLDElementType.TextLabel,
                     text: (formData as Partial<TextLabelNodeData>).text || '',
                     styleConfig: (formData as Partial<TextLabelNodeData>).styleConfig && Object.keys((formData as Partial<TextLabelNodeData>).styleConfig!).length > 0 
                                  ? (formData as Partial<TextLabelNodeData>).styleConfig 
-                                 : undefined, // Store undefined if empty
+                                 : undefined,
                 } as TextLabelNodeData;
-            } else if (selectedElement.data.elementType === SLDElementType.Inverter) {
-                 updatedElementData = { ...commonNodeData, elementType: SLDElementType.Inverter } as InverterNodeData;
-            } else if (selectedElement.data.elementType === SLDElementType.Contactor) {
-                 updatedElementData = { ...commonNodeData, elementType: SLDElementType.Contactor } as ContactorNodeData;
-            }
-            // Add other 'else if' blocks for other specific node types that have unique fields in formData not covered by 'config'
-            else {
-                // For other node types, cast from commonNodeData, ensuring elementType is correct
+            } else {
                 updatedElementData = { ...commonNodeData, elementType: selectedElement.data.elementType } as CustomNodeData;
             }
-        } else { // isEdge
+        } else { 
             updatedElementData = {
-                label: formData.label || selectedElement.data?.label || undefined, // Edges might not always have labels
+                label: formData.label || selectedElement.data?.label || undefined,
                 dataPointLinks: validDataLinks.length > 0 ? validDataLinks : undefined,
-                // Include other edge-specific properties from formData if they exist (e.g. flowType, voltageLevel)
                 flowType: (formData as Partial<CustomFlowEdgeData>).flowType,
                 voltageLevel: (formData as Partial<CustomFlowEdgeData>).voltageLevel,
-                isEnergized: !!(formData as Partial<CustomFlowEdgeData>).isEnergized, // ensure boolean
+                currentRatingAmps: (formData as Partial<CustomFlowEdgeData>).currentRatingAmps,
+                cableType: (formData as Partial<CustomFlowEdgeData>).cableType,
+                isEnergized: !!(formData as Partial<CustomFlowEdgeData>).isEnergized,
             } as CustomFlowEdgeData;
         }
         
-        onUpdateElement({ ...selectedElement, data: updatedElementData as any }); // as any due to broad CustomNodeData union
+        onUpdateElement({ ...selectedElement, data: updatedElementData as any }); 
         onOpenChange(false);
     }, [selectedElement, formData, dataLinks, onUpdateElement, onOpenChange]);
 
@@ -381,7 +378,6 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
 
     const elementTypeUserFriendly = getElementTypeName(selectedElement);
     const currentElementType = isNode(selectedElement) ? selectedElement.data.elementType : undefined;
-    const currentData = selectedElement.data || {}; // Fallback to empty object for current data
 
     const renderDataLinkCard = (link: DataPointLink, index: number) => (
         <Card key={index} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border-border/60 bg-card">
@@ -415,7 +411,6 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     </div>
                 </div>
                 <Separator className="my-3" />
-                {/* Value Mapping UI */}
                 <div className="space-y-2">
                     <Label className="text-xs font-medium flex justify-between items-center">
                         Value Mapping (Optional)
@@ -456,7 +451,6 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     )}
                 </div>
                 <Separator className="my-3" />
-                {/* Formatting UI */}
                 <div className="space-y-2">
                     <Label className="text-xs font-medium flex justify-between items-center">
                         Display Formatting (Optional)
@@ -586,10 +580,193 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                         </CardContent>
                                     </Card>
                                 )}
-                                {/* Add similar cards for other element types with specific 'config' fields */}
 
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Panel && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>PV Panel Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.technology" className="text-xs">Technology</Label> <Select name="config.technology" value={(formData.config as PanelNodeData['config'])?.technology || ''} onValueChange={(val) => handleSelectChange("config.technology", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select technology..." /></SelectTrigger> <SelectContent><SelectItem value="Mono-Si" className="text-xs">Mono-Si</SelectItem><SelectItem value="Poly-Si" className="text-xs">Poly-Si</SelectItem><SelectItem value="Thin-film" className="text-xs">Thin-film</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="config.powerRatingWp" name="config.powerRatingWp" label="Power Rating (Wp)" value={(formData.config as PanelNodeData['config'])?.powerRatingWp ?? ''} onChange={handleInputChange} placeholder="e.g., 300" min="0" />
+                                        </CardContent>
+                                    </Card>
+                                )}
 
-                                {isNode(selectedElement) && ( // Drilldown applicable to all nodes
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Breaker && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Breaker Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.type" className="text-xs">Type</Label> <Select name="config.type" value={(formData.config as BreakerNodeData['config'])?.type || ''} onValueChange={(val) => handleSelectChange("config.type", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select type..." /></SelectTrigger> <SelectContent><SelectItem value="MCB" className="text-xs">MCB</SelectItem><SelectItem value="MCCB" className="text-xs">MCCB</SelectItem><SelectItem value="ACB" className="text-xs">ACB</SelectItem><SelectItem value="VCB" className="text-xs">VCB</SelectItem><SelectItem value="SF6" className="text-xs">SF6</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="config.tripRatingAmps" name="config.tripRatingAmps" label="Trip Rating (Amps)" value={(formData.config as BreakerNodeData['config'])?.tripRatingAmps ?? ''} onChange={handleInputChange} placeholder="e.g., 100" min="0" />
+                                            <FieldInput type="number" id="config.interruptingCapacitykA" name="config.interruptingCapacitykA" label="Interrupting Capacity (kA)" value={(formData.config as BreakerNodeData['config'])?.interruptingCapacitykA ?? ''} onChange={handleInputChange} placeholder="e.g., 10" min="0" />
+                                            <div className="space-y-1"> <Label htmlFor="config.normallyOpen" className="text-xs">Default State</Label> <Select name="config.normallyOpen" value={String((formData.config as BreakerNodeData['config'])?.normallyOpen ?? false)} onValueChange={(val) => handleSelectChange("config.normallyOpen", val === 'true')}> <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger> <SelectContent><SelectItem value="false" className="text-xs">Normally Closed (NC)</SelectItem><SelectItem value="true" className="text-xs">Normally Open (NO)</SelectItem></SelectContent> </Select> </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Meter && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Meter Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.meterType" className="text-xs">Meter Type</Label> <Select name="config.meterType" value={(formData.config as MeterNodeData['config'])?.meterType || ''} onValueChange={(val) => handleSelectChange("config.meterType", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select meter type..." /></SelectTrigger> <SelectContent><SelectItem value="Energy" className="text-xs">Energy Meter</SelectItem><SelectItem value="PowerQuality" className="text-xs">Power Quality Meter</SelectItem><SelectItem value="SubMeter" className="text-xs">Sub-Meter</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput id="config.accuracyClass" name="config.accuracyClass" label="Accuracy Class" value={(formData.config as MeterNodeData['config'])?.accuracyClass ?? ''} onChange={handleInputChange} placeholder="e.g., 0.5S" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Battery && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Battery Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.technology" className="text-xs">Technology</Label> <Select name="config.technology" value={(formData.config as BatteryNodeData['config'])?.technology || ''} onValueChange={(val) => handleSelectChange("config.technology", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select technology..." /></SelectTrigger> <SelectContent><SelectItem value="Li-ion" className="text-xs">Li-ion</SelectItem><SelectItem value="Lead-Acid" className="text-xs">Lead-Acid</SelectItem><SelectItem value="Flow" className="text-xs">Flow Battery</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="config.capacityAh" name="config.capacityAh" label="Capacity (Ah)" value={(formData.config as BatteryNodeData['config'])?.capacityAh ?? ''} onChange={handleInputChange} placeholder="e.g., 1000" min="0"/>
+                                            <FieldInput type="number" id="config.voltageNominalV" name="config.voltageNominalV" label="Nominal Voltage (V)" value={(formData.config as BatteryNodeData['config'])?.voltageNominalV ?? ''} onChange={handleInputChange} placeholder="e.g., 48" min="0"/>
+                                            <FieldInput type="number" id="config.dodPercentage" name="config.dodPercentage" label="Depth of Discharge (%)" value={(formData.config as BatteryNodeData['config'])?.dodPercentage ?? ''} onChange={handleInputChange} placeholder="e.g., 80" min="0" max="100"/>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Grid && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Grid Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput id="config.voltageLevel" name="config.voltageLevel" label="Voltage Level (kV)" value={(formData.config as GridNodeData['config'])?.voltageLevel ?? ''} onChange={handleInputChange} placeholder="e.g., 11kV, 33kV, LT" />
+                                            <div className="space-y-1"> <Label htmlFor="config.frequencyHz" className="text-xs">Frequency (Hz)</Label> <Select name="config.frequencyHz" value={String((formData.config as GridNodeData['config'])?.frequencyHz || '50')} onValueChange={(val) => handleSelectChange("config.frequencyHz", parseFloat(val))}> <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger> <SelectContent><SelectItem value="50" className="text-xs">50 Hz</SelectItem><SelectItem value="60" className="text-xs">60 Hz</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="config.faultLevelMVA" name="config.faultLevelMVA" label="Fault Level (MVA)" value={(formData.config as GridNodeData['config'])?.faultLevelMVA ?? ''} onChange={handleInputChange} placeholder="e.g., 500" min="0"/>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Load && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Load Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.loadType" className="text-xs">Load Type</Label> <Select name="config.loadType" value={(formData.config as LoadNodeData['config'])?.loadType || ''} onValueChange={(val) => handleSelectChange("config.loadType", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select load type..." /></SelectTrigger> <SelectContent><SelectItem value="Resistive" className="text-xs">Resistive</SelectItem><SelectItem value="Inductive" className="text-xs">Inductive</SelectItem><SelectItem value="Capacitive" className="text-xs">Capacitive</SelectItem><SelectItem value="Motor" className="text-xs">Motor</SelectItem><SelectItem value="Lighting" className="text-xs">Lighting</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="config.ratedPowerkW" name="config.ratedPowerkW" label="Rated Power (kW)" value={(formData.config as LoadNodeData['config'])?.ratedPowerkW ?? ''} onChange={handleInputChange} placeholder="e.g., 10" min="0"/>
+                                            <FieldInput type="number" id="config.powerFactor" name="config.powerFactor" label="Power Factor" value={(formData.config as LoadNodeData['config'])?.powerFactor ?? ''} onChange={handleInputChange} placeholder="e.g., 0.85" min="0" max="1" step="0.01"/>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Busbar && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Busbar Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.material" className="text-xs">Material</Label> <Select name="config.material" value={(formData.config as BusbarNodeData['config'])?.material || ''} onValueChange={(val) => handleSelectChange("config.material", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select material..." /></SelectTrigger> <SelectContent><SelectItem value="Copper" className="text-xs">Copper</SelectItem><SelectItem value="Aluminum" className="text-xs">Aluminum</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="config.currentRatingAmps" name="config.currentRatingAmps" label="Current Rating (Amps)" value={(formData.config as BusbarNodeData['config'])?.currentRatingAmps ?? ''} onChange={handleInputChange} placeholder="e.g., 1000" min="0"/>
+                                            <FieldInput type="number" id="config.width" name="config.width" label="Width (px for display)" value={(formData.config as BusbarNodeData['config'])?.width ?? ''} onChange={handleInputChange} placeholder="e.g., 150" min="10"/>
+                                            <FieldInput type="number" id="config.height" name="config.height" label="Height (px for display)" value={(formData.config as BusbarNodeData['config'])?.height ?? ''} onChange={handleInputChange} placeholder="e.g., 12" min="5"/>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Transformer && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Transformer Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput id="config.ratingMVA" name="config.ratingMVA" label="Rating (MVA)" value={(formData.config as TransformerNodeData['config'])?.ratingMVA ?? ''} onChange={handleInputChange} placeholder="e.g., 1.5" />
+                                            <FieldInput id="config.primaryVoltage" name="config.primaryVoltage" label="Primary Voltage (kV)" value={(formData.config as TransformerNodeData['config'])?.primaryVoltage ?? ''} onChange={handleInputChange} placeholder="e.g., 11kV" />
+                                            <FieldInput id="config.secondaryVoltage" name="config.secondaryVoltage" label="Secondary Voltage (kV)" value={(formData.config as TransformerNodeData['config'])?.secondaryVoltage ?? ''} onChange={handleInputChange} placeholder="e.g., 0.433kV" />
+                                            <FieldInput id="config.vectorGroup" name="config.vectorGroup" label="Vector Group" value={(formData.config as TransformerNodeData['config'])?.vectorGroup ?? ''} onChange={handleInputChange} placeholder="e.g., Dyn11" />
+                                            <FieldInput type="number" id="config.impedancePercentage" name="config.impedancePercentage" label="Impedance (%)" value={(formData.config as TransformerNodeData['config'])?.impedancePercentage ?? ''} onChange={handleInputChange} placeholder="e.g., 5" min="0" step="0.1"/>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Generator && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Generator Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.fuelType" className="text-xs">Fuel Type</Label> <Select name="config.fuelType" value={(formData.config as GeneratorNodeData['config'])?.fuelType || ''} onValueChange={(val) => handleSelectChange("config.fuelType", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select fuel type..." /></SelectTrigger> <SelectContent><SelectItem value="Diesel" className="text-xs">Diesel</SelectItem><SelectItem value="Gas" className="text-xs">Natural Gas</SelectItem><SelectItem value="Hydro" className="text-xs">Hydro</SelectItem><SelectItem value="Wind" className="text-xs">Wind</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput id="config.ratingKVA" name="config.ratingKVA" label="Rating (kVA)" value={(formData.config as GeneratorNodeData['config'])?.ratingKVA ?? ''} onChange={handleInputChange} placeholder="e.g., 500" />
+                                            <FieldInput id="config.outputVoltage" name="config.outputVoltage" label="Output Voltage (V)" value={(formData.config as GeneratorNodeData['config'])?.outputVoltage ?? ''} onChange={handleInputChange} placeholder="e.g., 415V" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.PLC && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>PLC Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput id="config.model" name="config.model" label="Model" value={(formData.config as PLCNodeData['config'])?.model ?? ''} onChange={handleInputChange} placeholder="e.g., Siemens S7-1500" />
+                                            <FieldInput id="config.ipAddress" name="config.ipAddress" label="IP Address" value={(formData.config as PLCNodeData['config'])?.ipAddress ?? ''} onChange={handleInputChange} placeholder="e.g., 192.168.1.10" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Sensor && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Sensor Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="config.sensorType" className="text-xs">Sensor Type</Label> <Select name="config.sensorType" value={(formData.config as SensorNodeData['config'])?.sensorType || ''} onValueChange={(val) => handleSelectChange("config.sensorType", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select sensor type..." /></SelectTrigger> <SelectContent><SelectItem value="Temperature" className="text-xs">Temperature</SelectItem><SelectItem value="Irradiance" className="text-xs">Irradiance</SelectItem><SelectItem value="WindSpeed" className="text-xs">Wind Speed</SelectItem><SelectItem value="Pressure" className="text-xs">Pressure</SelectItem><SelectItem value="Flow" className="text-xs">Flow</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput id="config.measurementRange" name="config.measurementRange" label="Measurement Range" value={(formData.config as SensorNodeData['config'])?.measurementRange ?? ''} onChange={handleInputChange} placeholder="e.g., 0-100°C, 0-10 bar" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                
+                                {isNode(selectedElement) && currentElementType === SLDElementType.GenericDevice && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Generic Device Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput id="config.deviceType" name="config.deviceType" label="Device Type/Name" value={(formData.config as GenericDeviceNodeData['config'])?.deviceType ?? ''} onChange={handleInputChange} placeholder="e.g., UPS, VFD, Custom Relay" />
+                                            <FieldInput id="config.iconName" name="config.iconName" label="Lucide Icon Name (optional)" value={(formData.config as GenericDeviceNodeData['config'])?.iconName ?? ''} onChange={handleInputChange} placeholder="e.g., Zap, Fan, Server" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Isolator && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Isolator Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput type="number" id="config.poles" name="config.poles" label="Number of Poles" value={(formData.config as IsolatorNodeData['config'])?.poles ?? ''} onChange={handleInputChange} placeholder="e.g., 3 or 4" min="1" />
+                                            <div className="space-y-1"> <Label htmlFor="config.loadBreak" className="text-xs">Load Break Capability</Label> <Select name="config.loadBreak" value={String((formData.config as IsolatorNodeData['config'])?.loadBreak ?? false)} onValueChange={(val) => handleSelectChange("config.loadBreak", val === 'true')}> <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger> <SelectContent><SelectItem value="true" className="text-xs">Yes</SelectItem><SelectItem value="false" className="text-xs">No</SelectItem></SelectContent> </Select> </div>
+                                            <div className="space-y-1"> <Label htmlFor="config.manualOrMotorized" className="text-xs">Operation Type</Label> <Select name="config.manualOrMotorized" value={(formData.config as IsolatorNodeData['config'])?.manualOrMotorized || 'manual'} onValueChange={(val) => handleSelectChange("config.manualOrMotorized", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger> <SelectContent><SelectItem value="manual" className="text-xs">Manual</SelectItem><SelectItem value="motorized" className="text-xs">Motorized</SelectItem></SelectContent> </Select> </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                {isNode(selectedElement) && currentElementType === SLDElementType.ATS && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>ATS Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput type="number" id="config.transferTimeMs" name="config.transferTimeMs" label="Transfer Time (ms)" value={(formData.config as ATSNodeData['config'])?.transferTimeMs ?? ''} onChange={handleInputChange} placeholder="e.g., 50" min="0" />
+                                            <FieldInput type="number" id="config.numPoles" name="config.numPoles" label="Number of Poles" value={(formData.config as ATSNodeData['config'])?.numPoles ?? ''} onChange={handleInputChange} placeholder="e.g., 4" min="1" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                {isNode(selectedElement) && currentElementType === SLDElementType.JunctionBox && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Junction Box Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput id="config.material" name="config.material" label="Material" value={(formData.config as JunctionBoxNodeData['config'])?.material ?? ''} onChange={handleInputChange} placeholder="e.g., Polycarbonate, Metal" />
+                                            <FieldInput id="config.ipRating" name="config.ipRating" label="IP Rating" value={(formData.config as JunctionBoxNodeData['config'])?.ipRating ?? ''} onChange={handleInputChange} placeholder="e.g., IP65" />
+                                            <FieldInput type="number" id="config.numberOfStrings" name="config.numberOfStrings" label="Number of Strings" value={(formData.config as JunctionBoxNodeData['config'])?.numberOfStrings ?? ''} onChange={handleInputChange} placeholder="e.g., 4" min="1" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Fuse && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Fuse Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput type="number" id="config.ratingAmps" name="config.ratingAmps" label="Rating (Amps)" value={(formData.config as FuseNodeData['config'])?.ratingAmps ?? ''} onChange={handleInputChange} placeholder="e.g., 63" min="0" />
+                                            <FieldInput id="config.voltageRating" name="config.voltageRating" label="Voltage Rating (V)" value={(formData.config as FuseNodeData['config'])?.voltageRating ?? ''} onChange={handleInputChange} placeholder="e.g., 415V, 690V" />
+                                            <div className="space-y-1"> <Label htmlFor="config.fuseType" className="text-xs">Fuse Type</Label> <Select name="config.fuseType" value={(formData.config as FuseNodeData['config'])?.fuseType || ''} onValueChange={(val) => handleSelectChange("config.fuseType", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select fuse type..." /></SelectTrigger> <SelectContent><SelectItem value="Cartridge" className="text-xs">Cartridge</SelectItem><SelectItem value="HRC" className="text-xs">HRC</SelectItem><SelectItem value="Rewireable" className="text-xs">Rewireable</SelectItem><SelectItem value="Semiconductor" className="text-xs">Semiconductor Protection</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="config.breakingCapacitykA" name="config.breakingCapacitykA" label="Breaking Capacity (kA)" value={(formData.config as FuseNodeData['config'])?.breakingCapacitykA ?? ''} onChange={handleInputChange} placeholder="e.g., 80" min="0" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isEdge(selectedElement) && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Edge/Connection Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1"> <Label htmlFor="flowType" className="text-xs">Flow Type</Label> <Select name="flowType" value={formData.flowType || ''} onValueChange={(val) => handleSelectChange("flowType", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select flow type..." /></SelectTrigger> <SelectContent><SelectItem value="AC" className="text-xs">AC Power</SelectItem><SelectItem value="DC" className="text-xs">DC Power</SelectItem><SelectItem value="CONTROL_SIGNAL" className="text-xs">Control Signal</SelectItem><SelectItem value="DATA_BUS" className="text-xs">Data Bus</SelectItem></SelectContent> </Select> </div>
+                                            <div className="space-y-1"> <Label htmlFor="voltageLevel" className="text-xs">Voltage Level</Label> <Select name="voltageLevel" value={formData.voltageLevel || ''} onValueChange={(val) => handleSelectChange("voltageLevel", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select voltage level..." /></SelectTrigger> <SelectContent><SelectItem value="HV" className="text-xs">High Voltage (HV)</SelectItem><SelectItem value="MV" className="text-xs">Medium Voltage (MV)</SelectItem><SelectItem value="LV" className="text-xs">Low Voltage (LV)</SelectItem><SelectItem value="ELV" className="text-xs">Extra Low Voltage (ELV)</SelectItem></SelectContent> </Select> </div>
+                                            <FieldInput type="number" id="currentRatingAmps" name="currentRatingAmps" label="Current Rating (Amps)" value={formData.currentRatingAmps ?? ''} onChange={handleInputChange} placeholder="e.g., 250" min="0" />
+                                            <FieldInput id="cableType" name="cableType" label="Cable Type / Size" value={formData.cableType ?? ''} onChange={handleInputChange} placeholder="e.g., XLPE 3C x 185mm²" />
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && (
                                     <Card className='shadow-sm border-border/60'>
                                         <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Drilldown Link (Optional)</CardTitle></CardHeader>
                                         <CardContent className='p-4 pt-0 space-y-4'>

@@ -2,25 +2,47 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { PanelNodeData } from '@/types/sld'; // CustomNodeData is implicitly handled by NodeProps<PanelNodeData>
+import { PanelNodeData, DataPointLink, DataPoint } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
-import { SunIcon } from 'lucide-react';
+import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
+import { SunIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
 
 const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    realtimeData: state.realtimeData,
+    dataPoints: state.dataPoints,
   }));
 
   const isNodeEditable = useMemo(() => 
-    // Assuming admin or editor roles can edit. Adjust as per your UserRole enum and logic.
     isEditMode && (currentUser?.role === 'admin'),
     [isEditMode, currentUser]
   );
 
+  const processedStatus = useMemo(() => {
+    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
+    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
+      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+      return applyValueMapping(rawValue, statusLink);
+    }
+    return data.status || 'offline'; // Fallback to static status or default
+  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+
+  const powerOutput = useMemo(() => {
+    const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput');
+    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+      const dpMeta = dataPoints[powerLink.dataPointId];
+      const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+      const mappedValue = applyValueMapping(rawValue, powerLink);
+      return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
+    }
+    return data.config?.powerRatingWp ? `${data.config.powerRatingWp} Wp (rated)` : 'N/A';
+  }, [data.dataPointLinks, data.config?.powerRatingWp, realtimeData, dataPoints]);
+  
   // Determine status-based styling
   const statusClasses = useMemo(() => {
-    switch (data.status) {
+    switch (processedStatus) {
       case 'alarm':
       case 'fault':
         return 'border-destructive dark:border-red-400 bg-destructive/10 dark:bg-red-900/20 text-destructive-foreground';
@@ -28,10 +50,50 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConne
         return 'border-yellow-500 dark:border-yellow-400 bg-yellow-500/10 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300';
       case 'nominal':
       case 'producing':
-      default: // Default to nominal/producing state appearance
+      case 'online':
         return 'border-green-600 dark:border-green-500 bg-green-600/5 dark:bg-green-900/10 text-green-700 dark:text-green-300';
+      default: // Default for 'offline', 'standby' or unknown
+        return 'border-neutral-500 dark:border-neutral-600 bg-neutral-500/10 dark:bg-neutral-900/20 text-neutral-700 dark:text-neutral-300';
     }
-  }, [data.status]);
+  }, [processedStatus]);
+
+  const derivedNodeStyles = useMemo(() => 
+    getDerivedStyle(data, realtimeData, dataPoints),
+    [data, realtimeData, dataPoints]
+  );
+
+  const StatusIcon = useMemo(() => {
+    if (processedStatus === 'fault' || processedStatus === 'alarm') return AlertTriangleIcon;
+    if (processedStatus === 'warning') return AlertTriangleIcon; 
+    return SunIcon; // SunIcon for producing, nominal, online, or even offline (color will change)
+  }, [processedStatus]);
+
+  const iconColor = useMemo(() => {
+    if (derivedNodeStyles.color) return derivedNodeStyles.color; 
+    if (processedStatus === 'producing' || processedStatus === 'nominal' || processedStatus === 'online') return 'text-yellow-500 dark:text-yellow-400';
+    if (processedStatus === 'fault' || processedStatus === 'alarm') return 'text-destructive dark:text-red-400';
+    if (processedStatus === 'warning') return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-gray-400 dark:text-gray-500'; 
+  }, [processedStatus, derivedNodeStyles.color]);
+
+  const isProducing = useMemo(() => {
+    // A simple heuristic: if powerOutput is not "N/A" and not "0 W" (or similar zero values)
+    // This might need refinement based on actual formatted values from formatDisplayValue
+    if (powerOutput === 'N/A') return false;
+    const numericValue = parseFloat(powerOutput); // Extracts leading number
+    return !isNaN(numericValue) && numericValue > 0;
+  }, [powerOutput]);
+
+
+  // Merged styles for the main div
+  const componentStyle: React.CSSProperties = {
+    ...derivedNodeStyles, // Apply all derived styles
+    // Explicitly override border and background if not set by derived styles, to ensure statusClasses apply
+    borderColor: derivedNodeStyles.borderColor || undefined, // Let className handle if not in derived
+    backgroundColor: derivedNodeStyles.backgroundColor || undefined, // Let className handle
+    color: derivedNodeStyles.color || undefined, // Let className handle
+  };
+
 
   return (
     <motion.div
@@ -47,6 +109,7 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConne
         ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
         ${statusClasses} 
       `}
+      style={componentStyle}
       variants={{ 
         hover: { 
           scale: isNodeEditable ? 1.04 : 1, 
@@ -96,22 +159,25 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConne
 
       {/* Node Visual Content */}
       <div className="flex flex-col items-center justify-center w-full h-full pointer-events-none">
-        <SunIcon 
-            size={22} 
-            className={`mb-0.5 transition-colors duration-300 ${data.status === 'producing' || data.status === 'nominal' ? 'text-yellow-500 dark:text-yellow-400' : 'text-gray-400 dark:text-gray-500'}`} 
-        />
+        <motion.div
+          animate={isProducing && StatusIcon === SunIcon ? { scale: [1, 1.1, 1], opacity: [1, 0.8, 1] } : {}}
+          transition={isProducing && StatusIcon === SunIcon ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
+        >
+          <StatusIcon 
+              size={22} 
+              className={`mb-0.5 transition-colors duration-300 ${iconColor}`} 
+          />
+        </motion.div>
         <p 
           className="text-[10px] font-semibold leading-tight text-center truncate w-[90%]" 
           title={data.label}
-          style={{ color: 'inherit' }} // Inherit color from statusClasses text color
+          style={{ color: 'inherit' }} // Inherit color from statusClasses or derivedNodeStyles.color
         >
           {data.label}
         </p>
-         {data.config?.powerRatingWp && (
-            <p className="text-[8px] text-muted-foreground/80 leading-none">
-                {data.config.powerRatingWp} Wp
-            </p>
-        )}
+        <p className="text-[8px] leading-none" style={{ color: 'inherit' }} title={`Power: ${powerOutput}`}>
+            {powerOutput}
+        </p>
       </div>
     </motion.div>
   );

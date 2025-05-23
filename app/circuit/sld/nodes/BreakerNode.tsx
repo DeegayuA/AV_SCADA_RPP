@@ -2,14 +2,17 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BreakerNodeData } from '@/types/sld';
+import { BreakerNodeData, DataPointLink, DataPoint } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
+import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
 import { ZapOffIcon, ZapIcon, ShieldAlertIcon, ShieldCheckIcon, AlertTriangleIcon } from 'lucide-react'; // Or custom SVG
 
 const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    realtimeData: state.realtimeData,
+    dataPoints: state.dataPoints,
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -17,24 +20,71 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isC
     [isEditMode, currentUser]
   );
 
-  const isOpen = data.status === 'open' || (data.config?.normallyOpen && data.status !== 'closed'); // Example logic for open state
-  const isClosed = data.status === 'closed' || (!data.config?.normallyOpen && data.status !== 'open'); // Example logic
+  // Determine breaker status from DataPointLinks or fallback to data.status
+  const processedStatus = useMemo(() => {
+    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
+    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
+      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+      // Ensure applyValueMapping can handle various types, including boolean if status is directly represented
+      return applyValueMapping(rawValue, statusLink); 
+    }
+    // Fallback to static status if no DPLink for 'status' or data not available
+    return data.status; 
+  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  
+  // Determine if the breaker is open based on processedStatus or config
+  const isOpen = useMemo(() => {
+    // Prefer a DataPointLink for 'isOpen' if available
+    const isOpenLink = data.dataPointLinks?.find(link => link.targetProperty === 'isOpen');
+    if (isOpenLink && dataPoints[isOpenLink.dataPointId] && realtimeData) {
+      const rawValue = getDataPointValue(isOpenLink.dataPointId, realtimeData);
+      const mappedValue = applyValueMapping(rawValue, isOpenLink);
+      // Interpret various "true" conditions for isOpen
+      return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || Number(mappedValue) === 1;
+    }
+    // Fallback logic based on processedStatus or data.config
+    return processedStatus === 'open' || (data.config?.normallyOpen && processedStatus !== 'closed');
+  }, [data.dataPointLinks, data.config?.normallyOpen, processedStatus, realtimeData, dataPoints]);
 
   const statusStyles = useMemo(() => {
-    if (data.status === 'fault' || data.status === 'tripped' || data.status === 'alarm') {
+    let currentStatus = processedStatus; // Use the processed status
+
+    if (currentStatus === 'fault' || currentStatus === 'tripped' || currentStatus === 'alarm') {
       return { border: 'border-destructive dark:border-red-500', bg: 'bg-destructive/10 dark:bg-red-900/30', iconColor: 'text-destructive dark:text-red-400', main: 'text-destructive dark:text-red-400' };
     }
-    if (data.status === 'warning') {
+    if (currentStatus === 'warning') {
       return { border: 'border-yellow-500 dark:border-yellow-400', bg: 'bg-yellow-500/10 dark:bg-yellow-900/30', iconColor: 'text-yellow-500 dark:text-yellow-400', main: 'text-yellow-600 dark:text-yellow-400' };
     }
-    if (isClosed && (data.status === 'closed' || data.status === 'nominal' || data.status === 'energized')) {
+    // Consider 'closed' implies energized/nominal unless specified otherwise by another DPLink
+    if (!isOpen && (currentStatus === 'closed' || currentStatus === 'nominal' || currentStatus === 'energized')) {
       return { border: 'border-green-600 dark:border-green-500', bg: 'bg-green-600/10 dark:bg-green-900/30', iconColor: 'text-green-600 dark:text-green-500', main: 'text-green-700 dark:text-green-500' };
     }
-    // Open or offline/default
+    // Default for 'open', 'offline', or undefined status
     return { border: 'border-neutral-400 dark:border-neutral-600', bg: 'bg-neutral-200/20 dark:bg-neutral-700/30', iconColor: 'text-neutral-500 dark:text-neutral-400', main: 'text-neutral-600 dark:text-neutral-400' };
-  }, [data.status, isClosed]);
+  }, [processedStatus, isOpen]);
+
+  // Get additional styles from dataPointLinks (e.g., for custom colors based on other data)
+  const derivedNodeStyles = useMemo(() => 
+    getDerivedStyle(data, realtimeData, dataPoints),
+    [data, realtimeData, dataPoints]
+  );
+  
+  // Combine statusStyles with derivedNodeStyles. Derived styles can override.
+  // For simplicity, we'll focus on className-based statusStyles and let derivedNodeStyles apply inline.
+  // More complex merging might be needed if derivedNodeStyles also return classNames.
 
   const breakerTypeLabel = data.config?.type || 'Breaker';
+
+  // Choose icon based on status - can be expanded with more DPLinks
+  const StatusIcon = useMemo(() => {
+    if (processedStatus === 'fault' || processedStatus === 'tripped') return ShieldAlertIcon;
+    if (processedStatus === 'alarm') return AlertTriangleIcon; // Specific alarm icon
+    if (processedStatus === 'warning') return AlertTriangleIcon; // Or a dedicated warning icon
+    if (!isOpen && (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized')) return ShieldCheckIcon; // Indicates closed and healthy
+    if (isOpen) return ZapOffIcon; // Clearly open
+    return ZapIcon; // Default or unknown state icon (could also be ZapOffIcon if default is open)
+  }, [processedStatus, isOpen]);
+
 
   return (
     <motion.div
@@ -48,6 +98,7 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isC
           selected ? 'ring-1 ring-accent dark:ring-offset-neutral-900' : ''}
         ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
       `}
+      style={derivedNodeStyles} // Apply derived styles here
       variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
       whileHover="hover"
       initial="initial"
@@ -56,24 +107,49 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isC
       <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
       <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
 
-      <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" style={{ color: statusStyles.main }} title={`${data.label} (${breakerTypeLabel})`}>
+      <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" style={{ color: derivedNodeStyles.color || statusStyles.main }} title={`${data.label} (${breakerTypeLabel})`}>
         {data.label}
       </p>
       
-      {/* Simplified SVG Breaker Symbol */}
-      <svg viewBox="0 0 24 24" width="32" height="32" className={`flex-grow ${statusStyles.iconColor} transition-colors`}>
+      {/* SVG Breaker Symbol or Status Icon */}
+      {/* Option 1: Keep SVG and change its state */}
+      <motion.svg 
+        viewBox="0 0 24 24" 
+        width="32" height="32" 
+        className={`flex-grow`} 
+        style={{ color: derivedNodeStyles.color || statusStyles.iconColor }}
+        initial={false} // Prevent initial animation on mount
+      >
         <circle cx="12" cy="7" r="2.5" fill="currentColor" /> {/* Top terminal */}
         <circle cx="12" cy="17" r="2.5" fill="currentColor" /> {/* Bottom terminal */}
         <line x1="12" y1="9.5" x2="12" y2="14.5" stroke="currentColor" strokeWidth="1.5" /> {/* Vertical bar */}
-        {/* Switch arm */}
-        {isOpen ? (
-            <line x1="12" y1="12" x2="18" y2="8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        ) : ( // Closed
-            <line x1="12" y1="12" x2="12" y2="7" stroke="currentColor" strokeWidth="0" /> // effectively hidden when closed this way or adjust coords
-        )}
-         <rect x="8" y="11" width="8" height="2" fill="currentColor" className="opacity-60" /> {/* Box body part */}
-         {!isOpen && <circle cx="12" cy="12" r="1.5" fill="currentColor" /> /* Contact point when closed */ }
-      </svg>
+        
+        {/* Switch arm: using motion.line for smooth transition */}
+        <motion.line
+          key={isOpen ? "open-arm" : "closed-arm"} // Key change helps React trigger animation correctly
+          x1="12"
+          y1="12"
+          initial={false} // Start from current state if already rendered
+          animate={isOpen ? { x2: 18, y2: 8 } : { x2: 12, y2: 9.5 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        />
+        
+        <rect x="8" y="11" width="8" height="2" fill="currentColor" className="opacity-60" /> {/* Box body part */}
+        
+        {/* Contact point: fade in/out */}
+        <motion.circle 
+          cx="12" cy="12" r="1.5" fill="currentColor"
+          initial={{ opacity: isOpen ? 0 : 1 }}
+          animate={{ opacity: isOpen ? 0 : 1 }}
+          transition={{ duration: 0.15 }}
+        />
+      </motion.svg>
+      {/* Option 2: Use Lucide icons (if preferred over dynamic SVG) */}
+      {/* <StatusIcon size={32} className={`flex-grow transition-colors ${statusStyles.iconColor}`} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} /> */}
+
 
       <p className="text-[8px] text-muted-foreground text-center truncate w-full leading-tight" title={data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel}>
         {data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel.toUpperCase()}

@@ -2,11 +2,12 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BaseNodeData } from '@/types/sld'; // Assuming MotorNodeData or can be specific
+import { BaseNodeData, DataPointLink, DataPoint } from '@/types/sld'; 
 import { useAppStore } from '@/stores/appStore';
+import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
 import { CogIcon, PlayCircleIcon, PauseCircleIcon, AlertCircleIcon, XCircleIcon } from 'lucide-react';
 
-interface MotorNodeData extends BaseNodeData { // Example specific data
+interface MotorNodeData extends BaseNodeData { 
     config?: BaseNodeData['config'] & {
         ratedPowerkW?: number;
         voltage?: string;
@@ -15,9 +16,11 @@ interface MotorNodeData extends BaseNodeData { // Example specific data
 }
 
 const MotorNode: React.FC<NodeProps<MotorNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    realtimeData: state.realtimeData,
+    dataPoints: state.dataPoints,
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -25,76 +28,120 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = ({ data, selected, isConne
     [isEditMode, currentUser]
   );
 
-  const { StatusIcon, statusText, styleClasses, iconAnimation } = useMemo(() => {
-    let icon = CogIcon;
-    let text = data.status || 'Stopped';
-    let classes = 'border-neutral-400 dark:border-neutral-600 bg-muted/20 text-muted-foreground';
-    let anim = '';
+  const processedStatus = useMemo(() => {
+    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
+    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
+      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+      return applyValueMapping(rawValue, statusLink);
+    }
+    return data.status || 'stopped'; // Default status
+  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
 
-    switch (data.status) {
+  const powerDisplay = useMemo(() => {
+    const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerConsumption' || link.targetProperty === 'activePower');
+    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+        const dpMeta = dataPoints[powerLink.dataPointId];
+        const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+        const mappedValue = applyValueMapping(rawValue, powerLink);
+        return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
+    }
+    return data.config?.ratedPowerkW ? `${data.config.ratedPowerkW}kW` : 'N/A';
+  }, [data.dataPointLinks, data.config?.ratedPowerkW, realtimeData, dataPoints]);
+
+
+  const { StatusIcon, statusText, baseClasses, isSpinning } = useMemo(() => {
+    let icon = CogIcon;
+    let text = String(processedStatus).toUpperCase();
+    let classes = 'border-neutral-400 dark:border-neutral-600 bg-muted/20 text-muted-foreground';
+    let spinning = false;
+
+    switch (String(processedStatus).toLowerCase()) {
       case 'fault': case 'alarm': case 'tripped':
         icon = XCircleIcon; text = 'FAULT';
         classes = 'border-destructive bg-destructive/10 text-destructive'; break;
       case 'warning':
-        icon = AlertCircleIcon; text = 'Warning';
+        icon = AlertCircleIcon; text = 'WARNING';
         classes = 'border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'; break;
       case 'running':
-        icon = PlayCircleIcon; text = 'RUN'; anim = 'animate-spin animation-duration-2000';
+        icon = PlayCircleIcon; text = 'RUNNING'; spinning = true;
         classes = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400'; break;
       case 'stopped': case 'offline': case 'off':
-        icon = PauseCircleIcon; text = 'STOP';
+        icon = PauseCircleIcon; text = 'STOPPED';
         classes = 'border-neutral-500 bg-neutral-500/10 text-neutral-500'; break;
+      default: // Unknown or other statuses
+        icon = CogIcon; text = text || 'UNKNOWN';
+        classes = 'border-gray-400 bg-gray-400/10 text-gray-500'; break;
     }
-    return { StatusIcon: icon, statusText: text, styleClasses: classes, iconAnimation: anim };
-  }, [data.status]);
+    return { StatusIcon: icon, statusText: text, baseClasses: classes, isSpinning: spinning };
+  }, [processedStatus]);
 
-  // SVG for "M" inside a circle
-  const motorSymbolSVG = (
-    <svg viewBox="0 0 24 24" width="30" height="30" className={`transition-colors ${styleClasses.includes('text-muted-foreground') ? 'opacity-70' : ''} ${iconAnimation}`}>
+  const derivedNodeStyles = useMemo(() => 
+    getDerivedStyle(data, realtimeData, dataPoints),
+    [data, realtimeData, dataPoints]
+  );
+  
+  const MotorSymbolSVG = ({ className, isSpinning }: { className?: string, isSpinning?: boolean }) => {
+    const variants = {
+      spinning: { rotate: 360 },
+      still: { rotate: 0 },
+    };
+    const transition = isSpinning ? { loop: Infinity, ease: "linear", duration: 2 } : { duration: 0.5 }; // Faster spin than generator
+
+    return (
+      <motion.svg 
+        viewBox="0 0 24 24" width="30" height="30" 
+        className={className}
+        variants={variants}
+        animate={isSpinning ? "spinning" : "still"}
+        transition={transition}
+      >
         <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" fill="none"/>
         <text x="12" y="16.5" fontSize="12" textAnchor="middle" fontWeight="bold" fill="currentColor">M</text>
-    </svg>
-  );
+      </motion.svg>
+    );
+  };
+  
+  const mainDivClasses = `
+    sld-node motor-node group w-[75px] h-[85px] rounded-full shadow-lg 
+    flex flex-col items-center justify-between p-2
+    border-2 ${derivedNodeStyles.borderColor ? '' : baseClasses.split(' ')[0]} 
+    ${derivedNodeStyles.backgroundColor ? '' : baseClasses.split(' ')[1]}
+    ${derivedNodeStyles.color ? '' : baseClasses.split(' ')[2]}
+    bg-card dark:bg-neutral-800
+    transition-all duration-150
+    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
+    ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
+  `;
+  const effectiveIconColorClass = derivedNodeStyles.color ? '' : baseClasses.split(' ')[2];
 
 
   return (
     <motion.div
-      className={`
-        sld-node motor-node group w-[75px] h-[85px] rounded-full shadow-lg // Motors often circular
-        flex flex-col items-center justify-between p-2
-        border-2 ${styleClasses}
-        bg-card dark:bg-neutral-800 text-foreground
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
-      `}
+      className={mainDivClasses}
+      style={derivedNodeStyles} // Allow DPLinks to override all styles
       variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
-      {/* Motor is a load, typically powered from top */}
       <Handle type="target" position={Position.Top} id="top_power_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Power Input"/>
-      {/* Optionally, a bottom handle if it drives something mechanically that continues the diagram */}
-      {/* <Handle type="source" position={Position.Bottom} id="mech_out" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style" /> */}
 
-
-      <p className="text-[9px] font-semibold text-center truncate w-full" style={{color: 'var(--foreground)'}} title={data.label}>
+      <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
         {data.label}
       </p>
       
       <div className="my-0.5 pointer-events-none">
-        {motorSymbolSVG}
+        <MotorSymbolSVG className={`transition-colors ${effectiveIconColorClass}`} isSpinning={isSpinning} />
       </div>
       
       <div className="flex items-center justify-center gap-1">
-         <StatusIcon size={10} className={`${styleClasses.includes('text-muted-foreground') ? 'opacity-60' : ''}`}/>
-         <p className="text-[8px] font-medium text-center truncate leading-tight" style={{color: 'var(--foreground)'}}>
+         <StatusIcon size={10} className={`${effectiveIconColorClass}`}/>
+         <p className={`text-[8px] font-medium text-center truncate leading-tight ${effectiveIconColorClass}`}>
            {statusText}
          </p>
       </div>
-       {data.config?.ratedPowerkW && (
-            <p className="text-[7px] text-muted-foreground/90 leading-none">{data.config.ratedPowerkW}kW</p>
-        )}
+      <p className={`text-[7px] leading-none ${derivedNodeStyles.color ? '' : 'text-muted-foreground/90'}`} title={`Power: ${powerDisplay}`}>
+          {powerDisplay}
+      </p>
     </motion.div>
   );
 };
