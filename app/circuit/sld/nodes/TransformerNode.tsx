@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { TransformerNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { TransformerNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { GitBranchPlusIcon, AlertTriangleIcon } from 'lucide-react'; // Placeholder, ideally custom SVG
+import { GitBranchPlusIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Placeholder, ideally custom SVG. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -22,31 +25,31 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = ({ data, selec
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'offline'; // Default status
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   // Example: Displaying temperature or load percentage if linked
   const additionalInfo = useMemo(() => {
     const tempLink = data.dataPointLinks?.find(link => link.targetProperty === 'temperature');
-    if (tempLink && dataPoints[tempLink.dataPointId] && realtimeData) {
+    if (tempLink && dataPoints && dataPoints[tempLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[tempLink.dataPointId];
-      const rawValue = getDataPointValue(tempLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(tempLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, tempLink);
       return `Temp: ${formatDisplayValue(mappedValue, tempLink.format, dpMeta?.dataType)}`;
     }
     const loadLink = data.dataPointLinks?.find(link => link.targetProperty === 'loadPercentage');
-    if (loadLink && dataPoints[loadLink.dataPointId] && realtimeData) {
+    if (loadLink && dataPoints && dataPoints[loadLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[loadLink.dataPointId];
-      const rawValue = getDataPointValue(loadLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(loadLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, loadLink);
       return `Load: ${formatDisplayValue(mappedValue, loadLink.format, dpMeta?.dataType)}`;
     }
     return `${data.config?.primaryVoltage || 'HV'}/${data.config?.secondaryVoltage || 'LV'}`;
-  }, [data.dataPointLinks, data.config, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config, opcUaNodeValues, dataPoints]);
 
 
   const statusStyles = useMemo(() => {
@@ -61,8 +64,8 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = ({ data, selec
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   const isTransformerEnergized = useMemo(() => 
@@ -125,6 +128,24 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = ({ data, selec
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <Handle type="target" position={Position.Top} id="primary_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Primary"/>
       <Handle type="source" position={Position.Bottom} id="secondary_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Secondary"/>
 

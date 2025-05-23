@@ -2,10 +2,11 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BaseNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
-import { AlertTriangleIcon } from 'lucide-react'; // For fault/warning states
+import { AlertTriangleIcon, InfoIcon } from 'lucide-react'; // For fault/warning states. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
 interface IsolatorNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
@@ -14,11 +15,13 @@ interface IsolatorNodeData extends BaseNodeData {
     }
 }
 
-const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -29,23 +32,23 @@ const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = ({ data, selected, i
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'open'; // Default to open
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const isOpen = useMemo(() => {
     const isOpenLink = data.dataPointLinks?.find(link => link.targetProperty === 'isOpen');
-    if (isOpenLink && dataPoints[isOpenLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(isOpenLink.dataPointId, realtimeData);
+    if (isOpenLink && dataPoints && dataPoints[isOpenLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(isOpenLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, isOpenLink);
       return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || Number(mappedValue) === 1;
     }
     // Fallback logic based on processedStatus
     return processedStatus === 'open' || processedStatus === 'isolated';
-  }, [data.dataPointLinks, processedStatus, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, processedStatus, opcUaNodeValues, dataPoints]);
 
 
   const { statusText, baseClasses, effectiveColor } = useMemo(() => {
@@ -65,8 +68,8 @@ const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = ({ data, selected, i
   }, [isOpen, processedStatus]);
   
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   const IsolatorArmSVG = ({ className, isOpen }: { className?: string, isOpen?: boolean }) => {
@@ -111,7 +114,25 @@ const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = ({ data, selected, i
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
-      <p className={`text-[8px] font-medium text-center truncate w-full leading-none ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
+      <p className={`text-[9px] font-medium text-center truncate w-full leading-none ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
         {data.label}
       </p>
       

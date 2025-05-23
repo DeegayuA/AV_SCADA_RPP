@@ -2,9 +2,10 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BaseNodeData } from '@/types/sld'; // Or specific RelayNodeData
+import { BaseNodeData, CustomNodeType } from '@/types/sld'; // Or specific RelayNodeData. Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
-import { ShieldCheckIcon, ShieldAlertIcon, ShieldQuestionIcon, ZapIcon } from 'lucide-react';
+import { ShieldCheckIcon, ShieldAlertIcon, ShieldQuestionIcon, ZapIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
 interface RelayNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
@@ -13,10 +14,14 @@ interface RelayNodeData extends BaseNodeData {
     }
 }
 
-const RelayNode: React.FC<NodeProps<RelayNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+const RelayNode: React.FC<NodeProps<RelayNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Added
+    dataPoints: state.dataPoints, // Added
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -66,6 +71,24 @@ const RelayNode: React.FC<NodeProps<RelayNodeData>> = ({ data, selected, isConne
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* Relays usually have multiple connections: Power, CT/PT inputs, Trip Output */}
       <Handle type="target" position={Position.Top} id="power_in" isConnectable={isConnectable} className="!w-2 !h-2 sld-handle-style !bg-red-400" title="Power"/>
       <Handle type="target" position={Position.Left} id="ct_pt_in" isConnectable={isConnectable} className="!w-2 !h-2 sld-handle-style !bg-yellow-400" title="Measurement Inputs"/>

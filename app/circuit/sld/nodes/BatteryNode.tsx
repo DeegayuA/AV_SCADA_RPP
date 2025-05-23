@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BatteryNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { BatteryNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { BatteryChargingIcon, BatteryFullIcon, BatteryLowIcon, BatteryMediumIcon, AlertCircleIcon, ZapIcon } from 'lucide-react';
+import { BatteryChargingIcon, BatteryFullIcon, BatteryLowIcon, BatteryMediumIcon, AlertCircleIcon, ZapIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const BatteryNode: React.FC<NodeProps<BatteryNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const BatteryNode: React.FC<NodeProps<BatteryNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -22,24 +25,24 @@ const BatteryNode: React.FC<NodeProps<BatteryNodeData>> = ({ data, selected, isC
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'idle'; // Default to idle
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const socValue = useMemo(() => {
     const socLink = data.dataPointLinks?.find(link => link.targetProperty === 'soc');
-    if (socLink && dataPoints[socLink.dataPointId] && realtimeData) {
+    if (socLink && dataPoints && dataPoints[socLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[socLink.dataPointId];
-      const rawValue = getDataPointValue(socLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(socLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, socLink);
       // Assuming SOC is a number, format it.
       return parseFloat(formatDisplayValue(mappedValue, socLink.format, dpMeta?.dataType));
     }
     return typeof data.config?.soc === 'number' ? data.config.soc : -1; // Fallback to config
-  }, [data.dataPointLinks, data.config?.soc, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config?.soc, opcUaNodeValues, dataPoints]);
 
   const { icon: StatusIcon, borderClass, bgClass, textClass, animationClass } = useMemo(() => {
     let animClass = '';
@@ -69,8 +72,8 @@ const BatteryNode: React.FC<NodeProps<BatteryNodeData>> = ({ data, selected, isC
   }, [processedStatus, socValue]);
   
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   const displaySoc = socValue >= 0 ? `${Math.round(socValue)}%` : (processedStatus || 'N/A');
@@ -100,6 +103,24 @@ const BatteryNode: React.FC<NodeProps<BatteryNodeData>> = ({ data, selected, isC
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* Handles */}
       <Handle type="target" position={Position.Top} id="top_in_charge" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Charge Input"/>
       <Handle type="source" position={Position.Bottom} id="bottom_out_discharge" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Discharge Output"/>
@@ -121,6 +142,9 @@ const BatteryNode: React.FC<NodeProps<BatteryNodeData>> = ({ data, selected, isC
         />
       </motion.div>
       
+      <p className={`text-[9px] font-medium text-center truncate w-full leading-tight ${derivedNodeStyles.color ? '' : textClass}`} title={`Status: ${processedStatus}`}>
+        {String(processedStatus).toUpperCase()}
+      </p>
       <p className={`text-[10px] font-bold text-center ${derivedNodeStyles.color ? '' : textClass}`} title={`SOC: ${displaySoc}`}>
         {displaySoc}
       </p>

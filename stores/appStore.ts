@@ -2,7 +2,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import {
-    RealTimeData,
     DataPoint,
     CustomNodeType,
     CustomFlowEdge,
@@ -40,7 +39,7 @@ const defaultUser: User = {
 };
 
 interface AppState {
-  realtimeData: RealTimeData;
+  opcUaNodeValues: Record<string, string | number | boolean>; // Renamed and typed
   dataPoints: Record<string, DataPoint>; // Keyed by DataPoint ID for easy lookup
   isEditMode: boolean;
   currentUser: User | null;
@@ -48,7 +47,7 @@ interface AppState {
 }
 
 const initialState: AppState = {
-  realtimeData: {},
+  opcUaNodeValues: {}, // Initialized to empty object
   dataPoints: dataPointsWithIcons.reduce<Record<string, DataPoint>>((acc, dp) => {
     acc[dp.id] = { ...dp, label: dp.label || dp.name || dp.id }; // Ensure label exists
     return acc;
@@ -59,7 +58,7 @@ const initialState: AppState = {
 };
 
 interface SLDActions {
-  updateRealtimeData: (updates: RealTimeData) => void;
+  updateOpcUaNodeValues: (updates: Record<string, string | number | boolean>) => void; // Renamed and typed
   setDataPoints: (dataPoints: Record<string, DataPoint>) => void; // For dynamic updates to metadata if needed
   toggleEditMode: () => void;
   setCurrentUser: (user: User | null) => void;
@@ -119,18 +118,17 @@ export const useAppStore = create<AppState & SLDActions>()(
     (set, get) => ({
       ...initialState,
 
-      updateRealtimeData: (updates: RealTimeData) =>
+      updateOpcUaNodeValues: (updates: Record<string, string | number | boolean>) => // Renamed and typed
         set((state) => {
           if (typeof updates !== 'object' || updates === null) {
-            // console.warn("Zustand (appStore): updateRealtimeData received non-object data. Ignoring update.", updates);
+            // console.warn("Zustand (appStore): updateOpcUaNodeValues received non-object data. Ignoring update.", updates);
             return state; // No change if updates is not a valid object
           }
-          // Merge updates with existing realtimeData
-          // This assumes `updates` is a flat Record like { 'dp-1': value1, 'dp-2': value2 }
-          return { realtimeData: { ...state.realtimeData, ...updates }};
+          // Merge updates with existing opcUaNodeValues
+          return { opcUaNodeValues: { ...state.opcUaNodeValues, ...updates }};
         }),
 
-      setDataPoints: (newDataPoints: Record<string, DataPoint>) => 
+      setDataPoints: (newDataPoints: Record<string, DataPoint>) =>
         set({ dataPoints: newDataPoints }),
 
       toggleEditMode: () => {
@@ -171,7 +169,7 @@ export const useAppStore = create<AppState & SLDActions>()(
       partialize: (state: AppState & SLDActions): Partial<AppState> => ({ // Only persist these parts
         currentUser: state.currentUser,
         isEditMode: state.isEditMode,
-        // Do NOT persist realtimeData or dataPoints metadata from constants
+        // Do NOT persist opcUaNodeValues or dataPoints metadata from constants
         // selectedElementForDetails should also NOT be persisted as it's transient UI state
       }),
       onRehydrateStorage: (state) => onRehydrateStorageCallback(state as AppState | undefined), // Cast type
@@ -185,9 +183,9 @@ export const useCurrentUser = () => useAppStore((state) => state.currentUser);
 export const useCurrentUserRole = () => useAppStore((state) => state.currentUser?.role);
 export const useSelectedElementForDetails = () => useAppStore((state) => state.selectedElementForDetails); // New hook
 
-// Get a single realtime value, subscribing only to changes for that ID
-export const useRealtimeValue = (dataPointId: string | undefined): any | undefined => 
-    useAppStore(useCallback((state) => dataPointId ? state.realtimeData[dataPointId] : undefined, [dataPointId]));
+// Get a single OPC UA node value, subscribing only to changes for that ID
+export const useOpcUaNodeValue = (nodeId: string | undefined): string | number | boolean | undefined => 
+    useAppStore(useCallback((state) => nodeId ? state.opcUaNodeValues[nodeId] : undefined, [nodeId]));
 
-// useCallback imported from React for useRealtimeValue hook
+// useCallback imported from React for useOpcUaNodeValue hook
 import { useCallback } from 'react';

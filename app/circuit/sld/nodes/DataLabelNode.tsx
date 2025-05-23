@@ -2,7 +2,7 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { DataPointLink, DataPoint } from '@/types/sld';
+import { CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { 
     getDataPointValue, 
@@ -10,9 +10,11 @@ import {
     formatDisplayValue,
     getDerivedStyle // We can use this for dynamic styling of the label itself
 } from './nodeUtils'; 
-import { TextIcon } from 'lucide-react'; // Generic icon for a data label
+import { TextIcon, InfoIcon } from 'lucide-react'; // Generic icon for a data label. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
 interface DataLabelNodeData {
+  elementType: 'dataLabel'; // Explicitly define for type safety if used in CustomNodeData union
   dataPointLinks?: DataPointLink[];
   label?: string;
   styleConfig?: {
@@ -27,11 +29,13 @@ interface DataLabelNodeData {
   };
 }
 
-const DataLabelNode: React.FC<NodeProps<DataLabelNodeData>> = ({ data, selected, isConnectable, id }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const DataLabelNode: React.FC<NodeProps<DataLabelNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints, // Assuming appStore provides all DataPoint metadata
   }));
 
@@ -47,9 +51,9 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeData>> = ({ data, selected,
   );
 
   const { displayText, unitText } = useMemo(() => {
-    if (mainDisplayLink && dataPoints[mainDisplayLink.dataPointId]) {
+    if (mainDisplayLink && dataPoints && dataPoints[mainDisplayLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[mainDisplayLink.dataPointId] as DataPoint; // Cast if sure it exists
-      const rawValue = getDataPointValue(mainDisplayLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(mainDisplayLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, mainDisplayLink);
       const formattedText = formatDisplayValue(mappedValue, mainDisplayLink.format, dpMeta?.dataType);
       
@@ -59,12 +63,12 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeData>> = ({ data, selected,
     }
     // Fallback if no DPLink for value/text, or if static text is preferred for some DataLabels
     return { displayText: data.label || '---', unitText: '' };
-  }, [mainDisplayLink, data.label, realtimeData, dataPoints]);
+  }, [mainDisplayLink, data.label, opcUaNodeValues, dataPoints]);
 
   // Derive dynamic styles (e.g., color based on value, visibility)
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   // Combine static styles from data.styleConfig with derived dynamic styles
@@ -116,6 +120,27 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeData>> = ({ data, selected,
       transition={{ type: 'spring', stiffness: 350, damping: 15 }}
       title={data.label + (mainDisplayLink ? `: ${dataPoints[mainDisplayLink.dataPointId]?.description || mainDisplayLink.dataPointId}`: '')}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          style={{top: '2px', right: '2px'}} // Adjust position for smaller node
+          onClick={(e) => {
+            e.stopPropagation();
+            // Ensure data has elementType for CustomNodeType reconstruction if it's part of the type definition explicitly
+            const nodeDataWithElementType: DataLabelNodeData = { ...data, elementType: 'dataLabel' };
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data: nodeDataWithElementType, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* DataLabels are not typically primary connection points for power flow, 
           but might be for data/control signals. Kept minimal and conditional. */}
       {showHandles && (

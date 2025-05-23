@@ -2,14 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { SensorNodeData } from '@/types/sld';
+import { SensorNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
-import { ThermometerIcon, WindIcon, DropletsIcon, GaugeIcon, RssIcon, ScanEyeIcon } from 'lucide-react'; // Example icons
+import { ThermometerIcon, WindIcon, DropletsIcon, GaugeIcon, RssIcon, ScanEyeIcon, InfoIcon } from 'lucide-react'; // Example icons. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const SensorNode: React.FC<NodeProps<SensorNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Added
+    dataPoints: state.dataPoints, // Added
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -63,6 +68,24 @@ const SensorNode: React.FC<NodeProps<SensorNodeData>> = ({ data, selected, isCon
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* Sensors are typically sources of data/signals, can also be targets for power */}
       <Handle type="target" position={Position.Top} id="power_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-red-400 !border-red-500" title="Power"/>
       <Handle type="source" position={Position.Bottom} id="signal_out" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-purple-400 !border-purple-500" title="Signal Out"/>

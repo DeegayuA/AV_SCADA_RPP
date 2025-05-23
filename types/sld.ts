@@ -25,10 +25,13 @@ export interface DataPoint {
   enumSet?: Record<number | string, string>;
 }
 
-export type RealTimeData = Record<string, any>;
+export type RealTimeData = Record<string, string | number | boolean>; // Updated type
 
 export interface DataPointLink {
-  dataPointId: string;
+  dataPointId: string; // This remains the ID of the DataPoint metadata object
+  // If an OPC UA Node ID is different from DataPoint.id and needed for direct mapping,
+  // it could be added here, or DataPoint.nodeId could be used if always referring to an OPC UA Node ID.
+  // For now, assuming DataPoint.nodeId is the OPC UA Node ID used for opcUaNodeValues keys.
   targetProperty: string;
   valueMapping?: {
     type?: 'exact' | 'range' | 'threshold' | 'boolean' | string;
@@ -363,7 +366,7 @@ export interface CurrentUser {
 }
 
 export interface SLDState {
-  realtimeData: RealTimeData;
+  opcUaNodeValues: RealTimeData; // Changed from realtimeData to opcUaNodeValues
   dataPoints: Record<string, DataPoint>;
   isEditMode: boolean;
   currentUser: CurrentUser | null;

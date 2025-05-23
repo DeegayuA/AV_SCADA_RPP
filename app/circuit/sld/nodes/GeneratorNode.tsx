@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { GeneratorNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { GeneratorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { ZapIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon } from 'lucide-react';
+import { ZapIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -22,25 +25,25 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected,
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'offline'; // Default status
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const powerOutput = useMemo(() => {
     const powerLink = data.dataPointLinks?.find(
       link => link.targetProperty === 'powerOutput' || link.targetProperty === 'activePower'
     );
-    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, powerLink);
       return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
     return data.config?.ratingKVA ? `${data.config.ratingKVA} kVA (rated)` : 'N/A';
-  }, [data.dataPointLinks, data.config?.ratingKVA, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config?.ratingKVA, opcUaNodeValues, dataPoints]);
 
   interface StatusInfo {
     StatusIcon: typeof CogIcon;
@@ -85,8 +88,8 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected,
   }, [processedStatus]);
   
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   // Generator Symbol SVG (Circle with 'G' or Sine Wave)
@@ -154,6 +157,24 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected,
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Output"/>
       <Handle type="target" position={Position.Top} id="top_control_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-purple-400 !border-purple-500" title="Control/Fuel"/>
 
@@ -165,13 +186,13 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = ({ data, selected,
         <GeneratorSymbolSVG className={`transition-colors ${iconColorClass}`} isSpinning={isGeneratorRunning} />
       </div>
       
-      <div className="flex items-center justify-center gap-1" style={{ color: derivedNodeStyles.color }}>
+      <div className="flex items-center justify-center gap-1 mt-0.5" style={{ color: derivedNodeStyles.color }}>
         <StatusIcon size={10} className={`${iconColorClass} ${animationClass && (StatusIcon === CogIcon || StatusIcon === XCircleIcon || StatusIcon === AlertTriangleIcon || StatusIcon === PowerIcon) ? animationClass : ''}`} />
-        <p className={`text-[8px] font-medium text-center truncate leading-tight ${iconColorClass}`}>
+        <p className={`text-[9px] font-medium text-center truncate leading-tight ${iconColorClass}`}>
           {statusText}
         </p>
       </div>
-      <p className={`text-[7px] leading-none ${derivedNodeStyles.color ? '' : 'text-muted-foreground/90'}`} title={`Power: ${powerOutput}`}>
+      <p className={`text-[9px] leading-none ${derivedNodeStyles.color ? '' : 'text-muted-foreground/90'}`} title={`Power: ${powerOutput}`}>
           {powerOutput}
       </p>
     </motion.div>
