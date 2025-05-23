@@ -79,6 +79,7 @@ export const useWebSocket = () => {
                         }
                     } else {
                        console.warn("WebSocket: Received non-JSON or non-object data:", event.data);
+                    }
                 }
             } catch (e) {
                 console.error("WebSocket: Error parsing message. Raw data:", event.data, "Error:", e);
