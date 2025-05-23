@@ -111,6 +111,7 @@ export interface BreakerNodeData extends BaseNodeData {
         tripRatingAmps?: number;
         interruptingCapacitykA?: number;
         normallyOpen?: boolean;
+        controlNodeId?: string; // <-- Added
     };
 }
 export interface MeterNodeData extends BaseNodeData {
@@ -134,6 +135,7 @@ export interface ContactorNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
         normallyOpen?: boolean; // true for NO, false for NC
         coilVoltage?: string; // e.g., '24VDC', '230VAC'
+        controlNodeId?: string; // <-- Added
     };
 }
 export interface GridNodeData extends BaseNodeData {
@@ -212,6 +214,7 @@ export interface IsolatorNodeData extends BaseNodeData {
         poles?: number;
         loadBreak?: boolean;
         manualOrMotorized?: 'manual' | 'motorized';
+        controlNodeId?: string; // <-- Added
     };
 }
 
@@ -220,6 +223,7 @@ export interface ATSNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
         transferTimeMs?: number;
         numPoles?: number;
+        controlNodeId?: string; // <-- Added
     };
 }
 
@@ -239,6 +243,7 @@ export interface FuseNodeData extends BaseNodeData { // <<<--- ADDED THIS DEFINI
         voltageRating?: string; // e.g., "400V", "690V"
         fuseType?: 'Cartridge' | 'HRC' | 'Rewireable' | 'Semiconductor' | string; // High Rupturing Capacity
         breakingCapacitykA?: number;
+        controlNodeId?: string; // <-- Added
     };
 }
 

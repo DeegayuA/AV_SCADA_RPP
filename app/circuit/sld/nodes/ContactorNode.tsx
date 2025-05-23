@@ -2,15 +2,18 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { ContactorNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { ContactorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
-import { PowerIcon, PowerOffIcon, AlertTriangleIcon } from 'lucide-react';
+import { PowerIcon, PowerOffIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, realtimeData, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
     realtimeData: state.realtimeData,
     dataPoints: state.dataPoints,
   }));
@@ -72,6 +75,14 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = ({ data, selected,
     ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
   `;
 
+  const handleInfoClick = (event: React.MouseEvent) => {
+    event.stopPropagation();
+    const fullNodeObject: CustomNodeType = {
+        id, type, position, data, selected, dragging, zIndex, width, height,
+    };
+    setSelectedElementForDetails(fullNodeObject);
+  };
+
   return (
     <motion.div
       className={mainDivClasses}
@@ -80,6 +91,18 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = ({ data, selected,
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={handleInfoClick}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
       <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
 

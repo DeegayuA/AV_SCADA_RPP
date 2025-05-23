@@ -29,6 +29,7 @@ import {
   getNodeStrokeColor as getMiniMapNodeStrokeColor, ThemeAwarePalette,
 } from './ui/sldThemeUtils';
 import { useWebSocket, WebSocketMessageToServer } from '@/hooks/useWebSocketListener';
+import { useAppStore, useSelectedElementForDetails } from '@/stores/appStore'; // Added useSelectedElementForDetails
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -150,6 +151,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const currentLayoutLoadedFromServerOrInitialized = useRef(false); 
   const canEdit = useMemo(() => !!isEditModeFromProps, [isEditModeFromProps]);
   const initialFitViewDone = useRef(false); // Track if initial fitView has been performed for the current layout
+  const storeSelectedElement = useSelectedElementForDetails(); // Get from store
+  const { setSelectedElementForDetails } = useAppStore.getState(); // Get action for clearing
 
   const LOCAL_STORAGE_KEY_PREFIX = 'sldLayout_';
 
@@ -454,13 +457,49 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   }, [lastJsonMessage, currentLayoutIdKey, isEditModeFromProps, layoutId, currentThemeHookValue, removePlaceholderIfNeeded, reactFlowInstance]);
 
   useEffect(() => {
-    if (canEdit && isDirty && layoutId && nodes && edges) { 
+    if (canEdit && isDirty && layoutId && nodes && edges) {
         if (nodes.filter(n => n.id !== PLACEHOLDER_NODE_ID).length > 0 || edges.length > 0 || (nodes.length === 1 && nodes[0].id === PLACEHOLDER_NODE_ID && isDirty)) {
              debouncedAutoSave(nodes, edges, reactFlowInstance, layoutId);
         }
     }
     return () => { debouncedAutoSave.cancel(); };
   }, [nodes, edges, reactFlowInstance, layoutId, canEdit, isDirty, debouncedAutoSave]);
+
+
+  // Effect to handle opening detail sheet when storeSelectedElement changes
+  useEffect(() => {
+    if (storeSelectedElement && !canEdit) { // Only react in view mode
+      setSelectedElement(storeSelectedElement);
+      setIsDetailSheetOpen(true);
+      // Optional: Handle drill-down if the store-selected element implies it
+      if (isNode(storeSelectedElement) && storeSelectedElement.data.isDrillable && storeSelectedElement.data.subLayoutId) {
+        setDrillDownLayoutId(storeSelectedElement.data.subLayoutId);
+        setDrillDownParentLabel(storeSelectedElement.data.label);
+        setIsDrillDownOpen(true);
+      }
+    } else if (!storeSelectedElement && isDetailSheetOpen) {
+      // If store element is cleared and sheet is open, consider closing it
+      // setIsDetailSheetOpen(false); // This might be too aggressive, depends on desired UX
+    }
+  }, [storeSelectedElement, canEdit]);
+
+  // Effect to clear the store's selected element when the detail sheet is closed locally
+  // This prevents the sheet from reopening if canEdit changes or other effects run.
+  useEffect(() => {
+    if (!isDetailSheetOpen && storeSelectedElement) {
+        // Check if the local selectedElement is also cleared or different
+        // to avoid race conditions or unnecessary updates.
+        // This ensures we only clear the store's selection if the sheet was closed intentionally for that element.
+        if (!selectedElement || selectedElement.id !== storeSelectedElement.id) {
+             setSelectedElementForDetails(null);
+        } else if (selectedElement && selectedElement.id === storeSelectedElement.id && !isDrillDownOpen){
+            // If the sheet is closed, and it was for the storeSelectedElement, and not a drilldown, clear the store.
+            // This handles the case where user closes the sheet by clicking outside or hitting ESC.
+            setSelectedElementForDetails(null);
+        }
+    }
+  }, [isDetailSheetOpen, storeSelectedElement, selectedElement, setSelectedElementForDetails, isDrillDownOpen]);
+
 
   const colors: ThemeAwarePalette = getThemeAwareColors(currentThemeHookValue);
   const themedNodeColor = useCallback((node: Node) => getMiniMapNodeColor(node as CustomNodeType, colors), [colors]);
@@ -478,6 +517,25 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   if (!layoutId && !canEdit) return (<div className="sld-loader-container text-muted-foreground">No diagram specified.</div>);
 
   const isEffectivelyEmpty = nodes.length === 0 || (nodes.length === 1 && nodes[0].id === PLACEHOLDER_NODE_ID);
+
+  // When DetailSheet or DrillDownDialog closes, ensure the global store selection is also cleared.
+  const handleDetailSheetOpenChange = (open: boolean) => {
+    setIsDetailSheetOpen(open);
+    if (!open) {
+        setSelectedElement(null); // Clear local selection first
+        if (storeSelectedElement) setSelectedElementForDetails(null); // Then clear global selection
+    }
+  };
+
+  const handleDrillDownOpenChange = (open: boolean) => {
+    setIsDrillDownOpen(open);
+    if (!open) {
+        setDrillDownLayoutId(null);
+        setSelectedElement(null); // Clear local selection if drilldown closes
+        if (storeSelectedElement) setSelectedElementForDetails(null); // Clear global selection
+    }
+  };
+
 
   return (
     <motion.div 
@@ -571,8 +629,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         </ReactFlow>
       </div>
       {canEdit && selectedElement && ( <SLDInspectorDialog isOpen={isInspectorDialogOpen} onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} selectedElement={selectedElement} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement}/> )}
-      {!canEdit && selectedElement && (isNode(selectedElement) || isEdge(selectedElement)) && ( <SLDElementDetailSheet element={selectedElement} isOpen={isDetailSheetOpen} onOpenChange={(open) => { setIsDetailSheetOpen(open); if (!open) setSelectedElement(null);}} /> )}
-      {isDrillDownOpen && drillDownLayoutId && ( <SLDDrillDownDialog isOpen={isDrillDownOpen} onOpenChange={(open) => { setIsDrillDownOpen(open); if (!open) { setDrillDownLayoutId(null); setSelectedElement(null); }}} layoutId={drillDownLayoutId} parentLabel={drillDownParentLabel} /> )}
+      {!canEdit && selectedElement && (isNode(selectedElement) || isEdge(selectedElement)) && ( <SLDElementDetailSheet element={selectedElement} isOpen={isDetailSheetOpen} onOpenChange={handleDetailSheetOpenChange} /> )}
+      {isDrillDownOpen && drillDownLayoutId && ( <SLDDrillDownDialog isOpen={isDrillDownOpen} onOpenChange={handleDrillDownOpenChange} layoutId={drillDownLayoutId} parentLabel={drillDownParentLabel} /> )}
     </motion.div>
   );
 };

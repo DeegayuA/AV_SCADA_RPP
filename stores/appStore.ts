@@ -4,6 +4,8 @@ import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
 import {
     RealTimeData,
     DataPoint,
+    CustomNodeType,
+    CustomFlowEdge,
 } from '@/types/sld';
 import { User, UserRole } from '@/types/auth'; // Assuming auth types are correct
 
@@ -42,6 +44,7 @@ interface AppState {
   dataPoints: Record<string, DataPoint>; // Keyed by DataPoint ID for easy lookup
   isEditMode: boolean;
   currentUser: User | null;
+  selectedElementForDetails: CustomNodeType | CustomFlowEdge | null; // Added for detail sheet
 }
 
 const initialState: AppState = {
@@ -52,6 +55,7 @@ const initialState: AppState = {
   }, {}),
   isEditMode: false, // Default to false, admin can toggle
   currentUser: defaultUser, // Default to guest or null if prefer explicit login
+  selectedElementForDetails: null, // Initialize as null
 };
 
 interface SLDActions {
@@ -60,6 +64,7 @@ interface SLDActions {
   toggleEditMode: () => void;
   setCurrentUser: (user: User | null) => void;
   logout: () => void;
+  setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) => void; // Added action
 }
 
 const onRehydrateStorageCallback = (
@@ -152,17 +157,22 @@ export const useAppStore = create<AppState & SLDActions>()(
       },
 
       logout: () => {
-        set({ currentUser: defaultUser, isEditMode: false }); // Revert to default user on logout
+        set({ currentUser: defaultUser, isEditMode: false, selectedElementForDetails: null }); // Revert to default user on logout, clear selected element
         toast.success("Logged Out", { description: "You have been successfully signed out." });
       },
+
+      setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) =>
+        set({ selectedElementForDetails: element }),
+        
     }),
     {
       name: 'app-user-session-storage', // More specific name
       storage: createJSONStorage(() => safeLocalStorage), // Use safe local storage
       partialize: (state: AppState & SLDActions): Partial<AppState> => ({ // Only persist these parts
         currentUser: state.currentUser,
-        isEditMode: state.isEditMode, 
+        isEditMode: state.isEditMode,
         // Do NOT persist realtimeData or dataPoints metadata from constants
+        // selectedElementForDetails should also NOT be persisted as it's transient UI state
       }),
       onRehydrateStorage: (state) => onRehydrateStorageCallback(state as AppState | undefined), // Cast type
     }
@@ -173,6 +183,8 @@ export const useAppStore = create<AppState & SLDActions>()(
 export const useIsEditMode = () => useAppStore((state) => state.isEditMode);
 export const useCurrentUser = () => useAppStore((state) => state.currentUser);
 export const useCurrentUserRole = () => useAppStore((state) => state.currentUser?.role);
+export const useSelectedElementForDetails = () => useAppStore((state) => state.selectedElementForDetails); // New hook
+
 // Get a single realtime value, subscribing only to changes for that ID
 export const useRealtimeValue = (dataPointId: string | undefined): any | undefined => 
     useAppStore(useCallback((state) => dataPointId ? state.realtimeData[dataPointId] : undefined, [dataPointId]));
