@@ -1,6 +1,7 @@
 // hooks/useWebSocketListener.ts
 import { useAppStore } from '@/stores/appStore';
-import { RealTimeData } from '@/types/sld'; // Assuming RealTimeData is a Record<string, any> or similar
+// RealTimeData type might be removed or updated in types/sld.ts later if not used elsewhere.
+// For now, the store directly uses Record<string, string | number | boolean>.
 import { WS_URL } from '@/config/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
@@ -52,23 +53,33 @@ export const useWebSocket = () => {
                 
                 if (typeof data === 'object' && data !== null) {
                     if (data.type && typeof data.type === 'string') {
-                        // This is a structured message (e.g., for layout data, confirmations, commands)
-                        // console.log("WebSocket: Received structured message:", data);
-                        setLastJsonMessage(data as WebSocketMessageFromServer);
-
-                        // Example: if backend wraps real-time updates too, handle it based on type
-                        if (data.type === 'realtime-data-batch' && data.payload) {
-                           useAppStore.getState().updateRealtimeData(data.payload as RealTimeData);
+                        if (!data.type) { // Assuming OPC UA data doesn't have a 'type' wrapper
+                            const opcDataPayload: Record<string, string | number | boolean> = {};
+                            for (const key in data) {
+                                if (Object.prototype.hasOwnProperty.call(data, key)) {
+                                    const value = data[key];
+                                    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                                        opcDataPayload[key] = value;
+                                    } else {
+                                        console.warn(`WebSocket: Received non-primitive value for OPC UA Node ID ${key}:`, value);
+                                    }
+                                }
+                            }
+                            if (Object.keys(opcDataPayload).length > 0) {
+                                useAppStore.getState().updateOpcUaNodeValues(opcDataPayload);
+                            }
+                        } else {
+                            // Handle other structured messages (like layout-data, confirmations)
+                            // console.log("WebSocket: Received structured message:", data);
+                            setLastJsonMessage(data as WebSocketMessageFromServer);
+                            // If there's a specific type for OPC data that is structured, handle it here.
+                            // e.g. if (data.type === 'opcua-structured-batch' && data.payload) {
+                            //    useAppStore.getState().updateOpcUaNodeValues(data.payload as Record<string, string | number | boolean>);
+                            // }
                         }
                     } else {
-                        // Assumed to be a direct RealTimeData batch (as per user's original setup)
-                        // console.log("WebSocket: Received direct data batch (assumed RealTimeData).");
-                        useAppStore.getState().updateRealtimeData(data as RealTimeData);
-                        // To avoid spamming lastJsonMessage with continuous data if SLDWidget doesn't need it.
-                        // setLastJsonMessage({ type: 'direct-data-update', payload: data }); 
+                       console.warn("WebSocket: Received non-JSON or non-object data:", event.data);
                     }
-                } else {
-                   console.warn("WebSocket: Received non-JSON or non-object data:", event.data);
                 }
             } catch (e) {
                 console.error("WebSocket: Error parsing message. Raw data:", event.data, "Error:", e);

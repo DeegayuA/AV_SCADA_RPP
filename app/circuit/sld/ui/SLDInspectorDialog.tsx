@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trash2, PlusCircle, MinusCircle, X, Info, Sparkles, PencilLine, Link2, Settings2, Palmtree, Palette as PaletteIcon, CaseSensitive, AlignLeftIcon, BaselineIcon } from 'lucide-react';
+import { Trash2, PlusCircle, MinusCircle, X, Info as InfoIcon, Sparkles, PencilLine, Link2, Settings2, Palmtree, Palette as PaletteIcon, CaseSensitive, AlignLeftIcon, BaselineIcon, Zap as ZapIcon } from 'lucide-react'; // Added ZapIcon, Renamed Info to InfoIcon
 import { Separator } from '@/components/ui/separator';
 import {
     Dialog,
@@ -34,6 +34,7 @@ import {
     GeneratorNodeData, PLCNodeData, SensorNodeData, GenericDeviceNodeData, IsolatorNodeData,
     ATSNodeData, JunctionBoxNodeData, FuseNodeData,
     BaseNodeData, // Import BaseNodeData for common properties
+    // Individual node data types already imported
 } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
 import { ComboboxOption, SearchableSelect } from './SearchableSelect'; // Ensure this component is robust
@@ -379,6 +380,23 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
     const elementTypeUserFriendly = getElementTypeName(selectedElement);
     const currentElementType = isNode(selectedElement) ? selectedElement.data.elementType : undefined;
 
+    const actionableElementTypes: SLDElementType[] = [
+        SLDElementType.Breaker,
+        SLDElementType.Contactor,
+        SLDElementType.Fuse, // Assuming Fuse might be controllable
+        SLDElementType.Isolator, // Assuming Isolator might be controllable
+        SLDElementType.ATS, // Assuming ATS might be controllable
+    ];
+
+    // TODO: If DataPoint type gets 'isWritable', filter dataPointOptions here:
+    // const writableDataPointOptions = useMemo(() =>
+    //     dataPointOptions.filter(dpOption => {
+    //         const dp = dataPoints[dpOption.value];
+    //         return dp && dp.isWritable; // Assuming 'isWritable' property exists on DataPoint
+    //     }),
+    // [dataPointOptions, dataPoints]);
+    // For now, using all dataPointOptions for controlNodeId selection.
+
     const renderDataLinkCard = (link: DataPointLink, index: number) => (
         <Card key={index} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200 border-border/60 bg-card">
             <CardHeader className="p-3 bg-muted/30 border-b border-border/60 flex flex-row justify-between items-center">
@@ -415,7 +433,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     <Label className="text-xs font-medium flex justify-between items-center">
                         Value Mapping (Optional)
                         <TooltipProvider delayDuration={100}><Tooltip>
-                            <TooltipTrigger asChild><Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipTrigger asChild><InfoIcon className="w-3.5 h-3.5 text-muted-foreground cursor-help" /></TooltipTrigger>
                             <TooltipContent side="left" className="max-w-xs"><p>Transform data point values before they affect the target property. E.g., map 0/1 to "red"/"green", or numeric ranges to status strings.</p></TooltipContent>
                         </Tooltip></TooltipProvider>
                     </Label>
@@ -455,7 +473,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     <Label className="text-xs font-medium flex justify-between items-center">
                         Display Formatting (Optional)
                          <TooltipProvider delayDuration={100}><Tooltip>
-                            <TooltipTrigger asChild><Info className="w-3.5 h-3.5 text-muted-foreground cursor-help" /></TooltipTrigger>
+                            <TooltipTrigger asChild><InfoIcon className="w-3.5 h-3.5 text-muted-foreground cursor-help" /></TooltipTrigger>
                             <TooltipContent side="left" className="max-w-xs"><p>Control how the data point's value is displayed IF the Target Property expects text (e.g., Label, Data Value). Applied AFTER mapping.</p></TooltipContent>
                         </Tooltip></TooltipProvider>
                     </Label>
@@ -543,6 +561,47 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                         <FieldInput id="label" label="Display Label / Name" value={formData.label || ''} onChange={handleInputChange} name="label" placeholder="e.g., Main Inverter, Feeder Line" />
                                     </CardContent>
                                 </Card>
+
+                                {isNode(selectedElement) && actionableElementTypes.includes(currentElementType as SLDElementType) && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'>
+                                        <CardTitle className='text-base font-semibold flex items-center'>
+                                            <ZapIcon className="w-4 h-4 mr-2 text-orange-500" />
+                                            Control Configuration
+                                        </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                        <div className="space-y-1">
+                                            <Label htmlFor="config.controlNodeId" className="text-xs font-medium">
+                                            Control OPC UA Node ID (Writable)
+                                            <TooltipProvider delayDuration={100}>
+                                                <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    <InfoIcon className="w-3 h-3 ml-1.5 text-muted-foreground cursor-help inline" />
+                                                </TooltipTrigger>
+                                                <TooltipContent side="top" className="max-w-xs">
+                                                    <p>OPC UA node to write to for controlling this element (e.g., toggle open/close when clicked in view mode).</p>
+                                                </TooltipContent>
+                                                </Tooltip>
+                                            </TooltipProvider>
+                                            </Label>
+                                            <SearchableSelect
+                                            options={dataPointOptions} // Use full dataPointOptions; TODO: filter for writable if 'isWritable' becomes available on DataPoint
+                                            value={formData.config?.controlNodeId || ''}
+                                            onChange={(value) => handleSelectChange('config.controlNodeId', value || undefined)} // Send undefined if cleared
+                                            placeholder="Search & Select Writable Data Point..."
+                                            searchPlaceholder="Type to search..."
+                                            notFoundText="No data points found." // Update if filtering is added: "No writable data points found."
+                                            />
+                                            {formData.config?.controlNodeId && dataPoints[formData.config.controlNodeId] && (
+                                            <p className="text-xs text-muted-foreground pt-1">
+                                                Selected: {dataPoints[formData.config.controlNodeId].name} (ID: {formData.config.controlNodeId})
+                                            </p>
+                                            )}
+                                        </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
 
                                 {isNode(selectedElement) && currentElementType === SLDElementType.TextLabel && (
                                     <Card className='shadow-sm border-border/60'>

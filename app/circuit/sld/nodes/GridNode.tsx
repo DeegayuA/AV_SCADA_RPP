@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { GridNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { GridNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { ArrowDownToLineIcon, ZapIcon, AlertTriangleIcon, PowerOffIcon } from 'lucide-react'; // For grid connection
+import { ArrowDownToLineIcon, ZapIcon, AlertTriangleIcon, PowerOffIcon, InfoIcon } from 'lucide-react'; // For grid connection. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const GridNode: React.FC<NodeProps<GridNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -22,31 +25,31 @@ const GridNode: React.FC<NodeProps<GridNodeData>> = ({ data, selected, isConnect
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'online'; // Default to online
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const displayInfo = useMemo(() => {
     // Try to display voltage or frequency if linked
     const voltageLink = data.dataPointLinks?.find(link => link.targetProperty === 'voltage');
-    if (voltageLink && dataPoints[voltageLink.dataPointId] && realtimeData) {
+    if (voltageLink && dataPoints && dataPoints[voltageLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[voltageLink.dataPointId];
-      const rawValue = getDataPointValue(voltageLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(voltageLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, voltageLink);
       return formatDisplayValue(mappedValue, voltageLink.format, dpMeta?.dataType);
     }
     const freqLink = data.dataPointLinks?.find(link => link.targetProperty === 'frequency');
-     if (freqLink && dataPoints[freqLink.dataPointId] && realtimeData) {
+     if (freqLink && dataPoints && dataPoints[freqLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[freqLink.dataPointId];
-      const rawValue = getDataPointValue(freqLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(freqLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, freqLink);
       return formatDisplayValue(mappedValue, freqLink.format, dpMeta?.dataType);
     }
     return data.config?.voltageLevel || 'Grid';
-  }, [data.dataPointLinks, data.config?.voltageLevel, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config?.voltageLevel, opcUaNodeValues, dataPoints]);
 
 
   const { borderClass, bgClass, iconColorClass, textClass, Icon } = useMemo(() => {
@@ -59,8 +62,8 @@ const GridNode: React.FC<NodeProps<GridNodeData>> = ({ data, selected, isConnect
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   const mainDivClasses = `
@@ -85,6 +88,24 @@ const GridNode: React.FC<NodeProps<GridNodeData>> = ({ data, selected, isConnect
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Grid Output"/>
       <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Grid Input (Bidirectional)"/>
 

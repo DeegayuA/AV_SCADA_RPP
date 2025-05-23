@@ -2,9 +2,10 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BaseNodeData } from '@/types/sld';
+import { BaseNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
-import { LocateFixedIcon } from 'lucide-react'; // Placeholder, custom SVG better
+import { LocateFixedIcon, InfoIcon } from 'lucide-react'; // Placeholder, custom SVG better. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
 interface PTNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
@@ -14,10 +15,14 @@ interface PTNodeData extends BaseNodeData {
     }
 }
 
-const PTNode: React.FC<NodeProps<PTNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+const PTNode: React.FC<NodeProps<PTNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Added
+    dataPoints: state.dataPoints, // Added
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -61,6 +66,24 @@ const PTNode: React.FC<NodeProps<PTNodeData>> = ({ data, selected, isConnectable
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* PT connects to one point on the line (e.g., top) and secondary goes to measurement/protection */}
       <Handle type="target" position={Position.Top} id="primary_tap" isConnectable={isConnectable} className="!w-3 !h-3 !-mt-0.5 sld-handle-style" title="Primary Tap"/>
       {/* Secondary signal output */}

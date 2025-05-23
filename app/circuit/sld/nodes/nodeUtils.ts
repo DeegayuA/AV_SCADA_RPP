@@ -4,13 +4,26 @@ import { format as formatDate } from 'date-fns'; // Import date-fns for date for
 
 // Helper to get a data point value safely
 export function getDataPointValue(
-  dataPointId: string | undefined,
-  realtimeData: RealTimeData | undefined | null // Allow realtimeData to be potentially undefined
-): any | undefined {
-  if (!dataPointId || !realtimeData) {
+  internalDataPointId: string | undefined,
+  opcUaNodeValues: Record<string, string | number | boolean> | undefined | null,
+  allDataPoints: Record<string, DataPoint> | undefined | null
+): string | number | boolean | undefined {
+  if (!internalDataPointId || !opcUaNodeValues || !allDataPoints) {
+    // console.warn("getDataPointValue: Missing required parameters.", { internalDataPointId, opcUaNodeValues, allDataPoints });
     return undefined;
   }
-  return realtimeData[dataPointId];
+  const dpConfig = allDataPoints[internalDataPointId];
+  if (!dpConfig) {
+    console.warn(`getDataPointValue: DataPoint configuration not found for internal ID '${internalDataPointId}'.`);
+    return undefined;
+  }
+  if (!dpConfig.nodeId) {
+    console.warn(`getDataPointValue: OPC UA Node ID (nodeId) is not defined for DataPoint with internal ID '${internalDataPointId}'.`);
+    return undefined;
+  }
+  // Ensure that the key exists in opcUaNodeValues before returning, otherwise return undefined
+  // This prevents returning `null` if the key exists but its value is `null` (which shouldn't happen with the new type, but good practice)
+  return dpConfig.nodeId in opcUaNodeValues ? opcUaNodeValues[dpConfig.nodeId] : undefined;
 }
 
 // Helper to apply value mapping rules
@@ -198,17 +211,18 @@ interface ExtendedCSSProperties extends React.CSSProperties {
 
 export function getDerivedStyle(
   data: NodeDataForStyle | CustomFlowEdgeData, // Accept both node and edge data
-  realtimeData: RealTimeData,
+  opcUaNodeValues: Record<string, string | number | boolean>, // Renamed and using specific type
   dataPointsMetadatas: Record<string, DataPoint> // Pass all DP metadata
 ): ExtendedCSSProperties {
   const derivedStyle: ExtendedCSSProperties = {};
   if (!data.dataPointLinks) return derivedStyle;
 
   data.dataPointLinks.forEach(link => {
-    const dpMetadata = dataPointsMetadatas[link.dataPointId];
+    const dpMetadata = dataPointsMetadatas[link.dataPointId]; // This uses internalDataPointId
     if (!dpMetadata) return; // Skip if data point metadata not found
 
-    const rawValue = getDataPointValue(link.dataPointId, realtimeData);
+    // opcUaNodeValues is passed directly
+    const rawValue = getDataPointValue(link.dataPointId, opcUaNodeValues, dataPointsMetadatas);
     let targetValue = applyValueMapping(rawValue, link); // Apply mapping first
 
     // Further format if the targetProperty expects a string that should be formatted
@@ -254,21 +268,22 @@ export function getDerivedStyle(
 // Helper to get derived display text or primary value based on dataPointLinks
 export function getDerivedPrimaryDisplay(
     data: NodeDataForStyle | CustomFlowEdgeData,
-    realtimeData: RealTimeData,
+    opcUaNodeValues: Record<string, string | number | boolean>, // Renamed and using specific type
     dataPointsMetadatas: Record<string, DataPoint>,
     // Defines which DPLink.targetProperty to prioritize for display.
     // Could be 'value' for DataLabel, 'statusText' for a status display area, 'label' to override static label.
-    targetPropertyForDisplay: string = 'value' 
+    targetPropertyForDisplay: string = 'value'
 ): string | null {
     const displayLink = data.dataPointLinks?.find(link => link.targetProperty === targetPropertyForDisplay);
     if (!displayLink) return null; // No DPLink configured for this specific targetProperty.
 
-    const dpMetadata = dataPointsMetadatas[displayLink.dataPointId];
+    const dpMetadata = dataPointsMetadatas[displayLink.dataPointId]; // Uses internalDataPointId
     if (!dpMetadata) return null; // DataPoint metadata is essential for proper formatting.
 
-    const rawValue = getDataPointValue(displayLink.dataPointId, realtimeData);
+    // opcUaNodeValues is passed directly
+    const rawValue = getDataPointValue(displayLink.dataPointId, opcUaNodeValues, dataPointsMetadatas);
     const mappedValue = applyValueMapping(rawValue, displayLink);
-    
+
     // Now format this mappedValue (or rawValue if mapping didn't change it)
     return formatDisplayValue(mappedValue, displayLink.format, dpMetadata.dataType);
 }

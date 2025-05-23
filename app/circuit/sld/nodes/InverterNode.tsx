@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { InverterNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { InverterNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { ZapIcon, RefreshCwIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react'; // Example icons
+import { ZapIcon, RefreshCwIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from 'lucide-react'; // Example icons. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
   
@@ -22,25 +25,25 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'offline'; // Fallback to static status or default
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const powerOutput = useMemo(() => {
     const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput');
-    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, powerLink);
       // Assuming power is a number, format it. Add unit if not in format.
       // The formatDisplayValue can take a default unit from dpMeta if not in link.format.suffix
       return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
     return data.config?.ratedPower ? `${data.config.ratedPower} kW (rated)` : 'N/A';
-  }, [data.dataPointLinks, data.config?.ratedPower, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config?.ratedPower, opcUaNodeValues, dataPoints]);
 
   const statusStyles = useMemo(() => {
     // Base styling on processedStatus
@@ -78,8 +81,8 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   // Choose icon based on status
@@ -120,6 +123,24 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* DC Input */}
       <Handle
         type="target"
@@ -147,11 +168,14 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = ({ data, selected, i
           <StatusIcon size={18} className={statusStyles.iconColor} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} />
         </motion.div>
       </div>
-      <p className="text-[10px] font-semibold leading-tight mt-auto text-center truncate w-full" title={data.label} style={{ color: derivedNodeStyles.color || statusStyles.textColor }}>
+      <p className="text-[9px] font-medium leading-tight text-center truncate w-full" style={{ color: derivedNodeStyles.color || statusStyles.textColor }}>
+        {String(processedStatus).toUpperCase()}
+      </p>
+      <p className="text-[10px] font-semibold leading-tight mt-0.5 text-center truncate w-full" title={data.label} style={{ color: derivedNodeStyles.color || statusStyles.textColor }}>
         {data.label}
       </p>
       
-      <p className="text-[8px] leading-tight text-center truncate w-full" style={{ color: derivedNodeStyles.color || statusStyles.textColor }} title={`Power: ${powerOutput}`}>
+      <p className="text-[9px] leading-tight text-center truncate w-full" style={{ color: derivedNodeStyles.color || statusStyles.textColor }} title={`Power: ${powerOutput}`}>
           {powerOutput}
       </p>
     </motion.div>

@@ -2,9 +2,10 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BaseNodeData } from '@/types/sld'; // Use BaseNodeData or create specific CTNodeData
+import { BaseNodeData, CustomNodeType } from '@/types/sld'; // Use BaseNodeData or create specific CTNodeData. Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
-import { ZoomInIcon, ScanSearchIcon } from 'lucide-react'; // Placeholder, custom SVG better
+import { ZoomInIcon, ScanSearchIcon, InfoIcon } from 'lucide-react'; // Placeholder, custom SVG better. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
 interface CTNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
@@ -14,10 +15,12 @@ interface CTNodeData extends BaseNodeData {
     }
 }
 
-const CTNode: React.FC<NodeProps<CTNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser } = useAppStore(state => ({
+const CTNode: React.FC<NodeProps<CTNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -60,6 +63,24 @@ const CTNode: React.FC<NodeProps<CTNodeData>> = ({ data, selected, isConnectable
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* CT is typically in-line with a main conductor, with a signal output */}
       {/* Primary current flows through, usually top-to-bottom */}
       <Handle type="target" position={Position.Top} id="primary_in" isConnectable={isConnectable} className="!w-3 !h-3 !-mt-0.5 sld-handle-style" title="Primary In"/>

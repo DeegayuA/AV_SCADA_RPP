@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { PanelNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { PanelNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { SunIcon, AlertTriangleIcon, CheckCircleIcon } from 'lucide-react';
+import { SunIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -22,23 +25,23 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConne
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'offline'; // Fallback to static status or default
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const powerOutput = useMemo(() => {
     const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput');
-    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, powerLink);
       return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
     return data.config?.powerRatingWp ? `${data.config.powerRatingWp} Wp (rated)` : 'N/A';
-  }, [data.dataPointLinks, data.config?.powerRatingWp, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config?.powerRatingWp, opcUaNodeValues, dataPoints]);
   
   // Determine status-based styling
   const statusClasses = useMemo(() => {
@@ -58,8 +61,8 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConne
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   const StatusIcon = useMemo(() => {
@@ -121,6 +124,24 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConne
       initial="initial"
       transition={{ type: 'spring', stiffness: 350, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       {/* --- TOP HANDLE (TARGET - INPUT) --- */}
       <Handle
         type="target" 
@@ -169,13 +190,20 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = ({ data, selected, isConne
           />
         </motion.div>
         <p 
+          className="text-[9px] font-medium leading-tight text-center truncate w-[90%]" 
+          title={`Status: ${processedStatus}`}
+          style={{ color: 'inherit' }}
+        >
+          {String(processedStatus).toUpperCase()}
+        </p>
+        <p 
           className="text-[10px] font-semibold leading-tight text-center truncate w-[90%]" 
           title={data.label}
           style={{ color: 'inherit' }} // Inherit color from statusClasses or derivedNodeStyles.color
         >
           {data.label}
         </p>
-        <p className="text-[8px] leading-none" style={{ color: 'inherit' }} title={`Power: ${powerOutput}`}>
+        <p className="text-[9px] leading-none" style={{ color: 'inherit' }} title={`Power: ${powerOutput}`}>
             {powerOutput}
         </p>
       </div>

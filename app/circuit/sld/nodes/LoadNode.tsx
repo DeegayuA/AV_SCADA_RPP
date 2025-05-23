@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { LoadNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { LoadNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { ArrowRightToLineIcon, SlidersHorizontalIcon, AlertTriangleIcon } from 'lucide-react'; // Arrow for load consumption
+import { ArrowRightToLineIcon, SlidersHorizontalIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Arrow for load consumption. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const LoadNode: React.FC<NodeProps<LoadNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const LoadNode: React.FC<NodeProps<LoadNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -22,25 +25,25 @@ const LoadNode: React.FC<NodeProps<LoadNodeData>> = ({ data, selected, isConnect
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'off'; // Default status
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const powerConsumption = useMemo(() => {
     const powerLink = data.dataPointLinks?.find(
       link => link.targetProperty === 'powerConsumption' || link.targetProperty === 'power'
     );
-    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, powerLink);
       return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
     return data.config?.ratedPowerkW ? `${data.config.ratedPowerkW}kW (rated)` : (data.config?.loadType || 'Load');
-  }, [data.dataPointLinks, data.config, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config, opcUaNodeValues, dataPoints]);
 
   const statusStyles = useMemo(() => {
     // Base styles on processedStatus
@@ -55,8 +58,8 @@ const LoadNode: React.FC<NodeProps<LoadNodeData>> = ({ data, selected, isConnect
   }, [processedStatus]);
   
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
 
   // Resistor SVG remains, its color will be dynamic
@@ -126,6 +129,24 @@ const LoadNode: React.FC<NodeProps<LoadNodeData>> = ({ data, selected, isConnect
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Power Input"/>
 
       <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : statusStyles.textClass}`} title={data.label}>
@@ -144,8 +165,10 @@ const LoadNode: React.FC<NodeProps<LoadNodeData>> = ({ data, selected, isConnect
           />
         </motion.div>
       </div>
-      
-      <p className={`text-[8px] text-center truncate w-full leading-tight ${derivedNodeStyles.color ? '' : statusStyles.textClass}`} title={`Power: ${powerConsumption}`}>
+      <p className={`text-[9px] font-medium text-center truncate w-full leading-tight ${derivedNodeStyles.color ? '' : statusStyles.textClass}`} title={`Status: ${processedStatus}`}>
+        {String(processedStatus).toUpperCase()}
+      </p>
+      <p className={`text-[9px] text-center truncate w-full leading-tight ${derivedNodeStyles.color ? '' : statusStyles.textClass}`} title={`Power: ${powerConsumption}`}>
         {powerConsumption}
       </p>
     </motion.div>

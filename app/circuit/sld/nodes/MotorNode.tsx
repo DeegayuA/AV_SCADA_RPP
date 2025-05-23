@@ -2,10 +2,11 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BaseNodeData, DataPointLink, DataPoint } from '@/types/sld'; 
+import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { CogIcon, PlayCircleIcon, PauseCircleIcon, AlertCircleIcon, XCircleIcon } from 'lucide-react';
+import { CogIcon, PlayCircleIcon, PauseCircleIcon, AlertCircleIcon, XCircleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
 interface MotorNodeData extends BaseNodeData { 
     config?: BaseNodeData['config'] & {
@@ -15,11 +16,13 @@ interface MotorNodeData extends BaseNodeData {
     }
 }
 
-const MotorNode: React.FC<NodeProps<MotorNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -30,23 +33,23 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = ({ data, selected, isConne
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'stopped'; // Default status
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const powerDisplay = useMemo(() => {
     const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerConsumption' || link.targetProperty === 'activePower');
-    if (powerLink && dataPoints[powerLink.dataPointId] && realtimeData) {
+    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
         const dpMeta = dataPoints[powerLink.dataPointId];
-        const rawValue = getDataPointValue(powerLink.dataPointId, realtimeData);
+        const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
         const mappedValue = applyValueMapping(rawValue, powerLink);
         return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
     return data.config?.ratedPowerkW ? `${data.config.ratedPowerkW}kW` : 'N/A';
-  }, [data.dataPointLinks, data.config?.ratedPowerkW, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config?.ratedPowerkW, opcUaNodeValues, dataPoints]);
 
 
   const { StatusIcon, statusText, baseClasses, isSpinning } = useMemo(() => {
@@ -76,8 +79,8 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = ({ data, selected, isConne
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
   
   const MotorSymbolSVG = ({ className, isSpinning }: { className?: string, isSpinning?: boolean }) => {
@@ -123,6 +126,24 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = ({ data, selected, isConne
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <Handle type="target" position={Position.Top} id="top_power_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Power Input"/>
 
       <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
@@ -133,13 +154,13 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = ({ data, selected, isConne
         <MotorSymbolSVG className={`transition-colors ${effectiveIconColorClass}`} isSpinning={isSpinning} />
       </div>
       
-      <div className="flex items-center justify-center gap-1">
+      <div className="flex items-center justify-center gap-1 mt-0.5">
          <StatusIcon size={10} className={`${effectiveIconColorClass}`}/>
-         <p className={`text-[8px] font-medium text-center truncate leading-tight ${effectiveIconColorClass}`}>
+         <p className={`text-[9px] font-medium text-center truncate leading-tight ${effectiveIconColorClass}`}>
            {statusText}
          </p>
       </div>
-      <p className={`text-[7px] leading-none ${derivedNodeStyles.color ? '' : 'text-muted-foreground/90'}`} title={`Power: ${powerDisplay}`}>
+      <p className={`text-[9px] leading-none ${derivedNodeStyles.color ? '' : 'text-muted-foreground/90'}`} title={`Power: ${powerDisplay}`}>
           {powerDisplay}
       </p>
     </motion.div>

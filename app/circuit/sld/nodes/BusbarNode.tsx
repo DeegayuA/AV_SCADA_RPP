@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BusbarNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { BusbarNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, getDerivedStyle, formatDisplayValue } from './nodeUtils';
-import { MinusIcon } from 'lucide-react'; // Simple representation for a busbar
+import { MinusIcon, InfoIcon } from 'lucide-react'; // Simple representation for a busbar. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -22,12 +25,12 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = ({ data, selected, isCon
   
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'de-energized'; // Default status
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const statusColorClass = useMemo(() => {
     // This provides a fallback class if not overridden by a DPLink targeting 'backgroundColor' or 'fillColor'
@@ -37,22 +40,22 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = ({ data, selected, isCon
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
   
   // Display voltage or other info if linked
   const displayInfo = useMemo(() => {
     const voltageLink = data.dataPointLinks?.find(link => link.targetProperty === 'voltage');
-    if (voltageLink && dataPoints[voltageLink.dataPointId] && realtimeData) {
+    if (voltageLink && dataPoints && dataPoints[voltageLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[voltageLink.dataPointId];
-      const rawValue = getDataPointValue(voltageLink.dataPointId, realtimeData);
+      const rawValue = getDataPointValue(voltageLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, voltageLink);
       return formatDisplayValue(mappedValue, voltageLink.format, dpMeta?.dataType);
     }
     // Could add other parameters like frequency, etc.
     return data.label; // Fallback to label if no specific info DPLink
-  }, [data.dataPointLinks, data.label, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.label, opcUaNodeValues, dataPoints]);
 
 
   // Dimensions for a horizontal busbar by default
@@ -90,6 +93,25 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = ({ data, selected, isCon
       initial="initial"
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0" // Adjusted for busbar, typically small
+          style={{ top: `-${(height || busbarHeight)/2 - 2}px`, right: '-5px' }} // Example dynamic positioning if needed, or fixed like others
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <div 
         className={busbarVisualClasses}
         style={{ backgroundColor: derivedNodeStyles.backgroundColor }} // Allows DPLink to override statusColorClass

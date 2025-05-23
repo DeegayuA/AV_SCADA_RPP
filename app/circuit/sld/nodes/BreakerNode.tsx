@@ -2,16 +2,19 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BreakerNodeData, DataPointLink, DataPoint } from '@/types/sld';
+import { BreakerNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
-import { ZapOffIcon, ZapIcon, ShieldAlertIcon, ShieldCheckIcon, AlertTriangleIcon } from 'lucide-react'; // Or custom SVG
+import { ZapOffIcon, ZapIcon, ShieldAlertIcon, ShieldCheckIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
-const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isConnectable }) => {
-  const { isEditMode, currentUser, realtimeData, dataPoints } = useAppStore(state => ({
+const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    realtimeData: state.realtimeData,
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -23,28 +26,28 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isC
   // Determine breaker status from DataPointLinks or fallback to data.status
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints[statusLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, realtimeData);
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       // Ensure applyValueMapping can handle various types, including boolean if status is directly represented
       return applyValueMapping(rawValue, statusLink); 
     }
     // Fallback to static status if no DPLink for 'status' or data not available
     return data.status; 
-  }, [data.dataPointLinks, data.status, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
   
   // Determine if the breaker is open based on processedStatus or config
   const isOpen = useMemo(() => {
     // Prefer a DataPointLink for 'isOpen' if available
     const isOpenLink = data.dataPointLinks?.find(link => link.targetProperty === 'isOpen');
-    if (isOpenLink && dataPoints[isOpenLink.dataPointId] && realtimeData) {
-      const rawValue = getDataPointValue(isOpenLink.dataPointId, realtimeData);
+    if (isOpenLink && dataPoints && dataPoints[isOpenLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+      const rawValue = getDataPointValue(isOpenLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
       const mappedValue = applyValueMapping(rawValue, isOpenLink);
       // Interpret various "true" conditions for isOpen
       return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || Number(mappedValue) === 1;
     }
     // Fallback logic based on processedStatus or data.config
     return processedStatus === 'open' || (data.config?.normallyOpen && processedStatus !== 'closed');
-  }, [data.dataPointLinks, data.config?.normallyOpen, processedStatus, realtimeData, dataPoints]);
+  }, [data.dataPointLinks, data.config?.normallyOpen, processedStatus, opcUaNodeValues, dataPoints]);
 
   const statusStyles = useMemo(() => {
     let currentStatus = processedStatus; // Use the processed status
@@ -65,8 +68,8 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isC
 
   // Get additional styles from dataPointLinks (e.g., for custom colors based on other data)
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, realtimeData, dataPoints),
-    [data, realtimeData, dataPoints]
+    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    [data, opcUaNodeValues, dataPoints]
   );
   
   // Combine statusStyles with derivedNodeStyles. Derived styles can override.
@@ -104,6 +107,24 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isC
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {!isEditMode && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            const fullNodeObject: CustomNodeType = {
+                id, type, position, data, selected, dragging, zIndex, width, height,
+            };
+            setSelectedElementForDetails(fullNodeObject);
+          }}
+          title="View Details"
+        >
+          <InfoIcon className="h-3 w-3 text-primary/80" />
+        </Button>
+      )}
+
       <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
       <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
 
@@ -150,8 +171,11 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = ({ data, selected, isC
       {/* Option 2: Use Lucide icons (if preferred over dynamic SVG) */}
       {/* <StatusIcon size={32} className={`flex-grow transition-colors ${statusStyles.iconColor}`} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} /> */}
 
+      <p className="text-[10px] font-semibold" style={{ color: derivedNodeStyles.color || statusStyles.main }}>
+        {isOpen ? 'OPEN' : 'CLOSED'}
+      </p>
 
-      <p className="text-[8px] text-muted-foreground text-center truncate w-full leading-tight" title={data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel}>
+      <p className="text-[9px] text-muted-foreground text-center truncate w-full leading-tight" title={data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel}>
         {data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel.toUpperCase()}
       </p>
     </motion.div>
