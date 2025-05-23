@@ -50,6 +50,7 @@ export interface DataPoint {
   isSinglePhase?: boolean; // Hint for UI rendering
   threePhaseGroup?: string; // Link related phase items (e.g., 'grid-voltage')
   notes?: string; // Internal notes for clarification/TODOs
+decimalPlaces?: number; 
 }
 
 export interface DataPointConfig {

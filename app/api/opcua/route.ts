@@ -1,6 +1,7 @@
 // app/api/opcua/route.ts
 import { WS_PORT, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE } from "@/config/constants";
-import { dataPoints, nodeIds } from "@/config/dataPoints";
+// Ensure DataPoint type in "@/config/dataPoints" includes "decimalPlaces?: number;"
+import { dataPoints, nodeIds, DataPoint } from "@/config/dataPoints";
 import {
   OPCUAClient,
   ClientSession,
@@ -17,11 +18,11 @@ import { NextRequest, NextResponse } from 'next/server';
 // Variable to control if OPC UA connection should always be kept alive
 const KEEP_OPCUA_ALIVE = true;
 
-let endpointUrl: string;
+let endpointUrl: string = OPC_UA_ENDPOINT_OFFLINE; // Initialize with a default
 const POLLING_INTERVAL = 3000;
 const RECONNECT_DELAY = 5000;
 const SESSION_TIMEOUT = 60000;
-const WEBSOCKET_HEARTBEAT_INTERVAL = 5000;
+const WEBSOCKET_HEARTBEAT_INTERVAL = 30000;
 
 let opcuaClient: OPCUAClient | null = null;
 let opcuaSession: ClientSession | null = null;
@@ -34,27 +35,25 @@ let connectionAttempts = 0;
 const MAX_CONNECTION_ATTEMPTS = Infinity;
 let disconnectTimeout: NodeJS.Timeout | null = null;
 
-// Global WebSocketServer instances
 let localWsServer: WebSocketServer | null = null;
 let vercelWsServer: WebSocketServer | null = null;
 
-// Store ping interval IDs for cleanup
 let localPingIntervalId: NodeJS.Timeout | null = null;
 let vercelPingIntervalId: NodeJS.Timeout | null = null;
 
-const nodeIdsToMonitor = () => {
-  return nodeIds.filter((nodeId) => nodeId !== undefined);
+const nodeIdsToMonitor = (): string[] => {
+  return nodeIds.filter((nodeId): nodeId is string => nodeId !== undefined);
 };
 
-// Refactored function to initialize WebSocket event handlers for a given server instance
 function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
-    console.log(`Initializing event handlers for a WebSocketServer instance.`);
+    console.log(`Initializing event handlers for WebSocketServer instance (PID: ${process.pid})`);
     serverInstance.on("connection", (ws, req) => {
         const clientIp = req?.socket?.remoteAddress || req?.headers['x-forwarded-for'] || 'unknown';
         console.log(`Client connected to WebSocket from IP: ${clientIp}`);
         connectedClients.add(ws);
-        (ws as any).isAlive = true;
-        ws.on('pong', () => { (ws as any).isAlive = true; });
+        const wsWithAlive = ws as WebSocket & { isAlive: boolean };
+        wsWithAlive.isAlive = true;
+        ws.on('pong', () => { wsWithAlive.isAlive = true; });
 
         if (Object.keys(nodeDataCache).length > 0) {
             try { ws.send(JSON.stringify(nodeDataCache)); }
@@ -62,14 +61,14 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
         }
 
         if (connectedClients.size === 1 && !KEEP_OPCUA_ALIVE) {
-            console.log("First client connected (not KEEP_ALIVE), ensuring OPC UA connection.");
+            console.log("First client connected (KEEP_OPCUA_ALIVE is false), ensuring OPC UA connection.");
             if (disconnectTimeout) {
                 clearTimeout(disconnectTimeout);
                 disconnectTimeout = null;
                 console.log("Client reconnected, canceling scheduled OPC UA disconnection.");
             }
             if (!opcuaClient && !isConnectingOpcua) {
-                connectOPCUA();
+                connectOPCUA().catch(err => console.error("Error in connectOPCUA from WS connection:", err));
             } else if (opcuaSession && !dataInterval) {
                 startDataPolling();
             }
@@ -91,17 +90,25 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
             }
             const nodeId = Object.keys(dataToWrite)[0];
             const value = dataToWrite[nodeId];
-            if (!opcuaSession) {
-                console.error(`Cannot write to OPC UA: No active session for Node ID ${nodeId}.`);
-                sendStatusToClient(ws, 'error', nodeId, 'OPC UA session not active.');
+
+            // Corrected check: Rely on session and client existence
+            if (!opcuaClient || !opcuaSession) {
+                console.error(`Cannot write to OPC UA: No active client or session for Node ID ${nodeId}.`);
+                sendStatusToClient(ws, 'error', nodeId, 'OPC UA session not active or client disconnected.');
+                // Corrected check for attempting reconnect
+                if (!isConnectingOpcua && (!opcuaClient || !opcuaSession)) {
+                    attemptReconnect("write_attempt_no_session_or_client");
+                }
                 return;
             }
+
             const dataPointConfig = dataPoints.find(dp => dp.nodeId === nodeId);
             if (!dataPointConfig) {
                 console.error(`Received write request for unknown or unconfigured Node ID: ${nodeId}`);
                 sendStatusToClient(ws, 'error', nodeId, 'Node ID not configured for writing.');
                 return;
             }
+
             let opcuaDataType: DataType;
             switch (dataPointConfig.dataType) {
                 case 'Boolean': opcuaDataType = DataType.Boolean; break;
@@ -123,8 +130,11 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
                     const factor = dataPointConfig.factor ?? 1;
                     let displayValue = value;
                     if (typeof value === 'number') {
-                        displayValue = !Number.isInteger(value) ? parseFloat((value * factor).toFixed(2)) : value * factor;
+                        // Ensure DataPoint type in config/dataPoints.ts includes decimalPlaces?: number;
+                        const decimalPlaces = dataPointConfig.decimalPlaces ?? 2;
+                        displayValue = !Number.isInteger(value * factor) ? parseFloat((value * factor).toFixed(decimalPlaces)) : value * factor;
                     }
+
                     if (nodeDataCache[nodeId] !== displayValue) {
                         nodeDataCache[nodeId] = displayValue;
                         immediateUpdate[nodeId] = displayValue;
@@ -134,41 +144,41 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
                     console.error(`Failed to write to Node ID ${nodeId}. Status: ${statusCode.toString()}`);
                     sendStatusToClient(ws, 'error', nodeId, `OPC UA write failed: ${statusCode.toString()}`);
                 }
-            } catch (writeError) {
+            } catch (writeError: any) {
                 console.error(`Error during OPC UA write for ${nodeId}:`, writeError);
-                sendStatusToClient(ws, 'error', nodeId, `OPC UA write error: ${writeError instanceof Error ? writeError.message : 'Unknown'}`);
-                if (writeError instanceof Error && (writeError.message.includes("BadSession") || writeError.message.includes("BadNotConnected"))) {
+                sendStatusToClient(ws, 'error', nodeId, `OPC UA write error: ${writeError?.message || 'Unknown'}`);
+                if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
                     opcuaSession = null; stopDataPolling(); attemptReconnect("write_error_session_lost");
                 }
             }
         });
 
         ws.on("close", () => {
-            console.log("Client disconnected from WebSocket");
+            console.log(`Client disconnected from WebSocket. IP: ${clientIp}. Remaining clients: ${connectedClients.size-1}`);
             connectedClients.delete(ws);
-            if (connectedClients.size === 0 && !KEEP_OPCUA_ALIVE && opcuaClient) {
+            if (connectedClients.size === 0 && !KEEP_OPCUA_ALIVE && (opcuaClient || opcuaSession)) {
                 const DISCONNECT_DELAY = 5000;
-                console.log(`Last client disconnected, scheduling OPC UA disconnect in ${DISCONNECT_DELAY}ms.`);
+                console.log(`Last client disconnected, scheduling OPC UA disconnect in ${DISCONNECT_DELAY / 1000}s.`);
                 if (disconnectTimeout) clearTimeout(disconnectTimeout);
                 disconnectTimeout = setTimeout(() => {
                     console.log("Executing scheduled OPC UA disconnection.");
-                    disconnectOPCUA();
+                    disconnectOPCUA().catch(err => console.error("Error during scheduled OPCUA disconnect:", err));
                     disconnectTimeout = null;
                 }, DISCONNECT_DELAY);
             }
         });
 
         ws.on("error", (error) => {
-            console.error("WebSocket client error:", error);
+            console.error(`WebSocket client error. IP: ${clientIp}:`, error);
             connectedClients.delete(ws);
             ws.terminate();
-            if (connectedClients.size === 0 && !KEEP_OPCUA_ALIVE && opcuaClient) {
+             if (connectedClients.size === 0 && !KEEP_OPCUA_ALIVE && (opcuaClient || opcuaSession)) {
                 const DISCONNECT_DELAY = 5000;
-                console.log(`Last client errored, scheduling OPC UA disconnect in ${DISCONNECT_DELAY}ms.`);
+                console.log(`Last client errored out, scheduling OPC UA disconnect in ${DISCONNECT_DELAY / 1000}s.`);
                 if (disconnectTimeout) clearTimeout(disconnectTimeout);
                 disconnectTimeout = setTimeout(() => {
-                    console.log("Executing scheduled OPC UA disconnection after error.");
-                    disconnectOPCUA();
+                    console.log("Executing scheduled OPC UA disconnection after client error.");
+                    disconnectOPCUA().catch(err => console.error("Error during scheduled OPCUA disconnect after error:", err));
                     disconnectTimeout = null;
                 }, DISCONNECT_DELAY);
             }
@@ -178,6 +188,11 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
     serverInstance.on("error", (error) => {
         console.error("WebSocket Server instance error:", error);
     });
+
+    const activePingIntervalId = process.env.VERCEL === "1" ? vercelPingIntervalId : localPingIntervalId;
+    if (activePingIntervalId) {
+        clearInterval(activePingIntervalId);
+    }
 
     const pingInterval = setInterval(() => {
         serverInstance.clients.forEach(clientWs => {
@@ -201,100 +216,96 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
 
 async function ensureWebSocketServerInitialized() {
     const isVercel = process.env.VERCEL === "1";
-    let serverToUse: WebSocketServer | null = null;
+    let serverToUse: WebSocketServer | null = isVercel ? vercelWsServer : localWsServer;
 
-    if (isVercel) {
-        if (!vercelWsServer) {
+    if (!serverToUse) {
+        if (isVercel) {
             console.log("Initializing WebSocket server for Vercel (noServer: true)");
             vercelWsServer = new WebSocketServer({ noServer: true });
             initializeWebSocketEventHandlers(vercelWsServer);
-        }
-        serverToUse = vercelWsServer;
-    } else { // Local development
-        if (!localWsServer) {
+            serverToUse = vercelWsServer;
+        } else {
             console.log(`Initializing WebSocket server locally on port ${WS_PORT}`);
             localWsServer = new WebSocketServer({ port: WS_PORT });
             initializeWebSocketEventHandlers(localWsServer);
+            serverToUse = localWsServer;
         }
-        serverToUse = localWsServer;
     }
 
     if (KEEP_OPCUA_ALIVE && (!opcuaClient || !opcuaSession) && !isConnectingOpcua) {
         console.log("KEEP_OPCUA_ALIVE is true, ensuring OPC UA connection.");
-        // Ensure we don't call connectOPCUA if it's already running due to a previous call
-        // from another concurrent request during a cold start. isConnectingOpcua helps.
         if (!isConnectingOpcua) {
-            await connectOPCUA(); // `connectOPCUA` sets `isConnectingOpcua`
+            await connectOPCUA();
         }
     }
-    return serverToUse; // Return the server instance for direct use in GET if needed.
+    return serverToUse;
 }
 
 
 async function connectOPCUA() {
-  // The call to startWebSocketServer() or ensure it's started is now handled by ensureWebSocketServerInitialized()
-  // which is called before or at the start of typical workflows.
-
   endpointUrl = OPC_UA_ENDPOINT_OFFLINE;
+  // Corrected check: Rely on session and client existence
   if (opcuaClient && opcuaSession) {
-    console.log("OPC UA session already active.");
-    if(!dataInterval) startDataPolling(); // Ensure polling starts if session exists
+    console.log("OPC UA session already active and client presumed connected.");
+    if(!dataInterval) startDataPolling();
     return;
   }
   if (isConnectingOpcua || isDisconnectingOpcua) {
-    console.log("OPC UA connection/disconnection in progress.");
+    console.log("OPC UA connection/disconnection already in progress.");
     return;
   }
+
   isConnectingOpcua = true;
-  console.log(`Attempting to connect to OPC UA server (${connectionAttempts + 1}):`, endpointUrl);
+  connectionAttempts++;
+  console.log(`Attempting to connect to OPC UA server (attempt ${connectionAttempts}): ${endpointUrl}`);
 
   try {
     if (!opcuaClient) {
+      console.log("Creating new OPCUAClient instance.");
       opcuaClient = OPCUAClient.create({
         endpointMustExist: false,
-        connectionStrategy: { maxRetry: 1, initialDelay: RECONNECT_DELAY, maxDelay: RECONNECT_DELAY * 3 },
+        connectionStrategy: { maxRetry: 0, initialDelay: RECONNECT_DELAY, maxDelay: RECONNECT_DELAY * 2 },
         keepSessionAlive: true,
         securityMode: MessageSecurityMode.None,
         securityPolicy: SecurityPolicy.None,
         requestedSessionTimeout: SESSION_TIMEOUT,
+        clientName: `MyNextJsApp-PID${process.pid}`
       });
 
-      opcuaClient.on("backoff", (retry, delay) => console.log(`OPC UA backoff: retry ${retry} in ${delay}ms`));
-      opcuaClient.on("connection_lost", () => { console.error("OPC UA connection lost."); opcuaSession = null; stopDataPolling(); attemptReconnect("connection_lost"); });
+      opcuaClient.on("backoff", (retry, delay) => console.log(`OPC UA internal backoff: retry ${retry} in ${delay}ms (Note: custom retry logic is primary)`));
+      opcuaClient.on("connection_lost", () => { console.error("OPC UA CEvt: Connection lost."); opcuaSession = null; stopDataPolling(); attemptReconnect("connection_lost_event"); });
       opcuaClient.on("connection_reestablished", () => {
-        console.log("OPC UA connection re-established.");
-        if (!opcuaSession) { console.log("Re-creating session."); createSessionAndStartPolling(); }
-        connectionAttempts = 0;
+        console.log("OPC UA CEvt: Connection re-established.");
+        if (!opcuaSession) { console.log("Re-creating session after re-established connection."); createSessionAndStartPolling(); }
       });
-      opcuaClient.on("close", () => { console.log("OPC UA client connection closed."); opcuaSession = null; stopDataPolling(); attemptReconnect("close"); });
-      opcuaClient.on("timed_out_request", (request) => console.warn("OPC UA request timed out:", request?.toString()));
+      // Typed err parameter
+      opcuaClient.on("close", (err?: Error) => { console.log(`OPC UA CEvt: Connection closed. Error: ${err ? err.message : 'No error info'}`); opcuaSession = null; stopDataPolling(); });
+      opcuaClient.on("timed_out_request", (request) => console.warn("OPC UA CEvt: Request timed out:", request?.toString().substring(0,100)));
     }
 
-    if (!opcuaClient) throw new Error("OPC UA client not initialized.");
+    if (!opcuaClient) throw new Error("OPC UA client somehow still not initialized.");
+
     await opcuaClient.connect(endpointUrl);
     console.log("OPC UA client connected to:", endpointUrl);
     await createSessionAndStartPolling();
-    connectionAttempts = 0;
-  } catch (err) {
-    console.error(`Failed to connect OPC UA client to ${endpointUrl}:`, err);
-    if (endpointUrl === OPC_UA_ENDPOINT_OFFLINE) {
+  } catch (err: any) {
+    console.error(`Failed to connect OPC UA client to ${endpointUrl}:`, err.message);
+    // Corrected comparison with type assertion to satisfy TS strict literal checks if constants are literals
+    if (endpointUrl === OPC_UA_ENDPOINT_OFFLINE && OPC_UA_ENDPOINT_ONLINE && (OPC_UA_ENDPOINT_ONLINE as string) !== (OPC_UA_ENDPOINT_OFFLINE as string)) {
       console.log("Falling back to online OPC UA endpoint...");
       endpointUrl = OPC_UA_ENDPOINT_ONLINE;
-      if (opcuaClient) {
-          try { await opcuaClient.disconnect(); console.log("Disconnected from offline before fallback."); }
-          catch (disconnectErr) { console.warn("Error disconnecting before fallback:", disconnectErr); }
-           try {
-              await opcuaClient.connect(endpointUrl);
-              console.log("OPC UA client connected to fallback:", endpointUrl);
-              await createSessionAndStartPolling();
-              connectionAttempts = 0;
-          } catch (fallbackErr) {
-              console.error("Failed to connect to fallback OPC UA:", fallbackErr);
-              attemptReconnect("fallback_failure");
+      try {
+          if (opcuaClient) {
+            await opcuaClient.connect(endpointUrl);
+            console.log("OPC UA client connected to fallback:", endpointUrl);
+            await createSessionAndStartPolling();
+          } else {
+             console.error("OPC UA Client became null before fallback connection attempt.");
+             attemptReconnect("fallback_client_null_state");
           }
-      } else {
-           console.error("OPC UA Client null during fallback.");
-           attemptReconnect("fallback_client_null");
+      } catch (fallbackErr: any) {
+          console.error("Failed to connect to fallback OPC UA:", fallbackErr.message);
+          attemptReconnect("fallback_failure");
       }
     } else {
       attemptReconnect("initial_or_online_failure");
@@ -305,92 +316,150 @@ async function connectOPCUA() {
 }
 
 function attemptReconnect(reason: string) {
-  const shouldAttempt = connectedClients.size > 0 || KEEP_OPCUA_ALIVE;
-  if (!shouldAttempt || isConnectingOpcua || disconnectTimeout) {
-    if (!shouldAttempt) console.log("No clients and not KEEP_ALIVE, not reconnecting OPC UA.");
+  const shouldAttempt = (connectedClients.size > 0 || KEEP_OPCUA_ALIVE) && !isDisconnectingOpcua;
+  if (!shouldAttempt) {
+    if (isDisconnectingOpcua) console.log("Not attempting reconnect: OPC UA disconnection is in progress.");
+    else console.log("Not attempting reconnect: No clients and KEEP_OPCUA_ALIVE is false.");
     return;
   }
-  if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
-    connectionAttempts++;
-    console.log(`OPC UA reconnect (${connectionAttempts}) due to: ${reason} in ${RECONNECT_DELAY}ms`);
-    if (disconnectTimeout) clearTimeout(disconnectTimeout); // Should not happen here
-    setTimeout(connectOPCUA, RECONNECT_DELAY);
-  } else {
-    console.warn("Max OPC UA reconnect attempts reached.");
+  if (isConnectingOpcua) {
+      console.log("Not attempting reconnect: Connection attempt already in progress.");
+      return;
   }
+  if (connectionAttempts >= MAX_CONNECTION_ATTEMPTS && MAX_CONNECTION_ATTEMPTS !== Infinity) {
+    console.warn("Max OPC UA reconnect attempts reached. Not attempting further auto-reconnects.");
+    return;
+  }
+
+  console.log(`Scheduling OPC UA reconnect due to: ${reason}. Will try in ${RECONNECT_DELAY / 1000}s.`);
+  if (disconnectTimeout) {
+    clearTimeout(disconnectTimeout);
+    disconnectTimeout = null;
+  }
+  setTimeout(() => {
+      connectOPCUA().catch(err => console.error("Error from scheduled connectOPCUA:", err));
+  }, RECONNECT_DELAY);
 }
 
 async function createSessionAndStartPolling() {
-  if (!opcuaClient) { console.log("Cannot create session: OPC UA client non-existent."); attemptReconnect("session_no_client"); return; }
-  if (opcuaSession) { console.log("Session already exists."); if(!dataInterval) startDataPolling(); return; }
-  if (dataInterval) { console.log("Polling active without session. Stopping."); stopDataPolling(); }
+  // Corrected check: Relies on opcuaClient existence. `connectOPCUA` ensures client is connected before calling this.
+  if (!opcuaClient) {
+      console.log("Cannot create session: OPC UA client non-existent.");
+      // It's unlikely this specific path is hit if called from connectOPCUA's success path.
+      // But as a general safeguard for other potential callers:
+      attemptReconnect("session_creation_no_client");
+      return;
+  }
+  if (opcuaSession) {
+      console.log("OPC UA Session already exists. Ensuring polling is active.");
+      if(!dataInterval) startDataPolling();
+      return;
+  }
+  if (dataInterval) { console.log("Polling was active without session. Stopping polling before creating new session."); stopDataPolling(); }
 
   try {
     opcuaSession = await opcuaClient.createSession();
-    console.log("OPC UA session created.");
-    opcuaSession.on("session_closed", () => { console.log("OPC UA session closed event."); opcuaSession = null; stopDataPolling(); attemptReconnect("session_closed_event"); });
-    opcuaSession.on("keepalive", (state) => console.log("OPC UA session keepalive:", state));
-    opcuaSession.on("keepalive_failure", (state) => { console.error("OPC UA session keepalive failure:", state); opcuaSession = null; stopDataPolling(); attemptReconnect("keepalive_failure_event"); });
+    console.log(`OPC UA session created. SessionId: ${opcuaSession.sessionId.toString()}`);
+    connectionAttempts = 0;
+
+    opcuaSession.on("session_closed", (statusCode) => {
+        console.warn(`OPC UA SEvt: Session closed. Status: ${statusCode.toString()}`);
+        opcuaSession = null;
+        stopDataPolling();
+        attemptReconnect("session_closed_event");
+    });
+    opcuaSession.on("keepalive", (state) => {/*console.log("OPC UA SEvt: Session keepalive:", state.toString());*/});
+    opcuaSession.on("keepalive_failure", (state) => {
+        console.error("OPC UA SEvt: Session keepalive failure:", state ? state.toString() : "No state info");
+        opcuaSession = null; stopDataPolling(); attemptReconnect("keepalive_failure_event");
+    });
     startDataPolling();
-  } catch (err) {
-    console.error("Failed to create OPC UA session:", err);
+  } catch (err: any) {
+    console.error("Failed to create OPC UA session:", err.message);
     opcuaSession = null;
     attemptReconnect("session_creation_failure");
   }
 }
 
 function startDataPolling() {
-  if (dataInterval) { /*console.log("Polling already running.");*/ return; }
+  if (dataInterval) { return; }
   if (!opcuaSession) { console.log("Polling not started: No OPC UA session."); return; }
+  if (nodeIdsToMonitor().length === 0) { console.log("No nodes configured to monitor. Polling will not start effectively."); return;}
+
   console.log("Starting data polling...");
   dataInterval = setInterval(async () => {
-    if (!opcuaSession) { console.log("No session in poll cycle, stopping."); stopDataPolling(); attemptReconnect("session_missing_in_poll"); return; }
+    // Corrected check
+    if (!opcuaClient || !opcuaSession) {
+        console.warn("No client or session in poll cycle, stopping polling.");
+        stopDataPolling();
+        attemptReconnect("session_or_client_missing_in_poll");
+        return;
+    }
     try {
       const nodesToRead = nodeIdsToMonitor().map(nodeId => ({ nodeId, attributeId: AttributeIds.Value }));
-      if (nodesToRead.length === 0) { /*console.log("No nodes to monitor.");*/ return; }
+      if (nodesToRead.length === 0) return;
+
       const dataValues = await opcuaSession.read(nodesToRead);
       const currentDataBatch: Record<string, any> = {};
       let changed = false;
+
       dataValues.forEach((dataValue, index) => {
         const nodeId = nodesToRead[index].nodeId;
-        let newValue: any = "Error"; let readSuccess = false;
+        let newValue: any = nodeDataCache[nodeId] !== undefined ? nodeDataCache[nodeId] : "Error";
+        let readSuccess = false;
+
         if (dataValue.statusCode.isGood() && dataValue.value?.value !== null && dataValue.value?.value !== undefined) {
           const rawValue = dataValue.value.value;
           const dataPoint = dataPoints.find(p => p.nodeId === nodeId);
           const factor = dataPoint?.factor ?? 1;
+          // Ensure DataPoint type in config/dataPoints.ts includes decimalPlaces?: number;
+          const decimalPlaces = dataPoint?.decimalPlaces ?? 2;
+
           if (typeof rawValue === "number") {
-            newValue = !Number.isInteger(rawValue) ? parseFloat((rawValue * factor).toFixed(2)) : rawValue * factor;
+            if (dataPoint?.dataType === 'Float' || (dataPoint?.dataType === undefined && !Number.isInteger(rawValue * factor)) ) {
+                newValue = parseFloat((rawValue * factor).toFixed(decimalPlaces));
+            } else {
+                newValue = Math.round(rawValue * factor);
+            }
           } else { newValue = rawValue; }
           readSuccess = true;
-        } else { console.warn(`Failed to read NodeId ${nodeId}: ${dataValue.statusCode.toString()}`); }
+        } else {
+          if(dataValue.statusCode !== StatusCodes.BadNodeIdUnknown && dataValue.statusCode !== StatusCodes.BadNodeIdInvalid){
+            console.warn(`Failed to read NodeId ${nodeId}: ${dataValue.statusCode.toString()}`);
+          }
+          if(!readSuccess && nodeDataCache[nodeId] !== "Error") { newValue = "Error"; }
+        }
+
         if (nodeDataCache[nodeId] !== newValue || !(nodeId in nodeDataCache)) {
-          currentDataBatch[nodeId] = newValue; nodeDataCache[nodeId] = newValue;
-          if (readSuccess || nodeDataCache[nodeId] === "Error") changed = true;
+          nodeDataCache[nodeId] = newValue;
+          currentDataBatch[nodeId] = newValue;
+          changed = true;
         }
       });
+
       if (changed && Object.keys(currentDataBatch).length > 0 && connectedClients.size > 0) {
         broadcast(JSON.stringify(currentDataBatch));
       }
-    } catch (err) {
-      console.error("Error during OPC UA read poll:", err);
-      if (err instanceof Error && (err.message.includes("BadSession") || err.message.includes("BadNotConnected") || err.message.includes("Socket is closed"))) {
-        console.error("OPC UA Session/Connection error during poll. Reconnecting.");
-        opcuaSession = null; stopDataPolling(); attemptReconnect("polling_error");
+    } catch (err: any) {
+      console.error("Error during OPC UA read poll:", err.message);
+      if (err.message?.includes("BadSession") || err.message?.includes("BadNotConnected") || err.message?.includes("Socket is closed") || err.message?.includes("BadSecureChannelClosed")) {
+        console.error("OPC UA Session/Connection error during poll. Will attempt to reconnect.");
+        if (opcuaSession) opcuaSession = null;
+        stopDataPolling();
+        attemptReconnect("polling_error_session_connection");
       }
     }
   }, POLLING_INTERVAL);
 }
 
 function stopDataPolling() {
-  if (dataInterval) { clearInterval(dataInterval); dataInterval = null; /*console.log("Data polling stopped.");*/ }
+  if (dataInterval) { clearInterval(dataInterval); dataInterval = null; console.log("Data polling stopped."); }
 }
 
 function broadcast(data: string) {
     const serverToUse = process.env.VERCEL === "1" ? vercelWsServer : localWsServer;
-    if (!serverToUse) {
-        // console.warn("Broadcast: No active WebSocket server instance."); // Can be noisy if OPCUA connects before first client on Vercel
-        return;
-    }
+    if (!serverToUse) { return; }
+    if (serverToUse.clients.size === 0) { return; }
     serverToUse.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
             try { client.send(data); }
@@ -407,158 +476,171 @@ function sendStatusToClient(client: WebSocket, status: 'success' | 'error', node
 }
 
 async function disconnectOPCUA() {
-  if (isDisconnectingOpcua || !opcuaClient) return;
+  if (isDisconnectingOpcua) {
+    console.log("OPC UA disconnection already in progress.");
+    return;
+  }
+  if (!opcuaClient && !opcuaSession) {
+      console.log("OPC UA already disconnected or never connected.");
+      return;
+  }
+
   isDisconnectingOpcua = true;
   console.log("Disconnecting OPC UA client and session...");
   stopDataPolling();
+
   if (opcuaSession) {
-    try { console.log("Closing OPC UA session..."); await opcuaSession.close(); console.log("OPC UA session closed."); }
-    catch (err) { console.error("Error closing OPC UA session:", err); }
-    finally { opcuaSession = null; }
+    try {
+      console.log("Closing OPC UA session...");
+      await opcuaSession.close(true);
+      console.log("OPC UA session closed.");
+    } catch (err: any) {
+      console.error("Error closing OPC UA session:", err.message);
+    } finally {
+      opcuaSession = null;
+    }
   }
+
   if (opcuaClient) {
-    try { console.log("Disconnecting OPC UA client..."); await opcuaClient.disconnect(); console.log("OPC UA client disconnected."); }
-    catch (err) { console.error("Error disconnecting OPC UA client:", err); }
-    finally { opcuaClient = null; connectionAttempts = 0; }
+    try {
+      console.log("Disconnecting OPC UA client...");
+      await opcuaClient.disconnect();
+      console.log("OPC UA client disconnected.");
+    } catch (err: any) {
+      console.error("Error disconnecting OPC UA client:", err.message);
+    } finally {
+      opcuaClient = null;
+      connectionAttempts = 0;
+    }
   }
   isDisconnectingOpcua = false;
   console.log("OPC UA disconnection process finished.");
 }
 
-// Eager initialization when the module loads.
-// This is important if KEEP_OPCUA_ALIVE is true.
 (async () => {
-    console.log("API Route Module Loaded. Ensuring WebSocket Server is initialized.");
-    try {
-        await ensureWebSocketServerInitialized();
-    } catch (error) {
-        console.error("Error during initial WebSocket server setup:", error);
+    if (typeof process !== 'undefined' && process.pid) {
+        console.log(`API Route Module Loaded (PID: ${process.pid}). Ensuring WebSocket Server and OPC UA (if KEEP_ALIVE) are initialized.`);
+        try {
+            await ensureWebSocketServerInitialized();
+        } catch (error) {
+            console.error("Error during initial server setup:", error);
+        }
     }
 })();
 
-export async function GET(req: NextRequest, res: NextResponse) { // res is not standard for Route Handlers but some examples use it
-    const currentWsServer = await ensureWebSocketServerInitialized(); // Ensure server is ready and get the active instance
+export async function GET(req: NextRequest) {
+    await ensureWebSocketServerInitialized();
     const upgradeHeader = req.headers.get('upgrade');
 
-    if (process.env.VERCEL === "1" && upgradeHeader?.toLowerCase() === 'websocket') {
-        console.log("GET /api/opcua: Detected WebSocket upgrade request on Vercel.");
-        if (vercelWsServer) { // We can't access socket directly in NextRequest
-            // Vercel/Next.js edge runtime often uses a more direct way to handle upgrades.
-            // The 'ws' library's handleUpgrade can be used if direct access to underlying request/socket is possible.
-            // However, if `new WebSocketServer({ noServer: true })`'s 'connection' event fires automatically
-            // when client connects to `/api/opcua`, explicit handling here might not be needed
-            // or might conflict.
-
-            // Key: Test if vercelWsServer.on('connection', (ws, req) => {...}) in initializeWebSocketEventHandlers
-            // fires *without* the handleUpgrade call below. If it does, Vercel handles proxying well.
-            // If not, you *might* need something like this (but it depends heavily on Vercel's internals):
-            /*
-            const head = req.headers.get('sec-websocket-key'); // Simplified, proper head buffer is complex here
-            // In Next.js API routes, we can't directly access the socket
-            // We rely on Vercel's automatic handling of WebSocket connections
-            // when using WebSocketServer with {noServer: true}
-            
-            console.log("With noServer:true WSS, Vercel should handle the upgrade automatically.");
-            // We cannot use traditional handleUpgrade because we don't have access to raw socket in NextRequest
-            /* 
-            // This won't work in Next.js API routes:
-            vercelWsServer.handleUpgrade(req as any, req.socket as any, Buffer.from(head, 'base64'), (ws) => {
-                vercelWsServer.emit('connection', ws, req);
-            });
-            */
-            // For now, rely on Vercel's runtime + ws({noServer: true}) implicit handling.
-            // The primary role of this GET for websockets is just to exist as an HTTP endpoint
-            // that Vercel can then promote to a WebSocket connection.
-             console.log("Relying on Vercel's implicit upgrade handling for noServer:true WSS.");
+    if (upgradeHeader?.toLowerCase() === 'websocket') {
+        console.log(`GET /api/opcua: Detected WebSocket upgrade request (Vercel: ${process.env.VERCEL === "1"})`);
+        if (process.env.VERCEL === "1") {
+            if (vercelWsServer) {
+                console.log("Relying on Vercel's implicit WebSocket upgrade handling for 'noServer: true' WSS.");
+                const response = new Response(null, { status: 101 });
+                return response;
+            } else {
+                console.error("Vercel WebSocket upgrade detected, but vercelWsServer not initialized.");
+                return new NextResponse("WebSocket service not ready.", { status: 503 });
+            }
         } else {
-            console.warn("Vercel upgrade detected, but vercelWsServer or req.socket not available.");
-            return new NextResponse("WebSocket service not ready for upgrade.", { status: 503 });
+            console.warn("WebSocket upgrade request to /api/opcua in local/non-Vercel env. This path is not for direct WS upgrades locally.");
+            return new NextResponse("Misconfigured WebSocket upgrade. Connect directly to ws port.", { status: 426 });
         }
-        // Return 101 Switching Protocols - The standard response after successful upgrade
-        // The socket itself has been taken over by the WebSocket connection.
-        // NOTE: Returning a Response body can sometimes break the upgrade on Vercel.
-        // An empty Response might be safer if a response is strictly required by Next.js.
-        const response = new Response(null, { status: 101 });
-        // In some Vercel configurations, special headers are needed on the 101
-        // response.ws.add মানে কী?
-        // response.headers.set('upgrade', 'websocket');
-        // response.headers.set('connection', 'Upgrade');
-        return response;
-
-    } else if (upgradeHeader?.toLowerCase() === 'websocket') {
-        // Local development - ws://localhost:WS_PORT is handled directly by localWsServer,
-        // not through this GET route. So an upgrade request here locally would be unexpected.
-        console.warn("GET /api/opcua: WebSocket upgrade request received in non-Vercel/unexpected context.");
-        return new NextResponse("WebSocket upgrade endpoint misconfigured for local.", { status: 426 });
     }
 
-    // Standard HTTP GET handling (redirect or status message)
-    const host = req.headers.get("host");
-    // Correctly determine protocol, especially behind proxies
+    const host = req.headers.get("host") || "";
+    const reqUrl = req.nextUrl;
+    
     const xForwardedProto = req.headers.get("x-forwarded-proto");
     let protocol = "http";
     if (xForwardedProto) {
-        protocol = xForwardedProto.split(',')[0].trim(); // Handle multiple proxies
-    } else if (req.headers.get("referer")?.startsWith("https://")) {
-        protocol = "https";
-    } else if (process.env.NODE_ENV === "production" && process.env.VERCEL_URL?.startsWith("https://")) { // Vercel prod usually https
+        protocol = xForwardedProto.split(',')[0].trim();
+    } else if (req.nextUrl.protocol) {
+        protocol = req.nextUrl.protocol.slice(0, -1);
+    } else if (process.env.NODE_ENV === "production" && host.includes("vercel.app")) {
         protocol = "https";
     }
-
     const origin = `${protocol}://${host}`;
-    const isApiRouteAccess = req.nextUrl.pathname === '/api/opcua' || req.nextUrl.pathname === '/api/opcua/';
 
-    if (isApiRouteAccess) {
+    if (reqUrl.pathname === '/api/opcua' || reqUrl.pathname === '/api/opcua/') {
         const dashboardUrl = new URL('/control', origin);
-        console.log(`Redirecting API HTTP GET from ${req.url} to ${dashboardUrl.toString()}`);
-        return NextResponse.redirect(dashboardUrl.toString(), { status: 302 });
+        console.log(`HTTP GET to /api/opcua, redirecting to ${dashboardUrl.toString()}`);
+        return NextResponse.redirect(dashboardUrl.toString(), 302);
     }
 
-    return new NextResponse("OPC UA WebSocket Service is Running (HTTP Endpoint)", { status: 200 });
+    return new NextResponse("OPC UA WebSocket Service is active. This is the HTTP endpoint.", { status: 200 });
 }
 
+
 async function gracefulShutdown(signal: string) {
-    console.log(`Received ${signal}. Shutting down gracefully...`);
+    console.log(`Received ${signal}. Initiating graceful shutdown (PID: ${process.pid})...`);
     if (disconnectTimeout) clearTimeout(disconnectTimeout);
 
-    if (localPingIntervalId) { clearInterval(localPingIntervalId); console.log("Cleared local WebSocket ping interval.");}
-    if (vercelPingIntervalId) { clearInterval(vercelPingIntervalId); console.log("Cleared Vercel WebSocket ping interval.");}
+    if (localPingIntervalId) { clearInterval(localPingIntervalId); console.log("Cleared local WebSocket ping interval."); localPingIntervalId = null;}
+    if (vercelPingIntervalId) { clearInterval(vercelPingIntervalId); console.log("Cleared Vercel WebSocket ping interval."); vercelPingIntervalId = null;}
 
     const shutdownPromises: Promise<void>[] = [];
 
-    const closeServer = (server: WebSocketServer | null, name: string): Promise<void> => {
-        return new Promise<void>(resolve => {
+    const closeWebSocketServer = (server: WebSocketServer | null, name: string): Promise<void> => {
+        return new Promise((resolve) => {
             if (server) {
-                console.log(`Closing ${name} WebSocket server instance...`);
-                let clientCount = 0;
-                server.clients.forEach(client => { clientCount++; client.terminate(); });
-                console.log(`Terminated ${clientCount} clients for ${name}.`);
+                console.log(`Closing ${name} WebSocket server...`);
+                let activeClients = 0;
+                server.clients.forEach(client => {
+                    if (client.readyState === WebSocket.OPEN || client.readyState === WebSocket.CONNECTING) {
+                        activeClients++;
+                        client.terminate();
+                    }
+                });
+                console.log(`Terminated ${activeClients} client(s) for ${name} server.`);
                 server.close((err) => {
                     if (err) console.error(`Error closing ${name} WebSocket server:`, err);
-                    else console.log(`${name} WebSocket server instance closed.`);
+                    else console.log(`${name} WebSocket server closed.`);
                     resolve();
                 });
+                setTimeout(() => {
+                    console.warn(`${name} WebSocket server close timed out.`);
+                    resolve();
+                }, 5000);
             } else {
                 resolve();
             }
         });
     };
 
-    shutdownPromises.push(closeServer(vercelWsServer, "Vercel"));
-    shutdownPromises.push(closeServer(localWsServer, "Local"));
+    shutdownPromises.push(closeWebSocketServer(localWsServer, "Local"));
+    shutdownPromises.push(closeWebSocketServer(vercelWsServer, "Vercel"));
 
     try {
         await Promise.all(shutdownPromises);
-        if (opcuaClient) { // Only disconnect OPC UA if it was ever connected
+        console.log("All WebSocket servers notified or closed.");
+
+        if (opcuaClient || opcuaSession) {
+            console.log("Proceeding with OPC UA disconnection...");
             await disconnectOPCUA();
+        } else {
+            console.log("OPC UA was not active, no disconnection needed.");
         }
-        console.log("Graceful shutdown complete.");
-        process.exit(0);
+
+        console.log("Graceful shutdown sequence complete.");
+        setTimeout(() => process.exit(0), 1000);
+
     } catch (err) {
         console.error("Error during graceful shutdown:", err);
-        process.exit(1);
+        setTimeout(() => process.exit(1), 1000);
     }
 }
 
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+if (typeof process !== 'undefined') {
+    process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+    process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+    process.on('uncaughtException', (error, origin) => {
+        console.error(`Uncaught Exception (PID: ${process.pid}):`, error);
+        console.error('Exception origin:', origin);
+    });
+    process.on('unhandledRejection', (reason, promise) => {
+        console.error(`Unhandled Rejection at (PID: ${process.pid}):`, promise);
+        console.error('Reason:', reason);
+    });
+}

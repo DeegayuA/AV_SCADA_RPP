@@ -21,6 +21,7 @@ export interface DataPoint {
   factor?: number;
   precision?: number;
   isWritable?: boolean;
+  decimalPlaces?: number;
   enumSet?: Record<number | string, string>;
 }
 
