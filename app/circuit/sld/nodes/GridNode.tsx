@@ -9,7 +9,13 @@ import { ArrowDownToLineIcon, ZapIcon, AlertTriangleIcon, PowerOffIcon, InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type } = props; // Using only standard NodeProps properties
+  // Access additional properties needed for details view via type assertion
+  const { position, dragging, zIndex } = props as any;
+  const xPos = position?.x;
+  const yPos = position?.y;
+  const width = (props as any).width;
+  const height = (props as any).height;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,

@@ -3,12 +3,21 @@ import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { BatteryNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
+
+// Extended props interface to include additional properties used in the component
+interface ExtendedNodeProps extends NodeProps<BatteryNodeData> {
+  xPos: number;
+  yPos: number;
+  width?: number | null;
+  height?: number | null;
+}
+
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
 import { BatteryChargingIcon, BatteryFullIcon, BatteryLowIcon, BatteryMediumIcon, AlertCircleIcon, ZapIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const BatteryNode: React.FC<NodeProps<BatteryNodeData>> = (props) => { // Reverted to NodeProps
+const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedNodeProps that includes width and height
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,

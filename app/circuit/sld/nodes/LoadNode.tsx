@@ -8,7 +8,15 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { ArrowRightToLineIcon, SlidersHorizontalIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Arrow for load consumption. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const LoadNode: React.FC<NodeProps<LoadNodeData>> = (props) => { // Reverted to NodeProps
+// Extend NodeProps with the additional properties needed
+interface ExtendedNodeProps extends NodeProps<LoadNodeData> {
+  xPos: number;
+  yPos: number;
+  width?: number;
+  height?: number;
+}
+
+const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,

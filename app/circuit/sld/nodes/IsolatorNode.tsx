@@ -2,20 +2,27 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
-import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
+import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added CustomNodeType and SLDElementType
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
 import { AlertTriangleIcon, InfoIcon } from 'lucide-react'; // For fault/warning states. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 interface IsolatorNodeData extends BaseNodeData {
+    elementType: SLDElementType.Isolator;  // Use enum value instead of string literal
     config?: BaseNodeData['config'] & {
         poles?: number;
         loadBreak?: boolean;
     }
 }
 
-const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = (props) => { // Reverted to NodeProps
+// Extended node props with additional properties needed for our component
+interface ExtendedNodeProps extends NodeProps<IsolatorNodeData> {
+  width?: number;
+  height?: number;
+}
+
+const IsolatorNode: React.FC<ExtendedNodeProps> = (props) => {
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
@@ -120,12 +127,11 @@ const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = (props) => { // Reve
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
                 id, 
                 type, 
                 position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
+                data: { ...data, elementType: SLDElementType.Isolator } as any, // Use enum value
                 selected, 
                 dragging, 
                 zIndex, 

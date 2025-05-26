@@ -9,7 +9,7 @@ import { PowerIcon, PowerOffIcon, AlertTriangleIcon, InfoIcon } from 'lucide-rea
 import { Button } from "@/components/ui/button"; // Added Button
 
 const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props; // Removed width and height
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -85,8 +85,8 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => { // Re
         selected, 
         dragging, 
         zIndex, 
-                width: props.width === null ? undefined : props.width, 
-                height: props.height === null ? undefined : props.height, 
+                width: undefined, // Remove reference to non-existent props.width
+                height: undefined, // Remove reference to non-existent props.height
         connectable: isConnectable,
     };
     setSelectedElementForDetails(fullNodeObject);

@@ -1,6 +1,6 @@
 // components/sld/nodes/GeneratorNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
+import { NodeProps, Handle, Position, Node } from 'reactflow'; // Added Node type
 import { motion } from 'framer-motion';
 import { GeneratorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
@@ -8,8 +8,10 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { ZapIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<GeneratorNodeData>, 'position' | 'width' | 'height' | 'dragging' | 'zIndex'>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props;
+  const xPos = position.x;
+  const yPos = position.y;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -165,8 +167,7 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = (props) => { // Re
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
+                id, // Add the required id property
                 position: { x: xPos, y: yPos }, // Use xPos, yPos for position
                 data, 
                 selected, 

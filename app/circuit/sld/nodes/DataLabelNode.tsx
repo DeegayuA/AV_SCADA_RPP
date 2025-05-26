@@ -15,14 +15,15 @@ import { Button } from "@/components/ui/button"; // Added Button
 import { TextLabelConfigPopover } from '../ui/TextLabelConfigPopover'; // Assuming this is the correct path
 
 // Renamed interface to avoid conflict with the component name if it was also DataLabelNodeData
-interface DataLabelNodeType extends TextLabelNodeDataType { // Inherits from TextLabelNodeData which has styleConfig, label, text
+interface DataLabelNodeType extends Omit<TextLabelNodeDataType, 'elementType'> { // Inherits from TextLabelNodeData which has styleConfig, label, text
   elementType: 'dataLabel'; 
   dataPointLinks?: DataPointLink[]; // Specific to DataLabelNode
 }
 
 
 const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Reverted to NodeProps, used new interface
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props; // Fixed destructuring
+  const position = { x: xPos, y: yPos }; // Create position object from xPos and yPos
   const { setNodes } = useReactFlow(); // Added for direct updates if TextLabelConfigPopover is used
   const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode && state.currentUser?.role === 'admin', // Combined admin check
@@ -30,8 +31,11 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
     setSelectedElementForDetails: state.setSelectedElementForDetails,
     dataPoints: state.dataPoints, 
   }));
-
-  // isNodeEditable is now directly from useAppStore's isEditMode
+  
+  // Get OPC UA node values from app store instead of using the hook directly
+  const { opcUaNodeValues } = useAppStore(state => ({
+    opcUaNodeValues: state.opcUaNodeValues,
+  }));
 
   // --- Main Display DataPointLink Handling (Reverted to use opcUaNodeValues from store for simplicity, as this node doesn't use useOpcUaNodeValue hook yet)
   const mainDisplayLink = useMemo(() => 
@@ -91,10 +95,8 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
     id,
     type,
     data,
-    position: { x: xPos, y: yPos },
+    position: position,
     selected,
-    width: width || undefined, // Pass measured width if available
-    height: height || undefined, // Pass measured height if available
     dragging: !!dragging,
     zIndex: zIndex || 0,
     // connectable: isConnectable, // This property is part of NodeProps, not Node directly
@@ -168,9 +170,9 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
 
   return (
     <> 
-      {isEditMode && data.elementType === SLDElementType.TextLabel ? ( // Only show popover for TextLabel, not DataLabel
+      {isEditMode && false ? ( // DataLabelNode doesn't use TextLabelConfigPopover
           <TextLabelConfigPopover
-            node={nodeForPopover as ReactFlowNode<TextLabelNodeDataType>} // Cast to TextLabelNodeDataType for Popover
+            node={nodeForPopover as unknown as ReactFlowNode<TextLabelNodeDataType>} // Double cast to avoid type incompatibility
             onUpdateNodeStyle={handleStyleConfigUpdate}
             onUpdateNodeLabel={handleLabelUpdate} // Keep if 'label' is editable for TextLabels
             onUpdateNodeText={handleTextUpdate}   // Keep if 'text' is editable for TextLabels
@@ -189,15 +191,13 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
             className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
             style={{top: '2px', right: '2px'}}
             onClick={(e) => {
-                e.stopPropagation();
-                const nodeObjectForDetailView: CustomNodeType = {
+                const nodeObjectForDetailView = {
                     id, type, data, selected: !!selected, dragging: !!dragging, zIndex: zIndex || 0,
-                    position: { x: xPos, y: yPos },
-                    width: width || undefined,
-                    height: height || undefined,
+                    position: position, 
                     connectable: isConnectable,
-                };
+                } as unknown as CustomNodeType;
                 setSelectedElementForDetails(nodeObjectForDetailView);
+                e.stopPropagation();
             }}
             title="View Details"
         >

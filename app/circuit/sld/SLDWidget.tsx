@@ -1,7 +1,7 @@
 // components/sld/SLDWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from 'react'; // Added useLayoutEffect
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, ComponentType } from 'react'; // Added useLayoutEffect and ComponentType
 import ReactFlow, {
   ReactFlowProvider,
   Node, Edge, Connection, addEdge,
@@ -12,6 +12,7 @@ import ReactFlow, {
   Panel,
   BackgroundVariant,
   ReactFlowJsonObject,
+  NodeProps,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
@@ -74,25 +75,24 @@ interface WebSocketMessageFromServer {
 }
 
 const nodeTypes: NodeTypes = {
-    [SLDElementType.DataLabel]: DataLabelNode,
-    [SLDElementType.TextLabel]: TextLabelNode,
-    [SLDElementType.Inverter]: InverterNode,
-    [SLDElementType.Panel]: PanelNode,
+    [SLDElementType.DataLabel]: DataLabelNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.TextLabel]: TextLabelNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Inverter]: InverterNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Panel]: PanelNode as unknown as ComponentType<NodeProps>,
     // Uncomment and ensure you have the component files if you use these types:
-    [SLDElementType.Breaker]: BreakerNode,
-    [SLDElementType.Fuse]: FuseNode, // Assuming same as Breaker for now
-    [SLDElementType.Meter]: MeterNode,    
-    [SLDElementType.Battery]: BatteryNode, 
-    [SLDElementType.Contactor]: ContactorNode, 
-    [SLDElementType.Grid]: GridNode,       
-    [SLDElementType.Load]: LoadNode,       
-    [SLDElementType.Busbar]: BusbarNode,   
-    [SLDElementType.GenericDevice]: GenericDeviceNode,
-    [SLDElementType.Transformer]: TransformerNode,
-    [SLDElementType.Generator]: GeneratorNode,
-    [SLDElementType.PLC]: PLCNode,
-    [SLDElementType.Sensor]: SensorNode,
-
+    [SLDElementType.Breaker]: BreakerNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Fuse]: FuseNode as unknown as ComponentType<NodeProps>, // Double type assertion to fix compatibility
+    [SLDElementType.Meter]: MeterNode as unknown as ComponentType<NodeProps>,    
+    [SLDElementType.Battery]: BatteryNode as unknown as ComponentType<NodeProps>, 
+    [SLDElementType.Contactor]: ContactorNode as unknown as ComponentType<NodeProps>, 
+    [SLDElementType.Grid]: GridNode as unknown as ComponentType<NodeProps>,       
+    [SLDElementType.Load]: LoadNode as unknown as ComponentType<NodeProps>,       
+    [SLDElementType.Busbar]: BusbarNode as unknown as ComponentType<NodeProps>,   
+    [SLDElementType.GenericDevice]: GenericDeviceNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Transformer]: TransformerNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Generator]: GeneratorNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.PLC]: PLCNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Sensor]: SensorNode as unknown as ComponentType<NodeProps>,
 };
 const edgeTypes: EdgeTypes = { animatedFlow: AnimatedFlowEdge };
 const defaultEdgeOptions = { type: 'animatedFlow', style: { strokeWidth: 3 }, data: {} as CustomFlowEdgeData };

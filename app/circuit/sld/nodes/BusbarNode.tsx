@@ -1,15 +1,26 @@
 // components/sld/nodes/BusbarNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
+import { NodeProps as ReactFlowNodeProps, Handle, Position } from 'reactflow'; // Importing as ReactFlowNodeProps
 import { motion } from 'framer-motion';
 import { BusbarNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
+
+// Extended NodeProps with position property
+interface NodeProps<T = any> extends ReactFlowNodeProps<T> {
+  position: { x: number; y: number };
+  width?: number;
+  height?: number;
+}
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, getDerivedStyle, formatDisplayValue } from './nodeUtils';
 import { MinusIcon, InfoIcon } from 'lucide-react'; // Simple representation for a busbar. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, zIndex, dragging, position } = props; // Corrected destructuring
+  const xPos = position?.x ?? 0;
+  const yPos = position?.y ?? 0;
+  const width = props.width ?? null;
+  const height = props.height ?? null;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -18,11 +29,11 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
     dataPoints: state.dataPoints,
   }));
 
-  const isNodeEditable = useMemo(() => 
+  const isNodeEditable = useMemo(() =>
     isEditMode && (currentUser?.role === 'admin'),
     [isEditMode, currentUser]
   );
-  
+
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
     if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
@@ -39,11 +50,11 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
     return 'bg-neutral-400 dark:bg-neutral-600'; // De-energized, offline, or unknown
   }, [processedStatus]);
 
-  const derivedNodeStyles = useMemo(() => 
+  const derivedNodeStyles = useMemo(() =>
     getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
     [data, opcUaNodeValues, dataPoints]
   );
-  
+
   // Display voltage or other info if linked
   const displayInfo = useMemo(() => {
     const voltageLink = data.dataPointLinks?.find(link => link.targetProperty === 'voltage');
@@ -69,18 +80,18 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
     border border-transparent hover:border-primary/30
     transition-all duration-150
     ${isNodeEditable ? 'cursor-pointer' : 'cursor-default'}
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-neutral-900' : 
+    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-neutral-900' :
       selected ? 'ring-1 ring-accent dark:ring-offset-neutral-900' : ''}
   `;
-  
+
   // The busbar's actual visual bar. Its background color can be set by statusColorClass or by a DPLink via derivedNodeStyles.backgroundColor
   const busbarVisualClasses = `w-full h-full rounded-sm transition-colors duration-300 ${derivedNodeStyles.backgroundColor ? '' : statusColorClass}`;
 
   return (
     <motion.div
       className={mainDivClasses}
-      style={{ 
-        width: `${busbarWidth}px`, 
+      style={{
+        width: `${busbarWidth}px`,
         height: `${busbarHeight}px`,
         // Apply other derived styles like opacity, etc., but not backgroundColor here as it's on the inner div.
         // However, if derivedNodeStyles is intended to style the *container*, it's fine.
@@ -98,20 +109,20 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
           variant="ghost"
           size="icon"
           className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0" // Adjusted for busbar, typically small
-          style={{ top: `-${(height || busbarHeight)/2 - 2}px`, right: '-5px' }} // Example dynamic positioning if needed, or fixed like others
+          style={{ top: `-${(height || busbarHeight) / 2 - 2}px`, right: '-5px' }} // Example dynamic positioning if needed, or fixed like others
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                width: width === null ? undefined : width, 
-                height: height === null ? undefined : height, 
-                connectable: isConnectable,
+              id,
+              type,
+              position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+              data,
+              selected,
+              dragging,
+              zIndex,
+              width: width === null ? undefined : width,
+              height: height === null ? undefined : height,
+              connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -121,7 +132,7 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
         </Button>
       )}
 
-      <div 
+      <div
         className={busbarVisualClasses}
         style={{ backgroundColor: derivedNodeStyles.backgroundColor }} // Allows DPLink to override statusColorClass
       />
@@ -129,14 +140,14 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
       {/* Handles */}
       {[0.25, 0.5, 0.75].map(pos => (
         <Handle
-          key={`top-${pos}`} type="target" position={Position.Top} id={`top-${pos*100}`}
+          key={`top-${pos}`} type="target" position={Position.Top} id={`top-${pos * 100}`}
           style={{ left: `${pos * 100}%` }} isConnectable={isConnectable}
           className="!w-2.5 !h-2.5 !bg-neutral-400/70 dark:!bg-neutral-500/70 border !border-neutral-500 dark:!border-neutral-400 group-hover:!bg-primary/70 dark:group-hover:!bg-blue-400/70 react-flow__handle-common !opacity-0 group-hover:!opacity-100 transition-opacity"
         />
       ))}
       {[0.25, 0.5, 0.75].map(pos => (
         <Handle
-          key={`bottom-${pos}`} type="source" position={Position.Bottom} id={`bottom-${pos*100}`}
+          key={`bottom-${pos}`} type="source" position={Position.Bottom} id={`bottom-${pos * 100}`}
           style={{ left: `${pos * 100}%` }} isConnectable={isConnectable}
           className="!w-2.5 !h-2.5 !bg-neutral-400/70 dark:!bg-neutral-500/70 border !border-neutral-500 dark:!border-neutral-400 group-hover:!bg-primary/70 dark:group-hover:!bg-blue-400/70 react-flow__handle-common !opacity-0 group-hover:!opacity-100 transition-opacity"
         />
@@ -149,15 +160,15 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
         type="source" position={Position.Right} id="right" isConnectable={isConnectable}
         className="!w-2.5 !h-2.5 !bg-neutral-400/70 dark:!bg-neutral-500/70 border !border-neutral-500 dark:!border-neutral-400 group-hover:!bg-primary/70 dark:group-hover:!bg-blue-400/70 react-flow__handle-common !opacity-0 group-hover:!opacity-100 transition-opacity"
       />
-      
+
       {(displayInfo || data.label) && ( // Show label or displayInfo if available
-        <div 
+        <div
           className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-center"
-          style={{width: `${busbarWidth * 1.2}px`}}
+          style={{ width: `${busbarWidth * 1.2}px` }}
         >
-          <p className="text-[9px] font-medium text-muted-foreground dark:text-neutral-400 truncate" 
-             style={{color: derivedNodeStyles.color}} // Allow DPLink to color label text
-             title={displayInfo || data.label}
+          <p className="text-[9px] font-medium text-muted-foreground dark:text-neutral-400 truncate"
+            style={{ color: derivedNodeStyles.color }} // Allow DPLink to color label text
+            title={displayInfo || data.label}
           >
             {displayInfo || data.label}
           </p>

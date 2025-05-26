@@ -9,7 +9,12 @@ import { ZapOffIcon, ZapIcon, ShieldAlertIcon, ShieldCheckIcon, AlertTriangleIco
 import { Button } from "@/components/ui/button"; // Added Button
 
 const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, zIndex, dragging } = props; // Using standard NodeProps properties
+  const position = (props as any).position;
+  const xPos = position?.x ?? 0;
+  const yPos = position?.y ?? 0;
+  const width = (props as any).width;
+  const height = (props as any).height;
   const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,

@@ -151,10 +151,10 @@ const SLDElementControlPopup: React.FC<SLDElementControlPopupProps> = ({ // Rena
                     const statusLink = elementData.dataPointLinks?.find(l => l.targetProperty === 'status');
                     if (isOpenLink && dataPoints && dataPoints[isOpenLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
                       const rawValue = getDataPointValue(isOpenLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
-                      currentState = applyValueMapping(rawValue, isOpenLink, dataPoints[isOpenLink.dataPointId]) === true;
+                      currentState = applyValueMapping(rawValue, isOpenLink) === true;
                     } else if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
                       const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
-                      const mappedStatus = String(applyValueMapping(rawValue, statusLink, dataPoints[statusLink.dataPointId])).toLowerCase();
+                      const mappedStatus = String(applyValueMapping(rawValue, statusLink)).toLowerCase();
                       if (mappedStatus === 'open' || mappedStatus === 'tripped') currentState = true;
                       else if (mappedStatus === 'closed') currentState = false;
                     } else if (nodeConfig?.normallyOpen !== undefined) {
@@ -169,11 +169,11 @@ const SLDElementControlPopup: React.FC<SLDElementControlPopupProps> = ({ // Rena
                     const statusLink = elementData.dataPointLinks?.find(l => l.targetProperty === 'status');
                      if (isClosedLink && dataPoints && dataPoints[isClosedLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
                         const rawValue = getDataPointValue(isClosedLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
-                        const mappedValue = applyValueMapping(rawValue, isClosedLink, dataPoints[isClosedLink.dataPointId]);
+                        const mappedValue = applyValueMapping(rawValue, isClosedLink);
                         currentState = mappedValue === false; // isClosed=true means currentState (isOpen/isDeenergized) is false
                     } else if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
                       const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
-                      const mappedStatus = String(applyValueMapping(rawValue, statusLink, dataPoints[statusLink.dataPointId])).toLowerCase();
+                      const mappedStatus = String(applyValueMapping(rawValue, statusLink)).toLowerCase();
                       if (mappedStatus === 'open' || mappedStatus === 'de-energized' || mappedStatus === 'off') currentState = true;
                       else if (mappedStatus === 'closed' || mappedStatus === 'energized' || mappedStatus === 'on') currentState = false;
                     } else if (nodeConfig?.normallyOpen !== undefined) {
@@ -191,7 +191,10 @@ const SLDElementControlPopup: React.FC<SLDElementControlPopupProps> = ({ // Rena
                       toast.warning("WebSocket disconnected. Cannot send command.");
                       return;
                     }
-                    const writePayload = { [controlNodeId]: valueToWrite }; // Corrected payload
+                    const writePayload = { 
+                      type: 'controlWrite', 
+                      payload: { [controlNodeId]: valueToWrite }
+                    }; // Format matching WebSocketMessageToServer interface
                     sendJsonMessage(writePayload); // Send the payload directly
                     toast.info(`Attempting to ${valueToWrite ? trueActionLabel : falseActionLabel}...`);
                   };

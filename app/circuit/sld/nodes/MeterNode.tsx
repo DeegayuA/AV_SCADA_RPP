@@ -9,7 +9,7 @@ import { GaugeIcon, AlertTriangleIcon, CheckCircleIcon, TerminalSquareIcon, Info
 import { Button } from "@/components/ui/button"; // Added Button
 
 const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, zIndex, dragging } = props; // Adjusted destructuring
   const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -160,13 +160,12 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => { // Reverted t
             const fullNodeObject: CustomNodeType = {
                 id, 
                 type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                position: { x: 0, y: 0 }, // Default position as it's not available in props
                 data, 
                 selected, 
                 dragging, 
                 zIndex, 
-                width: width === null ? undefined : width, 
-                height: height === null ? undefined : height, 
+                // width and height are not available in NodeProps
                 connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);

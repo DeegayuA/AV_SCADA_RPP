@@ -8,7 +8,9 @@ import { ThermometerIcon, WindIcon, DropletsIcon, GaugeIcon, RssIcon, ScanEyeIco
 import { Button } from "@/components/ui/button"; // Added Button
 
 const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props;
+  const width = undefined;
+  const height = undefined;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -81,8 +83,7 @@ const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => { // Reverted
                 position: { x: xPos, y: yPos }, // Use xPos, yPos for position
                 data, 
                 selected, 
-                dragging, 
-                zIndex, 
+                // width and height are optional and might not be needed
                 width: width === null ? undefined : width, 
                 height: height === null ? undefined : height, 
                 connectable: isConnectable,

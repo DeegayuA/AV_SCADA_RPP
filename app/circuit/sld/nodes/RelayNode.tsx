@@ -2,12 +2,13 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
-import { BaseNodeData, CustomNodeType } from '@/types/sld'; // Or specific RelayNodeData. Added CustomNodeType
+import { BaseNodeData, CustomNodeType, SLDElementType } from '@/types/sld'; // Added SLDElementType
 import { useAppStore } from '@/stores/appStore';
 import { ShieldCheckIcon, ShieldAlertIcon, ShieldQuestionIcon, ZapIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 interface RelayNodeData extends BaseNodeData {
+    elementType: SLDElementType.Relay; // Add explicit element type
     config?: BaseNodeData['config'] & {
         relayType?: string; // e.g., "Overcurrent", "Differential", "Control"
         ansiCode?: string; // e.g., "50/51", "87T"
@@ -15,7 +16,8 @@ interface RelayNodeData extends BaseNodeData {
 }
 
 const RelayNode: React.FC<NodeProps<RelayNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, zIndex, dragging } = props;
+  const position = { x: props.xPos, y: props.yPos }; // Access position coordinates
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -78,19 +80,17 @@ const RelayNode: React.FC<NodeProps<RelayNodeData>> = (props) => { // Reverted t
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
             e.stopPropagation();
-            const fullNodeObject: CustomNodeType = {
+            const fullNodeObject = {
                 id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                position: position,
                 data, 
                 selected, 
                 dragging, 
-                zIndex, 
-                width: width === null ? undefined : width, 
-                height: height === null ? undefined : height, 
+                zIndex,
                 connectable: isConnectable,
+                type
             };
-            setSelectedElementForDetails(fullNodeObject);
+            setSelectedElementForDetails(fullNodeObject as unknown as CustomNodeType);
           }}
           title="View Details"
         >

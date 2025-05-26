@@ -8,7 +8,8 @@ import { CpuIcon, NetworkIcon, AlertTriangleIcon, CheckSquareIcon, InfoIcon } fr
 import { Button } from "@/components/ui/button"; // Added Button
 
 const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, dragging, zIndex, xPos, yPos } = props; // Fixed destructuring
+  const position = { x: xPos, y: yPos }; // Access position using xPos and yPos
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -62,17 +63,15 @@ const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => { // Reverted to No
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
                 id, 
                 type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                position, 
                 data, 
                 selected, 
                 dragging, 
                 zIndex, 
-                width, 
-                height, 
+                // width and height are not directly available in NodeProps
                 connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);

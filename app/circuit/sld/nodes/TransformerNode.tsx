@@ -9,7 +9,8 @@ import { GitBranchPlusIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; /
 import { Button } from "@/components/ui/button"; // Added Button
 
 const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+  const { data, selected, isConnectable, id, type, zIndex, dragging, xPos, yPos } = props; // Fixed destructuring
+  const position = { x: xPos, y: yPos }; // Create position object from xPos and yPos
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -135,7 +136,7 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { /
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
             e.stopPropagation();
-            const fullNodeObject: CustomNodeType = {
+            const fullNodeObject = {
                 id, 
                 type, 
                 position: { x: xPos, y: yPos }, // Use xPos, yPos for position
@@ -143,9 +144,7 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { /
                 selected, 
                 dragging, 
                 zIndex, 
-                width: width === null ? undefined : width, 
-                height: height === null ? undefined : height, 
-                connectable: isConnectable,
+                connectable: isConnectable
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

@@ -8,8 +8,16 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { SunIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
+interface ExtendedNodeProps extends Omit<NodeProps<PanelNodeData>, 'xPos' | 'yPos'> {
+  // Add properties with our desired optionality
+  xPos?: number;
+  yPos?: number;
+  width?: number;
+  height?: number;
+}
+
+const PanelNode: React.FC<ExtendedNodeProps> = (props) => {
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -134,7 +142,7 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => { // Reverted t
             const fullNodeObject: CustomNodeType = {
                 id, 
                 type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                position: { x: xPos ?? 0, y: yPos ?? 0 }, // Use xPos, yPos for position
                 data, 
                 selected, 
                 dragging, 
