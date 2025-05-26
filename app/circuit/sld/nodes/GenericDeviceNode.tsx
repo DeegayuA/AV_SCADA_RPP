@@ -8,7 +8,8 @@ import { BoxIcon, AlertTriangleIcon, CheckCircleIcon, XCircleIcon, InfoIcon } fr
 import { Button } from "@/components/ui/button"; // Added Button
 
 const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Destructure all needed props
+  const position = { x: xPos, y: yPos }; // Create position object from xPos and yPos
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -69,9 +70,8 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, type, position: { x: xPos, y: yPos }, data, selected, dragging, zIndex, width, height,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
