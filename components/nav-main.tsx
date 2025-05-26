@@ -1,4 +1,3 @@
-// Example modification for components/nav-main.tsx
 "use client";
 
 import * as React from "react";

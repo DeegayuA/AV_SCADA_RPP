@@ -1,6 +1,6 @@
 // components/sld/nodes/ContactorNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { ContactorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
@@ -8,8 +8,8 @@ import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUti
 import { PowerIcon, PowerOffIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props; // Removed width and height
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -78,7 +78,16 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
   const handleInfoClick = (event: React.MouseEvent) => {
     event.stopPropagation();
     const fullNodeObject: CustomNodeType = {
-        id, type, position, data, selected, dragging, zIndex, width, height,
+        id, 
+        type, 
+        position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+        data, 
+        selected, 
+        dragging, 
+        zIndex, 
+                width: undefined, // Remove reference to non-existent props.width
+                height: undefined, // Remove reference to non-existent props.height
+        connectable: isConnectable,
     };
     setSelectedElementForDetails(fullNodeObject);
   };

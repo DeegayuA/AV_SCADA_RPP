@@ -1,13 +1,14 @@
 // components/sld/nodes/PTNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
-import { BaseNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
+import { BaseNodeData, CustomNodeType, SLDElementType } from '@/types/sld'; // Added SLDElementType
 import { useAppStore } from '@/stores/appStore';
 import { LocateFixedIcon, InfoIcon } from 'lucide-react'; // Placeholder, custom SVG better. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 interface PTNodeData extends BaseNodeData {
+    elementType: SLDElementType.PT;
     config?: BaseNodeData['config'] & {
         ratio?: string; // e.g., "11kV/110V"
         accuracyClass?: string;
@@ -15,8 +16,14 @@ interface PTNodeData extends BaseNodeData {
     }
 }
 
-const PTNode: React.FC<NodeProps<PTNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+// Extend NodeProps to include optional 'width' and 'height'
+type ExtendedNodeProps = NodeProps<PTNodeData> & {
+  width?: number;
+  height?: number;
+};
+
+const PTNode: React.FC<ExtendedNodeProps> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -74,7 +81,16 @@ const PTNode: React.FC<NodeProps<PTNodeData>> = (props) => {
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                data: data as any, // Cast to any to bypass type check since we know this is valid
+                selected, 
+                dragging, 
+                zIndex, 
+                width, 
+                height, 
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

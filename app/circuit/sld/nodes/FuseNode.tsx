@@ -1,22 +1,29 @@
 // components/sld/nodes/FuseNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position, Node } from 'reactflow'; // Added Node type
 import { motion } from 'framer-motion';
-import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
+import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added SLDElementType
+
+interface ExtendedNodeProps<T = any> extends NodeProps<T> {
+  position: { x: number, y: number };
+  zIndex: number;
+  dragging: boolean; // Removed optional modifier (?) since NodeProps requires this to be boolean
+}
+
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
 import { ZapIcon, ShieldOffIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 interface FuseNodeData extends BaseNodeData {
-    config?: BaseNodeData['config'] & {
-        ratingAmps?: number;
-        type?: 'Cartridge' | 'Blade' | 'HRC';
-    }
+  type?: 'Cartridge' | 'Blade' | 'HRC';
+  elementType: SLDElementType.Fuse;
 }
 
-const FuseNode: React.FC<NodeProps<FuseNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging } = props;
+  const xPos = position.x;
+  const yPos = position.y;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -129,7 +136,15 @@ const FuseNode: React.FC<NodeProps<FuseNodeData>> = (props) => {
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                data, 
+                selected, 
+                // Width and height are not available from NodeProps
+                width: undefined, 
+                height: undefined, 
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

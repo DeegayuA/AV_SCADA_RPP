@@ -1,6 +1,6 @@
 // components/sld/nodes/InverterNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position, Node } from 'reactflow'; // Added Node type
 import { motion } from 'framer-motion';
 import { InverterNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
@@ -8,8 +8,12 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { ZapIcon, RefreshCwIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from 'lucide-react'; // Example icons. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<InverterNodeData>>> = (props) => { // Added Node type
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging } = props; // Now position is available
+  const { x: xPos, y: yPos } = position || { x: 0, y: 0 };
+  // Access width and height from props directly as they're not part of InverterNodeData
+  const width = (props as any).width || undefined;
+  const height = (props as any).height || undefined;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -123,15 +127,21 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
-      {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={() => {
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: position || { x: 0, y: 0 }, // Provide default position if undefined
+                data, 
+                selected, 
+                dragging, 
+                zIndex, 
+                width, 
+                height, 
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -139,7 +149,6 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
         >
           <InfoIcon className="h-3 w-3 text-primary/80" />
         </Button>
-      )}
 
       {/* DC Input */}
       <Handle

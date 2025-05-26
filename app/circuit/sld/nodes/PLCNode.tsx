@@ -1,14 +1,15 @@
 // components/sld/nodes/PLCNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { PLCNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { CpuIcon, NetworkIcon, AlertTriangleIcon, CheckSquareIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, dragging, zIndex, xPos, yPos } = props; // Fixed destructuring
+  const position = { x: xPos, y: yPos }; // Access position using xPos and yPos
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -62,9 +63,16 @@ const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => {
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position, 
+                data, 
+                selected, 
+                dragging, 
+                zIndex, 
+                // width and height are not directly available in NodeProps
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

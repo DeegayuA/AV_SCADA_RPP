@@ -1,15 +1,14 @@
 // components/sld/nodes/GenericDeviceNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { GenericDeviceNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { BoxIcon, AlertTriangleIcon, CheckCircleIcon, XCircleIcon, InfoIcon } from 'lucide-react'; // Default icon, Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Destructure all needed props
-  const position = { x: xPos, y: yPos }; // Create position object from xPos and yPos
+const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props; // Fixed destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -70,8 +69,16 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
+            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position: { x: xPos, y: yPos }, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos, y: yPos }, // Construct position from xPos and yPos
+                data, 
+                selected, 
+                dragging, 
+                zIndex,
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

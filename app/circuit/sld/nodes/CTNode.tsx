@@ -1,13 +1,14 @@
 // components/sld/nodes/CTNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
-import { BaseNodeData, CustomNodeType } from '@/types/sld'; // Use BaseNodeData or create specific CTNodeData. Added CustomNodeType
+import { BaseNodeData, CustomNodeType, SLDElementType } from '@/types/sld'; // Added SLDElementType
 import { useAppStore } from '@/stores/appStore';
 import { ZoomInIcon, ScanSearchIcon, InfoIcon } from 'lucide-react'; // Placeholder, custom SVG better. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 interface CTNodeData extends BaseNodeData {
+    elementType: SLDElementType.CT; // Added this property to match expected type
     config?: BaseNodeData['config'] & {
         ratio?: string; // e.g., "100/5A"
         accuracyClass?: string; // e.g., "0.5S"
@@ -15,8 +16,8 @@ interface CTNodeData extends BaseNodeData {
     }
 }
 
-const CTNode: React.FC<NodeProps<CTNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const CTNode: React.FC<NodeProps<CTNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, zIndex, dragging, xPos, yPos } = props; // Fixed destructuring to match NodeProps type
   const { isEditMode, currentUser, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -71,7 +72,15 @@ const CTNode: React.FC<NodeProps<CTNodeData>> = (props) => {
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos || 0, y: yPos || 0 }, // Create position object from xPos and yPos
+                data: data as any, // Type assertion to resolve compatibility issue
+                selected, 
+                dragging, 
+                zIndex, 
+                // Remove width and height as they're not available on NodeProps
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

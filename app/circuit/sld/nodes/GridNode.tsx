@@ -1,6 +1,6 @@
 // components/sld/nodes/GridNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { GridNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
@@ -8,8 +8,14 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { ArrowDownToLineIcon, ZapIcon, AlertTriangleIcon, PowerOffIcon, InfoIcon } from 'lucide-react'; // For grid connection. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type } = props; // Using only standard NodeProps properties
+  // Access additional properties needed for details view via type assertion
+  const { position, dragging, zIndex } = props as any;
+  const xPos = position?.x;
+  const yPos = position?.y;
+  const width = (props as any).width;
+  const height = (props as any).height;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -96,7 +102,16 @@ const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => {
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                data, 
+                selected, 
+                dragging, 
+                zIndex, 
+                width, 
+                height, 
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
