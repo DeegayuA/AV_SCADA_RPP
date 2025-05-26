@@ -49,6 +49,7 @@ export const useWebSocket = () => {
 
         ws.current.onmessage = (event) => {
             try {
+                console.log("Raw WebSocket message received:", event.data);
                 const data = JSON.parse(event.data as string);
                 
                 if (typeof data === 'object' && data !== null) {
@@ -66,11 +67,12 @@ export const useWebSocket = () => {
                                 }
                             }
                             if (Object.keys(opcDataPayload).length > 0) {
+                                console.log("Processed OPC UA payload for store:", opcDataPayload);
                                 useAppStore.getState().updateOpcUaNodeValues(opcDataPayload);
                             }
                         } else {
                             // Handle other structured messages (like layout-data, confirmations)
-                            // console.log("WebSocket: Received structured message:", data);
+                            console.log("Structured WebSocket message received:", data);
                             setLastJsonMessage(data as WebSocketMessageFromServer);
                             // If there's a specific type for OPC data that is structured, handle it here.
                             // e.g. if (data.type === 'opcua-structured-batch' && data.payload) {
