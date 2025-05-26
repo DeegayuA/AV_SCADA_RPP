@@ -3,7 +3,7 @@ import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
-import { useAppStore } from '@/stores/appStore';
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore'; // Added useOpcUaNodeValue
 import { 
     getDataPointValue, 
     applyValueMapping, 
@@ -31,11 +31,10 @@ interface DataLabelNodeData {
 
 const DataLabelNode: React.FC<NodeProps<DataLabelNodeData>> = (props) => {
   const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+  const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints, // Assuming appStore provides all DataPoint metadata
   }));
 
@@ -44,32 +43,84 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeData>> = (props) => {
     [isEditMode, currentUser]
   );
 
-  // Primary purpose: Display a value from a DataPointLink targeting 'value' or 'text'
+  // --- Main Display DataPointLink Handling ---
   const mainDisplayLink = useMemo(() => 
     data.dataPointLinks?.find(link => link.targetProperty === 'value' || link.targetProperty === 'text'),
     [data.dataPointLinks]
   );
+  const mainDisplayDataPointConfig = useMemo(() => mainDisplayLink ? dataPoints[mainDisplayLink.dataPointId] : undefined, [mainDisplayLink, dataPoints]);
+  const mainDisplayOpcUaNodeId = useMemo(() => mainDisplayDataPointConfig?.nodeId, [mainDisplayDataPointConfig]);
+  const reactiveMainDisplayValue = useOpcUaNodeValue(mainDisplayOpcUaNodeId);
 
   const { displayText, unitText } = useMemo(() => {
-    if (mainDisplayLink && dataPoints && dataPoints[mainDisplayLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const dpMeta = dataPoints[mainDisplayLink.dataPointId] as DataPoint; // Cast if sure it exists
-      const rawValue = getDataPointValue(mainDisplayLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      const mappedValue = applyValueMapping(rawValue, mainDisplayLink);
-      const formattedText = formatDisplayValue(mappedValue, mainDisplayLink.format, dpMeta?.dataType);
+    if (mainDisplayLink && mainDisplayDataPointConfig && reactiveMainDisplayValue !== undefined) {
+      const mappedValue = applyValueMapping(reactiveMainDisplayValue, mainDisplayLink);
+      const formattedText = formatDisplayValue(mappedValue, mainDisplayLink.format, mainDisplayDataPointConfig?.dataType);
       
       // Unit comes from format suffix, then dp unit
-      const unit = mainDisplayLink.format?.suffix || dpMeta?.unit || '';
+      const unit = mainDisplayLink.format?.suffix || mainDisplayDataPointConfig?.unit || '';
       return { displayText: formattedText, unitText: unit };
     }
     // Fallback if no DPLink for value/text, or if static text is preferred for some DataLabels
     return { displayText: data.label || '---', unitText: '' };
-  }, [mainDisplayLink, data.label, opcUaNodeValues, dataPoints]);
+  }, [mainDisplayLink, mainDisplayDataPointConfig, reactiveMainDisplayValue, data.label]);
 
   // Derive dynamic styles (e.g., color based on value, visibility)
-  const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
-  );
+  // --- Derived Styles DataPointLink Handling ---
+  const stylingLinks = useMemo(() => {
+    return data.dataPointLinks?.filter(link => 
+      !link.targetProperty || // Handle cases where targetProperty might be undefined but implies styling by context
+      ['fillColor', 'backgroundColor', 'strokeColor', 'borderColor', 'textColor', 'color', 'visible', 'visibility', 'opacity'].includes(link.targetProperty) || 
+      link.targetProperty.startsWith('--')
+    )?.filter(link => link.dataPointId !== mainDisplayLink?.dataPointId) || []; // Exclude mainDisplayLink if already handled
+  }, [data.dataPointLinks, mainDisplayLink]);
+
+  // Subscriptions for up to 3 dedicated styling links (excluding mainDisplayLink if it's for styling)
+  const styleLink1 = useMemo(() => stylingLinks[0], [stylingLinks]);
+  const styleLink1DataPointConfig = useMemo(() => styleLink1 ? dataPoints[styleLink1.dataPointId] : undefined, [styleLink1, dataPoints]);
+  const styleLink1OpcUaNodeId = useMemo(() => styleLink1DataPointConfig?.nodeId, [styleLink1DataPointConfig]);
+  const reactiveStyleLink1Value = useOpcUaNodeValue(styleLink1OpcUaNodeId);
+
+  const styleLink2 = useMemo(() => stylingLinks[1], [stylingLinks]);
+  const styleLink2DataPointConfig = useMemo(() => styleLink2 ? dataPoints[styleLink2.dataPointId] : undefined, [styleLink2, dataPoints]);
+  const styleLink2OpcUaNodeId = useMemo(() => styleLink2DataPointConfig?.nodeId, [styleLink2DataPointConfig]);
+  const reactiveStyleLink2Value = useOpcUaNodeValue(styleLink2OpcUaNodeId);
+
+  const styleLink3 = useMemo(() => stylingLinks[2], [stylingLinks]);
+  const styleLink3DataPointConfig = useMemo(() => styleLink3 ? dataPoints[styleLink3.dataPointId] : undefined, [styleLink3, dataPoints]);
+  const styleLink3OpcUaNodeId = useMemo(() => styleLink3DataPointConfig?.nodeId, [styleLink3DataPointConfig]);
+  const reactiveStyleLink3Value = useOpcUaNodeValue(styleLink3OpcUaNodeId);
+  
+  const opcUaValuesForDerivedStyle = useMemo(() => {
+    const values: Record<string, string | number | boolean> = {};
+
+    // Add main display value if its nodeId is defined
+    // This is crucial if mainDisplayLink itself is used for a style property (e.g. text color based on value)
+    if (mainDisplayOpcUaNodeId && reactiveMainDisplayValue !== undefined) {
+      values[mainDisplayOpcUaNodeId] = reactiveMainDisplayValue;
+    }
+
+    // Add values for dedicated styling links
+    if (styleLink1OpcUaNodeId && reactiveStyleLink1Value !== undefined) {
+      values[styleLink1OpcUaNodeId] = reactiveStyleLink1Value;
+    }
+    if (styleLink2OpcUaNodeId && reactiveStyleLink2Value !== undefined) {
+      values[styleLink2OpcUaNodeId] = reactiveStyleLink2Value;
+    }
+    if (styleLink3OpcUaNodeId && reactiveStyleLink3Value !== undefined) {
+      values[styleLink3OpcUaNodeId] = reactiveStyleLink3Value;
+    }
+    return values;
+  }, [
+    mainDisplayOpcUaNodeId, reactiveMainDisplayValue,
+    styleLink1OpcUaNodeId, reactiveStyleLink1Value,
+    styleLink2OpcUaNodeId, reactiveStyleLink2Value,
+    styleLink3OpcUaNodeId, reactiveStyleLink3Value
+  ]);
+
+  const derivedNodeStyles = useMemo(() => {
+    return getDerivedStyle(data, opcUaValuesForDerivedStyle, dataPoints);
+  }, [data, opcUaValuesForDerivedStyle, dataPoints]);
 
   // Combine static styles from data.styleConfig with derived dynamic styles
   const finalNodeStyle = useMemo(() => {

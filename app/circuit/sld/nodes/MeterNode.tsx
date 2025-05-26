@@ -3,18 +3,17 @@ import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { MeterNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
-import { useAppStore } from '@/stores/appStore';
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore'; // Added useOpcUaNodeValue
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
 import { GaugeIcon, AlertTriangleIcon, CheckCircleIcon, TerminalSquareIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
 const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => {
   const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+  const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
     dataPoints: state.dataPoints,
   }));
 
@@ -23,30 +22,36 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => {
     [isEditMode, currentUser]
   );
 
+  // --- Status DataPointLink Handling ---
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
   const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      return applyValueMapping(rawValue, statusLink);
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return applyValueMapping(reactiveStatusValue, statusLink);
     }
     return data.status || 'offline'; // Default status
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
+
+  // --- Meter Reading DataPointLink Handling ---
+  const readingDataPointLink = useMemo(() => 
+    data.dataPointLinks?.find(link => link.targetProperty === 'reading' || link.targetProperty === 'value'), 
+    [data.dataPointLinks]
+  );
+  const readingDataPointConfig = useMemo(() => readingDataPointLink ? dataPoints[readingDataPointLink.dataPointId] : undefined, [readingDataPointLink, dataPoints]);
+  const readingOpcUaNodeId = useMemo(() => readingDataPointConfig?.nodeId, [readingDataPointConfig]);
+  const reactiveReadingValue = useOpcUaNodeValue(readingOpcUaNodeId);
 
   const meterReading = useMemo(() => {
-    // Prioritize a 'reading' or 'value' DPLink
-    const readingLink = data.dataPointLinks?.find(
-      link => link.targetProperty === 'reading' || link.targetProperty === 'value'
-    );
-    if (readingLink && dataPoints && dataPoints[readingLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const dpMeta = dataPoints[readingLink.dataPointId];
-      const rawValue = getDataPointValue(readingLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      const mappedValue = applyValueMapping(rawValue, readingLink);
-      return formatDisplayValue(mappedValue, readingLink.format, dpMeta?.dataType);
+    if (readingDataPointLink && readingDataPointConfig && reactiveReadingValue !== undefined) {
+      const mappedValue = applyValueMapping(reactiveReadingValue, readingDataPointLink);
+      return formatDisplayValue(mappedValue, readingDataPointLink.format, readingDataPointConfig?.dataType);
     }
     // Fallback or static display if no DPLink for reading
     return data.config?.displayType || data.config?.meterType || 'Meter';
-  }, [data.dataPointLinks, data.config, opcUaNodeValues, dataPoints]);
-
+  }, [readingDataPointLink, readingDataPointConfig, reactiveReadingValue, data.config]);
 
   const statusStyles = useMemo(() => {
     if (processedStatus === 'fault' || processedStatus === 'alarm') 
@@ -59,10 +64,60 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => {
     return { border: 'border-neutral-400 dark:border-neutral-600', bg: 'bg-muted/30', iconColor: 'text-muted-foreground', textColor: 'text-muted-foreground' };
   }, [processedStatus]);
   
-  const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
-  );
+  // --- Derived Styles DataPointLink Handling ---
+  const stylingLinks = useMemo(() => {
+    return data.dataPointLinks?.filter(link => 
+      ['fillColor', 'backgroundColor', 'strokeColor', 'borderColor', 'textColor', 'color', 'visible', 'visibility', 'opacity'].includes(link.targetProperty) || link.targetProperty.startsWith('--')
+    ) || [];
+  }, [data.dataPointLinks]);
+
+  // Subscriptions for up to 3 dedicated styling links
+  const styleLink1 = useMemo(() => stylingLinks[0], [stylingLinks]);
+  const styleLink1DataPointConfig = useMemo(() => styleLink1 ? dataPoints[styleLink1.dataPointId] : undefined, [styleLink1, dataPoints]);
+  const styleLink1OpcUaNodeId = useMemo(() => styleLink1DataPointConfig?.nodeId, [styleLink1DataPointConfig]);
+  const reactiveStyleLink1Value = useOpcUaNodeValue(styleLink1OpcUaNodeId);
+
+  const styleLink2 = useMemo(() => stylingLinks[1], [stylingLinks]);
+  const styleLink2DataPointConfig = useMemo(() => styleLink2 ? dataPoints[styleLink2.dataPointId] : undefined, [styleLink2, dataPoints]);
+  const styleLink2OpcUaNodeId = useMemo(() => styleLink2DataPointConfig?.nodeId, [styleLink2DataPointConfig]);
+  const reactiveStyleLink2Value = useOpcUaNodeValue(styleLink2OpcUaNodeId);
+
+  const styleLink3 = useMemo(() => stylingLinks[2], [stylingLinks]);
+  const styleLink3DataPointConfig = useMemo(() => styleLink3 ? dataPoints[styleLink3.dataPointId] : undefined, [styleLink3, dataPoints]);
+  const styleLink3OpcUaNodeId = useMemo(() => styleLink3DataPointConfig?.nodeId, [styleLink3DataPointConfig]);
+  const reactiveStyleLink3Value = useOpcUaNodeValue(styleLink3OpcUaNodeId);
+
+  const opcUaValuesForDerivedStyle = useMemo(() => {
+    const values: Record<string, string | number | boolean> = {};
+
+    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
+      values[statusOpcUaNodeId] = reactiveStatusValue;
+    }
+    if (readingOpcUaNodeId && reactiveReadingValue !== undefined) {
+      values[readingOpcUaNodeId] = reactiveReadingValue;
+    }
+
+    if (styleLink1OpcUaNodeId && reactiveStyleLink1Value !== undefined) {
+      values[styleLink1OpcUaNodeId] = reactiveStyleLink1Value;
+    }
+    if (styleLink2OpcUaNodeId && reactiveStyleLink2Value !== undefined) {
+      values[styleLink2OpcUaNodeId] = reactiveStyleLink2Value;
+    }
+    if (styleLink3OpcUaNodeId && reactiveStyleLink3Value !== undefined) {
+      values[styleLink3OpcUaNodeId] = reactiveStyleLink3Value;
+    }
+    return values;
+  }, [
+    statusOpcUaNodeId, reactiveStatusValue,
+    readingOpcUaNodeId, reactiveReadingValue,
+    styleLink1OpcUaNodeId, reactiveStyleLink1Value,
+    styleLink2OpcUaNodeId, reactiveStyleLink2Value,
+    styleLink3OpcUaNodeId, reactiveStyleLink3Value
+  ]);
+
+  const derivedNodeStyles = useMemo(() => {
+    return getDerivedStyle(data, opcUaValuesForDerivedStyle, dataPoints);
+  }, [data, opcUaValuesForDerivedStyle, dataPoints]);
 
   const StatusIcon = useMemo(() => {
     if (processedStatus === 'fault' || processedStatus === 'alarm') return AlertTriangleIcon;
