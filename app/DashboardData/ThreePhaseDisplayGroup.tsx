@@ -67,6 +67,8 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
                     decimalPlaces: firstPhasePoint.decimalPlaces,
                     // Copy other relevant format-related fields from DataPoint type
                 } : {}),
+                icon: Sigma, // Added Sigma icon
+                category: 'three-phase', // Changed category to 'three-phase'
 
             };
         }, [group.groupKey, group.points, group.unit]);

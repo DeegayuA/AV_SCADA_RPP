@@ -1,14 +1,14 @@
 // components/sld/nodes/SensorNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { SensorNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
 import { ThermometerIcon, WindIcon, DropletsIcon, GaugeIcon, RssIcon, ScanEyeIcon, InfoIcon } from 'lucide-react'; // Example icons. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -76,7 +76,16 @@ const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => {
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                data, 
+                selected, 
+                dragging, 
+                zIndex, 
+                width: width === null ? undefined : width, 
+                height: height === null ? undefined : height, 
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

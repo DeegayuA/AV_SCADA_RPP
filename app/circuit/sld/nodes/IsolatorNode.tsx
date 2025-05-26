@@ -1,6 +1,6 @@
 // components/sld/nodes/IsolatorNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
@@ -15,8 +15,8 @@ interface IsolatorNodeData extends BaseNodeData {
     }
 }
 
-const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -122,7 +122,16 @@ const IsolatorNode: React.FC<NodeProps<IsolatorNodeData>> = (props) => {
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                data, 
+                selected, 
+                dragging, 
+                zIndex, 
+                width, 
+                height, 
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}

@@ -1,6 +1,6 @@
 // components/sld/nodes/GeneratorNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow';
+import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { GeneratorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore } from '@/stores/appStore';
@@ -8,8 +8,8 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { ZapIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props; // Destructure all needed props
+const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = (props) => { // Reverted to NodeProps
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -165,7 +165,16 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData>> = (props) => {
           onClick={(e) => {
             e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, position, data, selected, dragging, zIndex, width, height,
+                id, 
+                type, 
+                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
+                data, 
+                selected, 
+                dragging, 
+                zIndex, 
+                width: width === null ? undefined : width, 
+                height: height === null ? undefined : height, 
+                connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
