@@ -58,7 +58,6 @@ const DataPointCard: React.FC<DataPointCardProps> = React.memo(
                     point={point}
                     nodeValue={nodeValue} // GaugeCard might still expect a single value
                     isDisabled={isDisabled}
-                    currentHoverEffect={currentHoverEffect}
                     // DataPointGaugeCard might also need playNotificationSound, lastToastTimestamps, sendDataToWebSocket, isEditMode depending on its implementation
                     // If DataPointGaugeCard internally uses ValueDisplayContent, it will need these.
                     // For now, assuming it doesn't or handles it differently. If errors arise there, it will need similar updates.

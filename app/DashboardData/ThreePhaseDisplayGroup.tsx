@@ -1,5 +1,3 @@
-// src/components/dashboard/ThreePhaseDisplayGroup.tsx
-
 import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +9,7 @@ import {
 } from '@/components/ui/tooltip';
 import { ThreePhaseGroupInfo, NodeData } from './dashboardInterfaces';
 import { DataPoint } from '@/config/dataPoints'; // Make sure DataPoint is exported
-import { HelpCircle,Sigma } from 'lucide-react'; // Sigma for Total
+import { HelpCircle, Sigma, TrendingUp } from 'lucide-react'; // Sigma for Total/Average
 import ValueDisplayContent from './ValueDisplayContent';
 
 interface ThreePhaseDisplayGroupProps {
@@ -29,49 +27,74 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
     ({ group, nodeValues, isDisabled, currentHoverEffect, playNotificationSound, lastToastTimestamps, sendDataToWebSocket, isEditMode }) => {
         const RepresentativeIcon = group.icon || HelpCircle;
 
-        // Calculate Total Value
-        const totalValue = useMemo(() => {
+        const calculationType = useMemo(() => {
+            const unit = group.unit?.trim().toLowerCase() || '';
+if (
+    ['w', 'watt', 'watts', 'kw', 'kilowatt', 'kilowatts', 'kwh', 'kilowatt-hour', 'kilowatt-hours',
+     'wh', 'watt-hour', 'watt-hours', 'ah', 'va', 'kva', 'units'].includes(unit)
+) {
+           return 'sum';
+            }
+            return 'average';
+        }, [group.unit]);
+
+        // Calculate aggregated Value (Sum or Average)
+        const aggregatedValueData = useMemo(() => {
             let sum = 0;
-            let hasValidPhase = false;
-            (['a', 'b', 'c'] as const).forEach(phase => {
-                const point = group.points[phase];
-                if (point && point.nodeId) {
-                    const rawValue = nodeValues[point.nodeId];
+            let validPhasesCount = 0;
+            const phases: ('a' | 'b' | 'c')[] = ['a', 'b', 'c'];
+
+            phases.forEach(phaseKey => {
+                const pointConfig = group.points[phaseKey];
+                if (pointConfig && pointConfig.nodeId) {
+                    const rawValue = nodeValues[pointConfig.nodeId];
                     if (typeof rawValue === 'number' && !isNaN(rawValue)) {
-                        sum += rawValue * (point.factor ?? 1); // Apply factor if present
-                        hasValidPhase = true;
+                        sum += rawValue * (pointConfig.factor ?? 1);
+                        validPhasesCount++;
                     }
                 }
             });
-            return hasValidPhase ? sum : undefined; // Return undefined if no valid phases to sum
-        }, [group.points, nodeValues]);
 
-        // Create a pseudo DataPoint item for the total value for consistent rendering
-        // We take formatting hints from the first available phase, or provide defaults.
-        const totalItemConfig: DataPoint = useMemo(() => {
+            if (validPhasesCount === 0) {
+                return { value: undefined, count: 0 };
+            }
+
+            if (calculationType === 'sum') {
+                return { value: sum, count: validPhasesCount };
+            } else { // 'average'
+                return { value: sum / validPhasesCount, count: validPhasesCount };
+            }
+        }, [group.points, nodeValues, calculationType]);
+
+        const totalOrAverageItemConfig: DataPoint = useMemo(() => {
             const firstPhasePoint = group.points.a || group.points.b || group.points.c;
-            return {
-                id: `${group.groupKey}-total`, // Unique ID for the total
-                nodeId: `${group.groupKey}-total`, // For keying in ValueDisplayContent if needed
-                name: 'Total',
-                label: 'Total',
-                dataType: firstPhasePoint?.dataType || 'Float', // Infer from phases or default
-                unit: group.unit || firstPhasePoint?.unit || '',
-                factor: 1, // Total is already calculated with factors
-                uiType: 'display',
-                // Copy relevant formatting settings if needed, e.g., decimalPlaces
-                // For simplicity, ValueDisplayContent will use formatValue which might have defaults
-                // You might want to explicitly pass precision or formatting rules here
-                // from one of the phase points or define general rules.
-                ...(firstPhasePoint ? { 
-                    decimalPlaces: firstPhasePoint.decimalPlaces,
-                    // Copy other relevant format-related fields from DataPoint type
-                } : {}),
-                icon: Sigma, // Added Sigma icon
-                category: 'three-phase', // Changed category to 'three-phase'
+            const label = calculationType === 'sum' ? 'Total' : 'Average';
+            
+            let configuredDecimalPlaces = firstPhasePoint?.decimalPlaces;
+            if (calculationType === 'average') {
+                // For average, ensure at least some decimal places if original is 0 or undefined
+                if (configuredDecimalPlaces === undefined || configuredDecimalPlaces < 1) {
+                    configuredDecimalPlaces = 2; 
+                } else {
+                    // Optionally add one more decimal place for average if original is already defined
+                    configuredDecimalPlaces = configuredDecimalPlaces + 1;
+                }
+            }
 
+            return {
+                id: `${group.groupKey}-${calculationType}`, // Unique ID
+                nodeId: `${group.groupKey}-${calculationType}-value`, // Unique Node ID for nodeValues map key
+                name: label,
+                label: label, // Used by ValueDisplayContent if it had label logic
+                dataType: firstPhasePoint?.dataType || 'Float',
+                unit: group.unit || firstPhasePoint?.unit || '', // Preserve original unit
+                factor: 1, // Value is pre-calculated
+                uiType: 'display',
+                decimalPlaces: configuredDecimalPlaces,
+                icon: calculationType === 'sum' ? Sigma : TrendingUp,
+                category: 'three-phase',
             };
-        }, [group.groupKey, group.points, group.unit]);
+        }, [group.groupKey, group.points, group.unit, calculationType]);
 
 
         return (
@@ -88,19 +111,23 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-3 text-sm">
-                                    {/* Updated grid to 4 columns */}
                                     <div className="grid grid-cols-4 gap-x-2 gap-y-2 items-stretch">
-                                        {/* Phase and Total Headers */}
-                                        {(['a', 'b', 'c', 'total'] as const).map(colType => (
+                                        {/* Phase and Total/Average Headers */}
+                                        {(['a', 'b', 'c', 'summary'] as const).map(colType => (
                                             <div
                                                 key={`head-${group.groupKey}-${colType}`}
                                                 className={`text-xs font-medium text-center border-b pb-1.5 dark:border-neutral-700
-                                                    ${colType === 'total' ? 'text-primary dark:text-primary-light font-semibold' : 'text-neutral-500 dark:text-neutral-400'}`
+                                                    ${colType === 'summary' ? 'text-primary dark:text-primary-light font-semibold' : 'text-neutral-500 dark:text-neutral-400'}`
                                                 }
                                             >
-                                                {colType === 'total' ? (
+                                                {colType === 'summary' ? (
                                                     <span className="flex items-center justify-center gap-1">
-                                                        <Sigma size={13} className="opacity-80"/> Total
+                                                        {calculationType === 'sum' ? (
+                                                            <Sigma size={13} className="opacity-80" />
+                                                        ) : (
+                                                            <TrendingUp size={13} className="opacity-80" />
+                                                        )}
+                                                        {calculationType === 'sum' ? 'Total' : 'Average'}
                                                     </span>
                                                 ) : (
                                                     group.points[colType as 'a'|'b'|'c'] ? `Phase ${colType.toUpperCase()}` : '–'
@@ -130,19 +157,20 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
                                             );
                                         })}
 
-                                        {/* Total Value Column */}
-                                        <div key={`${group.groupKey}-total-value`} className="text-center pt-1.5 min-h-[36px] flex flex-col items-center justify-center font-semibold bg-neutral-50/50 dark:bg-neutral-800/30 rounded-sm">
-                                            {totalValue !== undefined ? (
+                                        {/* Total/Average Value Column */}
+                                        <div key={`${group.groupKey}-summary-value`} className="text-center pt-1.5 min-h-[36px] flex flex-col items-center justify-center font-semibold bg-neutral-100/80 dark:bg-neutral-800/60 rounded-lg">
+                                            {aggregatedValueData.value !== undefined ? (
                                                 <ValueDisplayContent
-                                                    item={totalItemConfig} // Use the pseudo config
-                                                    // Pass the pre-calculated totalValue directly if ValueDisplayContent can take it
-                                                    // Otherwise, put it in nodeValues with totalItemConfig.nodeId as key
-                                                    nodeValues={{ ...nodeValues, [totalItemConfig.nodeId]: totalValue }}
+                                                    item={totalOrAverageItemConfig}
+                                                    // Pass the pre-calculated value by adding it to a temporary nodeValues map
+                                                    // using the unique nodeId from totalOrAverageItemConfig
+                                                    nodeValues={{ [totalOrAverageItemConfig.nodeId]: aggregatedValueData.value }}
                                                     isDisabled={isDisabled}
-                                                    sendDataToWebSocket={sendDataToWebSocket} // Likely not applicable for Total
-                                                    playNotificationSound={playNotificationSound} // Likely not applicable for Total
-                                                    lastToastTimestamps={lastToastTimestamps} // Likely not applicable for Total
-                                                    isEditMode={false} // Total is usually not directly editable
+                                                    // These props are likely not applicable for a calculated display-only value
+                                                    sendDataToWebSocket={sendDataToWebSocket} 
+                                                    playNotificationSound={playNotificationSound}
+                                                    lastToastTimestamps={lastToastTimestamps}
+                                                    isEditMode={false} // Calculated value is not directly editable
                                                 />
                                             ) : (
                                                 <span className="text-neutral-400 dark:text-neutral-600 text-lg">-</span>

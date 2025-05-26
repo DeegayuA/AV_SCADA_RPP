@@ -11,7 +11,7 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ThreePhaseGroupInfo, NodeData } from './dashboardInterfaces';
-import CircularGauge from './CircularGauge';
+import { ValueStatusDisplay as CircularGauge } from './CircularGauge';
 import { HelpCircle } from 'lucide-react'; // Default icon
 
 interface ThreePhaseGaugeGroupProps {
@@ -52,10 +52,8 @@ const ThreePhaseGaugeGroup: React.FC<ThreePhaseGaugeGroupProps> = React.memo(
                                             <CircularGauge
                                                 key={point.id} // Use the point's id for gauge key
                                                 value={gaugeValue}
-                                                unit={group.unit} // Use the group unit for consistent display
                                                 label={`Phase ${phase.toUpperCase()}`} // Label for individual gauge
-                                                size={90}
-                                                strokeWidth={9}
+                                                size={{ width: 90, height: 90 }}
                                                 config={point} // Pass the individual point config for specific min/max/factor
                                             />
                                         );
