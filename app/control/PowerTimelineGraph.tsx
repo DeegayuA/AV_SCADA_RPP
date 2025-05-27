@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-// ... other imports from previous correct version
 import {
     LineChart,
     Line,
@@ -12,8 +11,8 @@ import {
     ResponsiveContainer,
 } from 'recharts';
 import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
-import { NodeData } from '@/app/DashboardData/dashboardInterfaces';
-import { DataPoint } from '@/config/dataPoints';
+import { NodeData } from '@/app/DashboardData/dashboardInterfaces'; // Adjust if path is different
+import { DataPoint } from '@/config/dataPoints'; // Adjust if path is different
 import { useTheme } from 'next-themes';
 import { Loader2, Zap, ShoppingCart, Send, TrendingUp, Leaf, AlertTriangleIcon, ArrowRightToLine, ArrowLeftFromLine, PlugZap } from 'lucide-react';
 
@@ -38,11 +37,11 @@ const chartConfig = {
     generation: { label: "Generation", icon: Zap, color: "hsl(var(--chart-1))" },
     usage:    { label: "Usage", icon: ShoppingCart, color: "hsl(var(--chart-2))" },
     gridFeed: { label: "Grid Feed", icon: Send, color: "hsl(var(--chart-3))" }, 
-    // net:      { label: "Net Power",icon: TrendingUp, color: "hsl(var(--chart-4))" },
+    // net:      { label: "Net Power",icon: TrendingUp, color: "hsl(var(--chart-4))" }, // Kept commented out
 } satisfies ChartConfig;
 
 
-const getResolvedColor = ( /* ... same as previous ... */
+const getResolvedColor = (
     colorName: keyof Omit<typeof chartConfig, 'net'> | 'net' | 'destructive' | 'success' | 'backgroundDefault' | 'backgroundSuccess' | 'backgroundDestructive', 
     theme?: string 
 ): string => {
@@ -77,27 +76,34 @@ const getResolvedColor = ( /* ... same as previous ... */
         let hslValue = style.getPropertyValue(cssVarToLookup).trim();
         if (hslValue) return hslValue.startsWith("hsl") ? hslValue : `hsl(${hslValue})`;
     }
-    const directFallbacks: Record<string,string> = { generation: "skyblue", usage: "orange", gridFeed: "mediumpurple", net: "mediumseagreen", destructive: "tomato", success:"limegreen" };
+    // Fallbacks if CSS vars are not found (should ideally not happen with Tailwind setup)
+    const directFallbacks: Record<string,string> = { 
+        generation: "skyblue", 
+        usage: "orange", 
+        gridFeed: "mediumpurple", 
+        net: "mediumseagreen", // Even if commented out in config, keep a fallback
+        destructive: "tomato", 
+        success:"limegreen" 
+    };
     return directFallbacks[colorName as Exclude<typeof colorName, 'backgroundDefault'|'backgroundSuccess'|'backgroundDestructive'>] || "grey";
 };
 
 
-const AnimatedNumber = ({ value, precision }: { value: number; precision: number }) => { /* ... same ... */
+const AnimatedNumber = ({ value, precision }: { value: number; precision: number }) => {
     const spring = useSpring(value, { mass: 0.8, stiffness: 100, damping: 20 });
     const display = useTransform(spring, (current) => parseFloat(current.toFixed(precision)));
     useEffect(() => { spring.set(value); }, [spring, value]);
     return <motion.span>{display}</motion.span>;
 };
 
-interface ChartDataPoint { /* ... same ... */
+interface ChartDataPoint {
     timestamp: number;
     generation: number;
     usage: number;
     gridFeed: number; 
-    // net: number; 
     isSelfSufficient?: boolean;
 }
-interface PowerTimelineGraphProps { /* ... same ... */
+interface PowerTimelineGraphProps {
     nodeValues: NodeData;
     allPossibleDataPoints: DataPoint[];
     generationDpIds: string[];
@@ -111,7 +117,7 @@ interface PowerTimelineGraphProps { /* ... same ... */
 
 const timeScaleConfig: Record<TimeScale, { 
     durationMs: number; tickIntervalMs: number; pointsToDisplay: number; liveUpdateIntervalMs: number;
-}> = { /* ... same ... */
+}> = {
    '30s': { durationMs: 30*1000,          tickIntervalMs: 3*1000,          pointsToDisplay: 10, liveUpdateIntervalMs: 1*1000 },
   '1m':  { durationMs: 1*60*1000,        tickIntervalMs: 6*1000,          pointsToDisplay: 10, liveUpdateIntervalMs: 1*1000 },
   '5m':  { durationMs: 5*60*1000,        tickIntervalMs: 30*1000,         pointsToDisplay: 10, liveUpdateIntervalMs: 5*1000 },
@@ -124,12 +130,15 @@ const timeScaleConfig: Record<TimeScale, {
   '1mo': { durationMs: 30*24*60*60*1000, tickIntervalMs: 72*60*60*1000,   pointsToDisplay: 10, liveUpdateIntervalMs: 60*60*1000 }
 };
 const unitToFactorMap: Record<PowerUnit, number> = { W: 1, kW: 1000, MW: 1000000, GW: 1000000000 };
-const convertToWatts = (v: number, u?: string) => { /* ... same ... */
-    if (typeof u !== 'string' || !u.trim()) return v;
-    const uc = u.trim().toUpperCase() as PowerUnit | string;
-    const f = unitToFactorMap[uc as PowerUnit]; return f !== undefined ? v * f : v;
+const convertToWatts = (v: number, u?: string): number => {
+    if (typeof u !== 'string' || !u.trim()) return v; // Assume watts if no unit or empty string
+    const unitClean = u.trim().toUpperCase() as PowerUnit | string;
+    const factor = unitToFactorMap[unitClean as PowerUnit];
+    return factor !== undefined ? v * factor : v; // Return original value if unit is unknown
 };
-const convertFromWatts = (v: number, u: PowerUnit) => v / (unitToFactorMap[u] || 1); 
+const convertFromWatts = (v: number, targetUnit: PowerUnit): number => {
+    return v / (unitToFactorMap[targetUnit] || 1);
+}; 
 
 
 const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
@@ -146,76 +155,139 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const displayUnitLabel = CHART_TARGET_UNIT; 
     const valuePrecision = POWER_PRECISION[CHART_TARGET_UNIT];
 
+    // Store previous usage value to smooth changes
+    const prevDemoUsageRef = useRef<number | null>(null);
+
     const generateDemoValues = useCallback(() => {
         const now = new Date();
         const totalMinutesInDay = now.getHours() * 60 + now.getMinutes();
     
-        // Solar generation: More pronounced curve, potential for zero at night
-        const peakSolarTime = 13 * 60; // 1 PM
-        const solarActivityStart = 6.5 * 60; // 6.30 AM
-        const solarActivityEnd = 18.5 * 60; // 6.30 PM
-        let solarFactor = 0;
-        if (totalMinutesInDay > solarActivityStart && totalMinutesInDay < solarActivityEnd) {
-            solarFactor = Math.sin((totalMinutesInDay - solarActivityStart) * Math.PI / (solarActivityEnd - solarActivityStart));
-            solarFactor = Math.max(0, solarFactor); // Ensure non-negative
+        // --- Solar Generation Simulation (from previous update) ---
+        const peakSolarTime = 13 * 60; 
+        const solarActivityStart = 6.0 * 60; 
+        const solarActivityEnd = 19.0 * 60;   
+        let solarPotentialFactor = 0;
+        if (totalMinutesInDay >= solarActivityStart && totalMinutesInDay <= solarActivityEnd) {
+            solarPotentialFactor = Math.sin((totalMinutesInDay - solarActivityStart) * Math.PI / (solarActivityEnd - solarActivityStart));
+            solarPotentialFactor = Math.max(0, solarPotentialFactor);
         }
-        const maxSolarOutputW = 12000; // Peak 12kW in Watts
-        let demoGenerationW = solarFactor * maxSolarOutputW * (0.75 + Math.random() * 0.5); // More variability
-        demoGenerationW = Math.max(0, demoGenerationW + (Math.random() - 0.5) * 800); 
+        const maxSolarOutputW = 12000; 
+
+        const cloudCycle1Minutes = 180; 
+        const cloudPhase1 = (totalMinutesInDay / cloudCycle1Minutes) * 2 * Math.PI;
+        const cloudEffect1 = (Math.sin(cloudPhase1 + Math.PI/4) + 1) / 2; 
+
+        const cloudCycle2Minutes = 75;  
+        const cloudPhase2 = (totalMinutesInDay / cloudCycle2Minutes) * 2 * Math.PI;
+        const cloudEffect2 = (Math.sin(cloudPhase2) + 1) / 2;
+
+        let combined_cloud_density = (cloudEffect1 * 0.6 + cloudEffect2 * 0.4); 
+
+        const dailyWeatherTypeCycleMinutes = 24 * 60; 
+        const dailyWeatherPhase = (totalMinutesInDay / dailyWeatherTypeCycleMinutes) * 2 * Math.PI + Math.PI; 
+        const daily_max_cloud_impact = 0.6 + ((Math.sin(dailyWeatherPhase) + 1) / 2) * 0.4; 
+
+        let final_cloud_cover_effect = combined_cloud_density * daily_max_cloud_impact;
+        final_cloud_cover_effect = Math.min(0.95, Math.max(0, final_cloud_cover_effect));
+
+        const weatherGenerationFactor = 1.0 - final_cloud_cover_effect;
+        let demoGenerationW = solarPotentialFactor * maxSolarOutputW * weatherGenerationFactor;
+        demoGenerationW += (Math.sin(totalMinutesInDay / 5 * Math.PI * 2) * 25); 
+        demoGenerationW = Math.max(0, demoGenerationW);
     
-        // Usage: Base load + morning/evening peaks, some randomness
-        const baseUsageW = 800 + Math.random() * 400; // Base 0.8-1.2kW
-        const morningPeakTime = 7.5 * 60; const eveningPeakTime = 18.5 * 60; const usageSpread = 1.5 * 60;
+        // --- Smoothed Usage Simulation ---
+        const baseUsageW_target = 600 + (Math.sin(totalMinutesInDay / (120) * Math.PI * 2) * 200); // Base oscillates slowly +/- 200W around 600W over 2 hours
+        
+        const morningPeakTime = 7.5 * 60; const eveningPeakTime = 18.5 * 60; const usageSpread = 1.2 * 60; // Slightly narrower peak
         const morningUsageFactor = Math.exp(-Math.pow(totalMinutesInDay - morningPeakTime, 2) / (2 * Math.pow(usageSpread, 2)));
         const eveningUsageFactor = Math.exp(-Math.pow(totalMinutesInDay - eveningPeakTime, 2) / (2 * Math.pow(usageSpread, 2)));
-        const peakUsageIncreaseW = 2500 + Math.random() * 1500; // Additional peak up to 2.5-4kW
-        let demoUsageW = baseUsageW + (morningUsageFactor * peakUsageIncreaseW) + (eveningUsageFactor * peakUsageIncreaseW * 1.2);
-        demoUsageW = Math.max(300, demoUsageW + (Math.random() - 0.5) * 400); // Min usage 0.3kW
+        
+        // Peak increase also has a slow oscillation to vary intensity
+        const peakUsageIncreaseW_target = 2000 + (Math.sin(totalMinutesInDay / (240) * Math.PI * 2 + Math.PI/2) * 1000); // Peak increase varies +/- 1kW around 2kW over 4 hours
+        
+        let targetDemoUsageW = baseUsageW_target + 
+                                (morningUsageFactor * peakUsageIncreaseW_target) + 
+                                (eveningUsageFactor * peakUsageIncreaseW_target * 1.1); // Evening slightly higher
+
+        // Add a very slow, small "appliance cycle" variation
+        targetDemoUsageW += (Math.sin(totalMinutesInDay / 30 * Math.PI * 2) * 150); // +/- 150W over 30 mins
+        targetDemoUsageW = Math.max(200, targetDemoUsageW); // Minimum 200W usage
+
+        let currentDemoUsageW: number;
+        const smoothingFactor = 0.1; // Adjust for more or less smoothing (0.01 = very slow, 0.5 = faster)
+
+        if (prevDemoUsageRef.current === null) {
+            currentDemoUsageW = targetDemoUsageW; // Initialize
+        } else {
+            // Smooth towards the target: current = prev + factor * (target - prev)
+            currentDemoUsageW = prevDemoUsageRef.current + smoothingFactor * (targetDemoUsageW - prevDemoUsageRef.current);
+        }
+        prevDemoUsageRef.current = currentDemoUsageW; // Store for next iteration
+
     
+        // --- Grid Feed Simulation (remains same) ---
         let demoGridFeedW = 0;
-        const netLocalW = demoGenerationW - demoUsageW; // What's left after local usage
+        const netLocalW = demoGenerationW - currentDemoUsageW; // Use smoothed usage
 
         if (exportMode === 'auto') {
-            demoGridFeedW = netLocalW; // positive is export, negative is import
-        } else { // 'manual' demo for grid feed
-            if (netLocalW < -500) { // Significant deficit, likely import
-                demoGridFeedW = netLocalW * (0.7 + Math.random() * 0.3); // Import a portion of deficit
-            } else if (netLocalW > 500) { // Significant surplus, likely export
-                demoGridFeedW = netLocalW * (0.5 + Math.random() * 0.5); // Export a portion of surplus
-            } else { // Near balance, could be small import/export or zero
-                demoGridFeedW = (Math.random() - 0.5) * 1000; // Small random feed +/- 0.5kW
+            demoGridFeedW = netLocalW; 
+        } else { 
+            if (netLocalW < -500) { 
+                demoGridFeedW = netLocalW * (0.7 + (Math.sin(totalMinutesInDay / 15 * Math.PI) + 1) / 2 * 0.3); // Smoother random component
+            } else if (netLocalW > 500) { 
+                demoGridFeedW = netLocalW * (0.5 + (Math.sin(totalMinutesInDay / 20 * Math.PI + 0.5) + 1) / 2 * 0.5); // Smoother random component
+            } else { 
+                demoGridFeedW = (Math.sin(totalMinutesInDay / 10 * Math.PI) * 500); // Smoother small random feed
             }
         }
     
         return {
             generation: convertFromWatts(demoGenerationW, CHART_TARGET_UNIT),
-            usage: convertFromWatts(demoUsageW, CHART_TARGET_UNIT),
+            usage: convertFromWatts(currentDemoUsageW, CHART_TARGET_UNIT),
             gridFeed: convertFromWatts(demoGridFeedW, CHART_TARGET_UNIT),
         };
-    }, [exportMode]);
+    }, [exportMode]); // prevDemoUsageRef is managed internally
 
 
-    const sumValuesForDpIds = useCallback((dpIdsToSum: string[]): number => { /* ... same ... */
-        if (useDemoData) return 0; 
+    const sumValuesForDpIds = useCallback((dpIdsToSum: string[]): number => {
+        if (useDemoData) return 0; // Demo data is handled by generateDemoValues for current sums
         if (!allPossibleDataPoints?.length || !Object.keys(nodeValues).length) return 0;
         let sumInWatts = 0;
         dpIdsToSum.forEach(dpId => {
             const dp = allPossibleDataPoints.find(p => p.id === dpId);
             if (dp) {
-                const rV = nodeValues[dp.nodeId]; const f = dp.factor || 1;
-                const vOI = (typeof rV === 'number' && isFinite(rV) ? rV * f : 0);
-                sumInWatts += convertToWatts(vOI, dp.unit);
+                const rawValueFromNode = nodeValues[dp.nodeId]; // Could be { value: X, unit: Y } or just X
+                let numericValue = 0;
+                let unitForConversion = dp.unit; // Use unit from DataPoint config by default
+
+                // Handle complex nodeValues structure if necessary
+                if (typeof rawValueFromNode === 'object' && rawValueFromNode !== null) {
+                    if ('value' in rawValueFromNode) {
+                        const typedValue = rawValueFromNode as { value: unknown, unit?: string };
+                        numericValue = Number(typedValue.value) || 0;
+                        if ('unit' in rawValueFromNode && typeof typedValue.unit === 'string') {
+                            unitForConversion = typedValue.unit; // Prefer unit from node data if available
+                        }
+                    }
+                } else if (typeof rawValueFromNode === 'number') {
+                    numericValue = rawValueFromNode;
+                }
+                
+                const factor = dp.factor || 1;
+                const valueOfInterest = (isFinite(numericValue) ? numericValue * factor : 0);
+                sumInWatts += convertToWatts(valueOfInterest, unitForConversion);
             }
         });
         return convertFromWatts(sumInWatts, CHART_TARGET_UNIT);
     }, [nodeValues, allPossibleDataPoints, useDemoData]);
     
-    useEffect(() => { /* ... unchanged config reset effect ... */
+    useEffect(() => {
         setChartData([]); setAnimationKey(Date.now()); setIsGraphReady(false);
         setLastUpdatedDisplayTime('N/A');
+        prevDemoUsageRef.current = null; // Reset smoothed usage when config changes
     }, [timeScale, generationDpIds, usageDpIds, exportDpIds, exportMode, useDemoData]);
 
-    useEffect(() => { /* Main data update logic */
+    useEffect(() => { 
         const dpsConfigured = generationDpIds.length > 0 && usageDpIds.length > 0;
         if ((!isLive && !useDemoData) || (!useDemoData && !dpsConfigured)) {
             if (liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
@@ -244,21 +316,19 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                 else { return; } 
             }
             
-            // const netPower = currentGen - currentUse; // Net Power logic commented out
-            const isSelfSufficient = currentGridFeed >= 0; // Self-sufficient if not importing (gridFeed is 0 or positive/exporting)
+            const isSelfSufficient = currentGridFeed >= 0; 
 
             const newPt: ChartDataPoint = {
                 timestamp: nowMs,
                 generation: parseFloat(currentGen.toFixed(valuePrecision)),
                 usage: parseFloat(currentUse.toFixed(valuePrecision)),
                 gridFeed: parseFloat(currentGridFeed.toFixed(valuePrecision)),
-                // net: parseFloat(netPower.toFixed(valuePrecision)), // Net Power removed from data point
                 isSelfSufficient: isSelfSufficient,
             };
 
             setChartData(prev => {
                 const cutoff = nowMs - durationMs;
-                const maxPts = Math.max(pointsToDisplay + Math.floor(pointsToDisplay * 0.25), 120);
+                const maxPts = Math.max(pointsToDisplay + Math.floor(pointsToDisplay * 0.25), 120); // Keep reasonable # of pts
                 let updated = prev.filter(d => d.timestamp >= cutoff);
                 updated.push(newPt);
                 return updated.length > maxPts ? updated.slice(-maxPts) : updated;
@@ -266,70 +336,110 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         };
 
         if (liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
-        if (useDemoData || (dpsConfigured && Object.keys(nodeValues).length > 0)) updateData();
+        // Initial call to populate data immediately if conditions met
+        if (useDemoData || (dpsConfigured && (isLive && Object.keys(nodeValues).length > 0))) {
+           updateData();
+        } else if (!isLive && dpsConfigured && Object.keys(nodeValues).length > 0) {
+           // For non-live, historic data could be pre-populated here if available
+           // For now, assumes non-live relies on existing chartData from elsewhere or stays empty if not pre-populated
+           setIsGraphReady(true); 
+        }
         
-        liveUpdateTimer.current = setInterval(updateData, useDemoData ? 2000 : liveUpdateIntervalMs);
+        if (isLive || useDemoData) {
+          liveUpdateTimer.current = setInterval(updateData, useDemoData ? 2000 : liveUpdateIntervalMs); // Demo data updates every 2s
+        }
         return () => { if (liveUpdateTimer.current) clearInterval(liveUpdateTimer.current); };
     }, [
         nodeValues, generationDpIds, usageDpIds, exportDpIds, exportMode, timeScale, 
         isLive, allPossibleDataPoints, sumValuesForDpIds, isGraphReady, valuePrecision, useDemoData, generateDemoValues
     ]);
 
-    const currentValues = useMemo(() => { // Includes gridFeed, isSelfSufficient, excludes net
+    const currentValues = useMemo(() => {
         let liveGen = 0, liveUse = 0, liveGridFeed = 0;
-        if (useDemoData) { // Use a fresh demo value for currentValues if demo mode
-             const demo = generateDemoValues();
+        if (useDemoData) { 
+             const demo = generateDemoValues(); // Fresh demo values for display header
              liveGen = demo.generation; liveUse = demo.usage; liveGridFeed = demo.gridFeed;
         } else {
-            liveGen = sumValuesForDpIds(generationDpIds); liveUse = sumValuesForDpIds(usageDpIds);
-            liveGridFeed = (exportMode === 'manual' && exportDpIds.length > 0) ? sumValuesForDpIds(exportDpIds) : (liveGen - liveUse);
+            liveGen = sumValuesForDpIds(generationDpIds); 
+            liveUse = sumValuesForDpIds(usageDpIds);
+            // For gridFeed, ensure calculation consistency with how chart data points are made
+            if (exportMode === 'manual' && exportDpIds.length > 0) {
+                 liveGridFeed = sumValuesForDpIds(exportDpIds);
+            } else { // 'auto' mode or manual with no export DPs
+                 liveGridFeed = liveGen - liveUse;
+            }
         }
         return { 
             generation: parseFloat(liveGen.toFixed(valuePrecision)), 
             usage: parseFloat(liveUse.toFixed(valuePrecision)),
             gridFeed: parseFloat(liveGridFeed.toFixed(valuePrecision)), 
-            // net: parseFloat((liveGen - liveUse).toFixed(valuePrecision)), // Net power removed
             timestamp: (isGraphReady || useDemoData) && chartData.length > 0 ? chartData[chartData.length-1].timestamp : Date.now(),
             isSelfSufficient: liveGridFeed >= 0,
         };
-    }, [nodeValues, sumValuesForDpIds, generationDpIds, usageDpIds, exportDpIds, exportMode, chartData, isGraphReady, valuePrecision, useDemoData, generateDemoValues]);
-
-    // const netPowerLineColor = useMemo(() => // Net Power commented out
-    //     currentValues.isSelfSufficient ? getResolvedColor('net', resolvedTheme) : getResolvedColor('destructive', resolvedTheme)
-    // , [currentValues.isSelfSufficient, resolvedTheme]);
+    }, [sumValuesForDpIds, generationDpIds, usageDpIds, exportDpIds, exportMode, chartData, isGraphReady, valuePrecision, useDemoData, generateDemoValues]);
 
     const chartBackgroundFill = useMemo(() => 
         currentValues.isSelfSufficient ? getResolvedColor('backgroundSuccess', resolvedTheme) : getResolvedColor('backgroundDestructive', resolvedTheme)
     , [currentValues.isSelfSufficient, resolvedTheme]);
 
 
-    const formatXAxisTick = useCallback((ts: number) => { /* ... same ... */ 
-        const date = new Date(ts); switch(timeScale){
-            case '1d':const h=date.getHours();return(h%3===0||h===0)?date.toLocaleTimeString([],{hour12:false,hour:'numeric'}):'';
-            case '6h':case '1h':return date.toLocaleTimeString([],{hour12:false,hour:'numeric',minute:'2-digit'});
-            default:return date.toLocaleTimeString([],{minute:'2-digit',second:'2-digit'});
+    const formatXAxisTick = useCallback((ts: number) => {
+        const date = new Date(ts); 
+        switch(timeScale){
+            case '1d': case '7d': case '1mo':
+              const h = date.getHours();
+              return (h % 6 === 0 || h === 0) ? date.toLocaleTimeString([],{hour12:false, hour:'numeric'}) : '';
+            case '12h': case '6h':
+              return date.toLocaleTimeString([],{hour12:false,hour:'numeric',minute:'2-digit'});
+            case '1h':  case '30m':
+              return date.toLocaleTimeString([],{hour12:false,hour:'numeric',minute:'2-digit'});
+            default: // 30s, 1m, 5m
+              return date.toLocaleTimeString([],{minute:'2-digit',second:'2-digit'});
         }
     }, [timeScale]);
-    const xAxisDomain = useMemo(():[number|'dataMin',number|'dataMax'] => { /* ... same ... */
+
+    const xAxisDomain = useMemo(():[number|'dataMin',number|'dataMax'] => {
         const {durationMs}=timeScaleConfig[timeScale];const now=Date.now();
-        if(!isGraphReady||chartData.length<2)return[now-durationMs,now];
-        const lastTs=chartData[chartData.length-1].timestamp;const end=isLive||useDemoData?now:lastTs;
-        return[end-durationMs,end];
+        if(!isGraphReady || chartData.length < 2) return [now-durationMs,now];
+        // For live or demo, X-axis always ends at 'now'
+        // For historical, it could end at last data point if `isLive` is false.
+        // Current logic uses 'now' if live/demo, or last data point if static and data exists
+        const endAnchor = (isLive || useDemoData) ? now : (chartData.length > 0 ? chartData[chartData.length-1].timestamp : now);
+        return [endAnchor-durationMs,endAnchor];
     },[timeScale,chartData,isLive,useDemoData,isGraphReady]);
     
-    const yAxisDomain = useMemo(():[number,number] => { /* Includes gridFeed, excludes net */
+    const yAxisDomain = useMemo(():[number,number] => {
         let vals = (!isGraphReady || chartData.length === 0) 
             ? [currentValues.generation, currentValues.usage, currentValues.gridFeed] 
-            : chartData.flatMap(d => [d.generation, d.usage, d.gridFeed]); // Removed d.net
+            : chartData.flatMap(d => [d.generation, d.usage, d.gridFeed]);
+        
         const finiteVals = vals.filter(v => typeof v === 'number' && isFinite(v));
-        const defMinY = CHART_TARGET_UNIT === 'kW' ? -10 : -10000; const defMaxY = CHART_TARGET_UNIT === 'kW' ? 50 : 50000;
+        
+        const defMinY = CHART_TARGET_UNIT === 'kW' ? -10 : -10000; 
+        const defMaxY = CHART_TARGET_UNIT === 'kW' ? 50 : 50000;
+
         if(finiteVals.length === 0) return [defMinY, defMaxY];
-        let minV = Math.min(...finiteVals, 0), maxV = Math.max(...finiteVals, 0);
-        if (minV === 0 && maxV === 0 && finiteVals.every(v => v === 0)) return [defMinY / 10, defMaxY / 10];
-        const range = Math.abs(maxV - minV); const minPadV = CHART_TARGET_UNIT === 'kW' ? 1 : (CHART_TARGET_UNIT === 'W' ? 500 : 0.1);
-        let pad = range * 0.20; pad = (range === 0) ? Math.max(Math.abs(maxV * 0.25), minPadV) : Math.max(pad, minPadV);
-        return [Math.min(Math.floor(minV - pad), 0), Math.max(Math.ceil(maxV + pad), 0)];
-    },[chartData,currentValues,isGraphReady]);
+        
+        let minV = Math.min(...finiteVals);
+        let maxV = Math.max(...finiteVals);
+
+        if (minV === maxV) {
+            const singleValueMinPad = CHART_TARGET_UNIT === 'kW' ? 1 : (CHART_TARGET_UNIT === 'W' ? 100 : 0.1);
+            if (minV === 0) {
+                return [ 
+                    (CHART_TARGET_UNIT === 'kW' ? -1 : (CHART_TARGET_UNIT === 'W' ? -500 : -0.5)), 
+                    (CHART_TARGET_UNIT === 'kW' ? 5  : (CHART_TARGET_UNIT === 'W' ? 2500 : 2.5)) 
+                ];
+            }
+            const paddingAmount = Math.max(Math.abs(minV * 0.5), singleValueMinPad); 
+            return [ Math.floor(minV - paddingAmount), Math.ceil(maxV + paddingAmount) ];
+        }
+
+        const range = maxV - minV; 
+        const rangeMinPad = CHART_TARGET_UNIT === 'kW' ? 1 : (CHART_TARGET_UNIT === 'W' ? 500 : 0.1);
+        let pad = Math.max(range * 0.20, rangeMinPad); 
+        return [Math.floor(minV - pad), Math.ceil(maxV + pad)];
+    },[chartData, currentValues, isGraphReady]);
 
 
     if (!useDemoData && (generationDpIds.length === 0 || usageDpIds.length === 0)) {
@@ -342,28 +452,34 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     return (
         <motion.div 
             className={cn(
-                "space-y-2 p-3 rounded-xl shadow-lg border-2 transition-colors duration-700 ease-in-out", // Changed to rounded-xl
+                "space-y-2 p-3 rounded-xl shadow-lg border-2 transition-colors duration-700 ease-in-out", 
                 currentValues.isSelfSufficient 
                     ? "border-green-400/60 dark:border-green-500/70" 
                     : "border-red-400/60 dark:border-red-500/70"
             )}
-            style={{ backgroundColor: chartBackgroundFill }}
+            style={{ backgroundColor: chartBackgroundFill }} // Framer Motion will animate this
             animate={{ backgroundColor: chartBackgroundFill }}
             transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}
         > 
             <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 text-xs sm:text-sm mb-2 px-1">
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2 items-stretch"> {/* Use items-stretch for equal height Gefühl */}
-                    {(['generation', 'usage', 'gridFeed'] as const).map(key => { // Removed 'net'
-                        const IconComponent = chartConfig[key].icon;
-                        const value = currentValues[key as keyof Omit<typeof currentValues, 'net' | 'timestamp' | 'isSelfSufficient'>]; // Assure value is number
-                        let itemColor = getResolvedColor(key, resolvedTheme);
-                        let IconToUse = IconComponent;
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-2 items-stretch">
+                    {(['generation', 'usage', 'gridFeed'] as const).map(key => {
+                        const config = chartConfig[key as keyof typeof chartConfig]; // gridFeed is in chartConfig
+                        const value = currentValues[key as keyof Omit<typeof currentValues, 'timestamp' | 'isSelfSufficient'>]; 
+                        let itemColor: string;
+                        let IconToUse: React.ElementType;
+                        let labelText: string;
 
                         if (key === 'gridFeed') {
-                            const gridValue = typeof value === 'number' ? value : 0;
-                            if (gridValue === 0) itemColor = getResolvedColor('net', resolvedTheme); 
-                            else itemColor = gridValue > 0 ? getResolvedColor('success', resolvedTheme) : getResolvedColor('destructive', resolvedTheme);
-                            IconToUse = gridValue === 0 ? PlugZap : (gridValue > 0 ? ArrowRightToLine : ArrowLeftFromLine);
+                            const gridValueNum = typeof value === 'number' ? value : 0;
+                            itemColor = gridValueNum === 0 ? getResolvedColor('net', resolvedTheme) : // 'net' is effectively 'balanced' color
+                                        (gridValueNum > 0 ? getResolvedColor('success', resolvedTheme) : getResolvedColor('destructive', resolvedTheme));
+                            IconToUse = gridValueNum === 0 ? PlugZap : (gridValueNum > 0 ? ArrowRightToLine : ArrowLeftFromLine);
+                            labelText = gridValueNum === 0 ? "Grid Balanced" : (gridValueNum > 0 ? "Grid Export" : "Grid Import");
+                        } else {
+                            itemColor = getResolvedColor(key, resolvedTheme);
+                            IconToUse = config.icon;
+                            labelText = config.label;
                         }
                         
                         return (
@@ -376,7 +492,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                 <IconToUse className="h-5 w-5 sm:h-6 sm:w-6 shrink-0" style={{color: itemColor}} />
                                 <div className="flex flex-col">
                                     <span className="text-xs sm:text-sm text-muted-foreground leading-tight">
-                                        {key === 'gridFeed' ? (typeof value === 'number' && value > 0 ? "Grid Export" : (typeof value === 'number' && value < 0 ? "Grid Import" : "Grid Balanced")) : chartConfig[key].label}
+                                        {labelText}
                                     </span>
                                     <span className="font-bold text-sm sm:text-base leading-tight" style={{color: itemColor}}>
                                         <AnimatedNumber value={typeof value === 'number' ? Math.abs(value) : 0} precision={valuePrecision} /> {displayUnitLabel}
@@ -423,13 +539,63 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                             <XAxis dataKey="timestamp" type="number" domain={xAxisDomain} scale="time" tickFormatter={formatXAxisTick} tickLine={false} axisLine={false} tickMargin={10} minTickGap={20} stroke="hsl(var(--muted-foreground))"/>
                             <YAxis yAxisId="left" domain={yAxisDomain} orientation="left" width={60} tickFormatter={(v) => v.toFixed(0)} tickLine={false} axisLine={false} tickMargin={5} stroke="hsl(var(--muted-foreground))"/>
                             
-                            <ChartTooltip cursor={{stroke: "hsl(var(--foreground)/0.3)", strokeDasharray: '3 3'}} content={ <ChartTooltipContent hideLabel labelFormatter={(l,p) => p?.[0]?.payload?.timestamp ? new Date(p[0].payload.timestamp).toLocaleString([],{dateStyle:'short',timeStyle:'medium'}) : ""} formatter={(v,n,item)=>{const dk=item.dataKey as keyof ChartDataPoint; let lbl=chartConfig[dk as keyof Omit<typeof chartConfig,'net'|'gridFeed'>]?.label || n; if(dk==='gridFeed')lbl=item.payload.gridFeed>=0? "Grid Export":"Grid Import"; return (<div className="flex items-center gap-2"><span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{backgroundColor: item.color}}/><div className="flex flex-1 justify-between leading-none"><span className="text-muted-foreground">{lbl}</span><span className="font-bold">{(v as number).toFixed(valuePrecision)} {displayUnitLabel}</span></div></div>);}} itemSorter={(i)=>{const o={generation:1,usage:2,gridFeed:3};return o[i.dataKey as keyof typeof o]??4;}}/> } />
+                            <ChartTooltip 
+                                cursor={{stroke: "hsl(var(--foreground)/0.3)", strokeDasharray: '3 3'}} 
+                                content={ 
+                                    <ChartTooltipContent 
+                                        hideLabel 
+                                        labelFormatter={(label,payload) => payload?.[0]?.payload?.timestamp ? new Date(payload[0].payload.timestamp).toLocaleString([],{dateStyle:'short',timeStyle:'medium'}) : ""}
+                                        formatter={(value, name, item) => {
+                                            const dataKey = item.dataKey as keyof ChartDataPoint;
+                                            let label = chartConfig[dataKey as keyof Omit<typeof chartConfig, 'net'>]?.label || name; // Allow net to be missing here
+                                            
+                                            if (dataKey === 'gridFeed' && item.payload) {
+                                                label = item.payload.gridFeed >= 0 ? "Grid Export" : "Grid Import";
+                                                // value might be negative, tooltip displays magnitude. Display raw value for clarity here
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{backgroundColor: item.color}}/>
+                                                        <div className="flex flex-1 justify-between leading-none">
+                                                            <span className="text-muted-foreground">{label}</span>
+                                                            <span className="font-bold">{(value as number).toFixed(valuePrecision)} {displayUnitLabel}</span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="h-2.5 w-2.5 shrink-0 rounded-[2px]" style={{backgroundColor: item.color}}/>
+                                                    <div className="flex flex-1 justify-between leading-none">
+                                                        <span className="text-muted-foreground">{label}</span>
+                                                        <span className="font-bold">{(value as number).toFixed(valuePrecision)} {displayUnitLabel}</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }}
+                                        itemSorter={(item)=>{ const order={generation:1,usage:2,gridFeed:3}; return order[item.dataKey as keyof typeof order] ?? 4; }}
+                                    /> 
+                                } 
+                            />
                             <ChartLegend content={<ChartLegendContent className="mt-1 -mb-1" />} />
-                            {/* Net Power Line Commented Out */}
-                            {/* <Line yAxisId="left" dataKey="net" type="monotone" name={chartConfig.net.label} stroke={netPowerLineColor} strokeWidth={3} dot={false} activeDot={{r:6,strokeWidth:2,stroke:netPowerLineColor}} isAnimationActive={isGraphReady&&(isLive||useDemoData)} animationDuration={useDemoData?400:200} connectNulls={false} /> */}
+                            
                             <Line yAxisId="left" dataKey="generation" type="monotone" stroke={getResolvedColor("generation", resolvedTheme)} strokeWidth={2.2} dot={false} activeDot={{r:5}} isAnimationActive={isGraphReady&&(isLive||useDemoData)} animationDuration={useDemoData?400:200} connectNulls={false} />
                             <Line yAxisId="left" dataKey="usage" type="monotone" stroke={getResolvedColor("usage", resolvedTheme)} strokeWidth={2.2} dot={false} activeDot={{r:5}} isAnimationActive={isGraphReady&&(isLive||useDemoData)} animationDuration={useDemoData?400:200} connectNulls={false} />
-                            <Line yAxisId="left" dataKey="gridFeed" name={chartConfig.gridFeed.label} type="monotone" stroke={currentValues.gridFeed >=0 ? getResolvedColor("gridFeed", resolvedTheme) : getResolvedColor("destructive", resolvedTheme)} strokeWidth={2.2} dot={false} activeDot={{r:5}} isAnimationActive={isGraphReady&&(isLive||useDemoData)} animationDuration={useDemoData?400:200} connectNulls={false} />
+                            <Line 
+                                yAxisId="left" 
+                                dataKey="gridFeed" 
+                                name={chartConfig.gridFeed.label} 
+                                type="monotone" 
+                                // Color of the line itself should reflect its state at the *current moment* (for live),
+                                // or for historical data, maybe the color should be fixed, or determined point by point (which Recharts doesn't easily support for a single line)
+                                // Let's use the currentValues state to determine the color of the entire line, as a simplification
+                                stroke={currentValues.gridFeed >=0 ? getResolvedColor("gridFeed", resolvedTheme) : getResolvedColor("destructive", resolvedTheme)}
+                                strokeWidth={2.2} 
+                                dot={false} 
+                                activeDot={{r:5}} 
+                                isAnimationActive={isGraphReady&&(isLive||useDemoData)} 
+                                animationDuration={useDemoData?400:200} 
+                                connectNulls={false} 
+                            />
                         </LineChart>
                     </ChartContainer>
                 </motion.div>
