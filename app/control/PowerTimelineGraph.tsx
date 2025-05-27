@@ -75,6 +75,7 @@ interface ChartDataPoint {
     timestamp: number;
     generation: number;
     usage: number;
+    export: number; // Added export
     net: number;
 }
 
@@ -82,15 +83,17 @@ export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 
 interface PowerTimelineGraphProps {
     nodeValues: NodeData;
-    generationNodes: string[];
-    usageNodes: string[];
-    timeScale: TimeScale;
     allPossibleDataPoints: DataPoint[];
+    generationDpIds: string[];
+    usageDpIds: string[];
+    exportDpIds: string[];
+    exportMode: 'auto' | 'manual';
+    timeScale: TimeScale;
     isLive?: boolean;
 }
 
-const SIMULATED_PEAK_SOLAR_KW = 50;
-const SIMULATED_BASE_USAGE_KW = 10;
+// Removed SIMULATED_PEAK_SOLAR_KW and SIMULATED_BASE_USAGE_KW
+// Simulation logic will use internal defaults or be adapted.
 
 const timeScaleConfig: Record<TimeScale, { 
     durationMs: number; 
@@ -108,49 +111,56 @@ const timeScaleConfig: Record<TimeScale, {
 
 const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     nodeValues,
-    generationNodes,
-    usageNodes,
-    timeScale,
     allPossibleDataPoints,
+    generationDpIds,
+    usageDpIds,
+    exportDpIds,
+    exportMode,
+    timeScale,
     isLive = true,
 }) => {
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const { resolvedTheme } = useTheme();
     const liveUpdateTimer = useRef<NodeJS.Timeout | null>(null);
     const [isLoadingInitial, setIsLoadingInitial] = useState(true);
-    const [animationKey, setAnimationKey] = useState(0); // To force re-render of motion.div
+    const [animationKey, setAnimationKey] = useState(0);
 
     const axisStrokeColor = useMemo(() => getThemeColor('muted-foreground', resolvedTheme), [resolvedTheme]);
     const gridStrokeColor = useMemo(() => resolvedTheme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)', [resolvedTheme]);
 
     useEffect(() => {
         setIsLoadingInitial(true);
-        setChartData([]); // Clear previous data on timescale change
-        setAnimationKey(prevKey => prevKey + 1); // Change key to ensure framer-motion re-animates
+        setChartData([]);
+        setAnimationKey(prevKey => prevKey + 1);
         const now = new Date();
-        console.log(`[${timeScale}] Loading historical data up to:`, now.toISOString());
-        const { generation, usage } = getSimulatedHistoricalData(timeScale, now, SIMULATED_PEAK_SOLAR_KW, SIMULATED_BASE_USAGE_KW);
+        // console.log(`[${timeScale}] Loading historical data up to:`, now.toISOString());
+        
+        // Use internal defaults of getSimulatedHistoricalData as SIMULATED_PEAK_SOLAR_KW etc. are removed
+        const simulated = getSimulatedHistoricalData(timeScale, now);
 
-        const mergedData: ChartDataPoint[] = generation.map(genPoint => {
-            const usagePoint = usage.find(u => u.timestamp === genPoint.timestamp) || { timestamp: genPoint.timestamp, value: generateUsageData(genPoint.timestamp, SIMULATED_BASE_USAGE_KW)};
+        const mergedData: ChartDataPoint[] = simulated.generation.map(genPoint => {
+            const usagePoint = simulated.usage.find(u => u.timestamp === genPoint.timestamp) || { timestamp: genPoint.timestamp, value: generateUsageData(genPoint.timestamp) };
+            const generationVal = genPoint.value;
+            const usageVal = usagePoint.value;
+            const exportVal = Math.max(0, generationVal - usageVal); // Calculate export for simulated data
             return {
                 timestamp: genPoint.timestamp,
-                generation: genPoint.value,
-                usage: usagePoint.value,
-                net: parseFloat((genPoint.value - usagePoint.value).toFixed(2)),
+                generation: generationVal,
+                usage: usageVal,
+                export: parseFloat(exportVal.toFixed(2)),
+                net: parseFloat((generationVal - usageVal).toFixed(2)),
             };
-        }).sort((a,b) => a.timestamp - b.timestamp); // Ensure sorted
+        }).sort((a, b) => a.timestamp - b.timestamp);
         
-        console.log(`[${timeScale}] Historical data points:`, mergedData.length, mergedData.slice(0, 5));
+        // console.log(`[${timeScale}] Historical data points:`, mergedData.length, mergedData.slice(0, 5));
         setChartData(mergedData);
         setIsLoadingInitial(false);
 
     }, [timeScale]);
 
-
     useEffect(() => {
         if (!isLive || isLoadingInitial) {
-            if(liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
+            if (liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
             return;
         }
         
@@ -160,35 +170,49 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
             const nowMs = Date.now();
             let currentGeneration = 0;
             let currentUsage = 0;
+            let currentExport = 0;
+
+            const generationDataPoints = generationDpIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[];
+            const usageDataPoints = usageDpIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[];
+            const exportDataPoints = exportDpIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[];
 
             let useLiveNodeValues = false;
-            if (generationNodes.length > 0 && usageNodes.length > 0 && Object.keys(nodeValues).length > 0) {
-                const hasGenNode = generationNodes.some(n => typeof nodeValues[n] === 'number');
-                const hasUsageNode = usageNodes.some(n => typeof nodeValues[n] === 'number');
-                if (hasGenNode && hasUsageNode) { // Only use live if both types of nodes are present and numeric
+            if (generationDataPoints.length > 0 && usageDataPoints.length > 0 && Object.keys(nodeValues).length > 0) {
+                 const hasGenNodeValue = generationDataPoints.some(dp => typeof nodeValues[dp.nodeId] === 'number');
+                 const hasUsageNodeValue = usageDataPoints.some(dp => typeof nodeValues[dp.nodeId] === 'number');
+                 if (hasGenNodeValue && hasUsageNodeValue) {
                     useLiveNodeValues = true;
-                }
+                 }
             }
             
             if (useLiveNodeValues) {
-                 currentGeneration = generationNodes.reduce((sum, nodeId) => {
-                    const value = nodeValues[nodeId];
-                    return sum + (typeof value === 'number' && isFinite(value) ? value : 0);
+                currentGeneration = generationDataPoints.reduce((sum, dp) => {
+                    const value = nodeValues[dp.nodeId];
+                    return sum + (typeof value === 'number' && isFinite(value) ? value * (dp.factor || 1) : 0);
                 }, 0);
 
-                currentUsage = usageNodes.reduce((sum, nodeId) => {
-                    const value = nodeValues[nodeId];
-                    return sum + (typeof value === 'number' && isFinite(value) ? Math.abs(value) : 0);
+                currentUsage = usageDataPoints.reduce((sum, dp) => {
+                    const value = nodeValues[dp.nodeId];
+                    // Usage is typically positive, ensure factor is applied correctly if it implies direction
+                    return sum + (typeof value === 'number' && isFinite(value) ? Math.abs(value * (dp.factor || 1)) : 0);
                 }, 0);
-                console.log(`[${timeScale}] Live node values update: Gen=${currentGeneration}, Usage=${currentUsage}`);
+
+                if (exportMode === 'manual') {
+                    currentExport = exportDataPoints.reduce((sum, dp) => {
+                        const value = nodeValues[dp.nodeId];
+                        return sum + (typeof value === 'number' && isFinite(value) ? value * (dp.factor || 1) : 0);
+                    }, 0);
+                } else { // auto
+                    currentExport = Math.max(0, currentGeneration - currentUsage);
+                }
+                // console.log(`[${timeScale}] Live node values update: Gen=${currentGeneration}, Usage=${currentUsage}, Export=${currentExport}`);
             } else {
-                const todaySolarCurve = generateDailySolarCurve(new Date(nowMs), SIMULATED_PEAK_SOLAR_KW, 60);
-                const closestGenerationPoint = todaySolarCurve.length > 0 ? todaySolarCurve.reduce((prev, curr) => 
-                    Math.abs(curr.timestamp - nowMs) < Math.abs(prev.timestamp - nowMs) ? curr : prev
-                ) : { timestamp: nowMs, value: 0 };
-                currentGeneration = closestGenerationPoint.value;
-                currentUsage = generateUsageData(nowMs, SIMULATED_BASE_USAGE_KW);
-                 // console.log(`[${timeScale}] Simulated live update: Gen=${currentGeneration}, Usage=${currentUsage}`);
+                // Fallback to simulation if not live or nodeValues incomplete
+                const simulatedNow = getSimulatedHistoricalData('1m', new Date(nowMs)); // Use 1m for a single point
+                currentGeneration = simulatedNow.generation.length > 0 ? simulatedNow.generation[0].value : 0;
+                currentUsage = simulatedNow.usage.length > 0 ? simulatedNow.usage[0].value : 0;
+                currentExport = Math.max(0, currentGeneration - currentUsage); // Auto for simulated
+                // console.log(`[${timeScale}] Simulated live update: Gen=${currentGeneration}, Usage=${currentUsage}, Export=${currentExport}`);
             }
             
             setChartData(prevData => {
@@ -196,55 +220,54 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                     timestamp: nowMs,
                     generation: parseFloat(currentGeneration.toFixed(2)),
                     usage: parseFloat(currentUsage.toFixed(2)),
+                    export: parseFloat(currentExport.toFixed(2)),
                     net: parseFloat((currentGeneration - currentUsage).toFixed(2)),
                 };
 
                 const cutoffTime = nowMs - durationMs;
-                // Filter out old data points
                 let updatedData = prevData.filter(d => d.timestamp >= cutoffTime);
-                // Add new data point
                 updatedData.push(newDataPoint);
-                // Sort to ensure timestamps are in order for the line chart
                 updatedData.sort((a, b) => a.timestamp - b.timestamp);
                 
-                // Trim if data grows too large (beyond pointsToDisplay * buffer)
-                if (updatedData.length > pointsToDisplay * 2 && updatedData.length > 30) { // Increased buffer for trimming
+                if (updatedData.length > pointsToDisplay * 2 && updatedData.length > 30) {
                     updatedData = updatedData.slice(-Math.floor(pointsToDisplay * 1.5));
                 }
-                // console.log(`[${timeScale}] chartData updated, length:`, updatedData.length);
                 return updatedData;
             });
         };
         
-        // Run initial update if chart is not empty, to append a "now" point quickly
-        // This depends if you want the live updates to start immediately or wait for the first interval.
-        // For now, let setInterval handle the first call for consistency.
-        
-        if(liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
+        if (liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
         liveUpdateTimer.current = setInterval(updateData, liveUpdateIntervalMs);
 
         return () => {
             if (liveUpdateTimer.current) clearInterval(liveUpdateTimer.current);
         };
-    }, [nodeValues, generationNodes, usageNodes, timeScale, isLive, isLoadingInitial]); // Removed chartData from here to avoid self-triggering loops
+    }, [
+        nodeValues, 
+        generationDpIds, 
+        usageDpIds, 
+        exportDpIds, 
+        exportMode, 
+        timeScale, 
+        isLive, 
+        isLoadingInitial, 
+        allPossibleDataPoints
+    ]);
 
 
     const currentValues = useMemo(() => {
-        if (chartData.length === 0) return { generation: 0, usage: 0, net: 0, timestamp: Date.now() };
+        if (chartData.length === 0) return { generation: 0, usage: 0, export: 0, net: 0, timestamp: Date.now() };
         return chartData[chartData.length - 1];
     }, [chartData]);
 
     const netPowerColor = useMemo(() => {
-        if (chartData.length === 0) return axisStrokeColor;
-        // Using explicit colors for debugging initially
-        return currentValues.net >= 0 ? '#10B981' : '#EF4444';
-        // return currentValues.net >= 0 ? getThemeColor('green-500', resolvedTheme) : getThemeColor('red-500', resolvedTheme);
-    }, [chartData, currentValues, axisStrokeColor, resolvedTheme]);
+        if (chartData.length === 0) return getThemeColor('muted-foreground', resolvedTheme);
+        return currentValues.net >= 0 ? getThemeColor('green-500', resolvedTheme) : getThemeColor('red-500', resolvedTheme);
+    }, [chartData, currentValues, resolvedTheme]);
     
-    const generationColor = useMemo(() => '#34D399', []); // Explicit for debugging
-    const usageColor = useMemo(() => '#FBBF24', []); // Explicit for debugging
-    // const generationColor = useMemo(() => getThemeColor('green-500', resolvedTheme), [resolvedTheme]);
-    // const usageColor = useMemo(() => getThemeColor('orange-500', resolvedTheme), [resolvedTheme]);
+    const generationColor = useMemo(() => getThemeColor('sky-500', resolvedTheme), [resolvedTheme]); // Changed from green
+    const usageColor = useMemo(() => getThemeColor('orange-500', resolvedTheme), [resolvedTheme]);
+    const exportColor = useMemo(() => getThemeColor('purple-500', resolvedTheme), [resolvedTheme]); // New export color
 
     const formatTick = useCallback((timestamp: number) => {
         const date = new Date(timestamp);
@@ -268,70 +291,52 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
 
     const xAxisDomain = useMemo((): [number | 'dataMin' | 'auto', number | 'dataMax' | 'auto'] => {
         const { durationMs } = timeScaleConfig[timeScale];
-        if (chartData.length < 2 || timeScale === 'day') { 
-            // For day or insufficient data, let Recharts auto-determine based on full dataset range
+        if (chartData.length < 2 || timeScale === 'day') {
             return ['dataMin', 'dataMax'];
         }
         const lastTimestamp = chartData[chartData.length - 1].timestamp;
         return [lastTimestamp - durationMs, lastTimestamp];
     }, [timeScale, chartData]);
 
-
     const yAxisDomain = useMemo((): [number | 'auto', number | 'auto'] => {
-        if (chartData.length === 0) return [-SIMULATED_BASE_USAGE_KW -10, SIMULATED_PEAK_SOLAR_KW + 10];
+        if (chartData.length === 0) return [-10, 50]; // Default if no data
 
-        let minVal = 0; // Start min at 0 or slightly below if net can be negative
-        let maxVal = 0; // Start max at 0
+        let minVal = 0;
+        let maxVal = 0;
         
         chartData.forEach(d => {
-            // Ensure values are finite numbers
             const gen = isFinite(d.generation) ? d.generation : 0;
             const usg = isFinite(d.usage) ? d.usage : 0;
+            const exp = isFinite(d.export) ? d.export : 0;
             const nt = isFinite(d.net) ? d.net : 0;
 
             minVal = Math.min(minVal, nt); // Net can be negative
-            maxVal = Math.max(maxVal, gen, usg, nt);
+            maxVal = Math.max(maxVal, gen, usg, exp, nt);
         });
 
-        // If all values were 0 or not finite, set a default small range
-        if (minVal === 0 && maxVal === 0 && chartData.every(d => d.net === 0 && d.generation === 0 && d.usage === 0)) {
-            return [-10, 10];
+        if (minVal === 0 && maxVal === 0 && chartData.every(d => d.net === 0 && d.generation === 0 && d.usage === 0 && d.export === 0)) {
+            return [-10, 10]; // All zeros
         }
         
-        // If still at initial values due to all NaNs or Infinities (though filtered above)
-        if (minVal === Infinity && maxVal === -Infinity) {
-             return [-10, SIMULATED_PEAK_SOLAR_KW + 10];
-        }
-
-
-        const padding = Math.max(Math.abs(maxVal - minVal) * 0.15, 15); // Increased padding
+        const padding = Math.max(Math.abs(maxVal - minVal) * 0.15, 15);
         const finalMin = Math.floor(minVal - padding);
         const finalMax = Math.ceil(maxVal + padding);
 
         return [finalMin, finalMax];
     }, [chartData]);
 
-    // DEBUGGING LOG:
-    useEffect(() => {
-      if (chartData.length > 0) {
-        // console.log("Current chartData:", JSON.stringify(chartData.slice(-5), null, 2));
-        // console.log("XAxis Domain:", xAxisDomain);
-        // console.log("YAxis Domain:", yAxisDomain);
-      }
-    }, [chartData, xAxisDomain, yAxisDomain]);
+    // Removed verbose debugging logs for brevity in this diff
 
-
-    if (isLoadingInitial && chartData.length === 0){ // Only show full loading if data isn't even there yet
+    if (isLoadingInitial && chartData.length === 0) {
         return <div className="flex items-center justify-center h-[340px] text-muted-foreground p-4">Loading graph data...</div>;
     }
-    if (generationNodes.length === 0 || usageNodes.length === 0) {
-        return <div className="flex items-center justify-center h-[340px] text-muted-foreground p-4">Please configure Generation and Usage nodes.</div>;
+    if (generationDpIds.length === 0 || usageDpIds.length === 0) {
+        return <div className="flex items-center justify-center h-[340px] text-muted-foreground p-4 text-center">Please configure Generation and Usage data points for the graph using the settings icon.</div>;
     }
-
 
     return (
         <div className="space-y-3">
-             <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-2 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm">
                 <div className="font-medium">
                     Generation: <span style={{color: generationColor}}>{currentValues.generation.toFixed(2)} kW</span>
                 </div>
@@ -339,7 +344,10 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                     Usage: <span style={{color: usageColor}}>{currentValues.usage.toFixed(2)} kW</span>
                 </div>
                 <div className="font-medium">
-                    Net Power: <span style={{ color: netPowerColor }}>{currentValues.net.toFixed(2)} kW</span>
+                    Export: <span style={{color: exportColor}}>{currentValues.export.toFixed(2)} kW</span>
+                </div>
+                <div className="font-medium">
+                    Net Power: <span style={{ color: netPowerColor }}>{currentValues.net.toFixed(2)} kW</span> {/* Net is Gen - Usage */}
                 </div>
             </div>
             <AnimatePresence mode="wait"> 
@@ -395,7 +403,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                 yAxisId="left" type="monotone" dataKey="net" name="Net Power"
                                 stroke={netPowerColor} strokeWidth={2.5} dot={false}
                                 isAnimationActive={true} animationDuration={300} connectNulls={false} 
-                                // hide={!chartData.some(d => d.net !== 0)} // Example: hide if all data is zero
+                                // hide={!chartData.some(d => d.net !== 0)}
                             />
                             <Line
                                 yAxisId="left" type="monotone" dataKey="generation" name="Generation"
@@ -406,6 +414,13 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                 yAxisId="left" type="monotone" dataKey="usage" name="Usage"
                                 stroke={usageColor} strokeWidth={1.5} dot={false}
                                 isAnimationActive={true} animationDuration={300} connectNulls={false}
+                            />
+                            <Line
+                                yAxisId="left" type="monotone" dataKey="export" name="Export"
+                                stroke={exportColor} strokeWidth={1.5} dot={false}
+                                isAnimationActive={true} animationDuration={300} connectNulls={false}
+                                // Conditionally hide if not relevant, e.g., if all export values are 0
+                                // hide={exportMode === 'auto' && !chartData.some(d => d.export > 0)}
                             />
                         </LineChart>
                     </ResponsiveContainer>

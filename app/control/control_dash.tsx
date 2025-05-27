@@ -48,6 +48,7 @@ import { UserRole } from '@/types/auth';
 import SLDWidget from "../circuit/sld/SLDWidget";
 import { useDynamicDefaultDataPointIds } from '../utils/defaultDataPoints';
 import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph';
+import PowerTimelineGraphConfigurator from './PowerTimelineGraphConfigurator';
 import { useAppStore, useCurrentUser, useIsEditMode } from '@/stores/appStore';
 
 interface DashboardHeaderControlProps {
@@ -673,10 +674,29 @@ const UnifiedDashboardPage: React.FC = () => {
   };
 
   const hasAnyDynamicCardContent = topSections.length > 0 || !!gaugesOverviewSectionDefinition || bottomReadingsSections.length > 0;
-  const [graphGenerationNodes, setGraphGenerationNodes] = useState<string[]>(['inverter-output-total-power']);
-  const [graphUsageNodes, setGraphUsageNodes] = useState<string[]>(['grid-total-active-power-side-to-side']);
+  // const [graphGenerationNodes, setGraphGenerationNodes] = useState<string[]>(['inverter-output-total-power']); // Will be replaced by DpIds
+  // const [graphUsageNodes, setGraphUsageNodes] = useState<string[]>(['grid-total-active-power-side-to-side']); // Will be replaced by DpIds
   const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>('day');
   const [isSldConfigOpen, setIsSldConfigOpen] = useState(false);
+
+  // State for PowerTimelineGraphConfigurator
+  const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
+  const [powerGraphGenerationDpIds, setPowerGraphGenerationDpIds] = useState<string[]>(['inverter-output-total-power']);
+  const [powerGraphUsageDpIds, setPowerGraphUsageDpIds] = useState<string[]>(['grid-total-active-power-side-to-side']);
+  const [powerGraphExportDpIds, setPowerGraphExportDpIds] = useState<string[]>([]);
+  const [powerGraphExportMode, setPowerGraphExportMode] = useState<'auto' | 'manual'>('auto');
+
+  const graphGenerationNodeIds = useMemo(() => {
+    if (!allPossibleDataPoints) return [];
+    return powerGraphGenerationDpIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)?.nodeId).filter(Boolean) as string[];
+  }, [powerGraphGenerationDpIds, allPossibleDataPoints]);
+
+  const graphUsageNodeIds = useMemo(() => {
+    if (!allPossibleDataPoints) return [];
+    return powerGraphUsageDpIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)?.nodeId).filter(Boolean) as string[];
+  }, [powerGraphUsageDpIds, allPossibleDataPoints]);
+
+  // TODO: graphExportNodeIds will be needed when PowerTimelineGraph is updated to handle export DPs
 
   if (!storeHasHydrated || !authCheckComplete) {
     return (
@@ -786,8 +806,51 @@ const UnifiedDashboardPage: React.FC = () => {
         </div>
         <Card className="shadow-lg my-6">
           <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row justify-between items-center mb-3"> <h3 className="text-xl font-semibold">Timeline Graph</h3> <div className="flex space-x-1 mt-2 sm:mt-0 flex-wrap justify-center"> {(['1m', '5m', '30m', '1h', '6h', 'day'] as TimeScale[]).map((ts) => (<Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto"> {ts.toUpperCase()} </Button>))} </div> </div>
-            {(graphGenerationNodes.length > 0 && graphUsageNodes.length > 0) ? (<PowerTimelineGraph nodeValues={nodeValues} generationNodes={graphGenerationNodes} usageNodes={graphUsageNodes} timeScale={graphTimeScale} allPossibleDataPoints={allPossibleDataPoints} isLive={isConnected && plcStatus === 'online'} />) : (<div className="flex items-center justify-center h-[300px] text-muted-foreground"> <p>Timeline graph not configured. {(isGlobalEditMode && currentUserRole === UserRole.ADMIN) ? "Select data points in the configurator." : (currentUserRole === UserRole.ADMIN ? "Enable Edit Mode to configure." : "Contact an administrator.")}</p> </div>)}
+            <div className="flex flex-col sm:flex-row justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <h3 className="text-xl font-semibold">Timeline Graph</h3>
+                {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
+                  <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}>
+                          <Settings className="h-4 w-4" />
+                          <span className="sr-only">Configure Graph</span>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Configure Graph Data Points</p></TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+              <div className="flex space-x-1 mt-2 sm:mt-0 flex-wrap justify-center">
+                {(['1m', '5m', '30m', '1h', '6h', 'day'] as TimeScale[]).map((ts) => (
+                  <Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto">
+                    {ts.toUpperCase()}
+                  </Button>
+                ))}
+              </div>
+            </div>
+            {(graphGenerationNodeIds.length > 0 || graphUsageNodeIds.length > 0) ? ( // Updated condition to check new NodeId arrays
+              <PowerTimelineGraph
+                nodeValues={nodeValues}
+                generationNodes={graphGenerationNodeIds} // Pass mapped NodeIds
+                usageNodes={graphUsageNodeIds} // Pass mapped NodeIds
+                // exportNodes={[]} // Placeholder for future export node IDs
+                timeScale={graphTimeScale}
+                allPossibleDataPoints={allPossibleDataPoints}
+                isLive={isConnected && plcStatus === 'online'}
+              />
+            ) : (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                <p>
+                  Timeline graph data points not configured.
+                  {isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click the settings icon to configure."}
+                  {currentUserRole === UserRole.ADMIN && !isGlobalEditMode && " Enable Edit Mode to configure."}
+                  {currentUserRole !== UserRole.ADMIN && " Contact an administrator to configure."}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
         {gaugesOverviewSectionDefinition && (<RenderingComponent sections={[gaugesOverviewSectionDefinition]} {...commonRenderingProps} />)}
@@ -806,6 +869,27 @@ const UnifiedDashboardPage: React.FC = () => {
         toast.info("Custom data point creation not implemented");
         return Promise.resolve({ success: false, error: "Custom data point creation not implemented" });
       }} />)}
+
+      {isGraphConfiguratorOpen && (
+        <PowerTimelineGraphConfigurator
+          isOpen={isGraphConfiguratorOpen}
+          onClose={() => setIsGraphConfiguratorOpen(false)}
+          allPossibleDataPoints={allPossibleDataPoints}
+          currentGenerationDpIds={powerGraphGenerationDpIds}
+          currentUsageDpIds={powerGraphUsageDpIds}
+          currentExportDpIds={powerGraphExportDpIds}
+          currentExportMode={powerGraphExportMode}
+          onSaveConfiguration={(config) => {
+            setPowerGraphGenerationDpIds(config.generationDpIds);
+            setPowerGraphUsageDpIds(config.usageDpIds);
+            setPowerGraphExportDpIds(config.exportDpIds);
+            setPowerGraphExportMode(config.exportMode);
+            setIsGraphConfiguratorOpen(false);
+            toast.success('Graph configuration updated.');
+          }}
+        />
+      )}
+
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
         <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
           <DialogHeader className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
@@ -827,18 +911,18 @@ const UnifiedDashboardPage: React.FC = () => {
                                 <DialogTitle>Select SLD Layout</DialogTitle>
                             </DialogHeader>
                             <div className="py-4">
-                                <Select 
+                                <Select
                                     onValueChange={(newLayoutId) => {
                                         setSldLayoutId(newLayoutId);
                                         setIsModalSldLayoutConfigOpen(false);
-                                    }} 
+                                    }}
                                     value={sldLayoutId}
                                 >
                                     <SelectTrigger className="w-full mb-2">
                                         <SelectValue placeholder="Choose a layout..." />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {AVAILABLE_SLD_LAYOUT_IDS.filter(Boolean).map((id) => 
+                                        {AVAILABLE_SLD_LAYOUT_IDS.filter(Boolean).map((id) =>
                                             <SelectItem key={id} value={String(id)}>
                                                 {String(id).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}
                                             </SelectItem>
