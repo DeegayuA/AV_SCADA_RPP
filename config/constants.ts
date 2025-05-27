@@ -23,7 +23,7 @@ export const WS_URL = (() => {
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.166.112:4840";
-export const VERSION = "1.5.0";
+export const VERSION = "1.6.0";
 export const PLANT_NAME= "Mini-Grid";
 export const PLANT_LOCATION = "Colombo, Sri Lanka";
 export const PLANT_TYPE = "Mini-Grid";
@@ -46,6 +46,10 @@ export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";
 
 // Ensure this is defined and exported
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = ['ranna_sld','main_plant', 'secondary_plant', 'empty_template', 'new_project_canvas'];
+// Potentially in a shared types file or at the top of PowerTimelineGraph.tsx
+export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
+export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
+
 
 export const USER = "viewer";
 // export const USER = "admin";
