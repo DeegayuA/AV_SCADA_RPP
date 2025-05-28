@@ -7,13 +7,6 @@ import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
 import { ZapIcon, RefreshCwIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from 'lucide-react'; // Example icons. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
-
-const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<InverterNodeData>>> = (props) => { // Added Node type
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging } = props; // Now position is available
-  const { x: xPos, y: yPos } = position || { x: 0, y: 0 };
-  // Access width and height from props directly as they're not part of InverterNodeData
-  const width = (props as any).width || undefined;
-  const height = (props as any).height || undefined;
 import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
 
 const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<InverterNodeData>>> = (props) => { // Added Node type

@@ -3,6 +3,10 @@ import React, { memo, useMemo } from 'react';
 import { NodeProps as ReactFlowNodeProps, Handle, Position } from 'reactflow'; // Importing as ReactFlowNodeProps
 import { motion } from 'framer-motion';
 import { BusbarNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
+import { getDataPointValue, applyValueMapping, getDerivedStyle, formatDisplayValue } from './nodeUtils';
+import { MinusIcon, InfoIcon } from 'lucide-react'; // Simple representation for a busbar. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
 
 // Extended NodeProps with position property
 interface NodeProps<T = any> extends ReactFlowNodeProps<T> {
@@ -10,29 +14,6 @@ interface NodeProps<T = any> extends ReactFlowNodeProps<T> {
   width?: number;
   height?: number;
 }
-import { useAppStore } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, getDerivedStyle, formatDisplayValue } from './nodeUtils';
-import { MinusIcon, InfoIcon } from 'lucide-react'; // Simple representation for a busbar. Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
-
-const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, zIndex, dragging, position } = props; // Corrected destructuring
-  const xPos = position?.x ?? 0;
-  const yPos = position?.y ?? 0;
-  const width = props.width ?? null;
-  const height = props.height ?? null;
-import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
-
-// Extended NodeProps with position property
-interface NodeProps<T = any> extends ReactFlowNodeProps<T> {
-  position: { x: number; y: number };
-  width?: number;
-  height?: number;
-}
-import { useAppStore } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, getDerivedStyle, formatDisplayValue } from './nodeUtils';
-import { MinusIcon, InfoIcon } from 'lucide-react'; // Simple representation for a busbar. Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
 
 const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
   const { data, selected, isConnectable, id, type, zIndex, dragging, position } = props;

@@ -7,15 +7,6 @@ import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
 import { ArrowDownToLineIcon, ZapIcon, AlertTriangleIcon, PowerOffIcon, InfoIcon } from 'lucide-react'; // For grid connection. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
-
-const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type } = props; // Using only standard NodeProps properties
-  // Access additional properties needed for details view via type assertion
-  const { position, dragging, zIndex } = props as any;
-  const xPos = position?.x;
-  const yPos = position?.y;
-  const width = (props as any).width;
-  const height = (props as any).height;
 import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
 
 const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => {

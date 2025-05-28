@@ -347,6 +347,7 @@ export enum SLDElementType {
   // Generic / Grouping
   GenericDevice = 'genericDevice',
   Group = 'group',
+  Switch = "Switch",
 }
 
 // --- Palette Configuration ---

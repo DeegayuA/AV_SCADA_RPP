@@ -70,6 +70,7 @@ import SLDElementControlPopup from './ui/SLDElementControlPopup';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import SLDDrillDownDialog from './ui/SLDDrillDownDialog';
+import SwitchNode from './nodes/SwitchNode';
 
 interface WebSocketMessageFromServer {
   type: string;

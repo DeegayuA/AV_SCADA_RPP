@@ -3,22 +3,10 @@ import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { LoadNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
-import { useAppStore } from '@/stores/appStore';
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
 import { ArrowRightToLineIcon, SlidersHorizontalIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Arrow for load consumption. Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
-
-// Extend NodeProps with the additional properties needed
-interface ExtendedNodeProps extends NodeProps<LoadNodeData> {
-  xPos: number;
-  yPos: number;
-  width?: number;
-  height?: number;
-}
-
-const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
-import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
 
 // Extend NodeProps with the additional properties needed
 interface ExtendedNodeProps extends NodeProps<LoadNodeData> {

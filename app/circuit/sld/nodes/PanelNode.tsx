@@ -8,16 +8,6 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { SunIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-interface ExtendedNodeProps extends Omit<NodeProps<PanelNodeData>, 'xPos' | 'yPos'> {
-  // Add properties with our desired optionality
-  xPos?: number;
-  yPos?: number;
-  width?: number;
-  height?: number;
-}
-
-const PanelNode: React.FC<ExtendedNodeProps> = (props) => {
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props;
 import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
 
 interface ExtendedNodeProps extends Omit<NodeProps<PanelNodeData>, 'xPos' | 'yPos'> {

@@ -8,8 +8,6 @@ import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUti
 import { PowerIcon, PowerOffIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
 
-const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props; // Removed width and height
 import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
 
 const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {

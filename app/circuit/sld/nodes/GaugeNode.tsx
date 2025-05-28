@@ -3,8 +3,7 @@ import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld';
-import { useAppStore } from '@/stores/appStore';
-import { useOpcUaNodeValue } from '@/hooks/useOpcUaNodeValue'; // Import the hook
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue } from './nodeUtils';
 import { GaugeIcon } from 'lucide-react'; // Placeholder icon
 
@@ -69,7 +68,7 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
       rawValue = reactiveNodeValue;
     } else {
       // Fallback to global store for other cases (e.g., old dataPointLinks or if reactive value is not ready)
-      rawValue = getDataPointValue(valueLink.dataPointId, opcUaNodeValues, dataPoints);
+      rawValue = opcUaNodeValues[valueLink.dataPointId] ?? null;
     }
     
     // Apply mapping if any (applies to both reactive and fallback paths)
@@ -103,7 +102,7 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
         formattedValue: finalFormattedValue, 
         displayUnit: finalUnit 
     };
-  }, [valueLink, primaryValueLink, reactiveNodeValue, opcUaNodeValues, dataPoints, unit, dpMeta?.dataType, dpMeta?.unit]); // Added dpMeta dependencies
+  }, [valueLink, primaryValueLink, reactiveNodeValue, opcUaNodeValues, dataPoints, unit]); // Removed incorrect dpMeta references
 
   const clampedValue = useMemo(() => {
     if (numericValue === null) return minVal; 
