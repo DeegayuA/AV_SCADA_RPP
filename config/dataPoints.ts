@@ -44,7 +44,7 @@ export interface DataPoint {
   min?: number; // Minimum value for gauges/validation
   max?: number; // Maximum value for gauges/validation
   description?: string; // Tooltip or extra info
-  category: 'battery' | 'grid' | 'inverter' | 'control' | 'three-phase' | 'pv' | 'settings' | 'status' | 'energy'; // Grouping
+  category: 'battery' | 'grid' | 'inverter' | 'control' | 'three-phase' | 'pv' | 'settings' | 'status' | 'energy' | 'simulation'; // Grouping
   factor?: number; // Multiplier for raw value (e.g., 0.1, 0.01, 0.001)
   phase?: 'a' | 'b' | 'c' | 'x'; // Phase identifier ('x' for non-phase specific or total)
   isSinglePhase?: boolean; // Hint for UI rendering

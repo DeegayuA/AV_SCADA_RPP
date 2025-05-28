@@ -29,7 +29,7 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
   }));
 
   const isNodeEditable = useMemo(() =>
-    isEditMode && (currentUser?.role === 'admin' || currentUser?.role === 'editor'),
+    isEditMode && (currentUser?.role === 'admin'),
     [isEditMode, currentUser]
   );
 
