@@ -17,7 +17,7 @@ import { motion } from 'framer-motion';
 import {
     BatteryCharging, Rows3, Cable, CircuitBoard, PlugZap, Zap, DatabaseZap, Thermometer,
     SlidersHorizontal, FileText, TextCursorInput, Cpu, ToyBrick, Workflow, GitFork, BoxSelect,
-    Unplug, ShieldAlert, ListFilter, SearchCode
+    Unplug, ShieldAlert, ListFilter, SearchCode, Gauge as GaugeIcon // Added GaugeIcon
 } from 'lucide-react';
 
 // Adjust the import path if SearchableSelect is not directly in ./
@@ -75,6 +75,18 @@ export const categorizedComponents: PaletteCategory[] = [
         defaultData: { label: 'Sensor', status: 'reading', config: { sensorType: 'Temperature'} } },
       { type: SLDElementType.PLC, label: 'PLC', icon: <Cpu size={16}/>,
         defaultData: { label: 'Main PLC', status: 'running' } },
+      { 
+        type: SLDElementType.Gauge, 
+        label: 'Gauge', 
+        icon: <GaugeIcon size={16}/>, 
+        defaultData: { 
+          label: 'Gauge', 
+          elementType: SLDElementType.Gauge, 
+          status: 'nominal', 
+          config: { minVal: 0, maxVal: 100, unit: '%' } 
+        },
+        description: 'Displays a single value as a visual gauge.'
+      },
     ],
    },
   {

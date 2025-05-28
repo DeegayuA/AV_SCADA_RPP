@@ -1439,6 +1439,10 @@ export const dataPoints: DataPoint[] = [
   // Meter Alt Energy (400-411) - Bulk generated above using Array.from
   // Meter Demand (413-416) - Generated above
   // Placeholder (346_placeholder) - Generated above
+  { id: 'sim_temp_1', name: 'Simulation Temperature', label: 'Simulation Temperature', nodeId: 'ns=2;s=SimTemp1', dataType: 'Float', unit: '°C', category: 'simulation', uiType: 'display', icon: Thermometer },
+  { id: 'sim_humidity_1', name: 'Simulation Humidity', label: 'Simulation Humidity', nodeId: 'ns=2;s=SimHumidity1', dataType: 'Float', unit: '%', category: 'simulation', uiType: 'display', icon: Activity },
+  { id: 'sim_pressure_1', name: 'Simulation Pressure', label: 'Simulation Pressure', nodeId: 'ns=2;s=SimPressure1', dataType: 'Float', unit: 'kPa', category: 'simulation', uiType: 'display', icon: Activity },
+  { id: 'sim_tank_level_1', name: 'Simulation Tank Level', label: 'Simulation Tank Level', nodeId: 'ns=2;s=SimTankLevel1', dataType: 'Float', unit: '%', category: 'simulation', uiType: 'display', icon: Gauge }
 ];
 
 // Export Node IDs for convenience if used by other parts of the application

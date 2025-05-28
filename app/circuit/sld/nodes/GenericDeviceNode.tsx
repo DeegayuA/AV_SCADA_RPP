@@ -1,26 +1,45 @@
 // components/sld/nodes/GenericDeviceNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
+import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { GenericDeviceNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
+import { GenericDeviceNodeData, CustomNodeType, DataPoint } from '@/types/sld'; // Added CustomNodeType, DataPoint
 import { useAppStore } from '@/stores/appStore';
 import { BoxIcon, AlertTriangleIcon, CheckCircleIcon, XCircleIcon, InfoIcon } from 'lucide-react'; // Default icon, Added InfoIcon
 import { Button } from "@/components/ui/button"; // Added Button
+import { getDataPointValue, applyValueMapping, formatDisplayValue } from './nodeUtils'; // Added imports
 
-const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props; // Fixed destructuring
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Added opcUaNodeValues, dataPoints
+const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props;
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Added
-    dataPoints: state.dataPoints, // Added
+    opcUaNodeValues: state.opcUaNodeValues,
+    dataPoints: state.dataPoints,
   }));
 
   const isNodeEditable = useMemo(() =>
     isEditMode && (currentUser?.role === 'admin'),
     [isEditMode, currentUser]
   );
+
+  const linkedDataValues = useMemo(() => {
+    if (!data.dataPointLinks || !opcUaNodeValues || !dataPoints) {
+      return [];
+    }
+    return data.dataPointLinks.map(link => {
+      const dpMeta = dataPoints[link.dataPointId] as DataPoint | undefined;
+      const label = dpMeta?.label || dpMeta?.name || link.dataPointId;
+      const rawValue = getDataPointValue(link.dataPointId, opcUaNodeValues, dataPoints);
+      const mappedValue = applyValueMapping(rawValue, link);
+      const formattedValue = formatDisplayValue(mappedValue, link.format, dpMeta?.dataType);
+      return {
+        label: label,
+        value: formattedValue,
+        key: `${link.dataPointId}-${link.targetProperty}` // Ensure unique key if multiple links point to same DP
+      };
+    }).filter(item => item.value !== undefined && item.value !== null && item.value !== '-'); // Filter out empty/default values
+  }, [data.dataPointLinks, opcUaNodeValues, dataPoints]);
 
   // Choose icon based on status or config.iconName (more complex logic needed for iconName mapping)
   const { StatusIcon, statusText, styleClasses } = useMemo(() => {
@@ -51,8 +70,8 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
   return (
     <motion.div
       className={`
-        sld-node generic-device-node group w-[90px] h-[75px] rounded-lg shadow-md
-        flex flex-col items-center justify-between p-2
+        sld-node generic-device-node group w-[90px] h-[95px] rounded-lg shadow-md 
+        flex flex-col items-center justify-start p-1.5 
         border-2 ${styleClasses}
         bg-card dark:bg-neutral-800 
         transition-all duration-150
@@ -99,11 +118,22 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
         {data.label}
       </p>
       
-      <StatusIcon size={24} className="my-0.5 transition-colors" />
+      <StatusIcon size={20} className="my-0.5 transition-colors" /> {/* Adjusted icon size slightly */}
       
-      <p className="text-[8px] text-muted-foreground text-center truncate w-full leading-tight" title={deviceTypeDisplay}>
+      <p className="text-[8px] text-muted-foreground text-center truncate w-full leading-tight mb-0.5" title={deviceTypeDisplay}>
         {deviceTypeDisplay}
       </p>
+
+      {linkedDataValues.length > 0 && (
+        <div className="data-display-area mt-0.5 w-full text-left text-[7px] overflow-y-auto max-h-[26px] px-0.5">
+          {linkedDataValues.map(item => (
+            <div key={item.key} className="flex justify-between items-center leading-tight">
+              <span className="truncate flex-1 mr-0.5" title={item.label}>{item.label}:</span>
+              <span className="font-semibold truncate max-w-[50%]" title={item.value}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 };
