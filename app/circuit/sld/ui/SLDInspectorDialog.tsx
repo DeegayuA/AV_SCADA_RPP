@@ -666,6 +666,17 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                                     options={dataPointOptions}
                                                     value={(formData.config as GaugeNodeData['config'])?.valueDataPointLink?.dataPointId || ''}
                                                     onChange={(value) => {
+                                                        if (!value) {
+                                                            setFormData(prev => {
+                                                                const newState = JSON.parse(JSON.stringify(prev));
+                                                                if (newState.config) {
+                                                                    newState.config.valueDataPointLink = undefined;
+                                                                }
+                                                                return newState;
+                                                            });
+                                                            return;
+                                                        }
+
                                                         const selectedDp = dataPoints[value as string];
                                                         let inferredType: NonNullable<DataPointLink['format']>['type'] = 'number'; // Default for gauge
                                                         if (selectedDp) {
@@ -674,15 +685,20 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                                             else if (selectedDp.dataType === 'String') inferredType = 'string';
                                                         }
 
-                                                        handleSelectChange('config.valueDataPointLink', value ? {
-                                                            dataPointId: value,
-                                                            targetProperty: 'value', // Default target property for gauge value
-                                                            format: {
-                                                                type: inferredType,
-                                                                suffix: selectedDp?.unit || '',
-                                                                ...(inferredType === 'number' && { precision: 2 }),
-                                                            }
-                                                        } : undefined);
+                                                        setFormData(prev => {
+                                                            const newState = JSON.parse(JSON.stringify(prev));
+                                                            if (!newState.config) newState.config = {};
+                                                            newState.config.valueDataPointLink = {
+                                                                dataPointId: value,
+                                                                targetProperty: 'value', // Default target property for gauge value
+                                                                format: {
+                                                                    type: inferredType,
+                                                                    suffix: selectedDp?.unit || '',
+                                                                    ...(inferredType === 'number' && { precision: 2 }),
+                                                                }
+                                                            };
+                                                            return newState;
+                                                        });
                                                     }}
                                                     placeholder="Search & Select Data Point for Gauge Value..."
                                                     searchPlaceholder="Type to search..."
