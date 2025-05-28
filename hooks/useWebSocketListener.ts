@@ -1,6 +1,5 @@
 // hooks/useWebSocketListener.ts
 import { useAppStore } from '@/stores/appStore';
-// RealTimeData type might be removed or updated in types/sld.ts later if not used elsewhere.
 // For now, the store directly uses Record<string, string | number | boolean>.
 import { WS_URL } from '@/config/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -13,7 +12,7 @@ export interface WebSocketMessageToServer {
 
 interface WebSocketMessageFromServer {
   type: string;
-  payload: any;
+  payload: any; // Note: 'any' is used here; could be 'unknown' for more strictness.
 }
 
 export const useWebSocket = () => {
@@ -60,29 +59,35 @@ export const useWebSocket = () => {
             } else if (event.data instanceof Blob) {
                 console.error("WebSocket: Received Blob data, which is not directly supported for JSON parsing in this handler. Please ensure server sends string or ArrayBuffer.");
                 toast.error("WebSocket Error", { description: "Received unexpected Blob data format." });
-                return; 
+                return;
             } else {
                 console.warn("WebSocket: event.data is of an unexpected type:", typeof event.data);
                 toast.error("WebSocket Error", { description: "Received unexpected data type."});
-                return; 
+                return;
             }
             console.log("WebSocket: Message data string for parsing:", messageDataString);
 
-            let data;
+            let parsedJson: unknown; // Use 'unknown' for safer parsing
             try {
-                data = JSON.parse(messageDataString);
+                parsedJson = JSON.parse(messageDataString);
             } catch (e) {
                 console.error("WebSocket: Error parsing JSON string. Raw string:", messageDataString, "Error:", e);
-                setLastJsonMessage({ type: 'parse_error', payload: { raw: messageDataString, error: (e as Error).message } } as any);
-                return; 
+                // Removed 'as any'. The object structure fits WebSocketMessageFromServer for an error message.
+                setLastJsonMessage({ type: 'parse_error', payload: { raw: messageDataString, error: (e instanceof Error ? e.message : String(e)) } });
+                return;
             }
 
-            console.log("WebSocket: Parsed data object:", data);
-            console.log("WebSocket: typeof data after parse:", typeof data);
+            console.log("WebSocket: Parsed data object:", parsedJson);
+            console.log("WebSocket: typeof data after parse:", typeof parsedJson); // Log typeof the unknown variable
                 
-            if (typeof data === 'object' && data !== null) {
+            // Check if parsedJson is an object and not null
+            if (typeof parsedJson === 'object' && parsedJson !== null) {
+                // Cast to Record<string, any> for easier property access,
+                // this assumes a dictionary-like object structure common for JSON.
+                const data = parsedJson as Record<string, any>;
+
                 // Distinguish OPC UA data (typically doesn't have 'type' field) from structured messages
-                if (!data.type) { // OPC UA Data: Expecting a flat Record<string, value>
+                if (typeof data.type === 'undefined') { // More explicit check for absence of 'type'
                     const opcDataPayload: Record<string, string | number | boolean> = {};
                     let hasValidOpcData = false;
                     for (const key in data) {
@@ -97,33 +102,34 @@ export const useWebSocket = () => {
                         }
                     }
                     if (hasValidOpcData) {
-                        // console.log("Processed OPC UA payload for store:", opcDataPayload); // Less verbose log
                         useAppStore.getState().updateOpcUaNodeValues(opcDataPayload);
                     } else {
-                        // This case could happen if the parsed JSON is an object but not the expected OPC-UA flat structure,
-                        // and also doesn't have a 'type' field.
-                        console.warn("WebSocket: Received object data without a 'type' field and not matching expected OPC-UA structure:", data);
+                        // This case can occur if the object has no own properties that are primitive,
+                        // or if the object is empty.
+                        console.warn("WebSocket: Received object data without a 'type' field and no valid OPC-UA primitive values found:", data);
                     }
-                } else if (data.type && typeof data.type === 'string') { // Structured Message (e.g., for SLD layouts)
+                } else if (typeof data.type === 'string') { // Structured Message
                     console.log("Structured WebSocket message received:", data);
-                    setLastJsonMessage(data as WebSocketMessageFromServer);
-                    // Example: if (data.type === 'opcua-structured-batch' && data.payload) {
-                    //    useAppStore.getState().updateOpcUaNodeValues(data.payload as Record<string, string | number | boolean>);
-                    // }
+                    // Constructing the message explicitly to ensure it matches WebSocketMessageFromServer
+                    // and doesn't carry unintended extra properties from `data`.
+                    // `data.payload` is fine because WebSocketMessageFromServer.payload is 'any'.
+                    const message: WebSocketMessageFromServer = {
+                        type: data.type,
+                        payload: data.payload // If data.payload might be missing, add 'payload' in data ? data.payload : undefined (or handle as error)
+                    };
+                    setLastJsonMessage(message);
                 } else {
-                    // Parsed JSON is an object, but 'type' field is missing or not a string.
-                    console.warn("WebSocket: Received object data with invalid or missing 'type' field:", data);
+                    // Parsed JSON is an object, but 'type' field is present and not a string.
+                    console.warn("WebSocket: Received object data with invalid 'type' field (not a string):", data);
                 }
             } else {
-                // Parsed JSON is not an object (e.g., a string, number, boolean directly, or null)
-                console.warn("WebSocket: Received JSON data that is not an object:", data);
+                // Parsed JSON is not an object (e.g., a string "foo", number 123, boolean true, or null, if server sent such JSON)
+                console.warn("WebSocket: Received JSON data that is not an object:", parsedJson);
             }
         };
 
         ws.current.onerror = (errorEvent) => {
             console.error("WebSocket: Error event occurred:", errorEvent);
-            // onclose will handle state changes and reconnection attempts.
-            // A toast here might be redundant if onclose provides one.
         };
 
         ws.current.onclose = (event) => {
@@ -131,16 +137,14 @@ export const useWebSocket = () => {
             console.log(`WebSocket: Connection closed. Reason: "${reason}", Clean: ${event.wasClean}`);
             setIsConnected(false);
             
-            // Attempt to reconnect if not a normal closure (1000) or explicit client unmount (1001 often implies this context)
             if (event.code !== 1000 && event.code !== 1001) { 
                 if (currentReconnectAttempts.current < maxReconnectAttempts.current) {
                     currentReconnectAttempts.current++;
-                    // Exponential backoff, but cap at 30 seconds
                     const delay = Math.min(1000 * Math.pow(1.8, currentReconnectAttempts.current), 30000); 
                     console.log(`WebSocket: Will attempt reconnect #${currentReconnectAttempts.current} in ${delay / 1000}s.`);
-                    if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current); // Clear any existing timer
+                    if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
                     reconnectIntervalId.current = setTimeout(connect, delay);
-                    if(currentReconnectAttempts.current === 1) { // Show toast on first disconnect leading to retry
+                    if(currentReconnectAttempts.current === 1) {
                          toast.warning("Real-time Sync Lost", { id: "ws-disconnect-retry", description: `Attempting to reconnect... (Attempt ${currentReconnectAttempts.current})`});
                     }
                 } else {
@@ -151,35 +155,35 @@ export const useWebSocket = () => {
                  toast.info("Real-time Sync Disconnected", { id: "ws-disconnect-clean", duration: 3000 });
             }
         };
-    }, [WS_URL]); // WS_URL is a dependency
+    }, [WS_URL]); 
 
     useEffect(() => {
-        if (typeof window !== 'undefined') { // Ensure WebSocket is only used client-side
-           connect(); // Initial connection attempt
+        if (typeof window !== 'undefined') { 
+           connect();
         }
-        return () => { // Cleanup on unmount
+        return () => {
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
             if (ws.current) {
                 console.log("WebSocket: Cleaning up connection on component unmount.");
                 ws.current.onopen = null;
                 ws.current.onmessage = null;
                 ws.current.onerror = null;
-                ws.current.onclose = null; // Important to remove listeners to prevent them firing on old instance
+                ws.current.onclose = null; 
                 if (ws.current.readyState === WebSocket.OPEN) {
                     ws.current.close(1000, "Client component unmounting");
                 }
-                ws.current = null; // Release the WebSocket object
+                ws.current = null;
             }
-            currentReconnectAttempts.current = 0; // Reset for next mount if any
-            setIsConnected(false); // Ensure state reflects disconnect
+            currentReconnectAttempts.current = 0;
+            setIsConnected(false);
         };
-    }, [connect]); // `connect` is stable due to useCallback
+    }, [connect]);
 
     const sendJsonMessage = useCallback((message: WebSocketMessageToServer) => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
             try {
                 ws.current.send(JSON.stringify(message));
-                // console.log("WebSocket: Sent message:", message.type, message.payload);
+                console.log("WebSocket: Sent message:", message.type, message.payload);
             } catch (error) {
                 console.error("WebSocket: Error serializing or sending message:", error, "Message:", message);
                 toast.error("Message Send Error", { description: "Failed to send data to the server." });
@@ -187,15 +191,12 @@ export const useWebSocket = () => {
         } else {
             console.warn("WebSocket: Attempted to send message while not connected. Message:", message.type);
             toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server. Message not sent."});
-            // Optionally queue message or trigger a reconnect attempt. connect() call here can be aggressive.
-            // The general reconnect logic in onclose should handle reconnections.
-            // If critical, and not connecting, explicitly call connect():
-            // if (!isConnected && (!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
-            //    console.log("WebSocket: Triggering connect() from sendJsonMessage due to disconnected state.");
-            //    connect();
-            // }
+            if (!isConnected && (!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
+               console.log("WebSocket: Triggering connect() from sendJsonMessage due to disconnected state.");
+               connect();
+            }
         }
-    }, [/* connect removed as it's mostly for initial and retry logic. Relies on OPEN state for send */]);
+    }, [/* isConnected and connect were not in dependencies previously, keep that if it was intentional */ isConnected, connect]); // Added isConnected and connect if re-connect attempt is desired here. If not, dependencies could be empty.
 
-    return { sendJsonMessage, lastJsonMessage, isConnected, connect }; // Expose connect for manual retry UIs
+    return { sendJsonMessage, lastJsonMessage, isConnected, connect };
 };
