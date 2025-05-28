@@ -250,13 +250,23 @@ export interface FuseNodeData extends BaseNodeData { // <<<--- ADDED THIS DEFINI
     };
 }
 
+export interface GaugeNodeData extends BaseNodeData {
+  elementType: SLDElementType.Gauge;
+  config?: BaseNodeData['config'] & {
+    minVal?: number;
+    maxVal?: number;
+    valueDataPointLink?: DataPointLink; // The primary link for the gauge's value
+    unit?: string;
+  };
+}
+
 // Union of all specific node data types
 export type CustomNodeData =
   | TextLabelNodeData | DataLabelNodeData | InverterNodeData | PanelNodeData
   | BreakerNodeData | MeterNodeData | BatteryNodeData | ContactorNodeData
   | GridNodeData | LoadNodeData | BusbarNodeData | GenericDeviceNodeData
   | TransformerNodeData | GeneratorNodeData | PLCNodeData | SensorNodeData
-  | IsolatorNodeData | ATSNodeData | JunctionBoxNodeData | FuseNodeData; // <<<--- ADDED FuseNodeData to UNION
+  | IsolatorNodeData | ATSNodeData | JunctionBoxNodeData | FuseNodeData | GaugeNodeData;
 
 
 // --- Edge Data ---
@@ -324,6 +334,7 @@ export enum SLDElementType {
   Sensor = 'sensor',
   CT = 'ct',
   PT = 'pt',
+  Gauge = 'gauge', // Added Gauge
 
   // Control & Automation
   PLC = 'plc',

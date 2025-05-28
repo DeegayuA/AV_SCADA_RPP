@@ -45,7 +45,7 @@ export const APP_PRIVACY_POLICY = "https://yourwebsite.com/privacy-policy";
 export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";
 
 // Ensure this is defined and exported
-export const AVAILABLE_SLD_LAYOUT_IDS: string[] = ['ranna_sld','main_plant', 'secondary_plant', 'empty_template', 'new_project_canvas'];
+export const AVAILABLE_SLD_LAYOUT_IDS: string[] = ['ranna_sld','main_plant', 'secondary_plant', 'empty_template', 'new_project_canvas', 'test_data_nodes_layout'];
 // Potentially in a shared types file or at the top of PowerTimelineGraph.tsx
 export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
 export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';

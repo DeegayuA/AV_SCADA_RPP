@@ -69,3 +69,5 @@ const MiniGauge: React.FC<MiniGaugeProps> = ({
   );
 };
 export default React.memo(MiniGauge);
+
+

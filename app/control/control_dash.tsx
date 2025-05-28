@@ -356,36 +356,114 @@ const UnifiedDashboardPage: React.FC = () => {
     let allOk=true; for(const a of qA){try{ws.current.send(JSON.stringify({[a.nodeId]:a.value}));}catch(e){allOk=false;console.error(`Fail queue ${a.nodeId}:`,e);toast.error("Queue Fail",{description:`Cmd ${a.nodeId||'??'} fail.`});}}
     await clearControlQueue(); if(allOk)toast.success("Queue OK",{description:"All sent."});else toast.warning("Queue Incomplete");
   }, []);
-  const connectWebSocket = useCallback(() => { /* ... unchanged ... */
-    if(!authCheckComplete)return;const f1='opcuaRedirected',f2='reloadingDueToDelay',f3='redirectingDueToExtremeDelay';if(ws.current&&(ws.current.readyState===WebSocket.OPEN||ws.current.readyState===WebSocket.CONNECTING))return;if(typeof window!=='undefined'&&(sessionStorage.getItem(f1)||sessionStorage.getItem(f2)||sessionStorage.getItem(f3)))return;
-    setIsConnected(false);const dMs=Math.min(1000+2000*Math.pow(1.5,reconnectAttempts.current),30000);if(reconnectInterval.current)clearTimeout(reconnectInterval.current);
-    reconnectInterval.current=setTimeout(()=>{if(typeof window==='undefined')return;ws.current=new WebSocket(WS_URL);
-    ws.current.onopen=()=>{console.log("WS Open:",WS_URL);setIsConnected(true);setLastUpdateTime(Date.now());reconnectAttempts.current=0;if(reconnectInterval.current)clearTimeout(reconnectInterval.current);toast.success('WS Connected',{id:'ws-conn',description:'Backend connected.',duration:3000});playNotificationSound('success');if(typeof window!=='undefined'){[f1,f2,f3].forEach(f=>sessionStorage.removeItem(f));}processControlActionQueue();};
-    ws.current.onmessage=(e)=>{try{const d=JSON.parse(e.data as string);if(typeof d==='object'&&d!==null){setNodeValues(p=>({...p,...d}));setLastUpdateTime(Date.now());}else console.warn("WS:non-obj",d);}catch(err){console.error("WS parse err",err,e.data);playNotificationSound('error');}};
-ws.current.onerror = (ev) => {
-  console.error("WS Err", ev);
-  setIsConnected(false);
 
-  const t = ev.target as WebSocket;
-  if (!t?.url?.includes(WS_URL)) return;
+  const connectWebSocket = useCallback(async () => {
+    if (!authCheckComplete) return;
+    const f1 = 'opcuaRedirected', f2 = 'reloadingDueToDelay', f3 = 'redirectingDueToExtremeDelay';
+    if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
+    if (typeof window !== 'undefined' && (sessionStorage.getItem(f1) || sessionStorage.getItem(f2) || sessionStorage.getItem(f3))) return;
 
-  if (reconnectAttempts.current >= maxReconnectAttempts - 1) {
-    toast.error('WS Critical', {
-      description: 'Connection failed after retries.'
-    });
+    setIsConnected(false);
+    const delayMs = Math.min(1000 + 2000 * Math.pow(1.5, reconnectAttempts.current), 30000);
+    if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
 
-    // Go to /api/opcua if not connected
-    fetch('/api/opcua')
-      .then(res => {
-        if (!res.ok) throw new Error('Failed to hit /api/opcua');
-        console.log('Triggered fallback API: /api/opcua');
-      })
-      .catch(err => console.error('Error hitting /api/opcua', err));
-  }
-};
- ws.current.onclose=(ev)=>{console.log(`WS Close: ${(ev.target as WebSocket)?.url} Code:${ev.code} Rsn:'${ev.reason||'-'}' Clean:${ev.wasClean}`);setIsConnected(false);if(ev.code===1000||ev.code===1001||ev.code===1005||ev.code === 1006||(typeof window!=='undefined'&&(sessionStorage.getItem(f1)||sessionStorage.getItem(f2)||sessionStorage.getItem(f3)))){reconnectAttempts.current=maxReconnectAttempts+1;return;}if(reconnectAttempts.current<maxReconnectAttempts){reconnectAttempts.current++;connectWebSocket();}else{toast.error('WS Fail',{description:'Max reconnects.'});playNotificationSound('error');}};
-    },dMs);
+    reconnectInterval.current = setTimeout(async () => {
+      if (typeof window === 'undefined') return;
+
+      try {
+        console.log("Attempting to contact /api/opcua endpoint before WebSocket connection...");
+        const response = await fetch('/api/opcua');
+        if (response.ok) {
+          console.log("/api/opcua endpoint reached successfully.");
+          // Potentially, response could provide a dynamic WS_URL, but for now, assume it's a status check/trigger.
+        } else {
+          console.warn(`/api/opcua endpoint returned an error: ${response.status}. Proceeding with WebSocket connection attempt anyway.`);
+          toast.warning("OPC UA API Check", { description: `Endpoint /api/opcua status: ${response.status}. Will still attempt WS connection.` });
+        }
+      } catch (error) {
+        console.error("Error fetching /api/opcua:", error, "Proceeding with WebSocket connection attempt anyway.");
+        toast.error("OPC UA API Error", { description: "Could not reach /api/opcua. Will still attempt WS connection." });
+      }
+      
+      console.log("Attempting WebSocket connection to:", WS_URL);
+      ws.current = new WebSocket(WS_URL);
+
+      ws.current.onopen = () => {
+        console.log("WS Open:", WS_URL);
+        setIsConnected(true);
+        setLastUpdateTime(Date.now());
+        reconnectAttempts.current = 0;
+        if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
+        toast.success('WS Connected', { id: 'ws-conn', description: 'Backend connected.', duration: 3000 });
+        playNotificationSound('success');
+        if (typeof window !== 'undefined') { [f1, f2, f3].forEach(f => sessionStorage.removeItem(f)); }
+        processControlActionQueue();
+      };
+
+      ws.current.onmessage = (e) => {
+        try {
+          const d = JSON.parse(e.data as string);
+          if (typeof d === 'object' && d !== null) {
+            setNodeValues(p => ({ ...p, ...d }));
+            setLastUpdateTime(Date.now());
+          } else console.warn("WS:non-obj", d);
+        } catch (err) {
+          console.error("WS parse err", err, e.data);
+          playNotificationSound('error');
+        }
+      };
+
+      ws.current.onerror = (ev) => {
+        console.error("WS Err on", (ev.target as WebSocket)?.url, ev);
+        setIsConnected(false);
+        const t = ev.target as WebSocket;
+
+        if (!t?.url?.includes(WS_URL)) {
+          console.warn("WS error from unexpected URL:", t?.url);
+          return;
+        }
+
+        // As per "websocket on error go to /api/opcua"
+        console.log("WebSocket error occurred. Pinging /api/opcua as part of error handling.");
+        fetch('/api/opcua')
+          .then(res => {
+            if (!res.ok) { 
+              console.warn('Error pinging /api/opcua after WS error:', res.status); 
+            } else { 
+              console.log('Successfully pinged /api/opcua after WS error.'); 
+            }
+          })
+          .catch(err => console.error('Failed to ping /api/opcua after WS error:', err));
+
+        if (reconnectAttempts.current >= maxReconnectAttempts - 1) {
+          toast.error('WS Critical', {
+            description: 'Connection failed after retries.'
+          });
+          // The fetch('/api/opcua') above already happened. If a specific fetch was needed
+          // *only* for max_retries, it would be here, but the instruction implies general on-error.
+        }
+      };
+
+      ws.current.onclose = (ev) => {
+        console.log(`WS Close: ${(ev.target as WebSocket)?.url} Code:${ev.code} Rsn:'${ev.reason || '-'}' Clean:${ev.wasClean}`);
+        setIsConnected(false);
+        if (ev.code === 1000 || ev.code === 1001 || ev.code === 1005 || ev.code === 1006 || (typeof window !== 'undefined' && (sessionStorage.getItem(f1) || sessionStorage.getItem(f2) || sessionStorage.getItem(f3)))) {
+          reconnectAttempts.current = maxReconnectAttempts + 1; // Stop retrying for these specific close codes
+          return;
+        }
+        if (reconnectAttempts.current < maxReconnectAttempts) {
+          reconnectAttempts.current++;
+          console.log(`Scheduling reconnect attempt ${reconnectAttempts.current} / ${maxReconnectAttempts} via onclose.`);
+          connectWebSocket(); 
+        } else {
+          toast.error('WS Fail', { description: 'Max reconnects.' });
+          playNotificationSound('error');
+        }
+      };
+    }, delayMs);
   }, [authCheckComplete, playNotificationSound, processControlActionQueue, WS_URL, maxReconnectAttempts]);
+
+
   const sendDataToWebSocket = useCallback(async (nodeId:string,value:boolean|number|string)=>{ /* ... unchanged ... */
     if(currentUserRole===UserRole.VIEWER){toast.warning("Restricted",{description:"Viewers cannot send cmds."});playNotificationSound('warning');return;}const pC=allPossibleDataPoints.find(p=>p.nodeId===nodeId);let v:any=value,cQV:any=undefined;
     if(pC?.dataType.includes('Int')){let pN:number;if(typeof value==='boolean')pN=value?1:0;else if(typeof value==='string')pN=parseInt(value,10);else pN=value as number;if(isNaN(pN)){toast.error('Send Err',{description:'Invalid int.'});return;}v=pN;cQV=pN;}
@@ -407,8 +485,8 @@ ws.current.onerror = (ev) => {
   useEffect(() => {const uc=()=>setCurrentTime(new Date().toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,day:'2-digit',month:'short',year:'numeric'}));uc();const i=setInterval(uc,1000);return()=>clearInterval(i);},[]);
   useEffect(() => { /* ... lagCheckInterval ... */
     if (!authCheckComplete) return; const lagI=setInterval(()=>{const cD=Date.now()-lastUpdateTime;setDelay(cD);const fS=typeof window!=='undefined'&&['reloadingDueToDelay','redirectingDueToExtremeDelay','opcuaRedirected'].some(f=>sessionStorage.getItem(f));if(fS)return;
-    if(isConnected&&cD>60000){console.error(`CRIT WS lag(${(cD/1000).toFixed(1)}s).Closing WS.`);toast.error('Critical Lag',{id:'ws-lag',description:'Re-establishing...',duration:10000});if(ws.current)ws.current.close(1011,"Crit Lag");return;}
-    else if(isConnected&&cD>30000){console.warn(`High WS lag(${(cD/1000).toFixed(1)}s).`);toast.warning('Stale Warn',{id:'ws-stale',description:`Last upd >${(cD/1000).toFixed(0)}s ago.`,duration:8000});}},15000);return()=>clearInterval(lagI);
+    if(isConnected&&cD>60000){console.error(`CRIT WS lag(${(Number(cD)/1000).toFixed(1)}s).Closing WS.`);toast.error('Critical Lag',{id:'ws-lag',description:'Re-establishing...',duration:10000});if(ws.current)ws.current.close(1011,"Crit Lag");return;}
+    else if(isConnected&&cD>30000){console.warn(`High WS lag(${(Number(cD)/1000).toFixed(1)}s).`);toast.warning('Stale Warn',{id:'ws-stale',description:`Last upd >${(Number(cD)/1000).toFixed(0)}s ago.`,duration:8000});}},15000);return()=>clearInterval(lagI);
   }, [lastUpdateTime, isConnected, playNotificationSound, authCheckComplete]);
   const checkPlcConnection = useCallback(async () => { /* ... unchanged, reduced noise ... */ if(!authCheckComplete)return;try{const r=await fetch('/api/opcua/status');if(!r.ok)throw new Error(`API Err:${r.status}`);const d=await r.json();const nS=d.connectionStatus;if(nS&&['online','offline','disconnected'].includes(nS))setPlcStatus(nS);else{if(plcStatus!=='disconnected')setPlcStatus('disconnected');}}catch(e){if(plcStatus!=='disconnected')setPlcStatus('disconnected');}},[plcStatus,authCheckComplete]);
   useEffect(() => {if (!authCheckComplete) return ()=>{}; checkPlcConnection(); const plcI=setInterval(checkPlcConnection,15000); return()=>clearInterval(plcI);},[checkPlcConnection,authCheckComplete]);

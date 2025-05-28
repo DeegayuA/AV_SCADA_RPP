@@ -48,44 +48,75 @@ export const useWebSocket = () => {
         };
 
         ws.current.onmessage = (event) => {
+            console.log("WebSocket: Raw event.data received:", event.data);
+            console.log("WebSocket: typeof event.data:", typeof event.data);
+
+            let messageDataString: string;
+            if (typeof event.data === 'string') {
+                messageDataString = event.data;
+            } else if (event.data instanceof ArrayBuffer) {
+                console.log("WebSocket: Received ArrayBuffer, decoding to UTF-8 string.");
+                messageDataString = new TextDecoder("utf-8").decode(event.data);
+            } else if (event.data instanceof Blob) {
+                console.error("WebSocket: Received Blob data, which is not directly supported for JSON parsing in this handler. Please ensure server sends string or ArrayBuffer.");
+                toast.error("WebSocket Error", { description: "Received unexpected Blob data format." });
+                return; 
+            } else {
+                console.warn("WebSocket: event.data is of an unexpected type:", typeof event.data);
+                toast.error("WebSocket Error", { description: "Received unexpected data type."});
+                return; 
+            }
+            console.log("WebSocket: Message data string for parsing:", messageDataString);
+
+            let data;
             try {
-                console.log("Raw WebSocket message received:", event.data);
-                const data = JSON.parse(event.data as string);
-                
-                if (typeof data === 'object' && data !== null) {
-                    if (data.type && typeof data.type === 'string') {
-                        if (!data.type) { // Assuming OPC UA data doesn't have a 'type' wrapper
-                            const opcDataPayload: Record<string, string | number | boolean> = {};
-                            for (const key in data) {
-                                if (Object.prototype.hasOwnProperty.call(data, key)) {
-                                    const value = data[key];
-                                    if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-                                        opcDataPayload[key] = value;
-                                    } else {
-                                        console.warn(`WebSocket: Received non-primitive value for OPC UA Node ID ${key}:`, value);
-                                    }
-                                }
-                            }
-                            if (Object.keys(opcDataPayload).length > 0) {
-                                console.log("Processed OPC UA payload for store:", opcDataPayload);
-                                useAppStore.getState().updateOpcUaNodeValues(opcDataPayload);
-                            }
-                        } else {
-                            // Handle other structured messages (like layout-data, confirmations)
-                            console.log("Structured WebSocket message received:", data);
-                            setLastJsonMessage(data as WebSocketMessageFromServer);
-                            // If there's a specific type for OPC data that is structured, handle it here.
-                            // e.g. if (data.type === 'opcua-structured-batch' && data.payload) {
-                            //    useAppStore.getState().updateOpcUaNodeValues(data.payload as Record<string, string | number | boolean>);
-                            // }
-                        }
-                    } else {
-                       console.warn("WebSocket: Received non-JSON or non-object data:", event.data);
-                    }
-                }
+                data = JSON.parse(messageDataString);
             } catch (e) {
-                console.error("WebSocket: Error parsing message. Raw data:", event.data, "Error:", e);
-                setLastJsonMessage({ type: 'parse_error', payload: { raw: event.data as string, error: (e as Error).message } } as any);
+                console.error("WebSocket: Error parsing JSON string. Raw string:", messageDataString, "Error:", e);
+                setLastJsonMessage({ type: 'parse_error', payload: { raw: messageDataString, error: (e as Error).message } } as any);
+                return; 
+            }
+
+            console.log("WebSocket: Parsed data object:", data);
+            console.log("WebSocket: typeof data after parse:", typeof data);
+                
+            if (typeof data === 'object' && data !== null) {
+                // Distinguish OPC UA data (typically doesn't have 'type' field) from structured messages
+                if (!data.type) { // OPC UA Data: Expecting a flat Record<string, value>
+                    const opcDataPayload: Record<string, string | number | boolean> = {};
+                    let hasValidOpcData = false;
+                    for (const key in data) {
+                        if (Object.prototype.hasOwnProperty.call(data, key)) {
+                            const value = data[key];
+                            if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+                                opcDataPayload[key] = value;
+                                hasValidOpcData = true;
+                            } else {
+                                console.warn(`WebSocket: Received non-primitive value for OPC UA Node ID ${key}:`, value);
+                            }
+                        }
+                    }
+                    if (hasValidOpcData) {
+                        // console.log("Processed OPC UA payload for store:", opcDataPayload); // Less verbose log
+                        useAppStore.getState().updateOpcUaNodeValues(opcDataPayload);
+                    } else {
+                        // This case could happen if the parsed JSON is an object but not the expected OPC-UA flat structure,
+                        // and also doesn't have a 'type' field.
+                        console.warn("WebSocket: Received object data without a 'type' field and not matching expected OPC-UA structure:", data);
+                    }
+                } else if (data.type && typeof data.type === 'string') { // Structured Message (e.g., for SLD layouts)
+                    console.log("Structured WebSocket message received:", data);
+                    setLastJsonMessage(data as WebSocketMessageFromServer);
+                    // Example: if (data.type === 'opcua-structured-batch' && data.payload) {
+                    //    useAppStore.getState().updateOpcUaNodeValues(data.payload as Record<string, string | number | boolean>);
+                    // }
+                } else {
+                    // Parsed JSON is an object, but 'type' field is missing or not a string.
+                    console.warn("WebSocket: Received object data with invalid or missing 'type' field:", data);
+                }
+            } else {
+                // Parsed JSON is not an object (e.g., a string, number, boolean directly, or null)
+                console.warn("WebSocket: Received JSON data that is not an object:", data);
             }
         };
 

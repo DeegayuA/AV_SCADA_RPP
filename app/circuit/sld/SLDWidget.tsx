@@ -59,6 +59,7 @@ import GeneratorNode from './nodes/GeneratorNode';
 import PLCNode from './nodes/PLCNode';
 import SensorNode from './nodes/SensorNode';
 import FuseNode from './nodes/FuseNode';
+import GaugeNode from './nodes/GaugeNode'; // Added GaugeNode import
 
 
 import AnimatedFlowEdge from './edges/AnimatedFlowEdge';
@@ -92,6 +93,7 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.Generator]: GeneratorNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.PLC]: PLCNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Sensor]: SensorNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Gauge]: GaugeNode as unknown as ComponentType<NodeProps>, // Added GaugeNode
 };
 const edgeTypes: EdgeTypes = { animatedFlow: AnimatedFlowEdge };
 const defaultEdgeOptions = { type: 'animatedFlow', style: { strokeWidth: 3 }, data: {} as CustomFlowEdgeData };

@@ -32,7 +32,7 @@ import {
     ContactorNodeData, InverterNodeData, PanelNodeData, BreakerNodeData, MeterNodeData,
     BatteryNodeData, GridNodeData, LoadNodeData, BusbarNodeData, TransformerNodeData,
     GeneratorNodeData, PLCNodeData, SensorNodeData, GenericDeviceNodeData, IsolatorNodeData,
-    ATSNodeData, JunctionBoxNodeData, FuseNodeData,
+    ATSNodeData, JunctionBoxNodeData, FuseNodeData, GaugeNodeData, // Added GaugeNodeData
     BaseNodeData, // Import BaseNodeData for common properties
     // Individual node data types already imported
 } from '@/types/sld';
@@ -115,6 +115,7 @@ const getElementTypeName = (element: CustomNodeType | CustomFlowEdge | null): st
             case SLDElementType.ATS: return 'ATS';
             case SLDElementType.JunctionBox: return 'Junction Box';
             case SLDElementType.Fuse: return 'Fuse';
+            case SLDElementType.Gauge: return 'Gauge Display'; // Added Gauge
             default: 
                 const typeName = (element.data as BaseNodeData)?.elementType || 'Unknown Node';
                 return typeName.charAt(0).toUpperCase() + typeName.slice(1) + ' Component';
@@ -599,6 +600,40 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                             </p>
                                             )}
                                         </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Gauge && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Gauge Configuration</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <FieldInput 
+                                                type="number" 
+                                                id="config.minVal" 
+                                                name="config.minVal" 
+                                                label="Minimum Value" 
+                                                value={(formData.config as GaugeNodeData['config'])?.minVal ?? ''} 
+                                                onChange={handleInputChange} 
+                                                placeholder="e.g., 0" 
+                                            />
+                                            <FieldInput 
+                                                type="number" 
+                                                id="config.maxVal" 
+                                                name="config.maxVal" 
+                                                label="Maximum Value" 
+                                                value={(formData.config as GaugeNodeData['config'])?.maxVal ?? ''} 
+                                                onChange={handleInputChange} 
+                                                placeholder="e.g., 100" 
+                                            />
+                                            <FieldInput 
+                                                id="config.unit" 
+                                                name="config.unit" 
+                                                label="Unit" 
+                                                value={(formData.config as GaugeNodeData['config'])?.unit ?? ''} 
+                                                onChange={handleInputChange} 
+                                                placeholder="e.g., %, kW, °C" 
+                                            />
                                         </CardContent>
                                     </Card>
                                 )}
