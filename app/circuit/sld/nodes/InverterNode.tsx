@@ -14,11 +14,18 @@ const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<Inverter
   // Access width and height from props directly as they're not part of InverterNodeData
   const width = (props as any).width || undefined;
   const height = (props as any).height || undefined;
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
+
+const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<InverterNodeData>>> = (props) => { // Added Node type
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging } = props; // Now position is available
+  const { x: xPos, y: yPos } = position || { x: 0, y: 0 };
+  const width = (props as any).width || undefined;
+  const height = (props as any).height || undefined;
+  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
+    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
     dataPoints: state.dataPoints,
   }));
   
@@ -27,30 +34,33 @@ const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<Inverter
     [isEditMode, currentUser]
   );
 
+  // --- Reactive Data Point Handling ---
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
+  const powerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput'), [data.dataPointLinks]);
+  const powerDataPointConfig = useMemo(() => powerLink ? dataPoints[powerLink.dataPointId] : undefined, [powerLink, dataPoints]);
+  const powerOpcUaNodeId = useMemo(() => powerDataPointConfig?.nodeId, [powerDataPointConfig]);
+  const reactivePowerValue = useOpcUaNodeValue(powerOpcUaNodeId);
+
   const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      return applyValueMapping(rawValue, statusLink);
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return applyValueMapping(reactiveStatusValue, statusLink);
     }
     return data.status || 'offline'; // Fallback to static status or default
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
   const powerOutput = useMemo(() => {
-    const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput');
-    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      const mappedValue = applyValueMapping(rawValue, powerLink);
-      // Assuming power is a number, format it. Add unit if not in format.
-      // The formatDisplayValue can take a default unit from dpMeta if not in link.format.suffix
-      return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
+    if (powerLink && powerDataPointConfig && reactivePowerValue !== undefined) {
+      const mappedValue = applyValueMapping(reactivePowerValue, powerLink);
+      return formatDisplayValue(mappedValue, powerLink.format, powerDataPointConfig?.dataType);
     }
     return data.config?.ratedPower ? `${data.config.ratedPower} kW (rated)` : 'N/A';
-  }, [data.dataPointLinks, data.config?.ratedPower, opcUaNodeValues, dataPoints]);
+  }, [powerLink, powerDataPointConfig, reactivePowerValue, data.config?.ratedPower]);
 
   const statusStyles = useMemo(() => {
-    // Base styling on processedStatus
     if (processedStatus === 'fault' || processedStatus === 'alarm') {
       return {
         borderColor: 'var(--destructive)',
@@ -84,10 +94,16 @@ const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<Inverter
     };
   }, [processedStatus]);
 
-  const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
-  );
+  const derivedNodeStyles = useMemo(() => {
+    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
+    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
+      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
+    }
+    if (powerOpcUaNodeId && reactivePowerValue !== undefined) {
+      primaryOpcUaValues[powerOpcUaNodeId] = reactivePowerValue;
+    }
+    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
+  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, powerOpcUaNodeId, reactivePowerValue, globalOpcUaNodeValues]);
 
   // Choose icon based on status
   const StatusIcon = useMemo(() => {

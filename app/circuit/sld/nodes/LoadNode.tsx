@@ -18,11 +18,23 @@ interface ExtendedNodeProps extends NodeProps<LoadNodeData> {
 
 const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
+
+// Extend NodeProps with the additional properties needed
+interface ExtendedNodeProps extends NodeProps<LoadNodeData> {
+  xPos: number;
+  yPos: number;
+  width?: number;
+  height?: number;
+}
+
+const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props;
+  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
+    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
     dataPoints: state.dataPoints,
   }));
 
@@ -31,30 +43,33 @@ const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
     [isEditMode, currentUser]
   );
 
+  // --- Reactive Data Point Handling ---
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
+  const powerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'powerConsumption' || link.targetProperty === 'power'), [data.dataPointLinks]);
+  const powerDataPointConfig = useMemo(() => powerLink ? dataPoints[powerLink.dataPointId] : undefined, [powerLink, dataPoints]);
+  const powerOpcUaNodeId = useMemo(() => powerDataPointConfig?.nodeId, [powerDataPointConfig]);
+  const reactivePowerValue = useOpcUaNodeValue(powerOpcUaNodeId);
+
   const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      return applyValueMapping(rawValue, statusLink);
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return applyValueMapping(reactiveStatusValue, statusLink);
     }
     return data.status || 'off'; // Default status
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
   const powerConsumption = useMemo(() => {
-    const powerLink = data.dataPointLinks?.find(
-      link => link.targetProperty === 'powerConsumption' || link.targetProperty === 'power'
-    );
-    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      const mappedValue = applyValueMapping(rawValue, powerLink);
-      return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
+    if (powerLink && powerDataPointConfig && reactivePowerValue !== undefined) {
+      const mappedValue = applyValueMapping(reactivePowerValue, powerLink);
+      return formatDisplayValue(mappedValue, powerLink.format, powerDataPointConfig?.dataType);
     }
     return data.config?.ratedPowerkW ? `${data.config.ratedPowerkW}kW (rated)` : (data.config?.loadType || 'Load');
-  }, [data.dataPointLinks, data.config, opcUaNodeValues, dataPoints]);
+  }, [powerLink, powerDataPointConfig, reactivePowerValue, data.config]);
 
   const statusStyles = useMemo(() => {
-    // Base styles on processedStatus
     if (processedStatus === 'fault' || processedStatus === 'alarm') 
       return { borderClass: 'border-destructive', bgClass: 'bg-destructive/10', iconColorClass: 'text-destructive', textClass: 'text-destructive-foreground' };
     if (processedStatus === 'overload' || processedStatus === 'warning') 
@@ -65,10 +80,16 @@ const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
     return { borderClass: 'border-neutral-400 dark:border-neutral-600', bgClass: 'bg-muted/30', iconColorClass: 'text-muted-foreground', textClass: 'text-muted-foreground' };
   }, [processedStatus]);
   
-  const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
-  );
+  const derivedNodeStyles = useMemo(() => {
+    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
+    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
+      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
+    }
+    if (powerOpcUaNodeId && reactivePowerValue !== undefined) {
+      primaryOpcUaValues[powerOpcUaNodeId] = reactivePowerValue;
+    }
+    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
+  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, powerOpcUaNodeId, reactivePowerValue, globalOpcUaNodeValues]);
 
   // Resistor SVG remains, its color will be dynamic
   const ResistorIcon = ({ className, isActive }: { className?: string, isActive?: boolean }) => {

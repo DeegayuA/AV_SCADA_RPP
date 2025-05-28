@@ -4,6 +4,7 @@ import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
+import { useOpcUaNodeValue } from '@/hooks/useOpcUaNodeValue'; // Import the hook
 import { getDataPointValue, applyValueMapping, formatDisplayValue } from './nodeUtils';
 import { GaugeIcon } from 'lucide-react'; // Placeholder icon
 
@@ -12,7 +13,7 @@ export interface GaugeNodeData extends BaseNodeData {
   config?: BaseNodeData['config'] & {
     minVal?: number;
     maxVal?: number;
-    valueDataPointLink?: DataPointLink;
+    valueDataPointLink?: DataPointLink; // This is the new dedicated link
     unit?: string;
   };
 }
@@ -20,12 +21,12 @@ export interface GaugeNodeData extends BaseNodeData {
 const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
   const { data, selected, isConnectable, id } = props;
 
-  const { opcUaNodeValues, dataPoints, isEditMode, currentUser, setSelectedElementForDetails } = useAppStore(state => ({
-    opcUaNodeValues: state.opcUaNodeValues,
+  const { opcUaNodeValues, dataPoints, isEditMode, currentUser } = useAppStore(state => ({
+    opcUaNodeValues: state.opcUaNodeValues, // Still needed for fallback and metadata
     dataPoints: state.dataPoints,
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
-    setSelectedElementForDetails: state.setSelectedElementForDetails,
+    // setSelectedElementForDetails is not used here, can be removed if not needed elsewhere
   }));
 
   const isNodeEditable = useMemo(() =>
@@ -35,27 +36,43 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
 
   const minVal = data.config?.minVal ?? 0;
   const maxVal = data.config?.maxVal ?? 100;
-  const unit = data.config?.unit ?? '';
+  const unit = data.config?.unit ?? ''; // Unit from config (e.g. for display purposes)
 
-  // Determine the primary DataPointLink for the gauge's value
-  const valueLink = useMemo(() => {
-    if (data.config?.valueDataPointLink) {
-      return data.config.valueDataPointLink;
-    }
-    // Fallback to the first dataPointLink if valueDataPointLink is not explicitly set
-    if (data.dataPointLinks && data.dataPointLinks.length > 0) {
+  // Determine the primary DataPointLink: use valueDataPointLink if available
+  const primaryValueLink = data.config?.valueDataPointLink;
+  
+  // Fallback to the first generic dataPointLink if primaryValueLink is not set
+  const fallbackValueLink = useMemo(() => {
+    if (!primaryValueLink && data.dataPointLinks && data.dataPointLinks.length > 0) {
+      // Ensure the first generic link is intended for 'value' or is the only one
+      // This simple fallback just takes the first one. More sophisticated logic could be added.
       return data.dataPointLinks[0];
     }
     return undefined;
-  }, [data.config?.valueDataPointLink, data.dataPointLinks]);
+  }, [primaryValueLink, data.dataPointLinks]);
+
+  const valueLink = primaryValueLink || fallbackValueLink;
+
+  // Use reactive value if primaryValueLink is set and has a dataPointId (nodeId)
+  const reactiveNodeValue = useOpcUaNodeValue(primaryValueLink?.dataPointId);
 
   const { numericValue, formattedValue, displayUnit } = useMemo(() => {
-    if (!valueLink || !valueLink.dataPointId || !opcUaNodeValues || !dataPoints) {
-      return { numericValue: null, formattedValue: "N/A", displayUnit: unit };
+    if (!valueLink || !valueLink.dataPointId || !dataPoints) {
+      return { numericValue: null, formattedValue: "N/A", displayUnit: unit || '' };
     }
 
     const dpMeta = dataPoints[valueLink.dataPointId] as DataPoint | undefined;
-    const rawValue = getDataPointValue(valueLink.dataPointId, opcUaNodeValues, dataPoints);
+    let rawValue: any;
+
+    if (primaryValueLink && primaryValueLink.dataPointId === valueLink.dataPointId) {
+      // Use reactive value if it's from the primary link
+      rawValue = reactiveNodeValue;
+    } else {
+      // Fallback to global store for other cases (e.g., old dataPointLinks or if reactive value is not ready)
+      rawValue = getDataPointValue(valueLink.dataPointId, opcUaNodeValues, dataPoints);
+    }
+    
+    // Apply mapping if any (applies to both reactive and fallback paths)
     const mappedValue = applyValueMapping(rawValue, valueLink);
     
     let currentNumericValue: number | null = null;
@@ -67,11 +84,18 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
         currentNumericValue = parsed;
       }
     } else if (typeof mappedValue === 'boolean') {
-        currentNumericValue = mappedValue ? 1 : 0; // Or map to min/max based on boolean
+      // Simple boolean to number conversion for gauge display
+      currentNumericValue = mappedValue ? 1 : 0; 
+      // Potentially, map true/false to maxVal/minVal or other configured values
+      // currentNumericValue = mappedValue ? maxVal : minVal;
     }
 
-
-    const finalFormattedValue = formatDisplayValue(mappedValue, valueLink.format, dpMeta?.dataType);
+    // Formatting for display
+    // The format object on valueLink should ideally be set up in SLDInspectorDialog
+    const displayFormat = valueLink.format || { type: dpMeta?.dataType === 'Boolean' ? 'boolean' : (dpMeta?.dataType === 'String' ? 'string' : 'number') };
+    const finalFormattedValue = formatDisplayValue(mappedValue, displayFormat, dpMeta?.dataType);
+    
+    // Determine unit: explicit config unit > DP unit > format suffix
     const finalUnit = unit || dpMeta?.unit || valueLink.format?.suffix || '';
 
     return { 
@@ -79,10 +103,10 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
         formattedValue: finalFormattedValue, 
         displayUnit: finalUnit 
     };
-  }, [valueLink, opcUaNodeValues, dataPoints, unit]);
+  }, [valueLink, primaryValueLink, reactiveNodeValue, opcUaNodeValues, dataPoints, unit, dpMeta?.dataType, dpMeta?.unit]); // Added dpMeta dependencies
 
   const clampedValue = useMemo(() => {
-    if (numericValue === null) return minVal; // Default to min if value is not available
+    if (numericValue === null) return minVal; 
     return Math.min(Math.max(numericValue, minVal), maxVal);
   }, [numericValue, minVal, maxVal]);
 

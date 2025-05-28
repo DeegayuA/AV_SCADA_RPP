@@ -4,6 +4,7 @@ import { Node, Edge, isEdge as isReactFlowEdge } from 'reactflow';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import DataLinkLiveValuePreview from './DataLinkLiveValuePreview'; // Import the new component
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -422,6 +423,11 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                         <Label htmlFor={`dp-select-${index}`} className="text-xs font-medium">Data Point <span className="text-red-500">*</span></Label>
                         <SearchableSelect options={dataPointOptions} value={link.dataPointId || ''} onChange={(value) => handleDataLinkChange(index, 'dataPointId', value)} placeholder="Search & Select Data Point..." searchPlaceholder="Type to search..." notFoundText="No data points found." />
                         {link.dataPointId && dataPoints[link.dataPointId] && <p className="text-xs text-muted-foreground pt-1">Type: {dataPoints[link.dataPointId].dataType}, Unit: {dataPoints[link.dataPointId].unit || "N/A"}</p>}
+                        <DataLinkLiveValuePreview 
+                            dataPointId={link.dataPointId}
+                            valueMapping={link.valueMapping}
+                            format={link.format}
+                        />
                     </div>
                     <div className="space-y-1">
                         <Label htmlFor={`target-prop-${index}`} className="text-xs font-medium">Target Property <span className="text-red-500">*</span></Label>
@@ -634,6 +640,60 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                                 onChange={handleInputChange} 
                                                 placeholder="e.g., %, kW, °C" 
                                             />
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {isNode(selectedElement) && currentElementType === SLDElementType.Gauge && (
+                                    <Card className='shadow-sm border-border/60'>
+                                        <CardHeader className='p-4'><CardTitle className='text-base font-semibold'>Gauge Value Data Point</CardTitle></CardHeader>
+                                        <CardContent className='p-4 pt-0 space-y-4'>
+                                            <div className="space-y-1">
+                                                <Label htmlFor="config.valueDataPointLink.dataPointId" className="text-xs font-medium">
+                                                    Value Data Point
+                                                    <TooltipProvider delayDuration={100}>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <InfoIcon className="w-3 h-3 ml-1.5 text-muted-foreground cursor-help inline" />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent side="top" className="max-w-xs">
+                                                                <p>Select the data point that will drive the gauge's value.</p>
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </Label>
+                                                <SearchableSelect
+                                                    options={dataPointOptions}
+                                                    value={(formData.config as GaugeNodeData['config'])?.valueDataPointLink?.dataPointId || ''}
+                                                    onChange={(value) => {
+                                                        const selectedDp = dataPoints[value as string];
+                                                        let inferredType: NonNullable<DataPointLink['format']>['type'] = 'number'; // Default for gauge
+                                                        if (selectedDp) {
+                                                            if (['Boolean'].includes(selectedDp.dataType)) inferredType = 'boolean';
+                                                            else if (selectedDp.dataType === 'DateTime') inferredType = 'dateTime';
+                                                            else if (selectedDp.dataType === 'String') inferredType = 'string';
+                                                        }
+
+                                                        handleSelectChange('config.valueDataPointLink', value ? {
+                                                            dataPointId: value,
+                                                            targetProperty: 'value', // Default target property for gauge value
+                                                            format: {
+                                                                type: inferredType,
+                                                                suffix: selectedDp?.unit || '',
+                                                                ...(inferredType === 'number' && { precision: 2 }),
+                                                            }
+                                                        } : undefined);
+                                                    }}
+                                                    placeholder="Search & Select Data Point for Gauge Value..."
+                                                    searchPlaceholder="Type to search..."
+                                                    notFoundText="No data points found."
+                                                />
+                                                {(formData.config as GaugeNodeData['config'])?.valueDataPointLink?.dataPointId && dataPoints[(formData.config as GaugeNodeData['config'])!.valueDataPointLink!.dataPointId!] && (
+                                                    <p className="text-xs text-muted-foreground pt-1">
+                                                        Selected: {dataPoints[(formData.config as GaugeNodeData['config'])!.valueDataPointLink!.dataPointId!].name} (ID: {(formData.config as GaugeNodeData['config'])!.valueDataPointLink!.dataPointId})
+                                                    </p>
+                                                )}
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 )}

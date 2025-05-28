@@ -3,27 +3,36 @@ import { DataPointLink, RealTimeData, DataPoint, CustomFlowEdgeData, BaseNodeDat
 import { format as formatDate } from 'date-fns'; // Import date-fns for date formatting
 
 // Helper to get a data point value safely
+// Prioritizes primaryOpcUaValues if the nodeId is found there, otherwise falls back to globalOpcUaNodeValues.
 export function getDataPointValue(
   internalDataPointId: string | undefined,
-  opcUaNodeValues: Record<string, string | number | boolean> | undefined | null,
-  allDataPoints: Record<string, DataPoint> | undefined | null
+  allDataPoints: Record<string, DataPoint> | undefined | null,
+  primaryOpcUaValues?: Record<string, string | number | boolean> | undefined | null,
+  globalOpcUaNodeValues?: Record<string, string | number | boolean> | undefined | null,
 ): string | number | boolean | undefined {
-  if (!internalDataPointId || !opcUaNodeValues || !allDataPoints) {
-    // console.warn("getDataPointValue: Missing required parameters.", { internalDataPointId, opcUaNodeValues, allDataPoints });
+  if (!internalDataPointId || !allDataPoints) {
     return undefined;
   }
   const dpConfig = allDataPoints[internalDataPointId];
-  if (!dpConfig) {
-    console.warn(`getDataPointValue: DataPoint configuration not found for internal ID '${internalDataPointId}'.`);
+  if (!dpConfig || !dpConfig.nodeId) {
+    // console.warn(`getDataPointValue: DataPoint configuration or Node ID not found for internal ID '${internalDataPointId}'.`);
     return undefined;
   }
-  if (!dpConfig.nodeId) {
-    console.warn(`getDataPointValue: OPC UA Node ID (nodeId) is not defined for DataPoint with internal ID '${internalDataPointId}'.`);
-    return undefined;
+
+  const nodeId = dpConfig.nodeId;
+
+  // Check primary (reactive) values first
+  if (primaryOpcUaValues && nodeId in primaryOpcUaValues) {
+    return primaryOpcUaValues[nodeId];
   }
-  // Ensure that the key exists in opcUaNodeValues before returning, otherwise return undefined
-  // This prevents returning `null` if the key exists but its value is `null` (which shouldn't happen with the new type, but good practice)
-  return dpConfig.nodeId in opcUaNodeValues ? opcUaNodeValues[dpConfig.nodeId] : undefined;
+
+  // Fallback to global values
+  if (globalOpcUaNodeValues && nodeId in globalOpcUaNodeValues) {
+    return globalOpcUaNodeValues[nodeId];
+  }
+  
+  // console.warn(`getDataPointValue: Value for Node ID '${nodeId}' (Internal ID '${internalDataPointId}') not found in primary or global sources.`);
+  return undefined;
 }
 
 // Helper to apply value mapping rules
@@ -210,20 +219,21 @@ interface ExtendedCSSProperties extends React.CSSProperties {
 }
 
 export function getDerivedStyle(
-  data: NodeDataForStyle | CustomFlowEdgeData, // Accept both node and edge data
-  opcUaNodeValues: Record<string, string | number | boolean>, // Renamed and using specific type
-  dataPointsMetadatas: Record<string, DataPoint> // Pass all DP metadata
+  data: NodeDataForStyle | CustomFlowEdgeData,
+  allDataPointsMetadatas: Record<string, DataPoint>,
+  primaryOpcUaValues?: Record<string, string | number | boolean> | undefined | null, // Specific reactive values from the node
+  globalOpcUaNodeValues?: Record<string, string | number | boolean> | undefined | null // Global values from the store
 ): ExtendedCSSProperties {
   const derivedStyle: ExtendedCSSProperties = {};
   if (!data.dataPointLinks) return derivedStyle;
 
   data.dataPointLinks.forEach(link => {
-    const dpMetadata = dataPointsMetadatas[link.dataPointId]; // This uses internalDataPointId
-    if (!dpMetadata) return; // Skip if data point metadata not found
+    const dpMetadata = allDataPointsMetadatas[link.dataPointId];
+    if (!dpMetadata) return;
 
-    // opcUaNodeValues is passed directly
-    const rawValue = getDataPointValue(link.dataPointId, opcUaNodeValues, dataPointsMetadatas);
-    let targetValue = applyValueMapping(rawValue, link); // Apply mapping first
+    // Use the modified getDataPointValue to fetch value, prioritizing primaryOpcUaValues
+    const rawValue = getDataPointValue(link.dataPointId, allDataPointsMetadatas, primaryOpcUaValues, globalOpcUaNodeValues);
+    let targetValue = applyValueMapping(rawValue, link);
 
     // Further format if the targetProperty expects a string that should be formatted
     // e.g. if targetProperty is 'labelSuffix' and DPLink has a format.
@@ -268,22 +278,117 @@ export function getDerivedStyle(
 // Helper to get derived display text or primary value based on dataPointLinks
 export function getDerivedPrimaryDisplay(
     data: NodeDataForStyle | CustomFlowEdgeData,
-    opcUaNodeValues: Record<string, string | number | boolean>, // Renamed and using specific type
-    dataPointsMetadatas: Record<string, DataPoint>,
-    // Defines which DPLink.targetProperty to prioritize for display.
-    // Could be 'value' for DataLabel, 'statusText' for a status display area, 'label' to override static label.
+    allDataPointsMetadatas: Record<string, DataPoint>,
+    primaryOpcUaValues?: Record<string, string | number | boolean> | undefined | null,
+    globalOpcUaNodeValues?: Record<string, string | number | boolean> | undefined | null,
     targetPropertyForDisplay: string = 'value'
 ): string | null {
     const displayLink = data.dataPointLinks?.find(link => link.targetProperty === targetPropertyForDisplay);
-    if (!displayLink) return null; // No DPLink configured for this specific targetProperty.
+    if (!displayLink) return null;
 
-    const dpMetadata = dataPointsMetadatas[displayLink.dataPointId]; // Uses internalDataPointId
-    if (!dpMetadata) return null; // DataPoint metadata is essential for proper formatting.
+    const dpMetadata = allDataPointsMetadatas[displayLink.dataPointId];
+    if (!dpMetadata) return null;
 
-    // opcUaNodeValues is passed directly
-    const rawValue = getDataPointValue(displayLink.dataPointId, opcUaNodeValues, dataPointsMetadatas);
+    const rawValue = getDataPointValue(displayLink.dataPointId, allDataPointsMetadatas, primaryOpcUaValues, globalOpcUaNodeValues);
     const mappedValue = applyValueMapping(rawValue, displayLink);
 
-    // Now format this mappedValue (or rawValue if mapping didn't change it)
     return formatDisplayValue(mappedValue, displayLink.format, dpMetadata.dataType);
+}
+
+// --- Text Measurement Utility ---
+let sharedCanvasContext: CanvasRenderingContext2D | null = null;
+
+function getCanvasContext(): CanvasRenderingContext2D {
+  if (!sharedCanvasContext) {
+    const canvas = document.createElement('canvas');
+    // The canvas does not need to be part of the document body to get a context.
+    sharedCanvasContext = canvas.getContext('2d');
+  }
+  if (!sharedCanvasContext) {
+    // Fallback or error if context cannot be obtained (highly unlikely for 2D)
+    console.error("Failed to get 2D canvas context for text measurement.");
+    // Return a dummy context or throw an error
+    return {
+        measureText: (text: string) => ({ width: text.length * 8, actualBoundingBoxAscent: 10, actualBoundingBoxDescent: 2 })
+    } as unknown as CanvasRenderingContext2D;
+  }
+  return sharedCanvasContext;
+}
+
+interface TextMeasurementOptions {
+  text: string;
+  fontFamily?: string;
+  fontSize?: string; // e.g., '16px'
+  fontWeight?: string | number; // e.g., 'bold', 700
+  fontStyle?: string; // e.g., 'italic'
+  padding?: string; // e.g., '5px', '5px 10px'
+  lineHeightFactor?: number; // e.g., 1.2 for 120% line height
+}
+
+interface TextDimensions {
+  width: number;
+  height: number;
+  padding: { top: number; right: number; bottom: number; left: number };
+}
+
+export function measureTextNode(options: TextMeasurementOptions): TextDimensions {
+  const {
+    text,
+    fontFamily = 'Arial, sans-serif', // Default font family
+    fontSize = '14px',
+    fontWeight = 'normal',
+    fontStyle = 'normal',
+    padding: paddingString = '4px', // Default padding
+    lineHeightFactor = 1.2, // Default line height
+  } = options;
+
+  const ctx = getCanvasContext();
+  ctx.font = `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`;
+
+  const lines = text.split('\n');
+  let maxWidth = 0;
+
+  lines.forEach(line => {
+    const metrics = ctx.measureText(line);
+    if (metrics.width > maxWidth) {
+      maxWidth = metrics.width;
+    }
+  });
+  
+  // Estimate line height: use actualBoundingBoxAscent/Descent if available and reliable,
+  // otherwise, fallback to fontSize * lineHeightFactor.
+  // For simplicity and broader compatibility, we'll use fontSize for height calculation per line.
+  const numericFontSize = parseFloat(fontSize); // Assuming fontSize is like '16px'
+  if (isNaN(numericFontSize)) {
+      console.warn(`measureTextNode: Invalid fontSize '${fontSize}'. Defaulting to 14px for height calc.`);
+  }
+  const singleLineHeight = (isNaN(numericFontSize) ? 14 : numericFontSize) * lineHeightFactor;
+  const totalTextHeight = lines.length * singleLineHeight;
+
+  // Parse padding
+  const paddingValues = (paddingString || '0').split(' ').map(p => parseFloat(p));
+  let parsedPadding = { top: 0, right: 0, bottom: 0, left: 0 };
+
+  if (paddingValues.length === 1) {
+    parsedPadding = { top: paddingValues[0], right: paddingValues[0], bottom: paddingValues[0], left: paddingValues[0] };
+  } else if (paddingValues.length === 2) {
+    parsedPadding = { top: paddingValues[0], right: paddingValues[1], bottom: paddingValues[0], left: paddingValues[1] };
+  } else if (paddingValues.length === 3) { // top, horizontal, bottom
+    parsedPadding = { top: paddingValues[0], right: paddingValues[1], bottom: paddingValues[2], left: paddingValues[1] };
+  } else if (paddingValues.length === 4) { // top, right, bottom, left
+    parsedPadding = { top: paddingValues[0], right: paddingValues[1], bottom: paddingValues[2], left: paddingValues[3] };
+  }
+  
+  // Validate parsed padding, default to 0 if NaN
+  Object.keys(parsedPadding).forEach(key => {
+    const k = key as keyof typeof parsedPadding;
+    if (isNaN(parsedPadding[k])) parsedPadding[k] = 0;
+  });
+
+
+  return {
+    width: maxWidth + parsedPadding.left + parsedPadding.right,
+    height: totalTextHeight + parsedPadding.top + parsedPadding.bottom,
+    padding: parsedPadding,
+  };
 }

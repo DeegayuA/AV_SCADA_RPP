@@ -29,43 +29,47 @@ export const categorizedComponents: PaletteCategory[] = [
     name: 'Sources & Storage',
     components: [
       { type: SLDElementType.Panel, label: 'PV Array', icon: <Rows3 size={16}/>,
-        defaultData: { label: 'PV Array', status: 'producing' } },
+        defaultData: { label: 'PV Array', status: 'producing', elementType: SLDElementType.Panel } },
       { type: SLDElementType.Battery, label: 'Battery', icon: <BatteryCharging size={16}/>,
-        defaultData: { label: 'Battery Bank', status: 'nominal', config: { capacityAh: 100, voltageNominalV: 48} } },
+        defaultData: { label: 'Battery Bank', status: 'nominal', config: { capacityAh: 100, voltageNominalV: 48}, elementType: SLDElementType.Battery } },
       { type: SLDElementType.Grid, label: 'Grid Source', icon: <Cable size={16}/>,
-        defaultData: { label: 'Utility Grid', status: 'connected', config: {voltageLevel: "11kV"} } },
+        defaultData: { label: 'Utility Grid', status: 'connected', config: {voltageLevel: "11kV"}, elementType: SLDElementType.Grid } },
       { type: SLDElementType.Generator, label: 'Generator', icon: <Zap size={16}/>,
-        defaultData: { label: 'Backup Gen', status: 'offline', config: {fuelType: "Diesel", ratingKVA: "150"} } },
+        defaultData: { label: 'Backup Gen', status: 'offline', config: {fuelType: "Diesel", ratingKVA: "150"}, elementType: SLDElementType.Generator } },
     ],
   },
   {
     name: 'Conversion & Switching',
     components: [
       { type: SLDElementType.Inverter, label: 'Inverter', icon: <CircuitBoard size={16}/>,
-        defaultData: { label: 'Inverter', status: 'nominal', config: { ratedPower: 100} } },
+        defaultData: { label: 'Inverter', status: 'nominal', config: { ratedPower: 100}, elementType: SLDElementType.Inverter } },
       { type: SLDElementType.Transformer, label: 'Transformer', icon: <GitFork size={16}/>,
-        defaultData: { label: 'Transformer', status: 'nominal', config: {ratingMVA: "1", primaryVoltage: "11kV", secondaryVoltage: "0.4kV" } } },
+        defaultData: { label: 'Transformer', status: 'nominal', config: {ratingMVA: "1", primaryVoltage: "11kV", secondaryVoltage: "0.4kV" }, elementType: SLDElementType.Transformer } },
       { type: SLDElementType.Breaker, label: 'Breaker', icon: <PlugZap size={16}/>,
-        defaultData: { label: 'CB', status: 'closed', config: { type: "MCCB" } } },
+        defaultData: { label: 'CB', status: 'closed', config: { type: "MCCB" }, elementType: SLDElementType.Breaker } },
+      { type: SLDElementType.Switch, label: 'Switch', icon: <SlidersHorizontal size={16}/>, // Assuming SlidersHorizontal for now, replace if a better icon is available
+        defaultData: { label: 'Switch', status: 'open', elementType: SLDElementType.Switch } },
       { type: SLDElementType.Contactor, label: 'Contactor', icon: <Zap size={16} className="opacity-80"/>,
-        defaultData: { label: 'K1', status: 'open', config: { normallyOpen: true } } as Partial<ContactorNodeData> },
+        defaultData: { label: 'K1', status: 'open', config: { normallyOpen: true }, elementType: SLDElementType.Contactor } as Partial<ContactorNodeData> },
       { type: SLDElementType.Fuse, label: 'Fuse', icon: <ShieldAlert size={16}/>,
-        defaultData: { label: 'F1', status: 'nominal', config: {ratingAmps: 10} } as Partial<FuseNodeData> },
+        defaultData: { label: 'F1', status: 'nominal', config: {ratingAmps: 10}, elementType: SLDElementType.Fuse } as Partial<FuseNodeData> },
       { type: SLDElementType.Isolator, label: 'Isolator', icon: <Unplug size={16}/>,
-        defaultData: { label: 'QS1', status: 'open', config: {poles: 3} } as Partial<IsolatorNodeData> },
+        defaultData: { label: 'QS1', status: 'open', config: {poles: 3}, elementType: SLDElementType.Isolator } as Partial<IsolatorNodeData> },
     ],
   },
   {
     name: 'Distribution & Loads',
     components: [
       { type: SLDElementType.Busbar, label: 'Busbar', icon: <Workflow size={16}/>,
-        defaultData: { label: 'Main Bus', status: 'energized', config: { width: 120, height: 10 } } },
+        defaultData: { label: 'Main Bus', status: 'energized', config: { width: 120, height: 10 }, elementType: SLDElementType.Busbar } },
       { type: SLDElementType.Meter, label: 'Meter', icon: <DatabaseZap size={16}/>,
-        defaultData: { label: 'Energy Meter', status: 'reading' } },
+        defaultData: { label: 'Energy Meter', status: 'reading', elementType: SLDElementType.Meter } },
       { type: SLDElementType.Load, label: 'Generic Load', icon: <SlidersHorizontal size={16}/>,
-        defaultData: { label: 'Load Center', status: 'active' } },
+        defaultData: { label: 'Load Center', status: 'active', elementType: SLDElementType.Load } },
       { type: SLDElementType.JunctionBox, label: 'Junction Box', icon: <ToyBrick size={16}/>,
-        defaultData: { label: 'JB-1', status: 'nominal', config: {numberOfStrings: 4} } as Partial<JunctionBoxNodeData>},
+        defaultData: { label: 'JB-1', status: 'nominal', config: {numberOfStrings: 4}, elementType: SLDElementType.JunctionBox } as Partial<JunctionBoxNodeData>},
+      { type: SLDElementType.GenericDevice, label: 'Generic Device', icon: <BoxSelect size={16}/>,
+        defaultData: { label: 'Device', status: 'nominal', elementType: SLDElementType.GenericDevice } },
     ],
   },
   {
@@ -83,19 +87,34 @@ export const categorizedComponents: PaletteCategory[] = [
           label: 'Gauge', 
           elementType: SLDElementType.Gauge, 
           status: 'nominal', 
-          config: { minVal: 0, maxVal: 100, unit: '%' } 
+          config: { minVal: 0, maxVal: 100, unit: '%' }
         },
         description: 'Displays a single value as a visual gauge.'
       },
     ],
    },
   {
+    name: 'Protection & Specialized',
+    components: [
+      { type: SLDElementType.ATS, label: 'ATS', icon: <GitFork size={16} />, // Placeholder icon, update if available
+        defaultData: { label: 'ATS', status: 'source1_nominal', elementType: SLDElementType.ATS } },
+      { type: SLDElementType.CT, label: 'CT', icon: <Zap size={16} />, // Placeholder icon
+        defaultData: { label: 'CT', status: 'nominal', elementType: SLDElementType.CT } },
+      { type: SLDElementType.PT, label: 'PT', icon: <Zap size={16} />, // Placeholder icon
+        defaultData: { label: 'PT', status: 'nominal', elementType: SLDElementType.PT } },
+      { type: SLDElementType.Motor, label: 'Motor', icon: <SlidersHorizontal size={16} />, // Placeholder icon
+        defaultData: { label: 'Motor', status: 'off', elementType: SLDElementType.Motor } },
+      { type: SLDElementType.Relay, label: 'Relay', icon: <CircuitBoard size={16} />, // Placeholder icon
+        defaultData: { label: 'Relay', status: 'deactivated', elementType: SLDElementType.Relay } },
+    ],
+  },
+  {
     name: 'Annotations',
     components: [
       { type: SLDElementType.DataLabel, label: 'Data Display', icon: <FileText size={16}/>,
-        defaultData: { label: 'Value:', status: 'nominal' } },
+        defaultData: { label: 'Value:', status: 'nominal', elementType: SLDElementType.DataLabel } },
       { type: SLDElementType.TextLabel, label: 'Text Box', icon: <TextCursorInput size={16}/>,
-        defaultData: { label: 'Info Label', text: 'Your text here', status: 'nominal', styleConfig: { fontSize: '10px', padding: '3px 5px', color: 'var(--muted-foreground)' } } as Partial<TextLabelNodeData> },
+        defaultData: { label: 'Info Label', text: 'Your text here', status: 'nominal', styleConfig: { fontSize: '10px', padding: '3px 5px', color: 'var(--muted-foreground)' }, elementType: SLDElementType.TextLabel } as Partial<TextLabelNodeData> },
     ],
   },
 ];

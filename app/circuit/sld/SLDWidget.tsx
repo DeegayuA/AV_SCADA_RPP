@@ -19,9 +19,10 @@ import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { throttle } from 'lodash';
-import { AlertTriangle, Check, Download, LayoutList, Loader2, RotateCcw, X } from 'lucide-react'; // Added Download
+import { AlertTriangle, Check, Download, LayoutList, Loader2, RotateCcw, X, Upload } from 'lucide-react'; // Added Download, Upload
 import { motion } from 'framer-motion';
 
+import { Textarea } from "@/components/ui/textarea"; // Added Textarea for import dialog
 import {
   SLDLayout, CustomNodeType, CustomFlowEdge, CustomNodeData,
   SLDElementType, CustomFlowEdgeData, TextLabelNodeData,
@@ -94,6 +95,7 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.PLC]: PLCNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Sensor]: SensorNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Gauge]: GaugeNode as unknown as ComponentType<NodeProps>, // Added GaugeNode
+    [SLDElementType.Switch]: SwitchNode as unknown as ComponentType<NodeProps>, // Added SwitchNode
 };
 const edgeTypes: EdgeTypes = { animatedFlow: AnimatedFlowEdge };
 const defaultEdgeOptions = { type: 'animatedFlow', style: { strokeWidth: 3 }, data: {} as CustomFlowEdgeData };
@@ -152,8 +154,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
   const [currentLayoutIdKey, setCurrentLayoutIdKey] = useState<string>('');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importJsonString, setImportJsonString] = useState('');
   
-  const currentLayoutLoadedFromServerOrInitialized = useRef(false); 
+  const currentLayoutLoadedFromServerOrInitialized = useRef(false);
   const canEdit = useMemo(() => !!isEditModeFromProps, [isEditModeFromProps]);
   const initialFitViewDone = useRef(false);
   const storeSelectedElement = useSelectedElementForDetails();
@@ -368,6 +372,93 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       // To simplify, for local-first:
       // setIsDirty(false); // This is now set within 'layout-saved-confirmation' or after local save without server. Let persistLayout manage it implicitly.
   }, [nodes, edges, reactFlowInstance, layoutId, canEdit, isDirty, persistLayout]);
+
+
+  const handleImportLayout = useCallback(() => {
+    if (!canEdit || !layoutId || !reactFlowInstance) {
+      toast.error("Import cannot be performed at this time.");
+      return;
+    }
+
+    try {
+      const parsedLayout = JSON.parse(importJsonString) as SLDLayout;
+
+      // Basic Validation
+      if (!parsedLayout || typeof parsedLayout !== 'object') {
+        toast.error("Invalid JSON format.", { description: "The input is not a valid JSON object." });
+        return;
+      }
+      if (typeof parsedLayout.layoutId !== 'string' || !Array.isArray(parsedLayout.nodes) || !Array.isArray(parsedLayout.edges)) {
+        toast.error("Invalid SLDLayout Structure.", { description: "The JSON object is missing required 'layoutId', 'nodes', or 'edges' properties of the correct type." });
+        return;
+      }
+      // Deeper validation (optional, but good)
+      // Ensure nodes have id, position, data
+      // Ensure edges have id, source, target
+      const isValidNodes = parsedLayout.nodes.every(n => 
+        typeof n.id === 'string' && 
+        typeof n.position === 'object' && n.position !== null && 
+        typeof n.data === 'object' && n.data !== null &&
+        typeof n.type === 'string' // Ensure node type is present
+      );
+      const isValidEdges = parsedLayout.edges.every(e =>
+        typeof e.id === 'string' &&
+        typeof e.source === 'string' &&
+        typeof e.target === 'string' &&
+        typeof e.type === 'string' // Ensure edge type is present
+      );
+
+      if (!isValidNodes) {
+        toast.error("Invalid Node Structure in SLDLayout.", { description: "One or more nodes are missing required properties (id, position, data, type)." });
+        return;
+      }
+      if (!isValidEdges) {
+        toast.error("Invalid Edge Structure in SLDLayout.", { description: "One or more edges are missing required properties (id, source, target, type)." });
+        return;
+      }
+      
+      // If the imported layoutId is different, warn the user they are importing into the current layoutId
+      if (parsedLayout.layoutId !== layoutId) {
+        toast.info("Importing Content to Current Layout", {
+          description: `The content from layout '${parsedLayout.layoutId.replace(/_/g, ' ')}' will be imported into your currently active layout '${layoutId.replace(/_/g, ' ')}'. The original layout ID from the JSON will be ignored for saving.`,
+          duration: 8000,
+        });
+      }
+      
+      // Update React Flow state
+      // Ensure nodes have 'selected: false' and types are correctly assigned
+      const validatedNodes = parsedLayout.nodes.map(n => ({ 
+          ...n, 
+          selected: false, 
+          // Ensure type is present, fallback to TextLabel if somehow missing (though validation should catch this)
+          type: n.type || n.data?.elementType || SLDElementType.TextLabel, 
+      }));
+
+      setNodes(removePlaceholderIfNeeded(validatedNodes));
+      setEdges(parsedLayout.edges || []); // Default to empty array if edges are null/undefined
+
+      // Apply viewport
+      if (parsedLayout.viewport && reactFlowInstance) {
+        reactFlowInstance.setViewport(parsedLayout.viewport, { duration: fitViewOptions.duration });
+      } else if (reactFlowInstance) {
+        reactFlowInstance.fitView(fitViewOptions);
+      }
+      initialFitViewDone.current = true; // Mark fitView/setViewport as done
+
+      // Persist changes to the current active layoutId
+      persistLayout(validatedNodes, parsedLayout.edges || [], reactFlowInstance, layoutId, true); // Manual save = true
+      setIsDirty(false); // Assume persistLayout handles making it clean or server confirms
+
+      toast.success("Layout Imported Successfully", { description: `Content imported into layout '${layoutId.replace(/_/g, ' ')}'.` });
+      setIsImportDialogOpen(false);
+      setImportJsonString('');
+
+    } catch (error: any) {
+      console.error("Error importing SLD layout:", error);
+      toast.error("Import Failed", { description: error.message || "Could not parse or apply the JSON content." });
+    }
+  }, [canEdit, layoutId, reactFlowInstance, importJsonString, persistLayout, removePlaceholderIfNeeded, fitViewOptions.duration]);
+
 
   // Function to export all SLD layouts from localStorage
   const handleExportAllLayouts = useCallback(() => {
@@ -772,11 +863,52 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                             <TooltipContent><p>Export All Stored Layouts</p></TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
+                       {/* Import Button */}
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button onClick={() => setIsImportDialogOpen(true)} size="sm" variant="outline" title="Import Layout from JSON">
+                                        <Upload className="h-4 w-4"/>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Import Layout from JSON</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </motion.div>
                 )}
             </Panel>
         </ReactFlow>
       </div>
+      {/* Import Dialog */}
+      {canEdit && layoutId && (
+        <AlertDialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+            <AlertDialogContent className="max-w-xl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Import SLD Layout from JSON</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Paste the JSON content of a single SLDLayout object below. This will overwrite the current layout ({layoutId.replace(/_/g, ' ')}).
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <Textarea
+                    placeholder="Paste SLDLayout JSON here..."
+                    value={importJsonString}
+                    onChange={(e) => setImportJsonString(e.target.value)}
+                    className="min-h-[200px] max-h-[400px] text-xs font-mono"
+                    aria-label="SLD Layout JSON Input"
+                />
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setImportJsonString('')}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => {
+                        // handleImportLayout will be called here
+                        // For now, just closing and logging
+                        console.log("Attempting to import:", importJsonString);
+                        handleImportLayout();
+                    }}>Import</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      )}
+
       {canEdit && selectedElement && ( <SLDInspectorDialog isOpen={isInspectorDialogOpen} onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} selectedElement={selectedElement} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement}/> )}
       {!canEdit && selectedElement && (isNode(selectedElement) || isEdge(selectedElement)) && ( <SLDElementControlPopup element={selectedElement} isOpen={isControlPopupOpen} onOpenChange={handleControlPopupOpenChange} /> )}
       {isDrillDownOpen && drillDownLayoutId && ( <SLDDrillDownDialog isOpen={isDrillDownOpen} onOpenChange={handleDrillDownOpenChange} layoutId={drillDownLayoutId} parentLabel={drillDownParentLabel} /> )}

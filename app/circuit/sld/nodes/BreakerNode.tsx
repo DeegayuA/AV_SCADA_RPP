@@ -15,10 +15,11 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => { // Revert
   const yPos = position?.y ?? 0;
   const width = (props as any).width;
   const height = (props as any).height;
-  const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
+  const { isEditMode, currentUser, dataPoints, globalOpcUaNodeValues, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
+    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
     dataPoints: state.dataPoints,
   }));
 
@@ -203,8 +204,10 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => { // Revert
   ]);
 
   const derivedNodeStyles = useMemo(() => {
-    return getDerivedStyle(data, opcUaValuesForDerivedStyle, dataPoints);
-  }, [data, opcUaValuesForDerivedStyle, dataPoints]);
+    // opcUaValuesForDerivedStyle already contains the reactive values for status, isOpen, and up to 3 style links.
+    // Pass these as primary, and globalOpcUaNodeValues as fallback.
+    return getDerivedStyle(data, dataPoints, opcUaValuesForDerivedStyle, globalOpcUaNodeValues);
+  }, [data, dataPoints, opcUaValuesForDerivedStyle, globalOpcUaNodeValues]);
 
   
   // Combine statusStyles with derivedNodeStyles. Derived styles can override.

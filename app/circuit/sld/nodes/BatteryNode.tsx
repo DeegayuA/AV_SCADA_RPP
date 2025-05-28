@@ -19,11 +19,28 @@ import { Button } from "@/components/ui/button"; // Added Button
 
 const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedNodeProps that includes width and height
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props; // Adjusted destructuring
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
+
+// Extended props interface to include additional properties used in the component
+interface ExtendedNodeProps extends NodeProps<BatteryNodeData> {
+  xPos: number;
+  yPos: number;
+  width?: number | null;
+  height?: number | null;
+}
+
+import { useAppStore } from '@/stores/appStore';
+import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
+import { BatteryChargingIcon, BatteryFullIcon, BatteryLowIcon, BatteryMediumIcon, AlertCircleIcon, ZapIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
+
+const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedNodeProps that includes width and height
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props;
+  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
+    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
     dataPoints: state.dataPoints,
   }));
 
@@ -32,26 +49,34 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedN
     [isEditMode, currentUser]
   );
 
+  // --- Reactive Data Point Handling ---
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
+  const socLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'soc'), [data.dataPointLinks]);
+  const socDataPointConfig = useMemo(() => socLink ? dataPoints[socLink.dataPointId] : undefined, [socLink, dataPoints]);
+  const socOpcUaNodeId = useMemo(() => socDataPointConfig?.nodeId, [socDataPointConfig]);
+  const reactiveSocValue = useOpcUaNodeValue(socOpcUaNodeId);
+
   const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      return applyValueMapping(rawValue, statusLink);
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return applyValueMapping(reactiveStatusValue, statusLink);
     }
     return data.status || 'idle'; // Default to idle
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
   const socValue = useMemo(() => {
-    const socLink = data.dataPointLinks?.find(link => link.targetProperty === 'soc');
-    if (socLink && dataPoints && dataPoints[socLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const dpMeta = dataPoints[socLink.dataPointId];
-      const rawValue = getDataPointValue(socLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      const mappedValue = applyValueMapping(rawValue, socLink);
-      // Assuming SOC is a number, format it.
-      return parseFloat(formatDisplayValue(mappedValue, socLink.format, dpMeta?.dataType));
+    if (socLink && socDataPointConfig && reactiveSocValue !== undefined) {
+      const mappedValue = applyValueMapping(reactiveSocValue, socLink);
+      // parseFloat will handle cases where formatDisplayValue might return "50%" -> 50
+      const formatted = formatDisplayValue(mappedValue, socLink.format, socDataPointConfig?.dataType);
+      const numericVal = parseFloat(formatted);
+      return isNaN(numericVal) ? -1 : numericVal; // Return -1 if parsing fails
     }
     return typeof data.config?.soc === 'number' ? data.config.soc : -1; // Fallback to config
-  }, [data.dataPointLinks, data.config?.soc, opcUaNodeValues, dataPoints]);
+  }, [socLink, socDataPointConfig, reactiveSocValue, data.config?.soc]);
 
   const { icon: StatusIcon, borderClass, bgClass, textClass, animationClass } = useMemo(() => {
     let animClass = '';
@@ -80,10 +105,16 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedN
     return { icon: ZapIcon, borderClass: 'border-neutral-400 dark:border-neutral-600', bgClass: 'bg-muted/30', textClass: 'text-muted-foreground', animationClass: animClass }; 
   }, [processedStatus, socValue]);
   
-  const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
-  );
+  const derivedNodeStyles = useMemo(() => {
+    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
+    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
+      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
+    }
+    if (socOpcUaNodeId && reactiveSocValue !== undefined) {
+      primaryOpcUaValues[socOpcUaNodeId] = reactiveSocValue;
+    }
+    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
+  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, socOpcUaNodeId, reactiveSocValue, globalOpcUaNodeValues]);
 
   const displaySoc = socValue >= 0 ? `${Math.round(socValue)}%` : (processedStatus || 'N/A');
 

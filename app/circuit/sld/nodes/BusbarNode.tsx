@@ -21,11 +21,30 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
   const yPos = position?.y ?? 0;
   const width = props.width ?? null;
   const height = props.height ?? null;
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
+
+// Extended NodeProps with position property
+interface NodeProps<T = any> extends ReactFlowNodeProps<T> {
+  position: { x: number; y: number };
+  width?: number;
+  height?: number;
+}
+import { useAppStore } from '@/stores/appStore';
+import { getDataPointValue, applyValueMapping, getDerivedStyle, formatDisplayValue } from './nodeUtils';
+import { MinusIcon, InfoIcon } from 'lucide-react'; // Simple representation for a busbar. Added InfoIcon
+import { Button } from "@/components/ui/button"; // Added Button
+
+const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, zIndex, dragging, position } = props;
+  const xPos = position?.x ?? 0;
+  const yPos = position?.y ?? 0;
+  const width = props.width ?? null;
+  const height = props.height ?? null;
+  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
+    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
     dataPoints: state.dataPoints,
   }));
 
@@ -34,39 +53,50 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => { // Reverted
     [isEditMode, currentUser]
   );
 
+  // --- Reactive Data Point Handling ---
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
+  const voltageLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'voltage'), [data.dataPointLinks]);
+  const voltageDataPointConfig = useMemo(() => voltageLink ? dataPoints[voltageLink.dataPointId] : undefined, [voltageLink, dataPoints]);
+  const voltageOpcUaNodeId = useMemo(() => voltageDataPointConfig?.nodeId, [voltageDataPointConfig]);
+  const reactiveVoltageValue = useOpcUaNodeValue(voltageOpcUaNodeId);
+  // --- End Reactive Data Point Handling ---
+
   const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      return applyValueMapping(rawValue, statusLink);
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return applyValueMapping(reactiveStatusValue, statusLink);
     }
     return data.status || 'de-energized'; // Default status
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
   const statusColorClass = useMemo(() => {
-    // This provides a fallback class if not overridden by a DPLink targeting 'backgroundColor' or 'fillColor'
     if (processedStatus === 'fault' || processedStatus === 'alarm') return 'bg-destructive dark:bg-red-700';
     if (processedStatus === 'energized' || processedStatus === 'nominal') return 'bg-green-500 dark:bg-green-600';
     return 'bg-neutral-400 dark:bg-neutral-600'; // De-energized, offline, or unknown
   }, [processedStatus]);
 
-  const derivedNodeStyles = useMemo(() =>
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
-  );
+  const derivedNodeStyles = useMemo(() => {
+    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
+    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
+      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
+    }
+    if (voltageOpcUaNodeId && reactiveVoltageValue !== undefined) {
+      primaryOpcUaValues[voltageOpcUaNodeId] = reactiveVoltageValue;
+    }
+    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
+  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, voltageOpcUaNodeId, reactiveVoltageValue, globalOpcUaNodeValues]);
 
   // Display voltage or other info if linked
   const displayInfo = useMemo(() => {
-    const voltageLink = data.dataPointLinks?.find(link => link.targetProperty === 'voltage');
-    if (voltageLink && dataPoints && dataPoints[voltageLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const dpMeta = dataPoints[voltageLink.dataPointId];
-      const rawValue = getDataPointValue(voltageLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      const mappedValue = applyValueMapping(rawValue, voltageLink);
-      return formatDisplayValue(mappedValue, voltageLink.format, dpMeta?.dataType);
+    if (voltageLink && voltageDataPointConfig && reactiveVoltageValue !== undefined) {
+      const mappedValue = applyValueMapping(reactiveVoltageValue, voltageLink);
+      return formatDisplayValue(mappedValue, voltageLink.format, voltageDataPointConfig?.dataType);
     }
-    // Could add other parameters like frequency, etc.
     return data.label; // Fallback to label if no specific info DPLink
-  }, [data.dataPointLinks, data.label, opcUaNodeValues, dataPoints]);
+  }, [voltageLink, voltageDataPointConfig, reactiveVoltageValue, data.label]);
 
 
   // Dimensions for a horizontal busbar by default

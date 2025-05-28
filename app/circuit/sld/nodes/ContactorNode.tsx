@@ -10,11 +10,15 @@ import { Button } from "@/components/ui/button"; // Added Button
 
 const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => { // Reverted to NodeProps
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props; // Removed width and height
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
+
+const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props;
+  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
+    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
     dataPoints: state.dataPoints,
   }));
 
@@ -23,26 +27,33 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => { // Re
     [isEditMode, currentUser]
   );
 
+  // --- Reactive Data Point Handling ---
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
+  const isClosedLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'isClosed'), [data.dataPointLinks]);
+  const isClosedDataPointConfig = useMemo(() => isClosedLink ? dataPoints[isClosedLink.dataPointId] : undefined, [isClosedLink, dataPoints]);
+  const isClosedOpcUaNodeId = useMemo(() => isClosedDataPointConfig?.nodeId, [isClosedDataPointConfig]);
+  const reactiveIsClosedValue = useOpcUaNodeValue(isClosedOpcUaNodeId);
+  // --- End Reactive Data Point Handling ---
+
   const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      return applyValueMapping(rawValue, statusLink);
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return applyValueMapping(reactiveStatusValue, statusLink);
     }
     return data.status || 'open'; // Default to open
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
   
   const isClosed = useMemo(() => {
-     // Prefer a DataPointLink for 'isClosed' if available for direct boolean control
-    const isClosedLink = data.dataPointLinks?.find(link => link.targetProperty === 'isClosed');
-    if (isClosedLink && dataPoints && dataPoints[isClosedLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(isClosedLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
-      const mappedValue = applyValueMapping(rawValue, isClosedLink);
+    if (isClosedLink && isClosedDataPointConfig && reactiveIsClosedValue !== undefined) {
+      const mappedValue = applyValueMapping(reactiveIsClosedValue, isClosedLink);
       return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || Number(mappedValue) === 1;
     }
     // Fallback logic based on processedStatus
     return processedStatus === 'closed' || processedStatus === 'energized';
-  }, [data.dataPointLinks, processedStatus, opcUaNodeValues, dataPoints]);
+  }, [isClosedLink, isClosedDataPointConfig, reactiveIsClosedValue, processedStatus]);
 
 
   const { borderClass, bgClass, textClass, Icon } = useMemo(() => {
@@ -52,16 +63,21 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => { // Re
       return { borderClass: 'border-yellow-500', bgClass: 'bg-yellow-500/10', textClass: 'text-yellow-500', Icon: AlertTriangleIcon };
     if (isClosed) 
       return { borderClass: 'border-green-600', bgClass: 'bg-green-600/10', textClass: 'text-green-600', Icon: PowerIcon };
-    // Open or default (offline, standby)
     return { borderClass: 'border-neutral-400 dark:border-neutral-600', bgClass: 'bg-muted/30', textClass: 'text-muted-foreground', Icon: PowerOffIcon };
   }, [processedStatus, isClosed]);
   
-  const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
-  );
+  const derivedNodeStyles = useMemo(() => {
+    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
+    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
+      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
+    }
+    if (isClosedOpcUaNodeId && reactiveIsClosedValue !== undefined) {
+      primaryOpcUaValues[isClosedOpcUaNodeId] = reactiveIsClosedValue;
+    }
+    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
+  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, isClosedOpcUaNodeId, reactiveIsClosedValue, globalOpcUaNodeValues]);
   
-  const contactorSymbolColor = derivedNodeStyles.color || textClass; // Use derived color or fallback to status text color
+  const contactorSymbolColor = derivedNodeStyles.color || textClass;
 
   // Combine classes and styles
   const mainDivClasses = `
