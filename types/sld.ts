@@ -279,6 +279,13 @@ export interface CustomFlowEdgeData {
   cableType?: string;
   isEnergized?: boolean;
   status?: 'nominal' | 'warning' | 'fault' | string;
+
+  // New field for individual edge animation settings
+  animationSettings?: {
+    generationDataPointId?: string;
+    usageDataPointId?: string;
+    speedMultiplier?: number;
+  };
 }
 
 // --- React Flow Element Types ---
@@ -296,7 +303,14 @@ export interface SLDLayout {
     lastModified?: string;
     version?: string;
     author?: string;
-  }
+    // New field for global animation settings
+    globalAnimationSettings?: {
+      isEnabled?: boolean; 
+      generationDataPointId?: string;
+      usageDataPointId?: string;
+      speedMultiplier?: number;
+    };
+  };
 }
 
 // --- SLD Element Types Enum ---

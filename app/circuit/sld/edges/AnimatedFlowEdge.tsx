@@ -1,15 +1,15 @@
 // components/sld/edges/AnimatedFlowEdge.tsx
 import React from 'react';
-import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge } from 'reactflow';
-import { getDataPointValue, applyValueMapping } from '../nodes/nodeUtils'; // Ensure nodeUtils path is correct
-import { CustomFlowEdgeData } from '@/types/sld';
+import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge, SLDLayout } from 'reactflow'; // Added SLDLayout for type
+import { getDataPointValue, applyValueMapping } from '../nodes/nodeUtils';
+import { CustomFlowEdgeData } from '@/types/sld'; // CustomFlowEdgeData should already include animationSettings and an optional globalAnimationSettings from the dynamic injection
 import { useAppStore } from '@/stores/appStore';
 
-// Centralized styling for consistency
+// Centralized styling for consistency (assuming this is already defined as is)
 const flowColors = {
   AC_HV: '#FFBF00',      // Bright Yellow-Orange
   AC_MV: '#FFA500',      // Orange
-  AC_LV: '#FF8C00',      // DarkOrange (was Tomato, more distinct from fault)
+  AC_LV: '#FF8C00',      // DarkOrange
   DC_HV: '#1E90FF',      // DodgerBlue
   DC_MV: '#00BFFF',      // DeepSkyBlue
   DC_LV: '#87CEFA',      // LightSkyBlue
@@ -27,14 +27,19 @@ const voltageStrokeWidths = {
 };
 const SELECTED_STROKE_WIDTH_INCREASE = 1.5;
 
+// Define the expected structure of data more accurately for props
+// Note: globalAnimationSettings is injected by SLDWidget.tsx and isn't part of types/sld.ts's CustomFlowEdgeData
+type AnimatedFlowEdgeDataWithGlobal = CustomFlowEdgeData & {
+  globalAnimationSettings?: SLDLayout['meta']['globalAnimationSettings'];
+};
 
 export default function AnimatedFlowEdge({
   id, sourceX, sourceY, targetX, targetY,
   sourcePosition, targetPosition,
   style = {}, markerEnd, data, selected,
-}: EdgeProps<CustomFlowEdgeData & { status?: string; currentLoad?: number }>) { // Allow optional status and currentLoad props
+}: EdgeProps<AnimatedFlowEdgeDataWithGlobal>) {
   
-  const { opcUaNodeValues, dataPoints } = useAppStore(state => ({ // Updated to use opcUaNodeValues and dataPoints
+  const { opcUaNodeValues, dataPoints } = useAppStore(state => ({
     opcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
   }));
@@ -43,20 +48,13 @@ export default function AnimatedFlowEdge({
     sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
   });
 
-  // --- Initialize values ---
-  let edgeStrokeColor = data?.isEnergized === false ? flowColors.OFFLINE : flowColors.ENERGIZED_DEFAULT; // Default to energized unless explicitly offline
-  if (data?.isEnergized === undefined && (!data?.dataPointLinks || data.dataPointLinks.length === 0)) { // if undefined and no DP links default to offline if not animated later
-    edgeStrokeColor = flowColors.OFFLINE;
-  }
-
+  // --- Initialize Base Visual Properties ---
+  let edgeStrokeColor = flowColors.OFFLINE; // Default to offline
   let edgeStrokeWidth = voltageStrokeWidths[(data?.voltageLevel as keyof typeof voltageStrokeWidths) || 'DEFAULT'] || voltageStrokeWidths.DEFAULT;
-  let animationName = 'none';
-  let animationDirection = 'normal';
-  let animationDuration = '20s'; // Default moderately slow speed
-  const baseStrokeDasharray = '10 4'; // Default dash pattern, slightly more spacing
+  const baseStrokeDasharray = '10 4';
 
-  // --- Apply static data props ---
-  if (data?.flowType) { // isEnergized state will be handled by DPLinks or default if no DPLinks
+  // Apply static flowType color if available (will be overridden by animation logic if active)
+  if (data?.flowType) {
     const flowTypeKey = `${data.flowType}_${data.voltageLevel || 'LV'}` as keyof typeof flowColors;
     if (flowColors[flowTypeKey]) {
       edgeStrokeColor = flowColors[flowTypeKey];
@@ -64,126 +62,183 @@ export default function AnimatedFlowEdge({
       edgeStrokeColor = flowColors.CONTROL_SIGNAL;
     } else if (data.flowType === 'AUX_POWER') {
       edgeStrokeColor = flowColors.AUX_POWER;
-    }
-  }
-
-  // Use static status if provided and no DPLink for status
-  if (data?.status === 'FAULT' && !(data?.dataPointLinks?.find(l => l.targetProperty === 'status'))) {
-    edgeStrokeColor = flowColors.FAULT;
-  } else if (data?.status === 'WARNING' && !(data?.dataPointLinks?.find(l => l.targetProperty === 'status'))) {
-    edgeStrokeColor = flowColors.WARNING;
-  }
-
-  // --- Realtime Data Overrides & Animation Control ---
-  let flowActive = data?.isEnergized ?? (data?.dataPointLinks?.some(l => ['flowDirection','isEnergized'].includes(l.targetProperty)) ? false : true) ; // Assume energized if isEnergized undefined AND no specific DPLinks exist for it, otherwise default to false if DPLinked
-
-  // Status Link (Faults, Warnings, Energized state) - highest priority for color and some animation
-  const statusLink = data?.dataPointLinks?.find(link => ['status', 'isEnergized'].includes(link.targetProperty));
-  if (statusLink && opcUaNodeValues && dataPoints) { // Added opcUaNodeValues and dataPoints checks
-    const rawStatusValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Updated call
-    const mappedStatusValue = statusLink.valueMapping ? applyValueMapping(rawStatusValue, statusLink) : rawStatusValue;
-    
-    if (statusLink.targetProperty === 'isEnergized') {
-      flowActive = !!mappedStatusValue; // True if truthy, false if falsy/undefined/null
-      if (!flowActive && edgeStrokeColor !== flowColors.FAULT && edgeStrokeColor !== flowColors.WARNING) { // Don't override fault/warning colors if going offline
-          edgeStrokeColor = flowColors.OFFLINE;
-      } else if (flowActive && edgeStrokeColor === flowColors.OFFLINE) { // If energized and was previously offline due to no static flowType
-          edgeStrokeColor = data?.flowType ? (flowColors[`${data.flowType}_${data.voltageLevel || 'LV'}` as keyof typeof flowColors] || flowColors.ENERGIZED_DEFAULT) : flowColors.ENERGIZED_DEFAULT;
-      }
-    } else if (statusLink.targetProperty === 'status') {
-        if (String(mappedStatusValue).toUpperCase() === 'FAULT') {
-            edgeStrokeColor = flowColors.FAULT;
-            animationName = 'faultPulse'; animationDuration = '1s';
-            flowActive = true; // Faults are considered active/visible
-        } else if (String(mappedStatusValue).toUpperCase() === 'WARNING') {
-            edgeStrokeColor = flowColors.WARNING; // Color for warning, animation might be default flow or subtle pulse
-            // flowActive = true; // Warnings are also active
-        } else if (String(mappedStatusValue).toUpperCase() === 'OFFLINE') {
-            if (edgeStrokeColor !== flowColors.FAULT && edgeStrokeColor !== flowColors.WARNING) edgeStrokeColor = flowColors.OFFLINE;
-            flowActive = false;
-        } else if (String(mappedStatusValue).toUpperCase() === 'ENERGIZED' || String(mappedStatusValue).toUpperCase() === 'NOMINAL') {
-             if (edgeStrokeColor === flowColors.OFFLINE) { // If energized and was previously offline due to no static flowType
-                 edgeStrokeColor = data?.flowType ? (flowColors[`${data.flowType}_${data.voltageLevel || 'LV'}` as keyof typeof flowColors] || flowColors.ENERGIZED_DEFAULT) : flowColors.ENERGIZED_DEFAULT;
-             }
-            flowActive = true;
-        }
+    } else {
+      edgeStrokeColor = flowColors.ENERGIZED_DEFAULT; // If flowType is set but not in map, assume energized
     }
   }
   
-  // Flow Direction Link (overrides static if present, but not if faultPulse is active)
-  const flowLink = data?.dataPointLinks?.find(link => link.targetProperty === 'flowDirection');
-  if (flowLink && animationName !== 'faultPulse' && opcUaNodeValues && dataPoints) { // Added opcUaNodeValues and dataPoints checks
-    const rawFlowValue = getDataPointValue(flowLink.dataPointId, opcUaNodeValues, dataPoints); // Updated call
-    // Note: applyValueMapping needs to handle numeric passthrough if mapping not matched
-    const mappedFlowState = flowLink.valueMapping ? applyValueMapping(rawFlowValue, flowLink) : rawFlowValue;
+  // --- Determine Active Animation Configuration ---
+  const edgeSpecificSettings = data?.animationSettings;
+  const globalSettings = data?.globalAnimationSettings;
 
-    if (mappedFlowState === 'forward' || (typeof mappedFlowState === 'number' && mappedFlowState > 0)) {
-      animationDirection = 'normal';
-      flowActive = true; 
-    } else if (mappedFlowState === 'reverse' || (typeof mappedFlowState === 'number' && mappedFlowState < 0)) {
-      animationDirection = 'reverse';
+  let activeGenerationDpId: string | undefined = undefined;
+  let activeUsageDpId: string | undefined = undefined;
+  let activeSpeedMultiplier: number = 1; // Default multiplier
+  let useNewAnimationSystem = false;
+
+  if (globalSettings?.isEnabled) {
+    activeGenerationDpId = globalSettings.generationDataPointId;
+    activeUsageDpId = globalSettings.usageDataPointId;
+    activeSpeedMultiplier = globalSettings.speedMultiplier ?? 1;
+    useNewAnimationSystem = true;
+  } else if (edgeSpecificSettings?.generationDataPointId && edgeSpecificSettings?.usageDataPointId) {
+    activeGenerationDpId = edgeSpecificSettings.generationDataPointId;
+    activeUsageDpId = edgeSpecificSettings.usageDataPointId;
+    activeSpeedMultiplier = edgeSpecificSettings.speedMultiplier ?? 1;
+    useNewAnimationSystem = true;
+  }
+
+  // --- Initialize Animation Variables ---
+  let flowActive = false;
+  let animationName = 'none';
+  let animationDirection = 'normal';
+  let animationDuration = '20s'; // Default, can be overridden
+
+  // --- New Animation Logic (Generation vs. Usage) ---
+  if (useNewAnimationSystem && activeGenerationDpId && activeUsageDpId) {
+    const rawGenValue = getDataPointValue(activeGenerationDpId, opcUaNodeValues, dataPoints);
+    const rawUsageValue = getDataPointValue(activeUsageDpId, opcUaNodeValues, dataPoints);
+    const genValue = typeof rawGenValue === 'number' ? rawGenValue : 0;
+    const usageValue = typeof rawUsageValue === 'number' ? rawUsageValue : 0;
+
+    if (genValue > usageValue) {
       flowActive = true;
-    } else { // 'none', 0, or unmapped states that don't translate to forward/reverse
-      if (flowActive) { // Only change to not flowing if it was previously active based on energy status
-         // Keep flowActive as is from status link, just don't animate direction if 'none'
+      animationDirection = 'normal'; // Forward
+    } else if (usageValue > genValue) {
+      flowActive = true;
+      animationDirection = 'reverse'; // Reverse
+    } // Else: genValue == usageValue or invalid, flowActive remains false
+
+    if (flowActive) {
+      const difference = Math.abs(genValue - usageValue);
+      // Ensure multiplier is positive and non-zero to avoid division by zero or no animation
+      const safeSpeedMultiplier = Math.max(0.01, activeSpeedMultiplier); 
+      const speedFactor = difference * safeSpeedMultiplier;
+      
+      if (speedFactor > 0) {
+        animationDuration = `${Math.max(0.2, Math.min(30, 20 / speedFactor))}s`; // Clamp duration
+        animationName = 'dashdraw';
+      } else {
+        // If speedFactor is 0 (e.g., multiplier is 0, or diff is 0 and somehow flowActive was true), no animation
+        flowActive = false; 
+        animationName = 'none';
       }
     }
-    if (flowActive && (mappedFlowState === 'forward' || mappedFlowState === 'reverse' || (typeof mappedFlowState === 'number' && mappedFlowState !== 0 ))) {
-        animationName = 'dashdraw';
+  } else if (!useNewAnimationSystem && data?.dataPointLinks?.length) {
+    // --- Fallback to Old DataPointLink System (if no new system config for this edge) ---
+    // This section should be reviewed: is it purely for fallback or should it be removed?
+    // For now, keeping a simplified version of old logic if new system isn't used.
+    const isEnergizedLink = data.dataPointLinks.find(l => l.targetProperty === 'isEnergized');
+    if (isEnergizedLink) {
+        const rawIsEnergized = getDataPointValue(isEnergizedLink.dataPointId, opcUaNodeValues, dataPoints);
+        flowActive = !!(isEnergizedLink.valueMapping ? applyValueMapping(rawIsEnergized, isEnergizedLink) : rawIsEnergized);
+    } else {
+        flowActive = data?.isEnergized ?? false; // Fallback to static if no link
+    }
+
+    if (flowActive) {
+        animationName = 'dashdraw'; // Default animation for active flow
+        const oldFlowLink = data.dataPointLinks.find(l => l.targetProperty === 'flowDirection');
+        if (oldFlowLink) {
+            const rawFlowVal = getDataPointValue(oldFlowLink.dataPointId, opcUaNodeValues, dataPoints);
+            const mappedFlow = oldFlowLink.valueMapping ? applyValueMapping(rawFlowVal, oldFlowLink) : rawFlowVal;
+            if (mappedFlow === 'reverse' || (typeof mappedFlow === 'number' && mappedFlow < 0)) animationDirection = 'reverse';
+            else if (mappedFlow === 'none' || mappedFlow === 0) animationName = 'none';
+        }
+        
+        const oldSpeedLink = data.dataPointLinks.find(l => l.targetProperty === 'animationSpeedFactor' || l.targetProperty === 'currentLoadPercent');
+        if (oldSpeedLink) {
+            const rawSpeedVal = getDataPointValue(oldSpeedLink.dataPointId, opcUaNodeValues, dataPoints);
+            const mappedSpeed = oldSpeedLink.valueMapping ? applyValueMapping(rawSpeedVal, oldSpeedLink) : rawSpeedVal;
+            if (typeof mappedSpeed === 'number' && mappedSpeed > 0) {
+                const speedFactor = oldSpeedLink.targetProperty === 'animationSpeedFactor' ? mappedSpeed : Math.max(0, Math.min(mappedSpeed / 100, 2));
+                const effectiveSpeedFactor = Math.max(0, Math.min(speedFactor, 5));
+                animationDuration = `${Math.max(0.5, Math.min(60, 20 / (1 + effectiveSpeedFactor * 2)))}s`;
+            }
+        }
     } else {
         animationName = 'none';
     }
-  } else if (flowActive && animationName !== 'faultPulse') { // if flowActive from status, but no specific flowLink
-    animationName = 'dashdraw'; // Default animation for active flow
+  } else {
+    // If no new system and no old DPLinks, use static isEnergized (already handled by initial flowActive setting for old system)
+    // Or, if there are no DPLinks at all, rely on static isEnergized.
+     flowActive = data?.isEnergized ?? false;
+     if (flowActive) {
+        animationName = 'dashdraw';
+        // Potentially use static direction/speed if they were part of CustomFlowEdgeData, but they are not.
+     } else {
+        animationName = 'none';
+     }
   }
 
-
-  // Animation Speed Link (modulates 'dashdraw' or 'faultPulse' if needed)
-  let currentSpeedFactor = typeof data?.currentLoad === 'number' ? data.currentLoad / 100 : 0; // 0-1 if currentLoad is %
-  const speedLink = data?.dataPointLinks?.find(link => ['animationSpeedFactor', 'currentLoadPercent'].includes(link.targetProperty));
-  if (speedLink && opcUaNodeValues && dataPoints) { // Added opcUaNodeValues and dataPoints checks
-    const rawSpeedValue = getDataPointValue(speedLink.dataPointId, opcUaNodeValues, dataPoints); // Updated call
-    const mappedSpeed = speedLink.valueMapping ? applyValueMapping(rawSpeedValue, speedLink) : rawSpeedValue;
-    if (typeof mappedSpeed === 'number' && mappedSpeed > 0) {
-      // If animationSpeedFactor, it's a multiplier. If currentLoadPercent, it's 0-100.
-      currentSpeedFactor = speedLink.targetProperty === 'animationSpeedFactor' ? mappedSpeed : Math.max(0, Math.min(mappedSpeed / 100, 2)); // Clamp load % contribution
+  // --- Determine Edge Color based on Flow State and Static Type ---
+  if (flowActive) {
+    // If flow is active, use type-specific color or default energized color.
+    // This re-applies type color if it was OFFLINE initially.
+    if (data?.flowType) {
+        const flowTypeKey = `${data.flowType}_${data.voltageLevel || 'LV'}` as keyof typeof flowColors;
+        if (flowColors[flowTypeKey]) edgeStrokeColor = flowColors[flowTypeKey];
+        else if (data.flowType === 'CONTROL_SIGNAL') edgeStrokeColor = flowColors.CONTROL_SIGNAL;
+        else if (data.flowType === 'AUX_POWER') edgeStrokeColor = flowColors.AUX_POWER;
+        else edgeStrokeColor = flowColors.ENERGIZED_DEFAULT;
+    } else {
+        edgeStrokeColor = flowColors.ENERGIZED_DEFAULT; 
     }
-  }
-
-  if (animationName === 'dashdraw' || animationName === 'faultPulse') { // Affects both normal and fault animation speed
-    const baseDuration = animationName === 'faultPulse' ? 1 : 20; // Faults faster base
-    // Higher speedFactor = shorter duration (faster animation). Factor of 1 results in baseDuration / (1+1*3) = baseDuration/4.
-    // Factor 0 gives baseDuration. Max factor (e.g. 2 for 200%) would be baseDuration / (1+2*3) = baseDuration/7
-    // Clamped to avoid excessively fast/slow.
-    const effectiveSpeedFactor = Math.max(0, Math.min(currentSpeedFactor, 5)); // Clamp speed factor influence
-    animationDuration = `${Math.max(0.5, Math.min(60, baseDuration / (1 + effectiveSpeedFactor * 2)))}s`;
+  } else {
+    // If not flowActive (and not FAULT/WARNING yet), set to OFFLINE.
+     if (edgeStrokeColor !== flowColors.FAULT && edgeStrokeColor !== flowColors.WARNING) { // Check to avoid overriding fault/warning
+        edgeStrokeColor = flowColors.OFFLINE;
+     }
   }
   
-  // Ensure if not flowActive and not fault, animation is 'none'
+  // --- Status Overrides (Fault/Warning) - Applied AFTER new animation logic ---
+  // This uses DataPointLinks for 'status'. This can remain as a separate way to indicate faults.
+  const statusLink = data?.dataPointLinks?.find(link => link.targetProperty === 'status');
+  if (statusLink) { // Removed opcUaNodeValues && dataPoints check as they are always available from store
+    const rawStatusValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints);
+    const mappedStatusValue = statusLink.valueMapping ? applyValueMapping(rawStatusValue, statusLink) : rawStatusValue;
+    
+    if (String(mappedStatusValue).toUpperCase() === 'FAULT') {
+        edgeStrokeColor = flowColors.FAULT;
+        animationName = 'faultPulse'; 
+        animationDuration = '1s'; 
+        flowActive = true; // Fault implies some form of activity/attention
+    } else if (String(mappedStatusValue).toUpperCase() === 'WARNING') {
+        if(edgeStrokeColor !== flowColors.FAULT) edgeStrokeColor = flowColors.WARNING; // Don't let warning override fault
+        // Keep animationName and duration from flow logic unless a specific warning animation is desired
+    }
+  } else if (data?.status === 'FAULT') { // Static fault status
+    edgeStrokeColor = flowColors.FAULT;
+    animationName = 'faultPulse'; animationDuration = '1s'; flowActive = true;
+  } else if (data?.status === 'WARNING' && edgeStrokeColor !== flowColors.FAULT) { // Static warning status
+     edgeStrokeColor = flowColors.WARNING;
+  }
+  
+  // Final check: if not flowActive (e.g. Gen==Usage, or not configured) AND not a fault pulse, then no animation.
   if (!flowActive && animationName !== 'faultPulse') {
     animationName = 'none';
   }
 
-
-  // --- Selected State Styling ---
+  // --- Selected State Styling (Applied Last) ---
   if (selected) {
     edgeStrokeColor = flowColors.SELECTED_STROKE;
     edgeStrokeWidth += SELECTED_STROKE_WIDTH_INCREASE;
-    // If selected and would normally animate, keep its animation. If not, add subtle pulse.
-    if (animationName === 'none' && (flowActive || data?.isEnergized)) {
-        animationName = 'subtlePulse';
+    if (animationName === 'none' && flowActive) { // If it would have animated but is now 'none' due to no gen/usage diff
+        animationName = 'subtlePulse'; // Keep it alive if selected and was supposed to be active
         animationDuration = '2s';
+    } else if (animationName === 'none' && !flowActive) { // If truly offline but selected
+        // No animation for selected offline, or a very subtle one if desired.
+        // For now, no animation if not flowActive.
     }
   }
 
-  // Final assembled style
+  // --- Final Assembled Style ---
   const finalStyle: React.CSSProperties = {
-    ...style, // Base styles from ReactFlow props
+    ...style,
     stroke: edgeStrokeColor,
     strokeWidth: edgeStrokeWidth,
   };
 
-  // Apply animation-related CSS properties only if an animation is active
   if (animationName !== 'none') {
     finalStyle.strokeDasharray = baseStrokeDasharray;
     finalStyle.animationName = animationName;
@@ -193,6 +248,13 @@ export default function AnimatedFlowEdge({
     finalStyle.animationTimingFunction = 'linear';
   }
   
+  // Remove temporary console logs from previous step
+  // console.log(`Edge ${id}: Global Settings:`, globalSettings);
+  // console.log(`Edge ${id}: Edge Specific Settings:`, edgeSpecificSettings);
+  // console.log(`Edge ${id}: Active DPs: GenDP=${activeGenerationDpId}, UsageDP=${activeUsageDpId}, SpeedMult=${activeSpeedMultiplier}`);
+  // console.log(`Edge ${id}: flowActive=${flowActive}, animationName=${animationName}, duration=${animationDuration}, direction=${animationDirection}, color=${edgeStrokeColor}`);
+
+
   return (
     <>
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={finalStyle} />
@@ -202,7 +264,7 @@ export default function AnimatedFlowEdge({
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              background: 'var(--background, var(--bg-background, #ffffff))', // Use theme-aware CSS vars
+              background: 'var(--background, var(--bg-background, #ffffff))',
               color: 'var(--foreground, var(--text-primary, #000000))',
               padding: '2px 5px',
               borderRadius: '4px',

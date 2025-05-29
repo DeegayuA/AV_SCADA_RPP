@@ -51,6 +51,7 @@ interface SLDInspectorDialogProps {
     selectedElement: CustomNodeType | CustomFlowEdge | null;
     onUpdateElement: (element: CustomNodeType | CustomFlowEdge) => void;
     onDeleteElement: (elementId: string) => void;
+    onSetGlobalAnimationSettings?: (config: AnimationFlowConfig) => void; // New prop
 }
 
 // --- Helper Data and Functions ---
@@ -132,7 +133,7 @@ const getElementTypeName = (element: CustomNodeType | CustomFlowEdge | null): st
 
 // --- Main Component ---
 const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
-    isOpen, onOpenChange, selectedElement, onUpdateElement, onDeleteElement
+    isOpen, onOpenChange, selectedElement, onUpdateElement, onDeleteElement, onSetGlobalAnimationSettings
 }) => {
     const { dataPoints } = useAppStore((state) => ({ dataPoints: state.dataPoints }));
     
@@ -369,6 +370,10 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                 cableType: (formData as Partial<CustomFlowEdgeData>).cableType,
                 isEnergized: !!(formData as Partial<CustomFlowEdgeData>).isEnergized,
             } as CustomFlowEdgeData;
+            // Ensure animationSettings are part of the saved data for edges
+            if (isEdge(selectedElement) && formData.animationSettings) {
+                (updatedElementData as CustomFlowEdgeData).animationSettings = formData.animationSettings;
+            }
         }
         
         onUpdateElement({ ...selectedElement, data: updatedElementData as any }); 
@@ -1034,81 +1039,38 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     onOpenChange={setIsAnimationConfiguratorOpen}
                     edge={selectedElement} // Already confirmed it's an edge here
                     availableDataPoints={Object.values(dataPoints)}
-                    onConfigure={(config: AnimationFlowConfig) => {
-                        console.log('Animation configuration received:', config);
-                        setDataLinks(prevLinks => {
-                            let newLinks = [...prevLinks];
-
-                            // Handle Flow Activation Link (isEnergized)
-                            const activeTargetProperty = 'isEnergized';
-                            const existingActiveLinkIndex = newLinks.findIndex(link => link.targetProperty === activeTargetProperty);
-
-                            if (config.flowActiveDataPointId) {
-                                if (existingActiveLinkIndex !== -1) {
-                                    newLinks[existingActiveLinkIndex] = {
-                                        ...newLinks[existingActiveLinkIndex],
-                                        dataPointId: config.flowActiveDataPointId,
-                                    };
-                                } else {
-                                    newLinks.push({
-                                        dataPointId: config.flowActiveDataPointId,
-                                        targetProperty: activeTargetProperty,
-                                    });
-                                }
-                            } else { // flowActiveDataPointId is not provided, remove existing link
-                                if (existingActiveLinkIndex !== -1) {
-                                    newLinks.splice(existingActiveLinkIndex, 1);
-                                }
+                    onConfigure={(config: AnimationFlowConfig) => { // This is the new handleAnimationConfig logic
+                        if (config.applyToAllEdges) {
+                            if (onSetGlobalAnimationSettings) {
+                                onSetGlobalAnimationSettings(config);
                             }
-
-                            // Handle Flow Direction Link (flowDirection)
-                            const directionTargetProperty = 'flowDirection';
-                            // Re-find index in case newLinks was modified by active link logic
-                            const existingDirectionLinkIndex = newLinks.findIndex(link => link.targetProperty === directionTargetProperty);
-
-                            if (config.flowDirectionDataPointId) {
-                                if (existingDirectionLinkIndex !== -1) {
-                                    newLinks[existingDirectionLinkIndex] = {
-                                        ...newLinks[existingDirectionLinkIndex],
-                                        dataPointId: config.flowDirectionDataPointId,
-                                    };
-                                } else {
-                                    newLinks.push({
-                                        dataPointId: config.flowDirectionDataPointId,
-                                        targetProperty: directionTargetProperty,
-                                    });
-                                }
-                            } else { // flowDirectionDataPointId is not provided, remove existing link
-                                if (existingDirectionLinkIndex !== -1) {
-                                    newLinks.splice(existingDirectionLinkIndex, 1);
-                                }
-                            }
-
-                            // Handle Flow Speed Link (animationSpeedFactor)
-                            const speedTargetProperty = 'animationSpeedFactor';
-                            // Re-find index in case newLinks was modified by previous logic
-                            const existingSpeedLinkIndex = newLinks.findIndex(link => link.targetProperty === speedTargetProperty);
-
-                            if (config.flowSpeedDataPointId) {
-                              if (existingSpeedLinkIndex !== -1) {
-                                newLinks[existingSpeedLinkIndex] = {
-                                  ...newLinks[existingSpeedLinkIndex],
-                                  dataPointId: config.flowSpeedDataPointId,
-                                };
-                              } else {
-                                newLinks.push({
-                                  dataPointId: config.flowSpeedDataPointId,
-                                  targetProperty: speedTargetProperty,
-                                });
-                              }
-                            } else { // flowSpeedDataPointId is not provided, remove existing link
-                              if (existingSpeedLinkIndex !== -1) {
-                                newLinks.splice(existingSpeedLinkIndex, 1);
-                              }
-                            }
+                            // Optionally clear local settings if global is applied
+                            // For now, only calling the global callback as per refined plan
+                            // setFormData(prev => ({ ...prev, animationSettings: undefined }));
+                            // setDataLinks(prev => prev.filter(link => 
+                            //     !['isEnergized', 'flowDirection', 'animationSpeedFactor'].includes(link.targetProperty)
+                            // ));
+                        } else {
+                            // Apply to current selected element (edge)
+                            const newAnimationSettings = {
+                                generationDataPointId: config.generationDataPointId,
+                                usageDataPointId: config.usageDataPointId,
+                                speedMultiplier: config.speedMultiplier,
+                            };
+                    
+                            setFormData(prevFormData => ({
+                                ...prevFormData,
+                                animationSettings: newAnimationSettings,
+                            }));
                             
-                            return newLinks;
-                        });
+                            setDataLinks(prevDataLinks => {
+                                // Filter out old animation-specific links
+                                return prevDataLinks.filter(link => 
+                                    !['isEnergized', 'flowDirection', 'animationSpeedFactor'].includes(link.targetProperty)
+                                );
+                            });
+                        }
+                        setIsAnimationConfiguratorOpen(false); // Close dialog after configuration
                     }}
                 />
             )}

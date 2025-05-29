@@ -160,6 +160,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importJsonString, setImportJsonString] = useState('');
   const [isBulkAnimationConfiguratorOpen, setIsBulkAnimationConfiguratorOpen] = useState(false);
+  const [activeGlobalAnimationSettings, setActiveGlobalAnimationSettings] = 
+    useState<SLDLayout['meta']['globalAnimationSettings'] | undefined>(undefined);
   
   const currentLayoutLoadedFromServerOrInitialized = useRef(false);
   const canEdit = useMemo(() => !!isEditModeFromProps, [isEditModeFromProps]);
@@ -314,11 +316,27 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     const layoutKey = `${LOCAL_STORAGE_KEY_PREFIX}${currentLayoutId}`;
     const nodesForStorage = nodesToSave.filter(n => n.id !== PLACEHOLDER_NODE_ID);
     const viewport = rfInstance ? rfInstance.getViewport() : undefined;
+    
+    let currentMeta: SLDLayout['meta'] = {};
+    try {
+        const layoutString = localStorage.getItem(layoutKey); // layoutKey is already defined in this scope
+        if (layoutString) {
+            const parsed = JSON.parse(layoutString) as SLDLayout;
+            currentMeta = parsed.meta || {};
+        }
+    } catch (e) {
+        console.warn(`Error parsing existing layout meta from localStorage for key ${layoutKey}:`, e);
+    }
+
     const layoutToPersist: SLDLayout = { 
         layoutId: currentLayoutId, 
-        nodes: nodesForStorage.map(n => ({ ...n, data: { ...n.data } })), // Ensure data is cloned
-        edges: edgesToSave.map(e => ({ ...e, data: { ...e.data } })),     // Ensure data is cloned
-        viewport 
+        nodes: nodesForStorage.map(n => ({ ...n, data: { ...n.data } })),
+        edges: edgesToSave.map(e => ({ ...e, data: { ...e.data } })),
+        viewport,
+        meta: { 
+            ...currentMeta, // Preserve other existing meta fields
+            globalAnimationSettings: activeGlobalAnimationSettings // Add/overwrite with current global settings
+        },
     };
     const layoutJsonString = JSON.stringify(layoutToPersist);
 
@@ -580,6 +598,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       console.log(`SLDWidget: Layout "${layoutId}" loaded from ${loadedFrom}.`);
       setNodes((loadedLayout.nodes || []).map(n => ({...n, selected: false})));
       setEdges(loadedLayout.edges || []);
+      setActiveGlobalAnimationSettings(loadedLayout.meta?.globalAnimationSettings || undefined); // Initialize global settings
       setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true; setIsDirty(false);
       initialFitViewDone.current = false;
       // If loaded from LS or constants, and onCodeChange exists, emit this initial state
@@ -594,16 +613,18 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     } else if (isEditModeFromProps) {
         const placeholderNodes = [createPlaceholderNode(layoutId, currentThemeHookValue)];
         setNodes(placeholderNodes); setEdges([]);
+        setActiveGlobalAnimationSettings(undefined); // Reset for new/placeholder layout
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true; setIsDirty(false); // A placeholder is considered "initialized"
         initialFitViewDone.current = false; 
         if (onCodeChange) { // Emit empty/placeholder state if applicable
-            onCodeChange(JSON.stringify({ layoutId, nodes: [], edges: [], viewport: undefined }), layoutId);
+            onCodeChange(JSON.stringify({ layoutId, nodes: [], edges: [], viewport: undefined, meta: { globalAnimationSettings: undefined } }), layoutId);
         }
     } else { // View mode, no local/constant, no websocket
         setNodes([createPlaceholderNode(layoutId + " (Connecting...)", currentThemeHookValue)]); setEdges([]);
+        setActiveGlobalAnimationSettings(undefined); // Reset
         setIsLoading(true); // Stays loading until WS might connect or timeout
     }
-  }, [layoutId, currentLayoutIdKey, isEditModeFromProps, isWebSocketConnected, sendJsonMessage, currentThemeHookValue, reactFlowInstance, onCodeChange]);
+  }, [layoutId, currentLayoutIdKey, isEditModeFromProps, isWebSocketConnected, sendJsonMessage, currentThemeHookValue, reactFlowInstance, onCodeChange, setActiveGlobalAnimationSettings]);
 
 
   useLayoutEffect(() => {
@@ -734,6 +755,11 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const themedNodeColor = useCallback((node: Node) => getMiniMapNodeColor(node as CustomNodeType, colors), [colors]);
   const themedNodeStrokeColor = useCallback((node: Node) => getMiniMapNodeStrokeColor(node as CustomNodeType, colors), [colors]);
     
+  const handleSetGlobalAnimationSettingsFromInspector = useCallback((config: AnimationFlowConfig) => {
+    console.log('SLDWidgetCore: Intent to set global animation settings from inspector:', config);
+    // Actual logic to update layout meta will be implemented in the next step.
+  }, []); // No dependencies for now as it's just a console.log
+
   const showInitialLoadingSpinner = isLoading && !currentLayoutLoadedFromServerOrInitialized.current;
   const showConnectingMessage = !isWebSocketConnected && layoutId && showInitialLoadingSpinner && !isEditModeFromProps; 
   const showDisconnectedMessageForEdit = canEdit && layoutId && !isWebSocketConnected && currentLayoutLoadedFromServerOrInitialized.current; 
@@ -765,6 +791,16 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   };
 
 
+  const edgesWithGlobalSettings = useMemo(() => {
+    return edges.map(edge => ({
+      ...edge,
+      data: {
+        ...edge.data,
+        globalAnimationSettings: activeGlobalAnimationSettings 
+      }
+    }));
+  }, [edges, activeGlobalAnimationSettings]);
+
   return (
     <motion.div 
         className="h-full w-full flex relative bg-background" 
@@ -789,7 +825,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       )}
       <div className="flex-grow h-full relative">
         <ReactFlow
-            nodes={nodes} edges={edges}
+            nodes={nodes} edges={edgesWithGlobalSettings}
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
             onInit={(instance) => {
                 setReactFlowInstance(instance);
@@ -932,7 +968,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         </AlertDialog>
       )}
 
-      {canEdit && selectedElement && ( <SLDInspectorDialog isOpen={isInspectorDialogOpen} onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} selectedElement={selectedElement} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement}/> )}
+      {canEdit && selectedElement && ( <SLDInspectorDialog isOpen={isInspectorDialogOpen} onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} selectedElement={selectedElement} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement} onSetGlobalAnimationSettings={handleSetGlobalAnimationSettingsFromInspector} /> )}
       {!canEdit && selectedElement && (isNode(selectedElement) || isEdge(selectedElement)) && ( <SLDElementControlPopup element={selectedElement} isOpen={isControlPopupOpen} onOpenChange={handleControlPopupOpenChange} /> )}
       {isDrillDownOpen && drillDownLayoutId && ( <SLDDrillDownDialog isOpen={isDrillDownOpen} onOpenChange={handleDrillDownOpenChange} layoutId={drillDownLayoutId} parentLabel={drillDownParentLabel} /> )}
       
@@ -943,46 +979,55 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
           edge={null} // Passing null as this is for bulk configuration
           availableDataPoints={Object.values(useAppStore.getState().dataPoints)}
           onConfigure={(config: AnimationFlowConfig) => {
-            const selectedEdgeIds = new Set(selectedEdges.map(e => e.id)); // Create Set for efficient lookup
-
-            setEdges(currentEdges =>
-              currentEdges.map(edge => {
-                if (!selectedEdgeIds.has(edge.id)) {
-                  return edge; // Not selected, return unchanged
-                }
-
-                // Selected edge, apply configuration
-                let edgeData: CustomFlowEdgeData = { ...(edge.data || {}) };
-                edgeData.dataPointLinks = [...(edgeData.dataPointLinks || [])];
-
-                // Logic for 'isEnergized' (Generation)
-                const activeTargetProperty = 'isEnergized';
-                const activeLinkIndex = edgeData.dataPointLinks.findIndex(l => l.targetProperty === activeTargetProperty);
-                if (config.flowActiveDataPointId) {
-                  if (activeLinkIndex !== -1) edgeData.dataPointLinks[activeLinkIndex] = { ...edgeData.dataPointLinks[activeLinkIndex], dataPointId: config.flowActiveDataPointId };
-                  else edgeData.dataPointLinks.push({ dataPointId: config.flowActiveDataPointId, targetProperty: activeTargetProperty });
-                } else if (activeLinkIndex !== -1) edgeData.dataPointLinks.splice(activeLinkIndex, 1);
-
-                // Logic for 'flowDirection' (Usage)
-                const directionTargetProperty = 'flowDirection';
-                const directionLinkIndex = edgeData.dataPointLinks.findIndex(l => l.targetProperty === directionTargetProperty);
-                if (config.flowDirectionDataPointId) {
-                  if (directionLinkIndex !== -1) edgeData.dataPointLinks[directionLinkIndex] = { ...edgeData.dataPointLinks[directionLinkIndex], dataPointId: config.flowDirectionDataPointId };
-                  else edgeData.dataPointLinks.push({ dataPointId: config.flowDirectionDataPointId, targetProperty: directionTargetProperty });
-                } else if (directionLinkIndex !== -1) edgeData.dataPointLinks.splice(directionLinkIndex, 1);
-                
-                // Logic for 'animationSpeedFactor' (Flow Speed)
-                const speedTargetProperty = 'animationSpeedFactor';
-                const speedLinkIndex = edgeData.dataPointLinks.findIndex(l => l.targetProperty === speedTargetProperty);
-                if (config.flowSpeedDataPointId) {
-                  if (speedLinkIndex !== -1) edgeData.dataPointLinks[speedLinkIndex] = { ...edgeData.dataPointLinks[speedLinkIndex], dataPointId: config.flowSpeedDataPointId };
-                  else edgeData.dataPointLinks.push({ dataPointId: config.flowSpeedDataPointId, targetProperty: speedTargetProperty });
-                } else if (speedLinkIndex !== -1) edgeData.dataPointLinks.splice(speedLinkIndex, 1);
-
-                return { ...edge, data: edgeData };
-              })
-            );
-            setIsDirty(true);
+            if (config.applyToAllEdges) {
+              handleSetGlobalAnimationSettingsFromInspector(config); // This sets activeGlobalAnimationSettings and isDirty
+          
+              // Clear local animationSettings from all edges if global is applied
+              setEdges(currentEdges =>
+                currentEdges.map(edge => {
+                  if (edge.data?.animationSettings) {
+                    const { animationSettings, ...restData } = edge.data; // Create new data object without animationSettings
+                    // Also ensure old DPLs are not present if we are strictly using global
+                    const filteredDPLs = (restData.dataPointLinks || []).filter(link => 
+                      !['isEnergized', 'flowDirection', 'animationSpeedFactor'].includes(link.targetProperty)
+                    );
+                    if (filteredDPLs.length > 0) {
+                      restData.dataPointLinks = filteredDPLs;
+                    } else {
+                      delete restData.dataPointLinks;
+                    }
+                    return { ...edge, data: restData };
+                  }
+                  return edge;
+                })
+              );
+              // setIsDirty(true) is already handled by handleSetGlobalAnimationSettingsFromInspector
+            } else {
+              // Apply to selected edges only
+              const selectedEdgeIds = new Set(selectedEdges.map(e => e.id));
+              setEdges(currentEdges =>
+                currentEdges.map(edge => {
+                  if (!selectedEdgeIds.has(edge.id)) {
+                    return edge;
+                  }
+                  let edgeData: CustomFlowEdgeData = { ...(edge.data || {}) };
+                  edgeData.animationSettings = {
+                    generationDataPointId: config.generationDataPointId,
+                    usageDataPointId: config.usageDataPointId,
+                    speedMultiplier: config.speedMultiplier,
+                  };
+                  // Filter out old, now superseded, direct animation control links
+                  edgeData.dataPointLinks = (edgeData.dataPointLinks || []).filter(link =>
+                    !['isEnergized', 'flowDirection', 'animationSpeedFactor'].includes(link.targetProperty) // Corrected 'isEnergIZED' to 'isEnergized'
+                  );
+                  if (edgeData.dataPointLinks.length === 0) {
+                    delete edgeData.dataPointLinks;
+                  }
+                  return { ...edge, data: edgeData };
+                })
+              );
+              setIsDirty(true);
+            }
             setIsBulkAnimationConfiguratorOpen(false);
           }}
         />

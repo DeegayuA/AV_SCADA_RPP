@@ -5,20 +5,22 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect, ComboboxOption } from './SearchableSelect';
 import { CustomFlowEdge, DataPoint } from '@/types/sld';
-import DataLinkLiveValuePreview from './DataLinkLiveValuePreview'; // Import the new component
-// Remove useAppStore import, dataPoints will be passed as a prop
+import DataLinkLiveValuePreview from './DataLinkLiveValuePreview';
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
-export interface AnimationFlowConfig { // Ensure export
-  flowActiveDataPointId?: string; // To be relabeled in usage context
-  flowDirectionDataPointId?: string; // To be relabeled in usage context
-  flowSpeedDataPointId?: string;
+export interface AnimationFlowConfig {
+  generationDataPointId?: string;
+  usageDataPointId?: string;
+  speedMultiplier?: number;
+  applyToAllEdges?: boolean;
 }
 
 interface AnimationFlowConfiguratorDialogProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  edge: CustomFlowEdge | null;
-  availableDataPoints: DataPoint[]; // Changed prop name for clarity
+  edge: CustomFlowEdge | null; // Null if for global/bulk settings
+  availableDataPoints: DataPoint[];
   onConfigure: (config: AnimationFlowConfig) => void;
 }
 
@@ -29,74 +31,88 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
   availableDataPoints,
   onConfigure,
 }) => {
-  const [flowActiveDp, setFlowActiveDp] = useState<string | undefined>(undefined);
-  const [flowDirectionDp, setFlowDirectionDp] = useState<string | undefined>(undefined);
-  const [flowSpeedDp, setFlowSpeedDp] = useState<string | undefined>(undefined);
+  const [generationDp, setGenerationDp] = useState<string | undefined>(undefined);
+  const [usageDp, setUsageDp] = useState<string | undefined>(undefined);
+  const [speedMultiplier, setSpeedMultiplier] = useState<number>(1);
+  const [applyToAllEdges, setApplyToAllEdges] = useState<boolean>(false);
 
   const dataPointOptions = useMemo((): ComboboxOption[] =>
     Object.values(availableDataPoints).map(dp => ({
       value: dp.id,
-      label: `${dp.name || dp.id}${dp.description ? ` (${dp.description})` : ''}`, // Slightly adjusted label
+      label: `${dp.name || dp.id}${dp.description ? ` (${dp.description})` : ''}`,
       description: `ID: ${dp.id} | Type: ${dp.dataType} | Unit: ${dp.unit || 'N/A'}`,
     })).sort((a, b) => a.label.localeCompare(b.label)),
   [availableDataPoints]);
 
   useEffect(() => {
-    if (isOpen && edge?.data?.dataPointLinks) {
-      // Initialize from existing links (simplified: assumes specific targetProperties)
-      // This logic might need to be more robust to find the *intended* controlling datapoints.
-      const activeLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'isEnergized' || l.targetProperty === 'status');
-      const directionLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'flowDirection');
-      const speedLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'animationSpeedFactor');
+    if (isOpen) {
+      const currentAnimSettings = edge?.data?.animationSettings;
+      setGenerationDp(currentAnimSettings?.generationDataPointId);
+      setUsageDp(currentAnimSettings?.usageDataPointId);
+      setSpeedMultiplier(currentAnimSettings?.speedMultiplier ?? 1);
       
-      setFlowActiveDp(activeLink?.dataPointId);
-      setFlowDirectionDp(directionLink?.dataPointId);
-      setFlowSpeedDp(speedLink?.dataPointId);
-    } else if (!isOpen) {
-      // Reset when dialog is closed or no relevant links
-      setFlowActiveDp(undefined);
-      setFlowDirectionDp(undefined);
-      setFlowSpeedDp(undefined);
+      setApplyToAllEdges(false); // Default to false when dialog opens for specific edge(s)
+      
+      // Legacy pre-fill (can be removed once animationSettings is primary)
+      if (!currentAnimSettings && edge?.data?.dataPointLinks) {
+          const activeLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'isEnergized' || l.targetProperty === 'status');
+          const directionLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'flowDirection');
+          if(activeLink) setGenerationDp(activeLink.dataPointId);
+          if(directionLink) setUsageDp(directionLink.dataPointId);
+          // Note: Speed multiplier from a link directly isn't straightforward, so it's not pre-filled from legacy links.
+      }
+
+    } else {
+      setGenerationDp(undefined);
+      setUsageDp(undefined);
+      setSpeedMultiplier(1);
+      setApplyToAllEdges(false);
     }
   }, [edge, isOpen]);
 
   const handleSave = () => {
     onConfigure({
-      flowActiveDataPointId: flowActiveDp,
-      flowDirectionDataPointId: flowDirectionDp,
-      flowSpeedDataPointId: flowSpeedDp,
+      generationDataPointId: generationDp,
+      usageDataPointId: usageDp,
+      speedMultiplier: speedMultiplier,
+      applyToAllEdges: applyToAllEdges,
     });
     onOpenChange(false);
   };
 
-  if (!edge) return null; // Don't render if no edge
+  // If edge is null, this dialog might be for global settings, adjust title accordingly.
+  // For now, the prompt implies edge is not null when called from inspector, 
+  // but it will be null when called for bulk configuration from SLDWidget.
+  const dialogTitle = edge 
+    ? `Configure Edge Animation: ${edge.data?.label || edge.id}` 
+    : "Configure Animation for Selected Edges";
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Configure Animation Flow: {edge.data?.label || edge.id}</DialogTitle>
+          <DialogTitle>{dialogTitle}</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 py-4">
           <div className="space-y-2">
-            <Label htmlFor="flowActiveDp" className="text-sm font-medium">
+            <Label htmlFor="generationDp" className="text-sm font-medium">
               Generation Data Point
             </Label>
             <SearchableSelect
               options={dataPointOptions}
-              value={flowActiveDp}
-              onChange={(value) => setFlowActiveDp(value || undefined)}
+              value={generationDp}
+              onChange={(value) => setGenerationDp(value || undefined)}
               placeholder="Select Data Point for Generation..."
               searchPlaceholder="Search data points..."
               notFoundText="No data points found."
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Controls if flow is active (e.g., links to 'isEnergized' or 'status').
+              Numeric. Positive values indicate generation/source. Links to 'isEnergized'.
             </p>
-            {flowActiveDp && (
+            {generationDp && (
               <div className="mt-2">
                 <DataLinkLiveValuePreview
-                  dataPointId={flowActiveDp}
+                  dataPointId={generationDp}
                   valueMapping={undefined} 
                   format={undefined} 
                 />
@@ -104,24 +120,24 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="flowDirectionDp" className="text-sm font-medium">
+            <Label htmlFor="usageDp" className="text-sm font-medium">
               Usage Data Point
             </Label>
             <SearchableSelect
               options={dataPointOptions}
-              value={flowDirectionDp}
-              onChange={(value) => setFlowDirectionDp(value || undefined)}
+              value={usageDp}
+              onChange={(value) => setUsageDp(value || undefined)}
               placeholder="Select Data Point for Usage..."
               searchPlaceholder="Search data points..."
               notFoundText="No data points found."
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Controls flow direction (e.g., links to 'flowDirection').
+              Numeric. Positive values indicate consumption/load. Links to 'flowDirection'.
             </p>
-            {flowDirectionDp && (
+            {usageDp && (
               <div className="mt-2">
                 <DataLinkLiveValuePreview
-                  dataPointId={flowDirectionDp}
+                  dataPointId={usageDp}
                   valueMapping={undefined} 
                   format={undefined} 
                 />
@@ -129,30 +145,32 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
             )}
           </div>
           <div className="space-y-2">
-            <Label htmlFor="flowSpeedDp" className="text-sm font-medium">
-              Flow Speed Data Point
+            <Label htmlFor="speedMultiplier" className="text-sm font-medium">
+              Speed Multiplier
             </Label>
-            <SearchableSelect
-              options={dataPointOptions}
-              value={flowSpeedDp}
-              onChange={(value) => setFlowSpeedDp(value || undefined)}
-              placeholder="Select Data Point for Flow Speed..."
-              searchPlaceholder="Search data points..."
-              notFoundText="No data points found."
+            <Input
+              id="speedMultiplier"
+              type="number"
+              value={speedMultiplier}
+              onChange={(e) => setSpeedMultiplier(parseFloat(e.target.value) || 1)}
+              min={0.1}
+              step={0.1}
+              className="w-full"
             />
             <p className="text-xs text-muted-foreground mt-1">
-              Controls animation speed (e.g., links to 'animationSpeedFactor').
+              Multiplier for the speed calculated from |Generation - Usage|. Default is 1.
             </p>
-            {flowSpeedDp && (
-              <div className="mt-2">
-                <DataLinkLiveValuePreview
-                  dataPointId={flowSpeedDp}
-                  valueMapping={undefined}
-                  format={undefined}
-                />
-              </div>
-            )}
           </div>
+          <div className="flex items-center space-x-2 mt-4 pt-4 border-t border-border/40"> {/* Adjusted pt for spacing after removing conditional */}
+            <Checkbox
+              id="applyToAllEdges"
+                checked={applyToAllEdges}
+                onCheckedChange={(checkedState) => setApplyToAllEdges(Boolean(checkedState.valueOf()))}
+              />
+              <Label htmlFor="applyToAllEdges" className="text-sm font-normal cursor-pointer">
+                Apply this animation logic to all edges in this SLD
+              </Label>
+            </div>
         </div>
         <DialogFooter>
           <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
@@ -164,9 +182,3 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
 };
 
 export default AnimationFlowConfiguratorDialog;
-
-// Also, ensure SearchableSelect component path is correct.
-// If SearchableSelect is not in './SearchableSelect', adjust the import path.
-// For example, if it's in a shared components/ui directory:
-// import { SearchableSelect, ComboboxOption } from '@/components/ui/SearchableSelect'; 
-// For now, assuming it's co-located as per the original SLDInspectorDialog.
