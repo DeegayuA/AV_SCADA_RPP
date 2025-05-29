@@ -402,3 +402,83 @@
   to { right: 100%; /* End off-screen on the other side */ }
 }
 
+
+
+/* In your global CSS file (e.g., globals.css) */
+
+/* --- Root / Light Theme Edge Colors --- */
+:root, [data-theme="light"] {
+  --edge-color-ac-hv: #D97706; /* Amber 600 (Good contrast for light theme) */
+  --edge-color-ac-mv: #F59E0B; /* Amber 500 */
+  --edge-color-ac-lv: #FBBF24; /* Amber 400 */
+  --edge-color-dc-hv: #2563EB; /* Blue 600 */
+  --edge-color-dc-mv: #3B82F6; /* Blue 500 */
+  --edge-color-dc-lv: #60A5FA; /* Blue 400 */
+  --edge-color-control-signal: #16A34A; /* Green 600 */
+  --edge-color-data-bus: #0D9488;  /* Teal 600 */
+  --edge-color-aux-power: #9333EA; /* Purple 600 */
+  --edge-color-energized-default: #65A30D; /* Lime 600 */
+  --edge-color-offline: #9CA3AF;   /* Gray 400 (Visibly offline but not too faint) */
+  --edge-color-fault: #DC2626;     /* Red 600 (Strong fault color) */
+  --edge-color-warning: #EAB308;   /* Yellow 500 (Clear warning) */
+  --edge-color-selected: #0EA5E9;  /* Sky 500 (Distinct selection) */
+  
+  --edge-animated-dash-default: #FFFFFF;         /* White dashes */
+  --edge-animated-dash-on-warning: #422006;      /* Dark Brown/Sienna on light yellow */
+  --edge-animated-dash-on-selected: #FFFFFF;     /* White on selection blue */
+
+  /* Edge Labels */
+  --edge-label-bg: #ffffff;
+  --edge-label-bg-inactive: #f3f4f6; /* Gray 100 */
+  --edge-label-text: #1f2937;      /* Gray 800 */
+  --edge-label-border-inactive: #d1d5db; /* Gray 300 */
+  --edge-label-shadow-color: rgba(0, 0, 0, 0.1);
+}
+
+/* --- Dark Theme Edge Colors --- */
+[data-theme="dark"] {
+  --edge-color-ac-hv: #FACC15;    /* Yellow 400 */
+  --edge-color-ac-mv: #FB923C;    /* Orange 400 */
+  --edge-color-ac-lv: #F97316;    /* Orange 500 */
+  --edge-color-dc-hv: #60A5FA;    /* Blue 400 */
+  --edge-color-dc-mv: #38BDF8;    /* Sky 400 */
+  --edge-color-dc-lv: #7DD3FC;    /* Sky 300 */
+  --edge-color-control-signal: #4ADE80; /* Green 400 */
+  --edge-color-data-bus: #2DD4BF;    /* Teal 400 */
+  --edge-color-aux-power: #C084FC;   /* Purple 400 */
+  --edge-color-energized-default: #86EFAC; /* Green 300 */
+  --edge-color-offline: #6B7280;     /* Gray 500 */
+  --edge-color-fault: #F87171;      /* Red 400 */
+  --edge-color-warning: #FDE047;    /* Yellow 300 (Brighter for dark background) */
+  --edge-color-selected: #7DD3FC;   /* Sky 300 (Brighter selection for dark mode) */
+
+  /* Animated dashes for dark theme */
+  /* Option 1: Dark dashes on light color paths (if paths are bright in dark mode) */
+  --edge-animated-dash-default: #111827; /* Gray 900 */
+  --edge-animated-dash-on-warning: #111827;
+  --edge-animated-dash-on-selected: #111827;
+
+  /* Edge Labels */
+  --edge-label-bg: #374151;         /* Gray 700 */
+  --edge-label-bg-inactive: #1f2937; /* Gray 800 */
+  --edge-label-text: #F3F4F6;       /* Gray 100 */
+  --edge-label-border-inactive: #4b5563; /* Gray 600 */
+  --edge-label-shadow-color: rgba(0, 0, 0, 0.25);
+}
+
+/* --- Edge Animation Keyframes (if not already defined) --- */
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: var(--edge-animation-dashoffset-end);
+  }
+}
+
+@keyframes faultPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+
+@keyframes subtlePulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
