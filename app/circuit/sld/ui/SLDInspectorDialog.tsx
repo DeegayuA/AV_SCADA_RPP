@@ -450,7 +450,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
 
     return (
         <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl lg:max-w-3xl max-h-[90vh] xl:max-h-[80vh] flex flex-col p-0 shadow-2xl rounded-lg border-border/70 bg-background">
+            <DialogContent className="max-w-3xl lg:max-w-5xl max-h-[90vh] xl:max-h-[80vh] flex flex-col p-0 shadow-2xl rounded-lg border-border/70 bg-background">
                 <DialogHeader className="p-4 border-b border-border/60 flex flex-row justify-between items-center top-0 bg-background/95 backdrop-blur-sm z-10">
                     <div className='space-y-0.5'>
                         <DialogTitle className="text-xl font-bold flex items-center">
