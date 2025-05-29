@@ -2,6 +2,10 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Node, Edge, isEdge as isReactFlowEdge } from 'reactflow';
 import { Button } from "@/components/ui/button";
+import AnimationFlowConfiguratorDialog from './AnimationFlowConfiguratorDialog';
+// Assuming AnimationFlowConfig is exported from AnimationFlowConfiguratorDialog.tsx
+// If not, this will need to be adjusted, or the interface defined locally/globally.
+import { AnimationFlowConfig } from './AnimationFlowConfiguratorDialog'; 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import DataLinkLiveValuePreview from './DataLinkLiveValuePreview'; // Import the new component
@@ -135,6 +139,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
     const [formData, setFormData] = useState<Partial<CustomNodeData & CustomFlowEdgeData & { styleConfig?: TextNodeStyleConfig }>>({});
     const [dataLinks, setDataLinks] = useState<DataPointLink[]>([]);
     const [activeTab, setActiveTab] = useState<string>("properties");
+    const [isAnimationConfiguratorOpen, setIsAnimationConfiguratorOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen && selectedElement) {
@@ -932,6 +937,18 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                             <div className="space-y-1"> <Label htmlFor="voltageLevel" className="text-xs">Voltage Level</Label> <Select name="voltageLevel" value={formData.voltageLevel || ''} onValueChange={(val) => handleSelectChange("voltageLevel", val)}> <SelectTrigger className="h-9 text-xs"><SelectValue placeholder="Select voltage level..." /></SelectTrigger> <SelectContent><SelectItem value="HV" className="text-xs">High Voltage (HV)</SelectItem><SelectItem value="MV" className="text-xs">Medium Voltage (MV)</SelectItem><SelectItem value="LV" className="text-xs">Low Voltage (LV)</SelectItem><SelectItem value="ELV" className="text-xs">Extra Low Voltage (ELV)</SelectItem></SelectContent> </Select> </div>
                                             <FieldInput type="number" id="currentRatingAmps" name="currentRatingAmps" label="Current Rating (Amps)" value={formData.currentRatingAmps ?? ''} onChange={handleInputChange} placeholder="e.g., 250" min="0" />
                                             <FieldInput id="cableType" name="cableType" label="Cable Type / Size" value={formData.cableType ?? ''} onChange={handleInputChange} placeholder="e.g., XLPE 3C x 185mm²" />
+                                            
+                                            <Separator className="my-4" />
+
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              className="w-full mt-4"
+                                              onClick={() => setIsAnimationConfiguratorOpen(true)}
+                                            >
+                                              <ZapIcon className="w-4 h-4 mr-2" />
+                                              Configure Animated Flow
+                                            </Button>
                                         </CardContent>
                                     </Card>
                                 )}
@@ -1010,6 +1027,67 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                     </Button>
                 </DialogFooter>
             </DialogContent>
+
+            {isEdge(selectedElement) && (
+                <AnimationFlowConfiguratorDialog
+                    isOpen={isAnimationConfiguratorOpen}
+                    onOpenChange={setIsAnimationConfiguratorOpen}
+                    edge={selectedElement} // Already confirmed it's an edge here
+                    availableDataPoints={Object.values(dataPoints)}
+                    onConfigure={(config: AnimationFlowConfig) => {
+                        console.log('Animation configuration received:', config);
+                        setDataLinks(prevLinks => {
+                            let newLinks = [...prevLinks];
+
+                            // Handle Flow Activation Link (isEnergized)
+                            const activeTargetProperty = 'isEnergized';
+                            const existingActiveLinkIndex = newLinks.findIndex(link => link.targetProperty === activeTargetProperty);
+
+                            if (config.flowActiveDataPointId) {
+                                if (existingActiveLinkIndex !== -1) {
+                                    newLinks[existingActiveLinkIndex] = {
+                                        ...newLinks[existingActiveLinkIndex],
+                                        dataPointId: config.flowActiveDataPointId,
+                                    };
+                                } else {
+                                    newLinks.push({
+                                        dataPointId: config.flowActiveDataPointId,
+                                        targetProperty: activeTargetProperty,
+                                    });
+                                }
+                            } else { // flowActiveDataPointId is not provided, remove existing link
+                                if (existingActiveLinkIndex !== -1) {
+                                    newLinks.splice(existingActiveLinkIndex, 1);
+                                }
+                            }
+
+                            // Handle Flow Direction Link (flowDirection)
+                            const directionTargetProperty = 'flowDirection';
+                            // Re-find index in case newLinks was modified by active link logic
+                            const existingDirectionLinkIndex = newLinks.findIndex(link => link.targetProperty === directionTargetProperty);
+
+                            if (config.flowDirectionDataPointId) {
+                                if (existingDirectionLinkIndex !== -1) {
+                                    newLinks[existingDirectionLinkIndex] = {
+                                        ...newLinks[existingDirectionLinkIndex],
+                                        dataPointId: config.flowDirectionDataPointId,
+                                    };
+                                } else {
+                                    newLinks.push({
+                                        dataPointId: config.flowDirectionDataPointId,
+                                        targetProperty: directionTargetProperty,
+                                    });
+                                }
+                            } else { // flowDirectionDataPointId is not provided, remove existing link
+                                if (existingDirectionLinkIndex !== -1) {
+                                    newLinks.splice(existingDirectionLinkIndex, 1);
+                                }
+                            }
+                            return newLinks;
+                        });
+                    }}
+                />
+            )}
         </Dialog>
     );
 };
