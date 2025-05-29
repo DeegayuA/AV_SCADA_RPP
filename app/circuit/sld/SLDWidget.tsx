@@ -1,7 +1,7 @@
 // components/sld/SLDWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, ComponentType } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, ComponentType, KeyboardEvent as ReactKeyboardEvent } from 'react'; // Added ReactKeyboardEvent
 import ReactFlow, {
   ReactFlowProvider,
   Node, Edge, Connection, addEdge,
@@ -11,18 +11,19 @@ import ReactFlow, {
   FitViewOptions,
   Panel,
   BackgroundVariant,
-  ReactFlowJsonObject, 
+  ReactFlowJsonObject,
   NodeProps,
-  Viewport, 
+  Viewport,
+  ConnectionLineType, // Added ConnectionLineType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
-import { throttle } from 'lodash';
-import { AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; 
+import { throttle, cloneDeep } from 'lodash'; // Added cloneDeep
+import { AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap, CopyIcon, ClipboardPasteIcon } from 'lucide-react'; // Added CopyIcon, ClipboardPasteIcon
 import { motion } from 'framer-motion';
 
-import { Textarea } from "@/components/ui/textarea"; 
+import { Textarea } from "@/components/ui/textarea";
 import {
   SLDLayout, CustomNodeType, CustomFlowEdge, CustomNodeData,
   SLDElementType, CustomFlowEdgeData, TextLabelNodeData, DataPoint, 
@@ -184,7 +185,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const storeSelectedElement = useSelectedElementForDetails();
   const { setSelectedElementForDetails } = useAppStore.getState();
 
+  const selectedNodesFromReactFlow = useMemo(() => nodes.filter(node => node.selected), [nodes]); // For UI button state
   const selectedEdgesFromReactFlow = useMemo(() => edges.filter(edge => edge.selected), [edges]);
+  const clipboardNodesRef = useRef<CustomNodeType[]>([]);
 
 
   const removePlaceholderIfNeeded = useCallback((currentNodes: CustomNodeType[]) => {
@@ -717,6 +720,114 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     return () => { debouncedAutoSave.cancel(); };
   }, [nodes, edges, reactFlowInstance, layoutId, canEdit, isDirty, debouncedAutoSave]);
 
+  const handleCopy = useCallback(() => {
+    if (!canEdit) return;
+    const selectedNodesToCopy = nodes.filter(node => node.selected && node.id !== PLACEHOLDER_NODE_ID);
+    if (selectedNodesToCopy.length === 0) {
+      // toast.info("No nodes selected to copy."); // Optional: if you want feedback even when nothing is copied
+      return;
+    }
+
+    clipboardNodesRef.current = selectedNodesToCopy.map(node => ({
+      // Essential properties for pasting. ID will be regenerated.
+      // Position is copied to use as a base for the new position.
+      ...node, // spread to get width, height, type etc.
+      data: cloneDeep(node.data), // Deep clone data
+      // Explicitly exclude problematic properties or ensure they are handled on paste
+      id: `original_${node.id}`, // Temporary ID, will be replaced on paste
+      selected: false, // Will be set to true for new nodes on paste
+      dragging: false,
+      // position: { x: node.position.x, y: node.position.y }, // Already spread
+    }));
+    toast.info(`Copied ${selectedNodesToCopy.length} node(s) to clipboard.`);
+  }, [canEdit, nodes]);
+
+  const handlePaste = useCallback(() => {
+    if (!canEdit || clipboardNodesRef.current.length === 0) {
+      if (canEdit && clipboardNodesRef.current.length === 0) {
+        toast.info("Clipboard is empty.");
+      }
+      return;
+    }
+
+    const newPastedNodes: CustomNodeType[] = clipboardNodesRef.current.map((copiedNode, index) => {
+      const nodeType = copiedNode.type || SLDElementType.GenericDevice; // Fallback type
+      const newId = `${nodeType}_${+new Date()}_${Math.random().toString(36).substring(2, 6)}_${index}`;
+      const newPosition = {
+        x: copiedNode.position.x + 20 + (index * 10), // Offset each pasted node slightly
+        y: copiedNode.position.y + 20 + (index * 10),
+      };
+
+      return {
+        ...copiedNode,
+        id: newId,
+        position: newPosition,
+        selected: true,
+        dragging: false, // Ensure dragging is false
+        data: cloneDeep(copiedNode.data), // Ensure data is a fresh deep copy
+        // Remove any viewport-specific temporary states if they exist from the copied node
+        positionAbsolute: undefined, // React Flow might add this, ensure it's clean for new node
+      };
+    });
+
+    setNodes((currentNodes) => {
+      const deselectedNodes = currentNodes.map(n => ({ ...n, selected: false }));
+      return removePlaceholderIfNeeded([...deselectedNodes, ...newPastedNodes]);
+    });
+
+    setIsDirty(true);
+    toast.success(`Pasted ${newPastedNodes.length} node(s).`);
+    initialFitViewDone.current = false; // To trigger fitView or other adjustments if needed
+
+    // Optional: Clear clipboard after paste to prevent pasting same items multiple times by mistake
+    // clipboardNodesRef.current = []; 
+    // Reactivate selection for the newly pasted nodes
+    setNodes(nds => nds.map(n => ({...n, selected: newPastedNodes.some(pn => pn.id === n.id) })));
+
+
+  }, [canEdit, removePlaceholderIfNeeded, setIsDirty, setNodes]);
+
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => { // Use global KeyboardEvent
+      if (!canEdit || !reactFlowWrapper.current || !reactFlowWrapper.current.contains(document.activeElement)) {
+        // Only act if SLDWidget or its children have focus and in edit mode
+        // This helps prevent global capture if user is typing in a text field outside SLDWidget
+        // A more robust check might involve checking if document.activeElement is inside reactFlowWrapper.current
+        return;
+      }
+
+      const isCmdCtrl = event.ctrlKey || event.metaKey;
+
+      if (isCmdCtrl && event.key.toLowerCase() === 'c') {
+        // Check if active element is an input field, if so, don't prevent default copy.
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable) {
+            // Allow default copy behavior for text fields
+            return; 
+        }
+        event.preventDefault();
+        handleCopy();
+      } else if (isCmdCtrl && event.key.toLowerCase() === 'v') {
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable) {
+            // Allow default paste behavior for text fields
+            return;
+        }
+        event.preventDefault();
+        handlePaste();
+      }
+    };
+
+    const wrapperElement = reactFlowWrapper.current; // Capture current value for cleanup
+    // Add listener to the wrapper, so it only triggers when SLDWidget is "active"
+    wrapperElement?.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      wrapperElement?.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canEdit, handleCopy, handlePaste]); // reactFlowWrapper is a ref, doesn't need to be in deps
+
 
   useEffect(() => {
     if (storeSelectedElement && !canEdit) {
@@ -865,18 +976,27 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             nodeTypes={nodeTypes} edgeTypes={edgeTypes} defaultEdgeOptions={defaultEdgeOptions}
             onDrop={onDrop} onDragOver={onDragOver} onNodeClick={handleElementClick}  onEdgeClick={handleElementClick} 
             onNodeDragStop={onNodeDragStop} onPaneClick={onPaneClick}
-            fitViewOptions={fitViewOptions} 
+            fitViewOptions={fitViewOptions}
             selectionMode={SelectionMode.Partial}
             elementsSelectable={canEdit || !isEffectivelyEmpty}
             panOnScroll panOnScrollMode={PanOnScrollMode.Free} proOptions={{ hideAttribution: true }}
             elevateNodesOnSelect={canEdit} deleteKeyCode={canEdit ? ['Backspace', 'Delete'] : null}
             nodesDraggable={canEdit} nodesConnectable={canEdit}
+            connectionLineType={ConnectionLineType.Step} // Added connectionLineType
             connectionRadius={35}
-            minZoom={0.05} maxZoom={4} 
+            minZoom={0.05} maxZoom={4}
         >
             <Controls showInteractive={canEdit} />
             <MiniMap pannable zoomable nodeColor={themedNodeColor} nodeStrokeColor={themedNodeStrokeColor} nodeStrokeWidth={2} nodeBorderRadius={2}
-                style={{ backgroundColor: colors.miniMapBg, border: `1px solid ${colors.miniMapBorder}` }} maskColor={colors.maskBg} maskStrokeColor={colors.maskStroke}/>
+                style={{ 
+                    backgroundColor: colors.miniMapBg, 
+                    border: `1px solid ${colors.miniMapBorder}`,
+                    width: 100, // Reduced width
+                    height: 75,  // Reduced height
+                }} 
+                maskColor={colors.maskBg} 
+                maskStrokeColor={colors.maskStroke}
+            />
             <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color={colors.backgroundDots} className="opacity-60" />
             
             <Panel position="top-right" className="!m-0 !p-0">
@@ -896,7 +1016,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                                   <Check className="h-3.5 w-3.5 mr-1.5 opacity-80" /> Synced
                               </span></TooltipTrigger><TooltipContent><p>Layout saved and synced with server.</p></TooltipContent></Tooltip></TooltipProvider>
                       )}
-                      {!isWebSocketConnected && isDirty && ( 
+                      {!isWebSocketConnected && isDirty && (
                            <TooltipProvider delayDuration={100}><Tooltip><TooltipTrigger asChild>
                                 <span className="text-xs text-sky-600 dark:text-sky-400 font-medium py-1 px-1.5 rounded-md bg-sky-500/10 flex items-center">
                                     <Check className="h-3.5 w-3.5 mr-1.5 opacity-80" /> Saved Locally
@@ -910,6 +1030,27 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                       )}
                       
                       {/* Action Buttons */}
+                       <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button onClick={handleCopy} size="sm" variant="outline" title="Copy Selected Nodes (Ctrl/Cmd+C)" disabled={selectedNodesFromReactFlow.length === 0}>
+                                        <CopyIcon className="h-4 w-4"/>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Copy Nodes ({selectedNodesFromReactFlow.length} selected)</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button onClick={handlePaste} size="sm" variant="outline" title="Paste Nodes (Ctrl/Cmd+V)" disabled={clipboardNodesRef.current.length === 0}>
+                                        <ClipboardPasteIcon className="h-4 w-4"/>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Paste Nodes ({clipboardNodesRef.current.length} in clipboard)</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+
                       <AlertDialog>
                           <AlertDialogTrigger asChild>
                               <Button size="sm" variant="outline" title="Clear Canvas" disabled={isEffectivelyEmpty && !isDirty && currentLayoutLoadedFromServerOrInitialized.current}>

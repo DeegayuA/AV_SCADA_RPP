@@ -1,6 +1,7 @@
 // components/sld/edges/AnimatedFlowEdge.tsx
 import React from 'react';
-import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge } from 'reactflow';
+import { EdgeProps, EdgeLabelRenderer, BaseEdge } from 'reactflow';
+import { getSmoothStepPath } from '@xyflow/react';
 import { getDataPointValue, applyValueMapping } from '../nodes/nodeUtils';
 import { 
     CustomFlowEdgeData, 
@@ -11,7 +12,7 @@ import { useAppStore } from '@/stores/appStore';
 
 // Centralized styling for consistency
 const flowColors = {
-  AC_HV: '#FFBF00',      // Bright Yellow-Orange
+  AC_HV: '#FFBF00', // Bright Yellow-Orange
   AC_MV: '#FFA500',      // Orange
   AC_LV: '#FF8C00',      // DarkOrange
   DC_HV: '#1E90FF',      // DodgerBlue
@@ -50,9 +51,9 @@ export default function AnimatedFlowEdge({
     dataPoints: state.dataPoints,
   }));
 
+  // Changed to getStepPath, removed borderRadius as it's not applicable.
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
-    borderRadius: 5,
   });
 
   let edgeStrokeColor = flowColors.OFFLINE;
