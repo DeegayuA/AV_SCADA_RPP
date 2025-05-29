@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect, ComboboxOption } from './SearchableSelect';
 import { CustomFlowEdge, DataPoint } from '@/types/sld';
+import DataLinkLiveValuePreview from './DataLinkLiveValuePreview'; // Import the new component
 // Remove useAppStore import, dataPoints will be passed as a prop
 
 interface AnimationFlowConfig {
@@ -86,6 +87,15 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
             <p className="text-xs text-muted-foreground mt-1">
               Controls if flow is active (e.g., links to 'isEnergized' or 'status').
             </p>
+            {flowActiveDp && (
+              <div className="mt-2">
+                <DataLinkLiveValuePreview
+                  dataPointId={flowActiveDp}
+                  valueMapping={undefined} 
+                  format={undefined} 
+                />
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="flowDirectionDp" className="text-sm font-medium">
@@ -102,6 +112,15 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
             <p className="text-xs text-muted-foreground mt-1">
               Controls flow direction (e.g., links to 'flowDirection').
             </p>
+            {flowDirectionDp && (
+              <div className="mt-2">
+                <DataLinkLiveValuePreview
+                  dataPointId={flowDirectionDp}
+                  valueMapping={undefined} 
+                  format={undefined} 
+                />
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
