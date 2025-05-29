@@ -19,7 +19,7 @@ import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { throttle } from 'lodash';
-import { AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; 
+import { ChevronDown, Save, AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; 
 import { motion } from 'framer-motion';
 
 import { Textarea } from "@/components/ui/textarea"; 
@@ -80,6 +80,12 @@ import AnimationFlowConfiguratorDialog, {
   DialogGlobalAnimationSettings 
 } from './ui/AnimationFlowConfiguratorDialog';
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface WebSocketMessageFromServer {
   type: string;
@@ -1137,9 +1143,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                 style={{ backgroundColor: colors.miniMapBg, border: `1px solid ${colors.miniMapBorder}` }} maskColor={colors.maskBg} maskStrokeColor={colors.maskStroke}/>
             <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color={colors.backgroundDots} className="opacity-60" />
             
-            <Panel position="top-right" className="!m-0 !p-0">
+              <Panel position="top-right" className="!m-0 !p-0">
                 {canEdit && layoutId && ( 
-                    <motion.div className="flex items-center gap-2 p-2.5 bg-background/80 backdrop-blur-sm border-border border rounded-bl-lg shadow-lg"
+                    <motion.div className="flex flex-wrap items-center gap-2 p-2.5 bg-background/80 backdrop-blur-sm border-border border rounded-bl-lg shadow-lg"
                         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}>
                       {/* Dirty/Saving status indicators */}
                       {isWebSocketConnected && isDirty && (
@@ -1169,72 +1175,95 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                       
                       {/* Action Buttons */}
                       {/* Clear Button */}
-                      <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="outline" title="Clear Canvas" disabled={isEffectivelyEmpty && !isDirty && currentLayoutLoadedFromServerOrInitialized.current}>
-                                  <RotateCcw className="h-4 w-4 mr-1.5"/> Clear
-                              </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Reset SLD Layout?</AlertDialogTitle>
-                              <AlertDialogDescription>Clear "{layoutId?.replace(/_/g, ' ')}"? This replaces content with a placeholder and clears global animation settings for this layout. Changes saved via auto/manual save.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={handleResetLayout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"> Reset </AlertDialogAction>
-                              </AlertDialogFooter>
-                          </AlertDialogContent>
-                      </AlertDialog>
+                        <AlertDialog>
+                            <TooltipProvider delayDuration={100}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <AlertDialogTrigger asChild>
+                                            <Button size="sm" variant="outline" className="h-9" disabled={isEffectivelyEmpty && !isDirty && currentLayoutLoadedFromServerOrInitialized.current}>
+                                                <RotateCcw className="h-4 w-4 md:mr-1.5"/> <span className="hidden md:inline">Clear</span>
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Clear current layout. This action is permanent for this session unless manually saved.</p></TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                            <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>Reset SLD Layout?</AlertDialogTitle>
+                                <AlertDialogDescription>Clear "{layoutId?.replace(/_/g, ' ')}"? This replaces content with a placeholder and clears global animation settings for this layout. Changes saved via auto/manual save.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleResetLayout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"> Reset </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
 
                       {/* Save Now Button */}
-                      <Button onClick={handleManualSaveLayout} size="sm" variant="secondary" title="Save Now & Sync"  disabled={!isDirty && !isEffectivelyEmpty && currentLayoutLoadedFromServerOrInitialized.current }> Save Now </Button>
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button onClick={handleManualSaveLayout} size="sm" variant="secondary" className="h-9" disabled={!isDirty && !isEffectivelyEmpty && currentLayoutLoadedFromServerOrInitialized.current }>
+                                        <Save className="h-4 w-4 md:mr-1.5" />
+                                        <span className="hidden md:inline">Save Now</span>
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Save Now & Sync</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                       
-                      {/* Export Current Button */}
-                      <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button onClick={handleExportSingleLayout} size="sm" variant="outline" disabled={!canEdit || !layoutId}>
-                                    <Download className="h-4 w-4 mr-1.5"/> Export Current
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Export the current SLD layout ({layoutId ? layoutId.replace(/_/g, ' ') : 'N/A'}) as a JSON file.</p></TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-
-                      {/* Export All Button */}
-                      <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button onClick={handleExportAllLayouts} size="sm" variant="outline" disabled={!canEdit}>
-                                    <Download className="h-4 w-4 mr-1.5"/> Export All
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Export all locally stored SLD layouts as a single JSON file.</p></TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      {/* Export Dropdown */}
+                      <DropdownMenu>
+                          <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                  <TooltipTrigger asChild>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button size="sm" variant="outline" disabled={!canEdit} className="h-9">
+                                              <Download className="h-4 w-4 md:mr-1.5" />
+                                              <span className="hidden md:inline">Export</span>
+                                              <ChevronDown className="h-4 w-4 ml-1 md:ml-1.5 opacity-70" />
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Export SLD layouts</p></TooltipContent>
+                              </Tooltip>
+                          </TooltipProvider>
+                          <DropdownMenuContent align="end" className="w-60">
+                              <DropdownMenuItem onClick={handleExportSingleLayout} disabled={!layoutId} className="text-xs cursor-pointer">
+                                  Export Current Layout
+                                  {layoutId && <span className="ml-auto text-muted-foreground pl-2 truncate max-w-[120px]">({layoutId.replace(/_/g, ' ')})</span>}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleExportAllLayouts} className="text-xs cursor-pointer">
+                                  Export All Local Layouts
+                              </DropdownMenuItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
                        
-                      {/* Import Current Button */}
-                      <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                              <TooltipTrigger asChild>
-                                  <Button onClick={() => setIsImportDialogOpen(true)} size="sm" variant="outline" disabled={!canEdit || !layoutId}>
-                                      <Upload className="h-4 w-4 mr-1.5"/> Import Current
-                                  </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Import an SLD layout (JSON paste/file) into the current view ({layoutId ? layoutId.replace(/_/g, ' ') : 'N/A'}).</p></TooltipContent>
-                          </Tooltip>
-                      </TooltipProvider>
-
-                      {/* Import All Button */}
-                      <TooltipProvider delayDuration={100}>
-                          <Tooltip>
-                              <TooltipTrigger asChild>
-                                  <Button onClick={() => setIsImportAllDialogOpen(true)} size="sm" variant="outline" disabled={!canEdit}>
-                                      <Upload className="h-4 w-4 mr-1.5" /> Import All
-                                  </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Import multiple SLD layouts (JSON paste/file) into local storage.</p></TooltipContent>
-                          </Tooltip>
-                      </TooltipProvider>
+                      {/* Import Dropdown */}
+                      <DropdownMenu>
+                          <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                  <TooltipTrigger asChild>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button size="sm" variant="outline" disabled={!canEdit} className="h-9">
+                                              <Upload className="h-4 w-4 md:mr-1.5" />
+                                              <span className="hidden md:inline">Import</span>
+                                              <ChevronDown className="h-4 w-4 ml-1 md:ml-1.5 opacity-70" />
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Import SLD layouts</p></TooltipContent>
+                              </Tooltip>
+                          </TooltipProvider>
+                          <DropdownMenuContent align="end" className="w-60">
+                              <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} disabled={!layoutId} className="text-xs cursor-pointer">
+                                  Import to Current Layout
+                                  {layoutId && <span className="ml-auto text-muted-foreground pl-2 truncate max-w-[120px]">({layoutId.replace(/_/g, ' ')})</span>}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setIsImportAllDialogOpen(true)} className="text-xs cursor-pointer">
+                                  Import All to Local
+                              </DropdownMenuItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
 
                       {/* Bulk Anim Button */}
                       <TooltipProvider delayDuration={100}>
@@ -1243,15 +1272,20 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                                   <Button 
                                       size="sm" 
                                       variant="outline" 
-                                      title="Bulk Configure Edge Animations" // Title attribute is fine here as it's more specific than tooltip
                                       disabled={!canEdit || selectedEdgesFromReactFlow.length === 0}
                                       onClick={handleOpenBulkAnimationConfigurator}
+                                      className="h-9"
                                   >
-                                      <ListChecks className="h-4 w-4 mr-1.5" />
-                                      Bulk Anim
-                                  </Button>
-                              </TooltipTrigger>
-                              <TooltipContent><p>Bulk Configure Edge Animations ({selectedEdgesFromReactFlow.length} selected)</p></TooltipContent>
+                                      <ListChecks className="h-4 w-4 md:mr-1.5" />
+                                      <span className="hidden md:inline">Bulk Anim</span>
+                                      {selectedEdgesFromReactFlow.length > 0 && (
+                                          <span className="ml-1.5 hidden md:inline text-xs px-1 py-0.5 bg-muted text-muted-foreground rounded">
+                                              {selectedEdgesFromReactFlow.length}
+                                          </span>
+                                      )}
+                                </Button>
+                            </TooltipTrigger>
+                              <TooltipContent><p>Bulk Configure Edge Animations {selectedEdgesFromReactFlow.length > 0 ? ` (${selectedEdgesFromReactFlow.length} selected)` : ' (No edges selected)'}</p></TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
                     </motion.div>
@@ -1297,7 +1331,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                             id="import-single-file-input" 
                             ref={fileInputRef}
                             onChange={handleFileSelectedForImport}
-                            style={{ display: 'none' }} 
+                            className="sr-only" 
+                            aria-label="Upload JSON file for current layout"
+                            title="Select a JSON file to import into current layout"
                         />
                         <Button 
                             variant="outline" 
@@ -1358,7 +1394,6 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                             if (selectedAllFileName) setSelectedAllFileName(null);
                         }}
                         className="min-h-[150px] max-h-[300px] text-xs font-mono"
-                        aria-label="All SLD Layouts JSON Input"
                     />
                     <div>
                         <input
@@ -1367,6 +1402,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                             id="import-all-layouts-file-input"
                             ref={importAllFileInputRef}
                             onChange={handleFileSelectedForAllImport}
+                            className="sr-only"
+                            aria-label="Upload JSON file for all layouts"
+                            title="Select a JSON file to import all layouts"
                             style={{ display: 'none' }}
                         />
                         <Button
