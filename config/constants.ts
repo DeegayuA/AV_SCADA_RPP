@@ -23,7 +23,7 @@ export const WS_URL = (() => {
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.166.112:4840";
-export const VERSION = "1.7.0";
+export const VERSION = "- Release v2025.05.29 • 15:30 (GMT+5:30)";
 export const PLANT_NAME= "Mini-Grid";
 export const PLANT_LOCATION = "Colombo, Sri Lanka";
 export const PLANT_TYPE = "Mini-Grid";

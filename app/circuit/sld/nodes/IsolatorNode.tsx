@@ -40,7 +40,7 @@ const IsolatorNode: React.FC<ExtendedNodeProps> = (props) => {
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
     if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'open'; // Default to open
@@ -49,7 +49,7 @@ const IsolatorNode: React.FC<ExtendedNodeProps> = (props) => {
   const isOpen = useMemo(() => {
     const isOpenLink = data.dataPointLinks?.find(link => link.targetProperty === 'isOpen');
     if (isOpenLink && dataPoints && dataPoints[isOpenLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(isOpenLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(isOpenLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       const mappedValue = applyValueMapping(rawValue, isOpenLink);
       return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || Number(mappedValue) === 1;
     }
@@ -75,7 +75,7 @@ const IsolatorNode: React.FC<ExtendedNodeProps> = (props) => {
   }, [isOpen, processedStatus]);
   
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    getDerivedStyle(data, dataPoints, opcUaNodeValues), // Corrected parameter order
     [data, opcUaNodeValues, dataPoints]
   );
 

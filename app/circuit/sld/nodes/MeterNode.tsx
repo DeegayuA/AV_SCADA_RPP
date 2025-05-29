@@ -116,8 +116,8 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => { // Reverted t
   ]);
 
   const derivedNodeStyles = useMemo(() => {
-    return getDerivedStyle(data, opcUaValuesForDerivedStyle, dataPoints);
-  }, [data, opcUaValuesForDerivedStyle, dataPoints]);
+    return getDerivedStyle(data, dataPoints, opcUaValuesForDerivedStyle);
+  }, [data, dataPoints, opcUaValuesForDerivedStyle]);
 
   const StatusIcon = useMemo(() => {
     if (processedStatus === 'fault' || processedStatus === 'alarm') return AlertTriangleIcon;

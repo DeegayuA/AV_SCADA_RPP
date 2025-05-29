@@ -60,7 +60,7 @@ const SLDElementControlPopup: React.FC<SLDElementControlPopupProps> = ({ // Rena
   const getDisplayData = (link: DataPointLink): { label: string; value: string; unit?: string, rawValue?: any } | null => {
     const dpDefinition = dataPoints[link.dataPointId];
     if (!dpDefinition) return null;
-    const rawValue = getDataPointValue(link.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
+    const rawValue = getDataPointValue(link.dataPointId, dataPoints, opcUaNodeValues); // Fixed argument order
     let displayValue = rawValue;
     if (link.valueMapping) {
       const mapped = applyValueMapping(rawValue, link);
@@ -150,10 +150,10 @@ const SLDElementControlPopup: React.FC<SLDElementControlPopupProps> = ({ // Rena
                     const isOpenLink = elementData.dataPointLinks?.find(l => l.targetProperty === 'isOpen');
                     const statusLink = elementData.dataPointLinks?.find(l => l.targetProperty === 'status');
                     if (isOpenLink && dataPoints && dataPoints[isOpenLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
-                      const rawValue = getDataPointValue(isOpenLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
+                      const rawValue = getDataPointValue(isOpenLink.dataPointId, dataPoints, opcUaNodeValues); // Corrected arguments
                       currentState = applyValueMapping(rawValue, isOpenLink) === true;
                     } else if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
-                      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
+                      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Corrected arguments
                       const mappedStatus = String(applyValueMapping(rawValue, statusLink)).toLowerCase();
                       if (mappedStatus === 'open' || mappedStatus === 'tripped') currentState = true;
                       else if (mappedStatus === 'closed') currentState = false;
@@ -168,11 +168,11 @@ const SLDElementControlPopup: React.FC<SLDElementControlPopupProps> = ({ // Rena
                     const isClosedLink = elementData.dataPointLinks?.find(l => l.targetProperty === 'isClosed'); // More direct
                     const statusLink = elementData.dataPointLinks?.find(l => l.targetProperty === 'status');
                      if (isClosedLink && dataPoints && dataPoints[isClosedLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
-                        const rawValue = getDataPointValue(isClosedLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
+                        const rawValue = getDataPointValue(isClosedLink.dataPointId, dataPoints, opcUaNodeValues); // Corrected arguments
                         const mappedValue = applyValueMapping(rawValue, isClosedLink);
                         currentState = mappedValue === false; // isClosed=true means currentState (isOpen/isDeenergized) is false
                     } else if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Check opcUaNodeValues and dataPoints
-                      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Corrected arguments
+                      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Corrected arguments
                       const mappedStatus = String(applyValueMapping(rawValue, statusLink)).toLowerCase();
                       if (mappedStatus === 'open' || mappedStatus === 'de-energized' || mappedStatus === 'off') currentState = true;
                       else if (mappedStatus === 'closed' || mappedStatus === 'energized' || mappedStatus === 'on') currentState = false;

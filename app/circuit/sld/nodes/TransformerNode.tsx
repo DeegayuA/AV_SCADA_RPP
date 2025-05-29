@@ -27,7 +27,7 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { /
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
     if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'offline'; // Default status
@@ -38,14 +38,14 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { /
     const tempLink = data.dataPointLinks?.find(link => link.targetProperty === 'temperature');
     if (tempLink && dataPoints && dataPoints[tempLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[tempLink.dataPointId];
-      const rawValue = getDataPointValue(tempLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(tempLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       const mappedValue = applyValueMapping(rawValue, tempLink);
       return `Temp: ${formatDisplayValue(mappedValue, tempLink.format, dpMeta?.dataType)}`;
     }
     const loadLink = data.dataPointLinks?.find(link => link.targetProperty === 'loadPercentage');
     if (loadLink && dataPoints && dataPoints[loadLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[loadLink.dataPointId];
-      const rawValue = getDataPointValue(loadLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(loadLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       const mappedValue = applyValueMapping(rawValue, loadLink);
       return `Load: ${formatDisplayValue(mappedValue, loadLink.format, dpMeta?.dataType)}`;
     }
@@ -65,7 +65,7 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { /
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    getDerivedStyle(data, dataPoints, opcUaNodeValues), // Correct parameter order
     [data, opcUaNodeValues, dataPoints]
   );
 

@@ -28,7 +28,7 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generator
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
     if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'offline'; // Default status
@@ -40,7 +40,7 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generator
     );
     if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
       const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(powerLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       const mappedValue = applyValueMapping(rawValue, powerLink);
       return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
@@ -90,7 +90,7 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generator
   }, [processedStatus]);
   
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
+    getDerivedStyle(data, dataPoints, opcUaNodeValues), // Correct parameter order
     [data, opcUaNodeValues, dataPoints]
   );
 

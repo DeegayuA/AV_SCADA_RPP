@@ -48,7 +48,7 @@ export const categorizedComponents: PaletteCategory[] = [
       { type: SLDElementType.Breaker, label: 'Breaker', icon: <PlugZap size={16}/>,
         defaultData: { label: 'CB', status: 'closed', config: { type: "MCCB" }, elementType: SLDElementType.Breaker } },
       { type: SLDElementType.Switch, label: 'Switch', icon: <SlidersHorizontal size={16}/>, // Assuming SlidersHorizontal for now, replace if a better icon is available
-        defaultData: { label: 'Switch', status: 'open', elementType: SLDElementType.Switch } },
+        defaultData: { label: 'Switch', status: 'open', elementType: SLDElementType.Switch } as Partial<any> },
       { type: SLDElementType.Contactor, label: 'Contactor', icon: <Zap size={16} className="opacity-80"/>,
         defaultData: { label: 'K1', status: 'open', config: { normallyOpen: true }, elementType: SLDElementType.Contactor } as Partial<ContactorNodeData> },
       { type: SLDElementType.Fuse, label: 'Fuse', icon: <ShieldAlert size={16}/>,
@@ -97,15 +97,15 @@ export const categorizedComponents: PaletteCategory[] = [
     name: 'Protection & Specialized',
     components: [
       { type: SLDElementType.ATS, label: 'ATS', icon: <GitFork size={16} />, // Placeholder icon, update if available
-        defaultData: { label: 'ATS', status: 'source1_nominal', elementType: SLDElementType.ATS } },
+        defaultData: { label: 'ATS', status: 'source1_nominal', elementType: SLDElementType.ATS } as Partial<any> },
       { type: SLDElementType.CT, label: 'CT', icon: <Zap size={16} />, // Placeholder icon
-        defaultData: { label: 'CT', status: 'nominal', elementType: SLDElementType.CT } },
+        defaultData: { label: 'CT', status: 'nominal', elementType: SLDElementType.CT } as Partial<any> },
       { type: SLDElementType.PT, label: 'PT', icon: <Zap size={16} />, // Placeholder icon
-        defaultData: { label: 'PT', status: 'nominal', elementType: SLDElementType.PT } },
+        defaultData: { label: 'PT', status: 'nominal', elementType: SLDElementType.PT } as Partial<any> },
       { type: SLDElementType.Motor, label: 'Motor', icon: <SlidersHorizontal size={16} />, // Placeholder icon
-        defaultData: { label: 'Motor', status: 'off', elementType: SLDElementType.Motor } },
+        defaultData: { label: 'Motor', status: 'off', elementType: SLDElementType.Motor } as Partial<any> },
       { type: SLDElementType.Relay, label: 'Relay', icon: <CircuitBoard size={16} />, // Placeholder icon
-        defaultData: { label: 'Relay', status: 'deactivated', elementType: SLDElementType.Relay } },
+        defaultData: { label: 'Relay', status: 'deactivated', elementType: SLDElementType.Relay } as Partial<any> },
     ],
   },
   {

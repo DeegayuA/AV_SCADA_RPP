@@ -2,13 +2,14 @@
 import React, { memo, useMemo } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
-import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld';
+import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import { applyValueMapping, getDerivedStyle } from './nodeUtils';
 import { InfoIcon, ToggleLeftIcon, ToggleRightIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 export interface SwitchNodeData extends BaseNodeData {
+  elementType: SLDElementType.Switch;
   config?: BaseNodeData['config'] & {
     // Specific config for SwitchNode if any in future, e.g., default state
   };
@@ -80,8 +81,8 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
   }, [stateOpcUaNodeId, reactiveStateValue]);
   
   const derivedNodeStyles = useMemo(() => {
-    return getDerivedStyle(data, opcUaValuesForDerivedStyle, dataPoints);
-  }, [data, opcUaValuesForDerivedStyle, dataPoints]);
+    return getDerivedStyle(data, dataPoints, opcUaValuesForDerivedStyle);
+  }, [data, dataPoints, opcUaValuesForDerivedStyle]);
 
   const statusStyles = useMemo(() => {
     if (isOn) {

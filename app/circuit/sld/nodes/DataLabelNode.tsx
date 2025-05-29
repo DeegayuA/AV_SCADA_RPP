@@ -46,7 +46,7 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
   const { displayText, unitText } = useMemo(() => {
     if (mainDisplayLink && dataPoints && dataPoints[mainDisplayLink.dataPointId] && opcUaNodeValues) {
       const dpMeta = dataPoints[mainDisplayLink.dataPointId] as DataPoint;
-      const rawValue = getDataPointValue(mainDisplayLink.dataPointId, opcUaNodeValues, dataPoints);
+      const rawValue = getDataPointValue(mainDisplayLink.dataPointId, dataPoints, opcUaNodeValues);
       const mappedValue = applyValueMapping(rawValue, mainDisplayLink);
       const formattedText = formatDisplayValue(mappedValue, mainDisplayLink.format, dpMeta?.dataType);
       const unit = mainDisplayLink.format?.suffix || dpMeta?.unit || '';
@@ -59,7 +59,7 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
   // Derive dynamic styles (e.g., color based on value, visibility)
   // For DataLabelNode, this might be less common unless its text color/visibility is data-driven
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Using global opcUaNodeValues for now
+    getDerivedStyle(data, dataPoints, opcUaNodeValues), // Correct parameter order: data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues
     [data, opcUaNodeValues, dataPoints]
   );
 

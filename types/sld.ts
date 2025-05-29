@@ -1,4 +1,5 @@
-import type { Node, Edge } from 'reactflow';
+// types/sld.ts
+import type { Node, Edge, Viewport } from 'reactflow'; // Combined Viewport import
 import type { LucideIcon } from 'lucide-react';
 import { UserRole } from './auth'; // Assuming this path and type are correct
 
@@ -19,19 +20,16 @@ export interface DataPoint {
   description?: string;
   category?: string;
   factor?: number;
-  precision?: number;
+  precision?: number; // Typically for display formatting, used by formatValue util
   isWritable?: boolean;
-  decimalPlaces?: number;
+  decimalPlaces?: number; // Can be synonymous with precision for formatting
   enumSet?: Record<number | string, string>;
 }
 
-export type RealTimeData = Record<string, string | number | boolean>; // Updated type
+export type RealTimeData = Record<string, string | number | boolean>;
 
 export interface DataPointLink {
-  dataPointId: string; // This remains the ID of the DataPoint metadata object
-  // If an OPC UA Node ID is different from DataPoint.id and needed for direct mapping,
-  // it could be added here, or DataPoint.nodeId could be used if always referring to an OPC UA Node ID.
-  // For now, assuming DataPoint.nodeId is the OPC UA Node ID used for opcUaNodeValues keys.
+  dataPointId: string;
   targetProperty: string;
   valueMapping?: {
     type?: 'exact' | 'range' | 'threshold' | 'boolean' | string;
@@ -59,7 +57,7 @@ export interface DataPointLink {
 export interface BaseNodeData {
   label: string;
   elementType: SLDElementType;
-  status?: 'nominal' | 'warning' | 'alarm' | 'offline' | 'producing' | 'running' | 'reading' | 'connected' | 'closed' | 'open' | 'active' | 'charging' | 'discharging' | string;
+  status?: string; // Broadened status type
   config?: Record<string, any>;
   dataPointLinks?: DataPointLink[];
   isDrillable?: boolean;
@@ -96,25 +94,25 @@ export interface DataLabelNodeData extends BaseNodeData {
 export interface InverterNodeData extends BaseNodeData {
   elementType: SLDElementType.Inverter;
   config?: BaseNodeData['config'] & {
-    ratedPower?: number; // kW
-    efficiency?: number; // %
+    ratedPower?: number; 
+    efficiency?: number; 
   };
 }
 export interface PanelNodeData extends BaseNodeData {
     elementType: SLDElementType.Panel;
     config?: BaseNodeData['config'] & {
         technology?: 'Mono-Si' | 'Poly-Si' | 'Thin-film';
-        powerRatingWp?: number; // Watts-peak
+        powerRatingWp?: number;
     };
 }
 export interface BreakerNodeData extends BaseNodeData {
     elementType: SLDElementType.Breaker;
     config?: BaseNodeData['config'] & {
-        type?: 'MCB' | 'MCCB' | 'ACB' | 'VCB' | 'SF6' | string; // Breaker type
+        type?: 'MCB' | 'MCCB' | 'ACB' | 'VCB' | 'SF6' | string;
         tripRatingAmps?: number;
         interruptingCapacitykA?: number;
         normallyOpen?: boolean;
-        controlNodeId?: string; // <-- Added
+        controlNodeId?: string; 
     };
 }
 export interface MeterNodeData extends BaseNodeData {
@@ -130,21 +128,21 @@ export interface BatteryNodeData extends BaseNodeData {
         technology?: 'Li-ion' | 'Lead-Acid' | 'Flow';
         capacityAh?: number;
         voltageNominalV?: number;
-        dodPercentage?: number; // Depth of Discharge
+        dodPercentage?: number;
     };
 }
 export interface ContactorNodeData extends BaseNodeData {
     elementType: SLDElementType.Contactor;
     config?: BaseNodeData['config'] & {
-        normallyOpen?: boolean; // true for NO, false for NC
-        coilVoltage?: string; // e.g., '24VDC', '230VAC'
-        controlNodeId?: string; // <-- Added
+        normallyOpen?: boolean;
+        coilVoltage?: string;
+        controlNodeId?: string;
     };
 }
 export interface GridNodeData extends BaseNodeData {
     elementType: SLDElementType.Grid;
     config?: BaseNodeData['config'] & {
-        voltageLevel?: string; // e.g., '11kV', '33kV', '400V'
+        voltageLevel?: string; 
         frequencyHz?: 50 | 60;
         faultLevelMVA?: number;
     };
@@ -162,8 +160,8 @@ export interface BusbarNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
         material?: 'Copper' | 'Aluminum';
         currentRatingAmps?: number;
-        width?: number; // For visual representation if fixed
-        height?: number; // For visual representation if fixed
+        width?: number; 
+        height?: number; 
     };
 }
 
@@ -217,7 +215,7 @@ export interface IsolatorNodeData extends BaseNodeData {
         poles?: number;
         loadBreak?: boolean;
         manualOrMotorized?: 'manual' | 'motorized';
-        controlNodeId?: string; // <-- Added
+        controlNodeId?: string;
     };
 }
 
@@ -226,7 +224,7 @@ export interface ATSNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
         transferTimeMs?: number;
         numPoles?: number;
-        controlNodeId?: string; // <-- Added
+        controlNodeId?: string;
     };
 }
 
@@ -239,14 +237,14 @@ export interface JunctionBoxNodeData extends BaseNodeData {
     };
 }
 
-export interface FuseNodeData extends BaseNodeData { // <<<--- ADDED THIS DEFINITION
+export interface FuseNodeData extends BaseNodeData {
     elementType: SLDElementType.Fuse;
     config?: BaseNodeData['config'] & {
         ratingAmps?: number;
-        voltageRating?: string; // e.g., "400V", "690V"
-        fuseType?: 'Cartridge' | 'HRC' | 'Rewireable' | 'Semiconductor' | string; // High Rupturing Capacity
+        voltageRating?: string; 
+        fuseType?: 'Cartridge' | 'HRC' | 'Rewireable' | 'Semiconductor' | string;
         breakingCapacitykA?: number;
-        controlNodeId?: string; // <-- Added
+        controlNodeId?: string;
     };
 }
 
@@ -255,8 +253,15 @@ export interface GaugeNodeData extends BaseNodeData {
   config?: BaseNodeData['config'] & {
     minVal?: number;
     maxVal?: number;
-    valueDataPointLink?: DataPointLink; // The primary link for the gauge's value
+    valueDataPointLink?: DataPointLink;
     unit?: string;
+  };
+}
+export interface SwitchNodeData extends BaseNodeData { // Added SwitchNodeData definition
+  elementType: SLDElementType.Switch; // Assuming SLDElementType.Switch exists
+  config?: BaseNodeData['config'] & {
+    numPositions?: number;
+    controlNodeId?: string;
   };
 }
 
@@ -266,50 +271,69 @@ export type CustomNodeData =
   | BreakerNodeData | MeterNodeData | BatteryNodeData | ContactorNodeData
   | GridNodeData | LoadNodeData | BusbarNodeData | GenericDeviceNodeData
   | TransformerNodeData | GeneratorNodeData | PLCNodeData | SensorNodeData
-  | IsolatorNodeData | ATSNodeData | JunctionBoxNodeData | FuseNodeData | GaugeNodeData;
+  | IsolatorNodeData | ATSNodeData | JunctionBoxNodeData | FuseNodeData | GaugeNodeData
+  | SwitchNodeData; // Added SwitchNodeData
 
+export type AnimationType = 'none' | 'dynamic_power_flow' | 'constant_unidirectional';
+
+export interface AnimationFlowConfig {
+  animationType?: AnimationType; // Defaults to 'dynamic_power_flow' if DPs are set, or 'none'
+
+  // For 'dynamic_power_flow'
+  generationDataPointId?: string;
+  usageDataPointId?: string;
+  gridNetFlowDataPointId?: string;
+  speedMultiplier?: number;       // Applied to |net flow| for dynamic speed
+  invertFlowDirection?: boolean;  // Inverts calculated dynamic direction
+
+  // For 'constant_unidirectional'
+  constantFlowDirection?: 'forward' | 'reverse'; // S->T or T->S
+  constantFlowSpeed?: 'slow' | 'medium' | 'fast' | number; // Predefined or custom ms/s
+  constantFlowActivationDataPointId?: string; // Optional boolean DP to toggle animation
+}
+
+export interface GlobalSLDAnimationSettings extends AnimationFlowConfig {
+  // animationType here sets the GLOBAL DEFAULT animation type
+  isEnabled?: boolean; // Enable/disable all global settings
+  globallyInvertDefaultDynamicFlowLogic?: boolean; // Master switch for default dynamic direction logic
+}
 
 // --- Edge Data ---
 export interface CustomFlowEdgeData {
   label?: string;
-  dataPointLinks?: DataPointLink[];
+  dataPointLinks?: DataPointLink[]; // For status (Fault, Warning), or potentially very simple on/off animation if new system not used
   flowType?: 'AC' | 'DC' | 'CONTROL_SIGNAL' | 'DATA_BUS' | 'NEUTRAL' | 'EARTH' | 'OFFLINE' | 'FAULT' | string;
   voltageLevel?: 'HV' | 'MV' | 'LV' | 'ELV' | string;
   currentRatingAmps?: number;
   cableType?: string;
-  isEnergized?: boolean;
-  status?: 'nominal' | 'warning' | 'fault' | string;
+  isEnergized?: boolean; // Static/Fallback property if no dynamic animation config
+  status?: string;       // Static/Fallback status
 
-  // New field for individual edge animation settings
-  animationSettings?: {
-    generationDataPointId?: string;
-    usageDataPointId?: string;
-    speedMultiplier?: number;
-  };
+  animationSettings?: AnimationFlowConfig; // Holds the resolved animation settings for this edge
 }
 
 // --- React Flow Element Types ---
 export type CustomNodeType = Node<CustomNodeData, SLDElementType | string>;
 export type CustomFlowEdge = Edge<CustomFlowEdgeData>;
 
+// --- Global Settings specifically for SLD Layout Animation ---
+export interface GlobalSLDAnimationSettings extends AnimationFlowConfig {
+  isEnabled?: boolean; // Master switch to enable/disable global animation settings completely
+  globallyInvertDefaultFlowForAllEdges?: boolean; // Master switch to flip the NEW default direction logic for all edges
+}
+
 // --- SLD Layout Structure ---
 export interface SLDLayout {
   layoutId: string;
   nodes: CustomNodeType[];
   edges: CustomFlowEdge[];
-  viewport?: { x: number; y: number; zoom: number; };
+  viewport?: Viewport; // Use imported Viewport type
   meta?: {
     description?: string;
     lastModified?: string;
     version?: string;
     author?: string;
-    // New field for global animation settings
-    globalAnimationSettings?: {
-      isEnabled?: boolean; 
-      generationDataPointId?: string;
-      usageDataPointId?: string;
-      speedMultiplier?: number;
-    };
+    globalAnimationSettings?: GlobalSLDAnimationSettings; // Updated to use the new specific type
   };
 }
 
@@ -332,26 +356,27 @@ export enum SLDElementType {
   Contactor = 'contactor',
   Fuse = 'fuse',
   Isolator = 'isolator',
-  ATS = 'ats',
+  ATS = 'ats', // Automatic Transfer Switch
+  Switch = "switch", // General purpose switch / disconnector
 
   // Distribution & Connection
   Busbar = 'busbar',
   JunctionBox = 'junctionBox',
-  Cable = 'cable',
+  Cable = 'cable', // Note: Edges usually represent cables, but a 'Cable' node type could be for specific cable details.
 
   // Loads
   Load = 'load',
-  Motor = 'motor',
+  Motor = 'motor', // Can be a specific type of load
 
   // Measurement & Metering
   Meter = 'meter',
   Sensor = 'sensor',
-  CT = 'ct',
-  PT = 'pt',
-  Gauge = 'gauge', // Added Gauge
+  CT = 'ct', // Current Transformer (often a sensor or part of meter)
+  PT = 'pt', // Potential Transformer (often a sensor or part of meter)
+  Gauge = 'gauge', 
 
   // Control & Automation
-  PLC = 'plc',
+  PLC = 'plc', // Programmable Logic Controller
   Relay = 'relay',
 
   // Annotations & Labels
@@ -359,9 +384,8 @@ export enum SLDElementType {
   TextLabel = 'textLabel',
 
   // Generic / Grouping
-  GenericDevice = 'genericDevice',
-  Group = 'group',
-  Switch = "Switch",
+  GenericDevice = 'genericDevice', // For anything not specifically typed
+  Group = 'group', // For React Flow's grouping feature
 }
 
 // --- Palette Configuration ---
@@ -369,7 +393,7 @@ export interface PaletteComponent {
   type: SLDElementType;
   label: string;
   defaultData?: Partial<CustomNodeData>;
-  icon?: React.ReactNode;
+  icon?: React.ReactNode; // Can be LucideIcon or custom SVG component
   description?: string;
 }
 
@@ -382,18 +406,21 @@ export interface PaletteCategory {
 export interface SLDWidgetProps {
   layoutId: string | null;
   isEditMode?: boolean;
-  currentUserRole?: UserRole;
-  onNavigateToLayout?: (layoutId: string) => void;
+  currentUserRole?: UserRole; // For permissions if needed
+  onNavigateToLayout?: (layoutId: string) => void; // If drilldown/navigation is handled by parent
+  // onCodeChange: defined in SLDWidget.tsx's local props interface as it's internal
 }
 
 export interface CurrentUser {
   id: string;
-  role: 'admin' | 'operator' | 'viewer' | string;
+  role: 'admin' | 'operator' | 'viewer' | string; // Align with UserRole from './auth'
 }
 
-export interface SLDState {
-  opcUaNodeValues: RealTimeData; // Changed from realtimeData to opcUaNodeValues
+// Used within appStore or passed around, not directly for SLDWidget itself
+export interface SLDAppState {
+  opcUaNodeValues: RealTimeData;
   dataPoints: Record<string, DataPoint>;
   isEditMode: boolean;
   currentUser: CurrentUser | null;
+  // Potentially other global states relevant to SLD display/interaction
 }

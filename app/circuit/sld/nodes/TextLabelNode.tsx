@@ -74,7 +74,7 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({
         fontFamily: data.styleConfig?.fontFamily || 'Arial, sans-serif', // Default font family
         // Ensure the node itself is laid out to allow content to dictate size if width/height were 'auto'
         display: 'flex', // Useful for aligning text content with padding
-        alignItems: data.styleConfig?.verticalAlign || 'center', // Example, if you add verticalAlign
+        alignItems: 'center', // Default vertical alignment to center
         justifyContent: data.styleConfig?.textAlign || 'flex-start', // Map textAlign to justifyContent
     };
     if (data.styleConfig?.textAlign === 'center') styles.justifyContent = 'center';

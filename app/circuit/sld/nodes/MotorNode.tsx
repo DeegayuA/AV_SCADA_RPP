@@ -36,7 +36,7 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
     if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
       return applyValueMapping(rawValue, statusLink);
     }
     return data.status || 'stopped'; // Default status
@@ -46,7 +46,7 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
     const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerConsumption' || link.targetProperty === 'activePower');
     if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
         const dpMeta = dataPoints[powerLink.dataPointId];
-        const rawValue = getDataPointValue(powerLink.dataPointId, opcUaNodeValues, dataPoints); // Pass all three
+        const rawValue = getDataPointValue(powerLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
         const mappedValue = applyValueMapping(rawValue, powerLink);
         return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
@@ -81,8 +81,8 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, opcUaNodeValues, dataPoints), // Changed realtimeData to opcUaNodeValues
-    [data, opcUaNodeValues, dataPoints]
+    getDerivedStyle(data, dataPoints, opcUaNodeValues), // Fixed parameter order to match function definition
+    [data, dataPoints, opcUaNodeValues]
   );
   
   const MotorSymbolSVG = ({ className, isSpinning }: { className?: string, isSpinning?: boolean }) => {

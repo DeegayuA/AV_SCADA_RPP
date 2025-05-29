@@ -30,7 +30,7 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
     return data.dataPointLinks.map(link => {
       const dpMeta = dataPoints[link.dataPointId] as DataPoint | undefined;
       const label = dpMeta?.label || dpMeta?.name || link.dataPointId;
-      const rawValue = getDataPointValue(link.dataPointId, opcUaNodeValues, dataPoints);
+      const rawValue = getDataPointValue(link.dataPointId, dataPoints, opcUaNodeValues);
       const mappedValue = applyValueMapping(rawValue, link);
       const formattedValue = formatDisplayValue(mappedValue, link.format, dpMeta?.dataType);
       return {

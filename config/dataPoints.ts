@@ -919,7 +919,7 @@ export const dataPoints: DataPoint[] = [
   {
     id: 'battery-capacity', name: 'Battery Capacity (SoC)', nodeId: 'ns=4;i=115',
     dataType: 'Int16', uiType: 'gauge', icon: Percent, unit: '%', category: 'battery', phase: 'x',
-    min: 0, max: 100, description: 'Current battery State of Charge (SoC) (e.g. raw 100 -> 100%).', factor: 1, label: ''
+    min: 0, max: 99.9, description: 'Current battery State of Charge (SoC) (e.g. raw 100 -> 100%).', factor: 1, label: ''
   },
   // --- Placeholder and Battery Power/Current/AH (i=116 to i=119) ---
   {

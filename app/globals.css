@@ -352,7 +352,7 @@
 
 @keyframes sld-dash {
   0% {
-    stroke-dasharray: 1, 150;
+    stroke-dasharray: 1, 100;
     stroke-dashoffset: 0;
   }
   50% {
@@ -374,3 +374,31 @@
 .reactflow-node:focus-within .sld-handle-style { /* if elements inside node are focused */
     @apply !opacity-80; /* Make handles more visible on selected/focused node */
 }
+
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -100; /* A large number, effectively loops the dashes */
+  }
+}
+
+@keyframes faultPulse {
+  0%, 100% { opacity: 1; /* stroke-width can also be animated */ }
+  50% { opacity: 0.6; /* stroke-width: calc(var(--base-stroke-width) + 1px); */ }
+}
+
+@keyframes subtlePulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* In your global CSS (e.g., app/globals.css) */
+@keyframes flow-preview-bullet-normal {
+  from { left: -10px; /* Assumes bullet width is 10px, start off-screen */ }
+  to { left: 100%; /* End off-screen on the other side */ }
+}
+
+@keyframes flow-preview-bullet-reverse {
+  from { right: -10px; /* Assumes bullet width is 10px, start off-screen */ }
+  to { right: 100%; /* End off-screen on the other side */ }
+}
+
