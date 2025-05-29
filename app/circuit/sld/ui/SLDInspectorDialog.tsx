@@ -1083,6 +1083,30 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                     newLinks.splice(existingDirectionLinkIndex, 1);
                                 }
                             }
+
+                            // Handle Flow Speed Link (animationSpeedFactor)
+                            const speedTargetProperty = 'animationSpeedFactor';
+                            // Re-find index in case newLinks was modified by previous logic
+                            const existingSpeedLinkIndex = newLinks.findIndex(link => link.targetProperty === speedTargetProperty);
+
+                            if (config.flowSpeedDataPointId) {
+                              if (existingSpeedLinkIndex !== -1) {
+                                newLinks[existingSpeedLinkIndex] = {
+                                  ...newLinks[existingSpeedLinkIndex],
+                                  dataPointId: config.flowSpeedDataPointId,
+                                };
+                              } else {
+                                newLinks.push({
+                                  dataPointId: config.flowSpeedDataPointId,
+                                  targetProperty: speedTargetProperty,
+                                });
+                              }
+                            } else { // flowSpeedDataPointId is not provided, remove existing link
+                              if (existingSpeedLinkIndex !== -1) {
+                                newLinks.splice(existingSpeedLinkIndex, 1);
+                              }
+                            }
+                            
                             return newLinks;
                         });
                     }}

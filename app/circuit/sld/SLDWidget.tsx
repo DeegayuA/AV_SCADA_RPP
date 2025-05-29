@@ -19,13 +19,13 @@ import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { throttle } from 'lodash';
-import { AlertTriangle, Check, Download, LayoutList, Loader2, RotateCcw, X, Upload } from 'lucide-react'; // Added Download, Upload
+import { AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; // Added Download, Upload, ListChecks, Zap
 import { motion } from 'framer-motion';
 
 import { Textarea } from "@/components/ui/textarea"; // Added Textarea for import dialog
 import {
   SLDLayout, CustomNodeType, CustomFlowEdge, CustomNodeData,
-  SLDElementType, CustomFlowEdgeData, TextLabelNodeData,
+  SLDElementType, CustomFlowEdgeData, TextLabelNodeData, DataPoint,
 } from '@/types/sld';
 import {
   getThemeAwareColors, getNodeColor as getMiniMapNodeColor,
@@ -71,6 +71,8 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import SLDDrillDownDialog from './ui/SLDDrillDownDialog';
 import SwitchNode from './nodes/SwitchNode';
+import AnimationFlowConfiguratorDialog, { AnimationFlowConfig } from './ui/AnimationFlowConfiguratorDialog';
+
 
 interface WebSocketMessageFromServer {
   type: string;
@@ -157,12 +159,15 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const [currentLayoutIdKey, setCurrentLayoutIdKey] = useState<string>('');
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
   const [importJsonString, setImportJsonString] = useState('');
+  const [isBulkAnimationConfiguratorOpen, setIsBulkAnimationConfiguratorOpen] = useState(false);
   
   const currentLayoutLoadedFromServerOrInitialized = useRef(false);
   const canEdit = useMemo(() => !!isEditModeFromProps, [isEditModeFromProps]);
   const initialFitViewDone = useRef(false);
   const storeSelectedElement = useSelectedElementForDetails();
   const { setSelectedElementForDetails } = useAppStore.getState();
+
+  const selectedEdges = useMemo(() => edges.filter(edge => edge.selected), [edges]);
 
   const removePlaceholderIfNeeded = useCallback((currentNodes: CustomNodeType[]) => {
     const hasPlaceholder = currentNodes.some(n => n.id === PLACEHOLDER_NODE_ID);
@@ -875,6 +880,23 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                                 <TooltipContent><p>Import Layout from JSON</p></TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
+                        <TooltipProvider delayDuration={100}>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Button 
+                                        size="sm" 
+                                        variant="outline" 
+                                        title="Bulk Configure Edge Animations"
+                                        disabled={!canEdit || selectedEdges.length === 0}
+                                        onClick={() => setIsBulkAnimationConfiguratorOpen(true)}
+                                    >
+                                        <ListChecks className="h-4 w-4 mr-1.5" />
+                                        Bulk Anim
+                                    </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Bulk Configure Edge Animations ({selectedEdges.length} selected)</p></TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
                     </motion.div>
                 )}
             </Panel>
@@ -913,6 +935,58 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       {canEdit && selectedElement && ( <SLDInspectorDialog isOpen={isInspectorDialogOpen} onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} selectedElement={selectedElement} onUpdateElement={handleUpdateElement} onDeleteElement={handleDeleteElement}/> )}
       {!canEdit && selectedElement && (isNode(selectedElement) || isEdge(selectedElement)) && ( <SLDElementControlPopup element={selectedElement} isOpen={isControlPopupOpen} onOpenChange={handleControlPopupOpenChange} /> )}
       {isDrillDownOpen && drillDownLayoutId && ( <SLDDrillDownDialog isOpen={isDrillDownOpen} onOpenChange={handleDrillDownOpenChange} layoutId={drillDownLayoutId} parentLabel={drillDownParentLabel} /> )}
+      
+      {isBulkAnimationConfiguratorOpen && canEdit && (
+        <AnimationFlowConfiguratorDialog
+          isOpen={isBulkAnimationConfiguratorOpen}
+          onOpenChange={setIsBulkAnimationConfiguratorOpen}
+          edge={null} // Passing null as this is for bulk configuration
+          availableDataPoints={Object.values(useAppStore.getState().dataPoints)}
+          onConfigure={(config: AnimationFlowConfig) => {
+            const selectedEdgeIds = new Set(selectedEdges.map(e => e.id)); // Create Set for efficient lookup
+
+            setEdges(currentEdges =>
+              currentEdges.map(edge => {
+                if (!selectedEdgeIds.has(edge.id)) {
+                  return edge; // Not selected, return unchanged
+                }
+
+                // Selected edge, apply configuration
+                let edgeData: CustomFlowEdgeData = { ...(edge.data || {}) };
+                edgeData.dataPointLinks = [...(edgeData.dataPointLinks || [])];
+
+                // Logic for 'isEnergized' (Generation)
+                const activeTargetProperty = 'isEnergized';
+                const activeLinkIndex = edgeData.dataPointLinks.findIndex(l => l.targetProperty === activeTargetProperty);
+                if (config.flowActiveDataPointId) {
+                  if (activeLinkIndex !== -1) edgeData.dataPointLinks[activeLinkIndex] = { ...edgeData.dataPointLinks[activeLinkIndex], dataPointId: config.flowActiveDataPointId };
+                  else edgeData.dataPointLinks.push({ dataPointId: config.flowActiveDataPointId, targetProperty: activeTargetProperty });
+                } else if (activeLinkIndex !== -1) edgeData.dataPointLinks.splice(activeLinkIndex, 1);
+
+                // Logic for 'flowDirection' (Usage)
+                const directionTargetProperty = 'flowDirection';
+                const directionLinkIndex = edgeData.dataPointLinks.findIndex(l => l.targetProperty === directionTargetProperty);
+                if (config.flowDirectionDataPointId) {
+                  if (directionLinkIndex !== -1) edgeData.dataPointLinks[directionLinkIndex] = { ...edgeData.dataPointLinks[directionLinkIndex], dataPointId: config.flowDirectionDataPointId };
+                  else edgeData.dataPointLinks.push({ dataPointId: config.flowDirectionDataPointId, targetProperty: directionTargetProperty });
+                } else if (directionLinkIndex !== -1) edgeData.dataPointLinks.splice(directionLinkIndex, 1);
+                
+                // Logic for 'animationSpeedFactor' (Flow Speed)
+                const speedTargetProperty = 'animationSpeedFactor';
+                const speedLinkIndex = edgeData.dataPointLinks.findIndex(l => l.targetProperty === speedTargetProperty);
+                if (config.flowSpeedDataPointId) {
+                  if (speedLinkIndex !== -1) edgeData.dataPointLinks[speedLinkIndex] = { ...edgeData.dataPointLinks[speedLinkIndex], dataPointId: config.flowSpeedDataPointId };
+                  else edgeData.dataPointLinks.push({ dataPointId: config.flowSpeedDataPointId, targetProperty: speedTargetProperty });
+                } else if (speedLinkIndex !== -1) edgeData.dataPointLinks.splice(speedLinkIndex, 1);
+
+                return { ...edge, data: edgeData };
+              })
+            );
+            setIsDirty(true);
+            setIsBulkAnimationConfiguratorOpen(false);
+          }}
+        />
+      )}
     </motion.div>
   );
 };

@@ -8,9 +8,10 @@ import { CustomFlowEdge, DataPoint } from '@/types/sld';
 import DataLinkLiveValuePreview from './DataLinkLiveValuePreview'; // Import the new component
 // Remove useAppStore import, dataPoints will be passed as a prop
 
-interface AnimationFlowConfig {
-  flowActiveDataPointId?: string;
-  flowDirectionDataPointId?: string;
+export interface AnimationFlowConfig { // Ensure export
+  flowActiveDataPointId?: string; // To be relabeled in usage context
+  flowDirectionDataPointId?: string; // To be relabeled in usage context
+  flowSpeedDataPointId?: string;
 }
 
 interface AnimationFlowConfiguratorDialogProps {
@@ -30,6 +31,7 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
 }) => {
   const [flowActiveDp, setFlowActiveDp] = useState<string | undefined>(undefined);
   const [flowDirectionDp, setFlowDirectionDp] = useState<string | undefined>(undefined);
+  const [flowSpeedDp, setFlowSpeedDp] = useState<string | undefined>(undefined);
 
   const dataPointOptions = useMemo((): ComboboxOption[] =>
     Object.values(availableDataPoints).map(dp => ({
@@ -45,13 +47,16 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
       // This logic might need to be more robust to find the *intended* controlling datapoints.
       const activeLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'isEnergized' || l.targetProperty === 'status');
       const directionLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'flowDirection');
+      const speedLink = edge.data.dataPointLinks.find(l => l.targetProperty === 'animationSpeedFactor');
       
       setFlowActiveDp(activeLink?.dataPointId);
       setFlowDirectionDp(directionLink?.dataPointId);
+      setFlowSpeedDp(speedLink?.dataPointId);
     } else if (!isOpen) {
       // Reset when dialog is closed or no relevant links
       setFlowActiveDp(undefined);
       setFlowDirectionDp(undefined);
+      setFlowSpeedDp(undefined);
     }
   }, [edge, isOpen]);
 
@@ -59,6 +64,7 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
     onConfigure({
       flowActiveDataPointId: flowActiveDp,
       flowDirectionDataPointId: flowDirectionDp,
+      flowSpeedDataPointId: flowSpeedDp,
     });
     onOpenChange(false);
   };
@@ -74,13 +80,13 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
         <div className="space-y-6 py-4">
           <div className="space-y-2">
             <Label htmlFor="flowActiveDp" className="text-sm font-medium">
-              Flow Activation Data Point
+              Generation Data Point
             </Label>
             <SearchableSelect
               options={dataPointOptions}
               value={flowActiveDp}
               onChange={(value) => setFlowActiveDp(value || undefined)}
-              placeholder="Select Data Point..."
+              placeholder="Select Data Point for Generation..."
               searchPlaceholder="Search data points..."
               notFoundText="No data points found."
             />
@@ -99,13 +105,13 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
           </div>
           <div className="space-y-2">
             <Label htmlFor="flowDirectionDp" className="text-sm font-medium">
-              Flow Direction Data Point
+              Usage Data Point
             </Label>
             <SearchableSelect
               options={dataPointOptions}
               value={flowDirectionDp}
               onChange={(value) => setFlowDirectionDp(value || undefined)}
-              placeholder="Select Data Point..."
+              placeholder="Select Data Point for Usage..."
               searchPlaceholder="Search data points..."
               notFoundText="No data points found."
             />
@@ -118,6 +124,31 @@ const AnimationFlowConfiguratorDialog: React.FC<AnimationFlowConfiguratorDialogP
                   dataPointId={flowDirectionDp}
                   valueMapping={undefined} 
                   format={undefined} 
+                />
+              </div>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="flowSpeedDp" className="text-sm font-medium">
+              Flow Speed Data Point
+            </Label>
+            <SearchableSelect
+              options={dataPointOptions}
+              value={flowSpeedDp}
+              onChange={(value) => setFlowSpeedDp(value || undefined)}
+              placeholder="Select Data Point for Flow Speed..."
+              searchPlaceholder="Search data points..."
+              notFoundText="No data points found."
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              Controls animation speed (e.g., links to 'animationSpeedFactor').
+            </p>
+            {flowSpeedDp && (
+              <div className="mt-2">
+                <DataLinkLiveValuePreview
+                  dataPointId={flowSpeedDp}
+                  valueMapping={undefined}
+                  format={undefined}
                 />
               </div>
             )}
