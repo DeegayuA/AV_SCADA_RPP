@@ -1,6 +1,6 @@
 // components/sld/edges/AnimatedFlowEdge.tsx
 import React from 'react';
-import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge } from 'reactflow';
+import { EdgeProps, getStepPath, EdgeLabelRenderer, BaseEdge } from 'reactflow'; // Changed getSmoothStepPath to getStepPath
 import { getDataPointValue, applyValueMapping } from '../nodes/nodeUtils';
 import { 
     CustomFlowEdgeData, 
@@ -50,9 +50,9 @@ export default function AnimatedFlowEdge({
     dataPoints: state.dataPoints,
   }));
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
+  // Changed to getStepPath, removed borderRadius as it's not applicable.
+  const [edgePath, labelX, labelY] = getStepPath({
     sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
-    borderRadius: 5,
   });
 
   let edgeStrokeColor = flowColors.OFFLINE;
