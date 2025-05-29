@@ -19,7 +19,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
-import { throttle } from 'lodash';
+import { cloneDeep, throttle } from 'lodash';
 import { ChevronDown, Save, AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; 
 import { motion } from 'framer-motion';
 
