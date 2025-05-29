@@ -1,5 +1,5 @@
 // app/circuit/sld/nodes/GaugeNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld';
@@ -145,48 +145,78 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
   const nodeWidth = 90;
   const nodeHeight = 75; // Adjusted height
 
+  const nodeWidth = 90;
+  const nodeHeight = 75; // Adjusted height
+
+  const [isRecentChange, setIsRecentChange] = useState(false);
+  const prevFormattedValueRef = useRef(formattedValue);
+
+  useEffect(() => {
+    if (prevFormattedValueRef.current !== formattedValue) {
+      setIsRecentChange(true);
+      const timer = setTimeout(() => setIsRecentChange(false), 700); // Match animation duration
+      prevFormattedValueRef.current = formattedValue;
+      return () => clearTimeout(timer);
+    }
+  }, [formattedValue]);
+
   return (
     <motion.div
       className={`
-        sld-node gauge-node group w-[${nodeWidth}px] h-[${nodeHeight}px] rounded-lg shadow-md
-        flex flex-col items-center justify-center p-1
-        border-2 border-neutral-400 dark:border-neutral-600
-        bg-card dark:bg-neutral-800 
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+        sld-node gauge-node group custom-node-hover w-[${nodeWidth}px] h-[${nodeHeight}px] rounded-lg shadow-md
+        flex flex-col items-center justify-center /* p-1 removed */
+        border-2 border-neutral-400 dark:border-neutral-600 /* Base border, can be overridden by DPL */
+        /* bg-card removed, moved to content wrapper */
+        /* transition-all duration-150 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        /* hover:shadow-lg removed */
       `}
+      style={{ borderColor: derivedNodeStyles.borderColor }} // Allow DPL to override border color
       title={data.label}
-      whileHover={{ scale: isNodeEditable ? 1.03 : 1 }}
+      // whileHover={{ scale: isNodeEditable ? 1.03 : 1 }} // Prefer CSS hover effects
       initial={{ scale: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style !-ml-1.5" />
-      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style !-mr-1.5" />
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="sld-handle-style !-ml-1.5" />
+      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="sld-handle-style !-mr-1.5" />
 
-      <p className="text-[9px] font-semibold text-center truncate w-full px-1" title={data.label}>
-        {data.label}
-      </p>
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div className={`
+          node-content-wrapper flex flex-col items-center justify-center p-1 w-full h-full rounded-sm
+          bg-card dark:bg-neutral-800 text-foreground
+          ${isRecentChange ? 'animate-status-highlight' : ''}
+        `}
+        style={{ 
+          backgroundColor: derivedNodeStyles.backgroundColor, // Allow DPL to override background
+          color: derivedNodeStyles.color, // Allow DPL to override text color
+        }}
+      >
+        <p className="text-[9px] font-semibold text-center truncate w-full px-1" title={data.label}>
+          {data.label}
+        </p>
 
-      <div className="relative flex flex-col items-center justify-center w-full">
-        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto max-h-[${svgHeight-10}px] mt-0.5">
-          <path d={backgroundArcPath} strokeDasharray="2 2" className="stroke-gray-300 dark:stroke-gray-600" strokeWidth={arcStrokeWidth-2} fill="none" />
-          {numericValue !== null && (
-            <path d={valueArcPath} className="stroke-primary" strokeWidth={arcStrokeWidth} fill="none" strokeLinecap="round"/>
-          )}
-        </svg>
-        <div className="absolute flex flex-col items-center justify-center" style={{ top: arcCenterY - arcRadius - 5}}>
-            <span className="text-[12px] font-bold text-primary" title={`${formattedValue} ${displayUnit}`}>
-                {formattedValue}
-            </span>
-            {displayUnit && <span className="text-[7px] text-muted-foreground -mt-0.5">{displayUnit}</span>}
+        <div className="relative flex flex-col items-center justify-center w-full">
+          <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto max-h-[${svgHeight-10}px] mt-0.5">
+            <path d={backgroundArcPath} strokeDasharray="2 2" className="stroke-gray-300 dark:stroke-gray-600" strokeWidth={arcStrokeWidth-2} fill="none" />
+            {numericValue !== null && (
+              <path d={valueArcPath} className="stroke-primary" strokeWidth={arcStrokeWidth} fill="none" strokeLinecap="round"/>
+            )}
+          </svg>
+          <div className="absolute flex flex-col items-center justify-center" style={{ top: arcCenterY - arcRadius - 5}}>
+              <span className="text-[12px] font-bold text-primary" title={`${formattedValue} ${displayUnit}`}>
+                  {formattedValue}
+              </span>
+              {displayUnit && <span className="text-[7px] text-muted-foreground -mt-0.5">{displayUnit}</span>}
+          </div>
         </div>
+         <p className="text-[7px] text-muted-foreground text-center w-full mt-auto leading-tight" title={`Range: ${minVal} - ${maxVal}`}>
+          {minVal} ... {maxVal}
+        </p>
       </div>
-       <p className="text-[7px] text-muted-foreground text-center w-full mt-auto leading-tight" title={`Range: ${minVal} - ${maxVal}`}>
-        {minVal} ... {maxVal}
-      </p>
     </motion.div>
   );
 };

@@ -137,36 +137,39 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => { // Reverted t
   return (
     <motion.div
       className={`
-        sld-node meter-node group w-[80px] h-[70px] rounded-lg shadow-lg
-        flex flex-col items-center justify-between p-1.5 
+        sld-node meter-node group custom-node-hover w-[80px] h-[70px] rounded-lg shadow-lg
+        flex flex-col items-center justify-between /* p-1.5 removed, moved to content wrapper */
         border-2 
-        bg-card dark:bg-neutral-800 
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
+        /* bg-card removed, moved to content wrapper */
+        /* transition-all duration-150 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        /* hover:shadow-xl removed */
       `}
-      style={componentStyle} // Apply merged styles: border color, bg color, text color
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={{
+        borderColor: componentStyle.borderColor, // Keep border from componentStyle (which includes derived or status)
+        opacity: derivedNodeStyles.opacity || undefined, // Apply opacity if derived
+        // backgroundColor and color are now primarily for the node-content-wrapper
+      }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: 0, y: 0 }, // Default position as it's not available in props
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                // width and height are not available in NodeProps
+                id, type, 
+                position: { x: 0, y: 0 }, 
+                data, selected, dragging, zIndex, 
                 connectable: isConnectable,
+                 // width and height are not available in NodeProps for this component
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -176,18 +179,30 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => { // Reverted t
         </Button>
       )}
 
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="react-flow__handle-common sld-handle-style" />
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="react-flow__handle-common sld-handle-style" />
 
-      <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
-        {data.label}
-      </p>
-      
-      <StatusIcon size={24} className={`my-1 transition-colors`} style={{ color: iconFinalColor }} />
-      
-      <p className="text-[8px] text-center truncate w-full leading-tight" title={meterReading}>
-        {meterReading}
-      </p>
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div
+        className={`node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-md
+                    bg-card dark:bg-neutral-800`} // Base background
+        style={{
+          backgroundColor: componentStyle.backgroundColor, // This will apply derived or status bg
+          color: componentStyle.color, // This will apply derived or status text color
+        }}
+      >
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label} {/* Text color will be inherited */}
+        </p>
+        
+        {/* Icon color will be inherited from parent or use iconFinalColor if DPL overrides text color */}
+        <StatusIcon size={24} className="my-1 transition-colors" style={{ color: iconFinalColor }} /> 
+        
+        <p className="text-[8px] text-center truncate w-full leading-tight" title={meterReading}>
+          {meterReading} {/* Text color will be inherited */}
+        </p>
+      </div>
     </motion.div>
   );
 };

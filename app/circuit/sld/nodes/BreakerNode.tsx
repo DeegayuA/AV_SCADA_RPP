@@ -1,5 +1,5 @@
 // components/sld/nodes/BreakerNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { BreakerNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -16,7 +16,7 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => { // Revert
   const width = (props as any).width;
   const height = (props as any).height;
   const { isEditMode, currentUser, dataPoints, globalOpcUaNodeValues, setSelectedElementForDetails } = useAppStore(state => ({
-    isEditMode: state.isEditMode,
+    isEditMode: state.isEditMode && state.currentUser?.role === 'admin', // Combined admin check
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
     globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
@@ -214,6 +214,18 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => { // Revert
   // For simplicity, we'll focus on className-based statusStyles and let derivedNodeStyles apply inline.
   // More complex merging might be needed if derivedNodeStyles also return classNames.
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
+
   const breakerTypeLabel = data.config?.type || 'Breaker';
 
   // Choose icon based on status - can be expanded with more DPLinks
@@ -230,105 +242,103 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => { // Revert
   return (
     <motion.div
       className={`
-        sld-node breaker-node group w-[70px] h-[90px] rounded-md shadow-md
-        flex flex-col items-center justify-between p-1.5 
-        border-2 ${statusStyles.border} ${statusStyles.bg}
-        bg-card dark:bg-neutral-800
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-neutral-900' : 
-          selected ? 'ring-1 ring-accent dark:ring-offset-neutral-900' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+        sld-node breaker-node group custom-node-hover w-[70px] h-[90px] rounded-md shadow-md
+        flex flex-col items-center justify-between 
+        border-2 ${statusStyles.border} 
+        bg-card dark:bg-neutral-800 
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
       `}
-      style={derivedNodeStyles} // Apply derived styles here
-      variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover"
+      // Note: Removed direct hover:shadow-lg, selected ring, and statusStyles.bg from here if they conflict with node-content-wrapper approach
+      // statusStyles.bg will be applied to node-content-wrapper
+      // transition-all duration-150 is part of custom-node-hover
+      style={derivedNodeStyles} // Apply derived styles that don't conflict with wrapper (e.g. visibility, opacity)
+      variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }} // Reduced scale for subtlety, hover handled by custom-node-hover primarily
+      // whileHover="hover" // Handled by custom-node-hover CSS
       initial="initial"
-      transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 15 }} // Adjusted for a slightly less bouncy feel if scale is used
     >
-      {!isEditMode && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                width: width === null ? undefined : width, 
-                height: height === null ? undefined : height, 
-                connectable: isConnectable,
-            };
-            setSelectedElementForDetails(fullNodeObject);
-          }}
-          title="View Details"
-        >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
-        </Button>
-      )}
+      {/* Handles are outside the node-content-wrapper so selection border doesn't cover them */}
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 react-flow__handle-common sld-handle-style" />
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 react-flow__handle-common sld-handle-style" />
 
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 !bg-slate-400 !border-slate-500 react-flow__handle-common sld-handle-style" />
-
-      <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" style={{ color: derivedNodeStyles.color || statusStyles.main }} title={`${data.label} (${breakerTypeLabel})`}>
-        {data.label}
-      </p>
-      
-      {/* SVG Breaker Symbol or Status Icon */}
-      {/* Option 1: Keep SVG and change its state */}
-      <motion.svg 
-        viewBox="0 0 24 24" 
-        width="32" height="32" 
-        className={`flex-grow`} 
-        style={{ color: derivedNodeStyles.color || statusStyles.iconColor }}
-        initial={false} // Prevent initial animation on mount
+      {/* node-content-wrapper will get the selection styles from globals.css */}
+      <div 
+        className={`node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-sm ${statusStyles.bg} ${isRecentStatusChange ? 'animate-status-highlight' : ''}`}
+        // Apply statusStyles.bg here. Border is on the outer div, or could be moved here too if preferred.
+        // If derivedNodeStyles include background or border, they might need to be applied here or carefully merged.
+        // For now, assuming derivedNodeStyles are for text color, visibility etc.
       >
-        <circle cx="12" cy="7" r="2.5" fill="currentColor" /> {/* Top terminal */}
-        <circle cx="12" cy="17" r="2.5" fill="currentColor" /> {/* Bottom terminal */}
-        <line x1="12" y1="9.5" x2="12" y2="14.5" stroke="currentColor" strokeWidth="1.5" /> {/* Vertical bar */}
-        
-        {/* Switch arm: using motion.line for smooth transition */}
-        <motion.line
-          key={isOpen ? "open-arm" : "closed-arm"} // Key change helps React trigger animation correctly
-          x1="12"
-          y1="12"
-          initial={false} // Start from current state if already rendered
-          animate={isOpen ? { x2: 18, y2: 8 } : { x2: 12, y2: 9.5 }}
-          transition={{ duration: 0.2, ease: "easeInOut" }}
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-        />
-        
-        <rect x="8" y="11" width="8" height="2" fill="currentColor" className="opacity-60" /> {/* Box body part */}
-        
-        {/* Contact point: fade in/out */}
-        <motion.circle 
-          cx="12" cy="12" r="1.5" fill="currentColor"
-          initial={{ opacity: isOpen ? 0 : 1 }}
-          animate={{ opacity: isOpen ? 0 : 1 }}
-          transition={{ duration: 0.15 }}
-        />
-      </motion.svg>
-      {/* Option 2: Use Lucide icons (if preferred over dynamic SVG) */}
-      {/* <StatusIcon size={32} className={`flex-grow transition-colors ${statusStyles.iconColor}`} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} /> */}
+        {!isEditMode && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              const fullNodeObject: CustomNodeType = {
+                  id, 
+                  type, 
+                  position: { x: xPos, y: yPos },
+                  data, 
+                  selected, 
+                  dragging, 
+                  zIndex, 
+                  width: width === null ? undefined : width, 
+                  height: height === null ? undefined : height, 
+                  connectable: isConnectable,
+              };
+              setSelectedElementForDetails(fullNodeObject);
+            }}
+            title="View Details"
+          >
+            <InfoIcon className="h-3 w-3 text-primary/80" />
+          </Button>
+        )}
 
-      <p className="text-[10px] font-semibold" style={{ color: derivedNodeStyles.color || statusStyles.main }}>
-        {isOpen ? 'OPEN' : 'CLOSED'}
-      </p>
+        <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" style={{ color: derivedNodeStyles.color || statusStyles.main }} title={`${data.label} (${breakerTypeLabel})`}>
+          {data.label}
+        </p>
+        
+        <motion.svg 
+          viewBox="0 0 24 24" 
+          width="32" height="32" 
+          className={`flex-grow`} 
+          style={{ color: derivedNodeStyles.color || statusStyles.iconColor }}
+          initial={false}
+        >
+          <circle cx="12" cy="7" r="2.5" fill="currentColor" />
+          <circle cx="12" cy="17" r="2.5" fill="currentColor" />
+          <line x1="12" y1="9.5" x2="12" y2="14.5" stroke="currentColor" strokeWidth="1.5" />
+          <motion.line
+            key={isOpen ? "open-arm" : "closed-arm"}
+            x1="12"
+            y1="12"
+            initial={false}
+            animate={isOpen ? { x2: 18, y2: 8 } : { x2: 12, y2: 9.5 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+          />
+          <rect x="8" y="11" width="8" height="2" fill="currentColor" className="opacity-60" />
+          <motion.circle 
+            cx="12" cy="12" r="1.5" fill="currentColor"
+            initial={{ opacity: isOpen ? 0 : 1 }}
+            animate={{ opacity: isOpen ? 0 : 1 }}
+            transition={{ duration: 0.15 }}
+          />
+        </motion.svg>
 
-      <p className="text-[9px] text-muted-foreground text-center truncate w-full leading-tight" title={data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel}>
-        {data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel.toUpperCase()}
-      </p>
+        <p className="text-[10px] font-semibold" style={{ color: derivedNodeStyles.color || statusStyles.main }}>
+          {isOpen ? 'OPEN' : 'CLOSED'}
+        </p>
+
+        <p className="text-[9px] text-muted-foreground text-center truncate w-full leading-tight" title={data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel}>
+          {data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel.toUpperCase()}
+        </p>
+      </div>
     </motion.div>
   );
 };
-// Add sld-handle-style to your global CSS for common handle visibility etc.
-// .sld-handle-style { /* Basic opacity/hover logic already in PanelNode's handle classes */ }
 
 export default memo(BreakerNode);

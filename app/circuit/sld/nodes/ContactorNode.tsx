@@ -1,5 +1,5 @@
 // components/sld/nodes/ContactorNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { ContactorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -79,15 +79,27 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
 
   // Combine classes and styles
   const mainDivClasses = `
-    sld-node contactor-node group w-[60px] h-[80px] rounded-md shadow-md
-    flex flex-col items-center justify-between p-1
+    sld-node contactor-node group custom-node-hover w-[60px] h-[80px] rounded-md shadow-md
+    flex flex-col items-center justify-between /* p-1 removed, moved to content wrapper */
     border-2 ${derivedNodeStyles.borderColor ? '' : borderClass} 
-    ${derivedNodeStyles.backgroundColor ? '' : bgClass}
-    bg-card dark:bg-neutral-800
-    transition-all duration-150
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-    ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+    /* specific bgClass, bg-card, textClass (via derivedNodeStyles) removed, moved to content wrapper */
+    /* transition-all duration-150 is part of custom-node-hover */
+    /* selected ring styles removed */
+    ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+    /* hover:shadow-lg removed */
   `;
+
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   const handleInfoClick = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -109,11 +121,17 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
   return (
     <motion.div
       className={mainDivClasses}
-      style={derivedNodeStyles} // Apply derived styles, allowing overrides
-      variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={{ 
+        borderColor: derivedNodeStyles.borderColor || undefined, // Apply border from derived or let class handle
+        // backgroundColor and color are now primarily for the node-content-wrapper
+        opacity: derivedNodeStyles.opacity || undefined, // Apply opacity if derived
+      }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
@@ -126,61 +144,72 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
         </Button>
       )}
 
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
 
-      <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : textClass}`} title={data.label}>
-        {data.label}
-      </p>
-      
-      <motion.svg 
-        viewBox="0 0 24 24" 
-        width="30" height="30" 
-        className={`transition-colors duration-200 ${derivedNodeStyles.color ? '' : textClass}`} 
-        style={{ color: derivedNodeStyles.color || ''}}
-        initial={false}
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div 
+        className={`node-content-wrapper flex flex-col items-center justify-between p-1 w-full h-full rounded-sm 
+                    ${derivedNodeStyles.backgroundColor ? '' : bgClass} 
+                    ${derivedNodeStyles.color ? '' : textClass}
+                    bg-card dark:bg-neutral-800
+                    ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
+        style={{
+          backgroundColor: derivedNodeStyles.backgroundColor || undefined, // Explicitly set from DPL or let class apply
+          color: derivedNodeStyles.color || undefined, // Explicitly set from DPL or let class apply
+        }}
       >
-        <circle cx="6" cy="8" r="2" fill="currentColor" /> 
-        <circle cx="18" cy="8" r="2" fill="currentColor" />
-        <line x1="6" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.5" />
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label} {/* Text color will be inherited */}
+        </p>
         
-        {/* Left contact */}
-        <motion.line
-          key={`left-contact-${isClosed}`}
-          x1="6" y1="10"
+        <motion.svg 
+          viewBox="0 0 24 24" 
+          width="30" height="30" 
+          className="transition-colors duration-200" // textClass removed, color inherited
+          style={{ color: 'currentColor' }} // Inherits color from parent (node-content-wrapper)
           initial={false}
-          animate={isClosed ? { x2: 6, y2: 16 } : { x2: 6, y2: 13 }} // Straight for closed, shorter for open start
-          transition={{ duration: 0.2, ease: "easeInOut" }}
-          stroke="currentColor" strokeWidth="1.5"
-        />
-        {!isClosed && ( // Angled part for open state
+        >
+          <circle cx="6" cy="8" r="2" fill="currentColor" /> 
+          <circle cx="18" cy="8" r="2" fill="currentColor" />
+          <line x1="6" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.5" />
+          
           <motion.line
-            key="left-angled-contact"
-            x1="6" y1="13" x2="8" y2="15"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.1, delay: 0.15 }} // Delay to appear after main line shortens
+            key={`left-contact-${isClosed}`}
+            x1="6" y1="10"
+            initial={false}
+            animate={isClosed ? { x2: 6, y2: 16 } : { x2: 6, y2: 13 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
             stroke="currentColor" strokeWidth="1.5"
           />
-        )}
+          {!isClosed && (
+            <motion.line
+              key="left-angled-contact"
+              x1="6" y1="13" x2="8" y2="15"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.1, delay: 0.15 }}
+              stroke="currentColor" strokeWidth="1.5"
+            />
+          )}
+          
+          <motion.line
+            key={`right-contact-${isClosed}`}
+            x1="18" y1="10"
+            initial={false}
+            animate={isClosed ? { x2: 18, y2: 16 } : { x2: 18, y2: 16 }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+            stroke="currentColor" strokeWidth="1.5"
+          />
+          
+          <rect x="4" y="16" width="16" height="3" rx="1" fill="currentColor" className="opacity-70"/>
+        </motion.svg>
         
-        {/* Right contact (simplified: always straight, changes length) */}
-        {/* For a more realistic NO contact, this would also need an angled part */}
-        <motion.line
-          key={`right-contact-${isClosed}`}
-          x1="18" y1="10"
-          initial={false}
-          animate={isClosed ? { x2: 18, y2: 16 } : { x2: 18, y2: 16 }} // Stays long for NO, but could be y2:13 for visual match
-          transition={{ duration: 0.2, ease: "easeInOut" }}
-          stroke="currentColor" strokeWidth="1.5"
-        />
-        
-        <rect x="4" y="16" width="16" height="3" rx="1" fill="currentColor" className="opacity-70"/>
-      </motion.svg>
-      
-      <p className={`text-[9px] font-bold ${derivedNodeStyles.color ? '' : textClass}`}>
-        {isClosed ? 'CLOSED' : 'OPEN'}
-      </p>
+        <p className="text-[9px] font-bold"> {/* Text color will be inherited */}
+          {isClosed ? 'CLOSED' : 'OPEN'}
+        </p>
+      </div>
     </motion.div>
   );
 };

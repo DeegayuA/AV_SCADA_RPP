@@ -1,5 +1,5 @@
 // components/sld/nodes/BusbarNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps as ReactFlowNodeProps, Handle, Position } from 'reactflow'; // Importing as ReactFlowNodeProps
 import { motion } from 'framer-motion';
 import { BusbarNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -85,18 +85,30 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
   const busbarHeight = data.config?.height || 12;
 
   const mainDivClasses = `
-    sld-node busbar-node group
+    sld-node busbar-node group custom-node-hover
     rounded shadow-sm 
     flex items-center justify-center relative
-    border border-transparent hover:border-primary/30
-    transition-all duration-150
+    /* border border-transparent removed, selection border will be on node-content-wrapper */
+    /* transition-all duration-150 is part of custom-node-hover */
     ${isNodeEditable ? 'cursor-pointer' : 'cursor-default'}
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-neutral-900' :
-      selected ? 'ring-1 ring-accent dark:ring-offset-neutral-900' : ''}
+    /* ring styles removed, selection style will be on node-content-wrapper */
   `;
 
-  // The busbar's actual visual bar. Its background color can be set by statusColorClass or by a DPLink via derivedNodeStyles.backgroundColor
-  const busbarVisualClasses = `w-full h-full rounded-sm transition-colors duration-300 ${derivedNodeStyles.backgroundColor ? '' : statusColorClass}`;
+  // The busbar's actual visual bar. Its background color can be set by statusColorClass or by a DPLink.
+  // Added node-content-wrapper here.
+  const busbarVisualClasses = `node-content-wrapper w-full h-full rounded-sm transition-colors duration-300 ${derivedNodeStyles.backgroundColor ? '' : statusColorClass}`;
+
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   return (
     <motion.div
@@ -104,14 +116,13 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
       style={{
         width: `${busbarWidth}px`,
         height: `${busbarHeight}px`,
-        // Apply other derived styles like opacity, etc., but not backgroundColor here as it's on the inner div.
-        // However, if derivedNodeStyles is intended to style the *container*, it's fine.
-        // For this component, usually the bar itself shows the color status.
-        borderColor: derivedNodeStyles.borderColor, // Example of applying other derived styles
+        borderColor: derivedNodeStyles.borderColor, // Keep this if it's for the outer container specifically
         opacity: derivedNodeStyles.opacity,
+        // backgroundColor for the main motion.div should be transparent or a base card color if the inner bar doesn't fill it.
+        // Given busbarVisualClasses is w-full h-full, this should be fine.
       }}
-      variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover"
+      // variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }} // Let CSS handle hover scale through custom-node-hover if defined, or keep for framer-motion specific
+      // whileHover="hover" // Let CSS handle hover effects via custom-node-hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
     >
@@ -120,9 +131,11 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
           variant="ghost"
           size="icon"
           className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0" // Adjusted for busbar, typically small
-          style={{ top: `-${(height || busbarHeight) / 2 - 2}px`, right: '-5px' }} // Example dynamic positioning if needed, or fixed like others
+          // Adjust button positioning if needed, ensure it's outside the main interaction area or handled.
+          // Using a common pattern for positioning the button slightly outside or at a corner.
+          className="absolute -top-1 -right-1 h-5 w-5 rounded-full z-20 bg-background/70 hover:bg-secondary/90 p-0.5"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection/drag
             const fullNodeObject: CustomNodeType = {
               id,
               type,
@@ -144,7 +157,7 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
       )}
 
       <div
-        className={busbarVisualClasses}
+        className={`${busbarVisualClasses} ${isRecentStatusChange ? 'animate-status-highlight' : ''}`}
         style={{ backgroundColor: derivedNodeStyles.backgroundColor }} // Allows DPLink to override statusColorClass
       />
 
@@ -153,32 +166,33 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
         <Handle
           key={`top-${pos}`} type="target" position={Position.Top} id={`top-${pos * 100}`}
           style={{ left: `${pos * 100}%` }} isConnectable={isConnectable}
-          className="!w-2.5 !h-2.5 !bg-neutral-400/70 dark:!bg-neutral-500/70 border !border-neutral-500 dark:!border-neutral-400 group-hover:!bg-primary/70 dark:group-hover:!bg-blue-400/70 react-flow__handle-common !opacity-0 group-hover:!opacity-100 transition-opacity"
+          className="react-flow__handle-common sld-handle-style" // Use global style, size from global
         />
       ))}
       {[0.25, 0.5, 0.75].map(pos => (
         <Handle
           key={`bottom-${pos}`} type="source" position={Position.Bottom} id={`bottom-${pos * 100}`}
           style={{ left: `${pos * 100}%` }} isConnectable={isConnectable}
-          className="!w-2.5 !h-2.5 !bg-neutral-400/70 dark:!bg-neutral-500/70 border !border-neutral-500 dark:!border-neutral-400 group-hover:!bg-primary/70 dark:group-hover:!bg-blue-400/70 react-flow__handle-common !opacity-0 group-hover:!opacity-100 transition-opacity"
+          className="react-flow__handle-common sld-handle-style" // Use global style
         />
       ))}
       <Handle
         type="target" position={Position.Left} id="left" isConnectable={isConnectable}
-        className="!w-2.5 !h-2.5 !bg-neutral-400/70 dark:!bg-neutral-500/70 border !border-neutral-500 dark:!border-neutral-400 group-hover:!bg-primary/70 dark:group-hover:!bg-blue-400/70 react-flow__handle-common !opacity-0 group-hover:!opacity-100 transition-opacity"
+        className="react-flow__handle-common sld-handle-style" // Use global style
       />
       <Handle
         type="source" position={Position.Right} id="right" isConnectable={isConnectable}
-        className="!w-2.5 !h-2.5 !bg-neutral-400/70 dark:!bg-neutral-500/70 border !border-neutral-500 dark:!border-neutral-400 group-hover:!bg-primary/70 dark:group-hover:!bg-blue-400/70 react-flow__handle-common !opacity-0 group-hover:!opacity-100 transition-opacity"
+        className="react-flow__handle-common sld-handle-style" // Use global style
       />
 
-      {(displayInfo || data.label) && ( // Show label or displayInfo if available
+      {/* Label is positioned absolutely, outside the main colored bar, so it won't get selection styling directly */}
+      {(displayInfo || data.label) && (
         <div
-          className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-center"
+          className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-center pointer-events-none" // pointer-events-none for label
           style={{ width: `${busbarWidth * 1.2}px` }}
         >
           <p className="text-[9px] font-medium text-muted-foreground dark:text-neutral-400 truncate"
-            style={{ color: derivedNodeStyles.color }} // Allow DPLink to color label text
+            style={{ color: derivedNodeStyles.color }} 
             title={displayInfo || data.label}
           >
             {displayInfo || data.label}

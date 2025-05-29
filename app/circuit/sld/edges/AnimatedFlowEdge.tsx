@@ -57,7 +57,7 @@ export default function AnimatedFlowEdge({
 
   let edgeStrokeColor = flowColors.OFFLINE;
   let edgeStrokeWidth = voltageStrokeWidths[(data?.voltageLevel as keyof typeof voltageStrokeWidths) || 'DEFAULT'] || voltageStrokeWidths.DEFAULT;
-  const baseStrokeDasharray = '4 4'; 
+  const baseStrokeDasharray = '8 6'; // Updated dash pattern
 
   let flowActive = false; 
   let animationName = 'none';
@@ -196,7 +196,11 @@ export default function AnimatedFlowEdge({
   if (finalStatus === 'FAULT') {
     edgeStrokeColor = flowColors.FAULT;
     animationName = 'faultPulse'; 
-    animationDuration = '1s'; 
+    animationDuration = '1s';
+    // Set CSS variable for base stroke width for the animation
+    if (finalBasePathStyle) { // Ensure finalBasePathStyle is defined
+        (finalBasePathStyle as any)['--base-stroke-width'] = `${edgeStrokeWidth}px`;
+    }
     // animationDirection can remain as previously calculated for fault context, or default to 'normal'
   } else if (finalStatus === 'WARNING') {
     if(edgeStrokeColor !== flowColors.FAULT) edgeStrokeColor = flowColors.WARNING; // Don't let warning override fault color
@@ -222,15 +226,32 @@ export default function AnimatedFlowEdge({
         animationName = 'subtlePulse'; 
         animationDuration = '2s';
     }
+    // Apply SVG filter for selected state
+    if (finalBasePathStyle) { // Ensure finalBasePathStyle is defined
+        (finalBasePathStyle as any).filter = `url(#selected-edge-glow-${id})`;
+    }
   }
 
   // --- Final Style Assembly for the Base Path ---
-  const finalBasePathStyle: React.CSSProperties = {
+  // finalBasePathStyle is initialized before this block if selected is true
+  // This ensures that if it wasn't initialized (selected is false), it gets initialized here.
+  // Or, more cleanly, initialize it once before the 'selected' block.
+  const finalBasePathStyle: React.CSSProperties = { // Initialized or re-initialized here for clarity
     ...style,
     stroke: edgeStrokeColor,
     strokeWidth: edgeStrokeWidth,
     strokeLinecap: 'round',
   };
+  
+  // Re-apply filter if selected, as finalBasePathStyle might have been re-initialized
+  if (selected) {
+    (finalBasePathStyle as any).filter = `url(#selected-edge-glow-${id})`;
+  }
+  // Re-apply --base-stroke-width for fault state if it was re-initialized
+  if (finalStatus === 'FAULT') {
+    (finalBasePathStyle as any)['--base-stroke-width'] = `${edgeStrokeWidth - (selected ? SELECTED_STROKE_WIDTH_INCREASE : 0)}px`; // Use original width before selection increase
+  }
+
 
   if (animationName !== 'none') {
     finalBasePathStyle.strokeDasharray = baseStrokeDasharray;
@@ -238,11 +259,22 @@ export default function AnimatedFlowEdge({
     finalBasePathStyle.animationDuration = animationDuration;
     finalBasePathStyle.animationDirection = animationDirection; 
     finalBasePathStyle.animationIterationCount = 'infinite';
-    finalBasePathStyle.animationTimingFunction = 'linear';
+    finalBasePathStyle.animationTimingFunction = 'linear'; // Default is linear, can be overridden by specific animation if needed
+    if (animationName === 'faultPulse' || animationName === 'subtlePulse') {
+        finalBasePathStyle.animationTimingFunction = 'ease-in-out'; // Override for pulse animations
+    }
   }
   
   return (
     <>
+      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
+        <defs>
+          <filter id={`selected-edge-glow-${id}`} x="-50%" y="-50%" width="200%" height="200%">
+            {/* Using feDropShadow for a simpler glow effect */}
+            <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor={flowColors.SELECTED_STROKE} floodOpacity="0.75" />
+          </filter>
+        </defs>
+      </svg>
       <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={finalBasePathStyle} />
       {data?.label && (
         <EdgeLabelRenderer>

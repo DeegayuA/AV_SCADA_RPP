@@ -1,5 +1,5 @@
 // components/sld/nodes/PLCNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { PLCNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
@@ -42,37 +42,45 @@ const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => { // Reverted to No
     return { StatusIcon: icon, statusText: text, styleClasses: classes };
   }, [data.status]);
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(data.status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== data.status) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = data.status;
+      return () => clearTimeout(timer);
+    }
+  }, [data.status]);
+
   return (
     <motion.div
       className={`
-        sld-node plc-node group w-[100px] h-[70px] rounded-lg shadow-md
-        flex flex-col items-center justify-between p-2
-        border-2 ${styleClasses}
-        bg-card dark:bg-neutral-800 text-foreground
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+        sld-node plc-node group custom-node-hover w-[100px] h-[70px] rounded-lg shadow-md
+        flex flex-col items-center justify-between /* p-2 removed, moved to content wrapper */
+        border-2 ${styleClasses.split(' ').filter(c => c.startsWith('border-')).join(' ')} /* Keep only border from styleClasses */
+        /* bg-card, text-foreground and specific bg/text from styleClasses removed, moved to content wrapper */
+        /* transition-all duration-150 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        /* hover:shadow-lg removed */
       `}
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position, 
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                // width and height are not directly available in NodeProps
-                connectable: isConnectable,
+                id, type, position, data, selected, dragging, zIndex, connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -82,22 +90,30 @@ const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => { // Reverted to No
         </Button>
       )}
 
-      {/* PLCs often have multiple I/O and network connections */}
-      <Handle type="target" position={Position.Top} id="power_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 !-mt-1 sld-handle-style !bg-red-400 !border-red-500" title="Power In"/>
-      <Handle type="source" position={Position.Bottom} id="network_out" isConnectable={isConnectable} className="!w-2.5 !h-2.5 !-mb-1 sld-handle-style !bg-blue-400 !border-blue-500" title="Network/IO"/>
-      <Handle type="target" position={Position.Left} id="digital_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 !-ml-1 sld-handle-style !bg-yellow-400 !border-yellow-500" title="Digital Inputs"/>
-      <Handle type="source" position={Position.Right} id="digital_out" isConnectable={isConnectable} className="!w-2.5 !h-2.5 !-mr-1 sld-handle-style !bg-purple-400 !border-purple-500" title="Digital Outputs"/>
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="power_in" isConnectable={isConnectable} className="sld-handle-style !-mt-1" title="Power In"/>
+      <Handle type="source" position={Position.Bottom} id="network_out" isConnectable={isConnectable} className="sld-handle-style !-mb-1" title="Network/IO"/>
+      <Handle type="target" position={Position.Left} id="digital_in" isConnectable={isConnectable} className="sld-handle-style !-ml-1" title="Digital Inputs"/>
+      <Handle type="source" position={Position.Right} id="digital_out" isConnectable={isConnectable} className="sld-handle-style !-mr-1" title="Digital Outputs"/>
 
-
-      <p className="text-[10px] font-semibold text-center truncate w-full" title={data.label}>
-        {data.label}
-      </p>
-      
-      <StatusIcon size={22} className="my-0.5 transition-colors" />
-      
-      <p className="text-[9px] font-medium text-center truncate w-full leading-tight">
-        {statusText}
-      </p>
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div className={`
+          node-content-wrapper flex flex-col items-center justify-between p-2 w-full h-full rounded-md
+          ${styleClasses.split(' ').filter(c => !c.startsWith('border-')).join(' ')} /* Keep bg and text from styleClasses */
+          bg-card dark:bg-neutral-800 text-foreground /* Base background and text */
+          ${isRecentStatusChange ? 'animate-status-highlight' : ''}
+        `}
+      >
+        <p className="text-[10px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label} {/* Text color will be inherited */}
+        </p>
+        
+        <StatusIcon size={22} className="my-0.5 transition-colors" /> {/* Icon color will be inherited */}
+        
+        <p className="text-[9px] font-medium text-center truncate w-full leading-tight">
+          {statusText} {/* Text color will be inherited */}
+        </p>
+      </div>
     </motion.div>
   );
 };

@@ -1,5 +1,5 @@
 // components/sld/nodes/IsolatorNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added CustomNodeType and SLDElementType
@@ -102,42 +102,55 @@ const IsolatorNode: React.FC<ExtendedNodeProps> = (props) => {
   };
   
   const mainDivClasses = `
-    sld-node isolator-node group w-[50px] h-[70px] rounded-md shadow-sm
-    flex flex-col items-center justify-between pt-1 pb-1.5 px-0.5
+    sld-node isolator-node group custom-node-hover w-[50px] h-[70px] rounded-md shadow-sm
+    flex flex-col items-center justify-between /* Padding removed, moved to content wrapper */
     border-2 ${derivedNodeStyles.borderColor ? '' : baseClasses.split(' ')[0]} 
-    ${derivedNodeStyles.backgroundColor ? '' : baseClasses.split(' ')[1]}
-    bg-card dark:bg-neutral-800
-    transition-all duration-150
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-    ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+    /* bg-card and specific bgClass removed, moved to content wrapper */
+    /* transition-all duration-150 is part of custom-node-hover */
+    /* selected ring styles removed */
+    ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+    /* hover:shadow-lg removed */
   `;
-  const finalEffectiveColor = derivedNodeStyles.color || effectiveColor;
+  // finalEffectiveColor will be applied to the node-content-wrapper or inherited for elements within it.
+
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   return (
     <motion.div
       className={mainDivClasses}
-      style={derivedNodeStyles} // Derived styles can override all aspects
-      variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={{
+        borderColor: derivedNodeStyles.borderColor || undefined,
+        opacity: derivedNodeStyles.opacity || undefined,
+        // backgroundColor and color are now primarily for the node-content-wrapper
+      }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data: { ...data, elementType: SLDElementType.Isolator } as any, // Use enum value
-                selected, 
-                dragging, 
-                zIndex, 
-                width, 
-                height, 
-                connectable: isConnectable,
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data: { ...data, elementType: SLDElementType.Isolator } as any, 
+                selected, dragging, zIndex, width, height, connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -146,25 +159,39 @@ const IsolatorNode: React.FC<ExtendedNodeProps> = (props) => {
           <InfoIcon className="h-3 w-3 text-primary/80" />
         </Button>
       )}
-
-      <p className={`text-[9px] font-medium text-center truncate w-full leading-none ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
-        {data.label}
-      </p>
       
-      <div className="flex flex-col items-center my-0.5 pointer-events-none h-[32px] justify-center relative">
-         <div className={`w-1.5 h-1.5 rounded-full absolute top-0`} style={{backgroundColor: finalEffectiveColor}}></div> {/* Top contact */}
-         <IsolatorArmSVG className={`${finalEffectiveColor}`} isOpen={isOpen} />
-         <div className={`w-1.5 h-1.5 rounded-full absolute bottom-0`} style={{backgroundColor: finalEffectiveColor}}></div> {/* Bottom contact */}
-         {(processedStatus === 'fault' || processedStatus === 'alarm' || processedStatus === 'warning') && (
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} className="absolute">
-                 <AlertTriangleIcon size={14} className={finalEffectiveColor} />
-            </motion.div>
-         )}
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div
+        className={`node-content-wrapper flex flex-col items-center justify-between pt-1 pb-1.5 px-0.5 w-full h-full rounded-sm
+                    ${derivedNodeStyles.backgroundColor ? '' : baseClasses.split(' ')[1]} /* bg from baseClasses */
+                    ${derivedNodeStyles.color ? '' : baseClasses.split(' ')[2]} /* text color from baseClasses */
+                    bg-card dark:bg-neutral-800
+                    ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
+        style={{
+          backgroundColor: derivedNodeStyles.backgroundColor || undefined,
+          color: derivedNodeStyles.color || effectiveColor, // Use effectiveColor as fallback for text
+        }}
+      >
+        <p className="text-[9px] font-medium text-center truncate w-full leading-none" title={data.label}>
+          {data.label} {/* Text color will be inherited */}
+        </p>
+        
+        <div className="flex flex-col items-center my-0.5 pointer-events-none h-[32px] justify-center relative">
+           {/* SVG and contact points color will be inherited */}
+           <div className="w-1.5 h-1.5 rounded-full absolute top-0" style={{backgroundColor: 'currentColor'}}></div>
+           <IsolatorArmSVG className="current-color-class-placeholder" isOpen={isOpen} /> {/* Replace placeholder with actual class if needed or rely on inheritance */}
+           <div className="w-1.5 h-1.5 rounded-full absolute bottom-0" style={{backgroundColor: 'currentColor'}}></div>
+           {(processedStatus === 'fault' || processedStatus === 'alarm' || processedStatus === 'warning') && (
+              <motion.div initial={{opacity:0}} animate={{opacity:1}} className="absolute">
+                   <AlertTriangleIcon size={14} className="current-color-class-placeholder" /> {/* Replace placeholder */}
+              </motion.div>
+           )}
+        </div>
+        
+        <p className="text-[9px] font-bold leading-tight">
+          {statusText} {/* Text color will be inherited */}
+        </p>
       </div>
-      
-      <p className={`text-[9px] font-bold leading-tight ${finalEffectiveColor}`}>
-        {statusText}
-      </p>
     </motion.div>
   );
 };

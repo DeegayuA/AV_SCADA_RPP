@@ -1,5 +1,5 @@
 // components/sld/nodes/SensorNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { SensorNodeData, CustomNodeType } from '@/types/sld'; // Added CustomNodeType
@@ -55,38 +55,52 @@ const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => { // Reverted
     return { DisplayIcon: icon, statusText: text, styleClasses: classes };
   }, [data.status, data.config?.sensorType]);
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(data.status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== data.status) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = data.status;
+      return () => clearTimeout(timer);
+    }
+  }, [data.status]);
+
   return (
     <motion.div
       className={`
-        sld-node sensor-node group w-[80px] h-[65px] rounded-lg shadow-md
-        flex flex-col items-center justify-between p-1.5
-        border-2 ${styleClasses}
-        bg-card dark:bg-neutral-800 text-foreground
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+        sld-node sensor-node group custom-node-hover w-[80px] h-[65px] rounded-lg shadow-md
+        flex flex-col items-center justify-between /* p-1.5 removed, moved to content wrapper */
+        border-2 ${styleClasses.split(' ')[0]} /* Keep only border class */
+        /* bg-card, text-foreground and specific bg/text from styleClasses removed, moved to content wrapper */
+        /* transition-all duration-150 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        /* hover:shadow-lg removed */
       `}
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                // width and height are optional and might not be needed
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data, selected, 
                 width: width === null ? undefined : width, 
                 height: height === null ? undefined : height, 
                 connectable: isConnectable,
+                dragging: !!dragging, // Ensure dragging is boolean
+                zIndex: zIndex || 0,   // Ensure zIndex is number
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -96,19 +110,28 @@ const SensorNode: React.FC<NodeProps<SensorNodeData>> = (props) => { // Reverted
         </Button>
       )}
 
-      {/* Sensors are typically sources of data/signals, can also be targets for power */}
-      <Handle type="target" position={Position.Top} id="power_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-red-400 !border-red-500" title="Power"/>
-      <Handle type="source" position={Position.Bottom} id="signal_out" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-purple-400 !border-purple-500" title="Signal Out"/>
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="power_in" isConnectable={isConnectable} className="sld-handle-style !-mt-1" title="Power In"/>
+      <Handle type="source" position={Position.Bottom} id="signal_out" isConnectable={isConnectable} className="sld-handle-style !-mb-1" title="Signal Out"/>
 
-      <p className="text-[9px] font-medium text-center truncate w-full" title={data.label}>
-        {data.label}
-      </p>
-      
-      <DisplayIcon size={20} className="my-0.5 transition-colors" />
-      
-      <p className="text-[8px] font-normal text-center truncate w-full leading-tight">
-        {statusText}
-      </p>
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div className={`
+          node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-md
+          ${styleClasses.substring(styleClasses.indexOf(' ') + 1)} /* Keep only bg and text from styleClasses */
+          bg-card dark:bg-neutral-800 text-foreground /* Base background and text */
+          ${isRecentStatusChange ? 'animate-status-highlight' : ''}
+        `}
+      >
+        <p className="text-[9px] font-medium text-center truncate w-full" title={data.label}>
+          {data.label} {/* Text color will be inherited */}
+        </p>
+        
+        <DisplayIcon size={20} className="my-0.5 transition-colors" /> {/* Icon color will be inherited */}
+        
+        <p className="text-[8px] font-normal text-center truncate w-full leading-tight">
+          {statusText} {/* Text color will be inherited */}
+        </p>
+      </div>
     </motion.div>
   );
 };

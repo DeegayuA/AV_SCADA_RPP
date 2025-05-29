@@ -1,5 +1,5 @@
 // app/circuit/sld/nodes/SwitchNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld';
@@ -93,21 +93,36 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
 
   const SwitchIcon = isOn ? ToggleRightIcon : ToggleLeftIcon;
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevIsOnRef = useRef(isOn);
+
+  useEffect(() => {
+    if (prevIsOnRef.current !== isOn) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevIsOnRef.current = isOn;
+      return () => clearTimeout(timer);
+    }
+  }, [isOn]);
+
   return (
     <motion.div
       className={`
-        sld-node switch-node group w-[70px] h-[70px] rounded-lg shadow-md
-        flex flex-col items-center justify-center p-1.5 
-        border-2 ${statusStyles.border} ${statusStyles.bg}
-        bg-card dark:bg-neutral-800 
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-neutral-900' : 
-          selected ? 'ring-1 ring-accent dark:ring-offset-neutral-900' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+        sld-node switch-node group custom-node-hover w-[70px] h-[70px] rounded-lg shadow-md
+        flex flex-col items-center justify-center /* p-1.5 removed */
+        border-2 ${statusStyles.border} 
+        /* bg-card and statusStyles.bg removed, moved to content wrapper */
+        /* transition-all duration-150 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        /* hover:shadow-lg removed */
       `}
-      style={derivedNodeStyles}
-      variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover"
+      style={{
+        borderColor: derivedNodeStyles.borderColor || statusStyles.border, // DPL override for border
+        opacity: derivedNodeStyles.opacity || undefined,
+      }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
       onDoubleClick={() => {
@@ -121,13 +136,14 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
         }
       }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
              const fullNodeObject: CustomNodeType = {
                 id, type, position: { x: xPos, y: yPos }, data, selected, 
                 dragging, zIndex, width: width === null ? undefined : width, 
@@ -141,20 +157,35 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
         </Button>
       )}
 
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-
-      <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" style={{ color: derivedNodeStyles.color || statusStyles.main }} title={data.label}>
-        {data.label || 'Switch'}
-      </p>
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="sld-handle-style" />
       
-      <SwitchIcon size={30} className={`flex-grow transition-colors ${statusStyles.iconColor}`} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} />
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div className={`
+          node-content-wrapper flex flex-col items-center justify-center p-1.5 w-full h-full rounded-sm 
+          ${statusStyles.bg} ${statusStyles.main} /* Apply status bg and text color */
+          bg-card dark:bg-neutral-800 /* Base background */
+          ${isRecentStatusChange ? 'animate-status-highlight' : ''}
+        `}
+        style={{ 
+          backgroundColor: derivedNodeStyles.backgroundColor, // DPL override for background
+          color: derivedNodeStyles.color, // DPL override for text
+        }}
+      >
+        <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" title={data.label}>
+          {data.label || 'Switch'}
+        </p>
+        
+        {/* Icon color will be inherited or overridden by DPL */}
+        <SwitchIcon size={30} className={`flex-grow transition-colors`} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} />
 
-      <p className="text-[10px] font-semibold" style={{ color: derivedNodeStyles.color || statusStyles.main }}>
-        {isOn ? 'ON' : 'OFF'}
-      </p>
+        <p className="text-[10px] font-semibold">
+          {isOn ? 'ON' : 'OFF'}
+        </p>
+      </div>
     </motion.div>
   );
 };

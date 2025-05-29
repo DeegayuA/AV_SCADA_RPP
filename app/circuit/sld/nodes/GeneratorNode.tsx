@@ -1,5 +1,5 @@
 // components/sld/nodes/GeneratorNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position, Node } from 'reactflow'; // Added Node type
 import { motion } from 'framer-motion';
 import { GeneratorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -126,53 +126,66 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generator
 
   // Merge styles: derivedNodeStyles override class-based styles
   const componentStyle: React.CSSProperties = {
-    borderColor: derivedNodeStyles.borderColor,
-    backgroundColor: derivedNodeStyles.backgroundColor,
-    color: derivedNodeStyles.color, 
+    // Border color is applied to the outer div if derived, otherwise class handles it.
+    borderColor: derivedNodeStyles.borderColor || undefined,
+    // Background and color are primarily for the inner content wrapper.
+    // Opacity can be for the outer div.
+    opacity: derivedNodeStyles.opacity || undefined,
   };
+  // Text and BG colors for the inner wrapper, derived or from status.
+  const contentBgColor = derivedNodeStyles.backgroundColor || statusClasses.split(' ')[1];
+  const contentTextColor = derivedNodeStyles.color || statusClasses.split(' ')[2];
+
+
   const mainDivClasses = `
-    sld-node generator-node group w-[85px] h-[90px] rounded-lg shadow-lg
-    flex flex-col items-center justify-between p-2
+    sld-node generator-node group custom-node-hover w-[85px] h-[90px] rounded-lg shadow-lg
+    flex flex-col items-center justify-between /* p-2 removed, moved to content wrapper */
     border-2 ${derivedNodeStyles.borderColor ? '' : statusClasses.split(' ')[0]} 
-    ${derivedNodeStyles.backgroundColor ? '' : statusClasses.split(' ')[1]}
-    ${derivedNodeStyles.color ? '' : statusClasses.split(' ')[2]}
-    bg-card dark:bg-neutral-800
-    transition-all duration-150
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-    ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
+    /* bg-card and specific status bg/text classes removed, moved to content wrapper */
+    /* transition-all duration-150 is part of custom-node-hover */
+    /* selected ring styles removed */
+    ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+    /* hover:shadow-xl removed */
     ${animationClass && !isGeneratorRunning ? animationClass : ''} 
   `;
-  // Apply main animationClass (like pulse for running) to the whole node if not using individual SVG spin for running.
-  // Or, remove 'animate-pulse' from statusClasses for 'running' if GeneratorSymbolSVG handles its own spinning.
-  // For this example, let's assume GeneratorSymbolSVG's spin is the primary "running" animation.
-  // So, we remove 'animate-pulse' from statusClasses if it was there for running state.
-  // And the mainDivClasses will use `animationClass` only for non-running transitional states like starting/stopping.
+  // animationClass for starting/stopping on the main div is fine.
+  // Running animation is on the SVG.
+  
+  const iconColorClass = derivedNodeStyles.color ? '' : statusClasses.split(' ')[2]; // This will be used for the SVG if no DPL color.
 
-  const iconColorClass = derivedNodeStyles.color ? '' : statusClasses.split(' ')[2];
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
 
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   return (
     <motion.div
       className={mainDivClasses}
-      style={componentStyle}
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={componentStyle} // Applies borderColor and opacity from derivedNodeStyles
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, // Add the required id property
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
+                id, type, // Added type
+                position: { x: xPos, y: yPos }, 
+                data, selected, dragging, zIndex, 
                 width: width === null ? undefined : width, 
                 height: height === null ? undefined : height, 
                 connectable: isConnectable,
@@ -185,26 +198,41 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generator
         </Button>
       )}
 
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Output"/>
-      <Handle type="target" position={Position.Top} id="top_control_in" isConnectable={isConnectable} className="!w-2.5 !h-2.5 sld-handle-style !bg-purple-400 !border-purple-500" title="Control/Fuel"/>
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" title="Output"/>
+      <Handle type="target" position={Position.Top} id="top_control_in" isConnectable={isConnectable} className="sld-handle-style" title="Control/Fuel"/> {/* Removed specific color and size */}
 
-      <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
-        {data.label}
-      </p>
-      
-      <div className="my-0.5 pointer-events-none">
-        <GeneratorSymbolSVG className={`transition-colors ${iconColorClass}`} isSpinning={isGeneratorRunning} />
-      </div>
-      
-      <div className="flex items-center justify-center gap-1 mt-0.5" style={{ color: derivedNodeStyles.color }}>
-        <StatusIcon size={10} className={`${iconColorClass} ${animationClass && (StatusIcon === CogIcon || StatusIcon === XCircleIcon || StatusIcon === AlertTriangleIcon || StatusIcon === PowerIcon) ? animationClass : ''}`} />
-        <p className={`text-[9px] font-medium text-center truncate leading-tight ${iconColorClass}`}>
-          {statusText}
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div
+        className={`node-content-wrapper flex flex-col items-center justify-between p-2 w-full h-full rounded-md
+                    ${contentBgColor} ${contentTextColor}
+                    bg-card dark:bg-neutral-800
+                    ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
+        style={{
+          backgroundColor: derivedNodeStyles.backgroundColor || undefined, // DPL takes precedence
+          color: derivedNodeStyles.color || undefined, // DPL takes precedence
+        }}
+      >
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label}
+        </p>
+        
+        <div className="my-0.5 pointer-events-none">
+          {/* SVG color will be inherited from parent (node-content-wrapper) */}
+          <GeneratorSymbolSVG className="transition-colors" isSpinning={isGeneratorRunning} />
+        </div>
+        
+        <div className="flex items-center justify-center gap-1 mt-0.5">
+          {/* StatusIcon color will be inherited. Animation class for cog/warning icons. */}
+          <StatusIcon size={10} className={`${animationClass && (StatusIcon === CogIcon || StatusIcon === XCircleIcon || StatusIcon === AlertTriangleIcon || StatusIcon === PowerIcon) ? animationClass : ''}`} />
+          <p className="text-[9px] font-medium text-center truncate leading-tight">
+            {statusText}
+          </p>
+        </div>
+        <p className="text-[9px] leading-none" title={`Power: ${powerOutput}`}>
+            {powerOutput}
         </p>
       </div>
-      <p className={`text-[9px] leading-none ${derivedNodeStyles.color ? '' : 'text-muted-foreground/90'}`} title={`Power: ${powerOutput}`}>
-          {powerOutput}
-      </p>
     </motion.div>
   );
 };

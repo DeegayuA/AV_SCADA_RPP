@@ -1,5 +1,5 @@
 // components/sld/nodes/GenericDeviceNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { GenericDeviceNodeData, CustomNodeType, DataPoint } from '@/types/sld'; // Added CustomNodeType, DataPoint
@@ -67,37 +67,47 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
   
   const deviceTypeDisplay = data.config?.deviceType || 'Device';
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(data.status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== data.status) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = data.status;
+      return () => clearTimeout(timer);
+    }
+  }, [data.status]);
+
   return (
     <motion.div
       className={`
-        sld-node generic-device-node group w-[90px] h-[95px] rounded-lg shadow-md 
-        flex flex-col items-center justify-start p-1.5 
-        border-2 ${styleClasses}
-        bg-card dark:bg-neutral-800 
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+        sld-node generic-device-node group custom-node-hover w-[90px] h-[95px] rounded-lg shadow-md 
+        flex flex-col items-center justify-start /* p-1.5 removed, moved to content wrapper */
+        border-2 ${styleClasses.split(' ').filter(c => c.startsWith('border-')).join(' ')} /* Keep only border from styleClasses */
+        /* bg-card and specific bg-* from styleClasses removed, moved to content wrapper */
+        /* transition-all duration-150 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        /* hover:shadow-lg removed */
       `}
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Construct position from xPos and yPos
-                data, 
-                selected, 
-                dragging, 
-                zIndex,
-                connectable: isConnectable,
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data, selected, dragging, zIndex, connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -107,33 +117,41 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
         </Button>
       )}
 
-      {/* Generic devices often have both input and output */}
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Input"/>
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Output"/>
-      {/* Optional side handles if it's a passthrough or branching device */}
-      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style !-ml-1.5" title="Side Input"/>
-      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style !-mr-1.5" title="Side Output"/>
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" title="Input"/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" title="Output"/>
+      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="sld-handle-style !-ml-1.5" title="Side Input"/>
+      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="sld-handle-style !-mr-1.5" title="Side Output"/>
 
-      <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
-        {data.label}
-      </p>
-      
-      <StatusIcon size={20} className="my-0.5 transition-colors" /> {/* Adjusted icon size slightly */}
-      
-      <p className="text-[8px] text-muted-foreground text-center truncate w-full leading-tight mb-0.5" title={deviceTypeDisplay}>
-        {deviceTypeDisplay}
-      </p>
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div className={`
+          node-content-wrapper flex flex-col items-center justify-start p-1.5 w-full h-full rounded-md
+          ${styleClasses.split(' ').filter(c => !c.startsWith('border-')).join(' ')} /* Keep bg and text from styleClasses */
+          bg-card dark:bg-neutral-800 /* Base background if no status bgClass */
+          ${isRecentStatusChange ? 'animate-status-highlight' : ''}
+        `}
+      >
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label}
+        </p>
+        
+        <StatusIcon size={20} className="my-0.5 transition-colors" /> 
+        
+        <p className="text-[8px] text-muted-foreground text-center truncate w-full leading-tight mb-0.5" title={deviceTypeDisplay}>
+          {deviceTypeDisplay}
+        </p>
 
-      {linkedDataValues.length > 0 && (
-        <div className="data-display-area mt-0.5 w-full text-left text-[7px] overflow-y-auto max-h-[26px] px-0.5">
-          {linkedDataValues.map(item => (
-            <div key={item.key} className="flex justify-between items-center leading-tight">
-              <span className="truncate flex-1 mr-0.5" title={item.label}>{item.label}:</span>
-              <span className="font-semibold truncate max-w-[50%]" title={item.value}>{item.value}</span>
-            </div>
-          ))}
-        </div>
-      )}
+        {linkedDataValues.length > 0 && (
+          <div className="data-display-area mt-0.5 w-full text-left text-[7px] overflow-y-auto max-h-[26px] px-0.5">
+            {linkedDataValues.map(item => (
+              <div key={item.key} className="flex justify-between items-center leading-tight">
+                <span className="truncate flex-1 mr-0.5" title={item.label}>{item.label}:</span>
+                <span className="font-semibold truncate max-w-[50%]" title={item.value}>{item.value}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </motion.div>
   );
 };

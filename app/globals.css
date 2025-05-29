@@ -365,15 +365,65 @@
   }
 }
 .sld-handle-style {
-  @apply !opacity-0 group-hover:!opacity-100 transition-opacity duration-150 ease-in-out;
-  /* Default colors can be set here, but specific node handles override them */
-  /* e.g. @apply !bg-slate-300 dark:!bg-slate-600 !border-slate-400 dark:!border-slate-500; */
+  @apply !w-3.5 !h-3.5 !opacity-0 group-hover:!opacity-100 
+         !bg-primary/80 !border-primary-foreground/30 dark:!bg-primary dark:!border-slate-700 
+         transition-all duration-150 ease-in-out !rounded-sm !border;
+  /* Ensure high specificity if needed, or that these are not overridden by default handle styles */
 }
 .reactflow-node.selected .sld-handle-style,
-.reactflow-node:focus .sld-handle-style, /* if you make nodes focusable */
-.reactflow-node:focus-within .sld-handle-style { /* if elements inside node are focused */
-    @apply !opacity-80; /* Make handles more visible on selected/focused node */
+.reactflow-node:focus .sld-handle-style, 
+.reactflow-node:focus-within .sld-handle-style {
+    @apply !opacity-100 !bg-primary !border-primary-foreground/50; /* More visible on selected/focused node */
 }
+
+/* Custom Node Hover Effect - to be applied to node wrappers */
+.custom-node-hover {
+  @apply transition-all duration-150 ease-in-out;
+}
+.custom-node-hover:hover {
+   /* Using a brighter shadow for hover */
+  box-shadow: 0 0 10px 3px hsla(var(--primary), 0.4); /* Using hsla for direct primary color with alpha */
+  /* border-color: hsl(var(--accent)); /* Optional: change border color on hover */
+}
+
+/* Custom Node Selection Style - applied to the wrapper inside .reactflow-node.selected */
+/* Assumes node components will have an inner div with class like 'node-content-wrapper' */
+.node-content-wrapper { /* Base style for node content wrappers */
+  @apply transition-colors duration-200 ease-in-out;
+}
+
+.reactflow-node.selected .node-content-wrapper {
+  @apply !border-2 !border-primary;
+  box-shadow: 0 0 12px 4px hsla(var(--primary), 0.5); /* Using hsla for direct primary color with alpha */
+}
+/* Fallback if node-content-wrapper is not consistently used, style .react-flow__node-default itself */
+/* This might be too broad, so prefer the .node-content-wrapper approach */
+.react-flow__node-default.selected, .react-flow__node-custom.selected {
+    /* Example: if you want to ensure the selection is visible directly on the node element provided by React Flow */
+    /* box-shadow: 0 0 12px 4px hsla(var(--primary), 0.6); */
+}
+
+/* Animation for status change highlight */
+@keyframes status-change-highlight {
+  0% { 
+    box-shadow: 0 0 0px 0px hsla(var(--primary), 0.1);
+    /* Optional: Slightly different border to indicate change */
+    /* border-color: hsla(var(--primary), 0.5); */
+  }
+  50% { 
+    box-shadow: 0 0 10px 3px hsla(var(--primary), 0.3); 
+    /* border-color: hsla(var(--primary), 0.8); */
+  }
+  100% { 
+    box-shadow: 0 0 0px 0px hsla(var(--primary), 0.1);
+    /* border-color: hsla(var(--primary), 0.5); */ /* Or back to original if it was changed */
+  }
+}
+
+.animate-status-highlight {
+  animation: status-change-highlight 0.7s ease-out;
+}
+
 
 @keyframes dashdraw {
   to {
@@ -382,13 +432,20 @@
 }
 
 @keyframes faultPulse {
-  0%, 100% { opacity: 1; /* stroke-width can also be animated */ }
-  50% { opacity: 0.6; /* stroke-width: calc(var(--base-stroke-width) + 1px); */ }
+  0%, 100% { 
+    opacity: 1; 
+    stroke-width: var(--base-stroke-width); 
+  }
+  50% { 
+    opacity: 0.3; 
+    stroke-width: calc(var(--base-stroke-width) + 1.5px); 
+  }
 }
 
 @keyframes subtlePulse {
-  0%, 100% { opacity: 0.8; }
+  0%, 100% { opacity: 0.65; }
   50% { opacity: 1; }
+  /* animation-timing-function: ease-in-out; /* This is set in JS, but can be here for reference */
 }
 
 /* In your global CSS (e.g., app/globals.css) */

@@ -1,5 +1,5 @@
 // components/sld/nodes/PanelNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { PanelNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -119,124 +119,119 @@ const PanelNode: React.FC<ExtendedNodeProps> = (props) => {
     color: derivedNodeStyles.color || undefined, // Let className handle
   };
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
+
 
   return (
     <motion.div
       className={`
-        sld-node panel-node group w-[100px] h-[60px] rounded-lg shadow-lg
-        flex flex-col items-center justify-center p-1 
-        border-2 relative 
-        bg-card dark:bg-neutral-800 
-        transition-all duration-200 ease-in-out
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-neutral-900 shadow-primary/30' : 
-          selected ? 'ring-1 ring-accent ring-offset-1 dark:ring-offset-neutral-900 shadow-accent/20' : 
-          'hover:shadow-md'} 
+        sld-node panel-node group custom-node-hover w-[100px] h-[60px] rounded-lg shadow-lg
+        flex flex-col items-center justify-center relative 
+        border-2 
         ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-        ${statusClasses} 
+        ${statusClasses.split(' ').filter(c => c.startsWith('border-')).join(' ')} /* Keep only border from statusClasses */
+        bg-card dark:bg-neutral-800 /* Base background, specific bg moved to wrapper */
       `}
-      style={componentStyle}
-      variants={{ 
-        hover: { 
-          scale: isNodeEditable ? 1.04 : 1, 
-          boxShadow: isNodeEditable ? "0px 5px 15px rgba(0,0,0,0.1)" : "0px 2px 8px rgba(0,0,0,0.07)" 
-        }, 
-        initial: { scale: 1 } 
-      }}
-      whileHover="hover"
+      // Removed transition-all, hover:shadow-md, selected ring/shadow from here.
+      // componentStyle will apply derived styles. statusClasses for border is applied.
+      style={componentStyle} 
+      // variants for framer-motion hover scale effect (subtle)
+      variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }}
+      // whileHover="hover" // Let CSS handle hover effects via custom-node-hover
       initial="initial"
-      transition={{ type: 'spring', stiffness: 350, damping: 12 }}
+      transition={{ type: 'spring', stiffness: 400, damping: 15 }}
     >
-      {!isEditMode && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos ?? 0, y: yPos ?? 0 }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                width, 
-                height, 
-                connectable: isConnectable,
-            };
-            setSelectedElementForDetails(fullNodeObject);
-          }}
-          title="View Details"
-        >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
-        </Button>
-      )}
-
-      {/* --- TOP HANDLE (TARGET - INPUT) --- */}
+      {/* Handles are outside the node-content-wrapper */}
       <Handle
         type="target" 
         position={Position.Top}
-        id="top_in" // Unique ID for this handle on the node
+        id="top_in"
         isConnectable={isConnectable}
-        className={`
-          !w-3 !h-3 !-translate-y-1/2 !rounded-full
-          !bg-slate-300 dark:!bg-slate-600 
-          border-2 !border-slate-400 dark:!border-slate-500
-          group-hover:!opacity-100 group-hover:!bg-sky-500 dark:group-hover:!bg-sky-400 group-hover:!border-sky-600 dark:group-hover:!border-sky-500
-          transition-all duration-150 ease-in-out
-          ${isNodeEditable && selected ? '!opacity-100 !bg-sky-400' : !isNodeEditable ? '!opacity-30' : '!opacity-0'} 
-          react-flow__handle-common 
-        `}
+        className="!w-3 !h-3 !-translate-y-1/2 !rounded-full react-flow__handle-common sld-handle-style"
         title="DC Input (Optional)"
       />
-
-      {/* --- BOTTOM HANDLE (SOURCE - OUTPUT) --- */}
       <Handle
         type="source"
         position={Position.Bottom}
-        id="bottom_out" // Unique ID for this handle on the node
+        id="bottom_out"
         isConnectable={isConnectable}
-        className={`
-          !w-3 !h-3 !translate-y-1/2 !rounded-full
-          !bg-slate-300 dark:!bg-slate-600 
-          border-2 !border-slate-400 dark:!border-slate-500
-          group-hover:!opacity-100 group-hover:!bg-amber-500 dark:group-hover:!bg-amber-400 group-hover:!border-amber-600 dark:group-hover:!border-amber-500
-          transition-all duration-150 ease-in-out
-           ${isNodeEditable && selected ? '!opacity-100 !bg-amber-400' : !isNodeEditable ? '!opacity-30' : '!opacity-0'}
-          react-flow__handle-common
-        `}
+        className="!w-3 !h-3 !translate-y-1/2 !rounded-full react-flow__handle-common sld-handle-style"
         title="DC Output"
       />
 
-      {/* Node Visual Content */}
-      <div className="flex flex-col items-center justify-center w-full h-full pointer-events-none">
-        <motion.div
-          animate={isProducing && StatusIcon === SunIcon ? { scale: [1, 1.1, 1], opacity: [1, 0.8, 1] } : {}}
-          transition={isProducing && StatusIcon === SunIcon ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
-        >
-          <StatusIcon 
-              size={22} 
-              className={`mb-0.5 transition-colors duration-300 ${iconColor}`} 
-          />
-        </motion.div>
-        <p 
-          className="text-[9px] font-medium leading-tight text-center truncate w-[90%]" 
-          title={`Status: ${processedStatus}`}
-          style={{ color: 'inherit' }}
-        >
-          {String(processedStatus).toUpperCase()}
-        </p>
-        <p 
-          className="text-[10px] font-semibold leading-tight text-center truncate w-[90%]" 
-          title={data.label}
-          style={{ color: 'inherit' }} // Inherit color from statusClasses or derivedNodeStyles.color
-        >
-          {data.label}
-        </p>
-        <p className="text-[9px] leading-none" style={{ color: 'inherit' }} title={`Power: ${powerOutput}`}>
-            {powerOutput}
-        </p>
+      {/* node-content-wrapper for selection styles and specific background */}
+      <div className={`
+          node-content-wrapper flex flex-col items-center justify-center w-full h-full p-1 rounded-md
+          ${statusClasses.split(' ').filter(c => c.startsWith('bg-') || c.startsWith('text-')).join(' ')} /* Keep bg and text from statusClasses */
+          ${isRecentStatusChange ? 'animate-status-highlight' : ''}
+        `}
+      >
+        {!isEditMode && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+            onClick={(e) => {
+              e.stopPropagation();
+              const fullNodeObject: CustomNodeType = {
+                  id, 
+                  type, 
+                  position: { x: xPos ?? 0, y: yPos ?? 0 },
+                  data, 
+                  selected, 
+                  dragging, 
+                  zIndex, 
+                  width, 
+                  height, 
+                  connectable: isConnectable,
+              };
+              setSelectedElementForDetails(fullNodeObject);
+            }}
+            title="View Details"
+          >
+            <InfoIcon className="h-3 w-3 text-primary/80" />
+          </Button>
+        )}
+
+        {/* Node Visual Content - pointer-events-none ensures group-hover on parent works */}
+        <div className="flex flex-col items-center justify-center w-full h-full pointer-events-none">
+          <motion.div
+            animate={isProducing && StatusIcon === SunIcon ? { scale: [1, 1.1, 1], opacity: [1, 0.8, 1] } : {}}
+            transition={isProducing && StatusIcon === SunIcon ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
+          >
+            <StatusIcon 
+                size={22} 
+                className={`mb-0.5 transition-colors duration-300 ${iconColor}`} 
+            />
+          </motion.div>
+          <p 
+            className="text-[9px] font-medium leading-tight text-center truncate w-[90%]" 
+            title={`Status: ${processedStatus}`}
+            style={{ color: 'inherit' }} // Inherits from node-content-wrapper's text-* or derivedNodeStyles.color
+          >
+            {String(processedStatus).toUpperCase()}
+          </p>
+          <p 
+            className="text-[10px] font-semibold leading-tight text-center truncate w-[90%]" 
+            title={data.label}
+            style={{ color: 'inherit' }} 
+          >
+            {data.label}
+          </p>
+          <p className="text-[9px] leading-none" style={{ color: 'inherit' }} title={`Power: ${powerOutput}`}>
+              {powerOutput}
+          </p>
+        </div>
       </div>
     </motion.div>
   );
