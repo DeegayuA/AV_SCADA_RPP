@@ -64,6 +64,7 @@ interface SLDActions {
   setCurrentUser: (user: User | null) => void;
   logout: () => void;
   setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) => void; // Added action
+  updateNodeConfig: (nodeId: string, config: any, data?: any) => void;
 }
 
 const onRehydrateStorageCallback = (
@@ -161,7 +162,17 @@ export const useAppStore = create<AppState & SLDActions>()(
 
       setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) =>
         set({ selectedElementForDetails: element }),
-        
+      
+      updateNodeConfig: (nodeId: string, config: any, data?: any) => {
+        // Implementation of updateNodeConfig
+        // You need to implement this method according to your requirements
+        console.log('Updating node config for', nodeId, config, data);
+        // Example implementation - update with actual logic as needed
+        set((state) => {
+          // Update logic here - this is just a placeholder
+          return state;
+        });
+      },
     }),
     {
       name: 'app-user-session-storage', // More specific name
