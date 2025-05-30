@@ -221,32 +221,34 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
             onUpdateNodeText={handleTextUpdate}   
             isEditMode={isEditMode} 
           >
-            {NodeContentWithAnimation} {/* Use updated NodeContent */}
+            {NodeContentWithAnimation}
           </TextLabelConfigPopover>
         ) : (
-          NodeContentWithAnimation // Render DataLabelNode content directly
-      )}
-      {/* Info button for DataLabel */}
-      {!isEditMode && (
-        <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-            style={{top: '2px', right: '2px'}}
-            onClick={(e) => {
-                const nodeObjectForDetailView = {
-                    id, type, data, selected: !!selected, dragging: !!dragging, zIndex: zIndex || 0,
-                    position: position, 
-                    connectable: isConnectable,
-                } as unknown as CustomNodeType;
-                setSelectedElementForDetails(nodeObjectForDetailView);
-                e.stopPropagation();
-            }}
-            title="View Details"
-        >
-            <InfoIcon className="h-3 w-3 text-primary/80" />
-        </Button>
-      )}
+          <div className="relative">
+            {NodeContentWithAnimation} {/* Render DataLabelNode content directly */}
+            {/* Info button for DataLabel */}
+            {!isEditMode && (
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+                  style={{top: '2px', right: '2px'}}
+                  onClick={(e) => {
+                      const nodeObjectForDetailView = {
+                          id, type, data, selected: !!selected, dragging: !!dragging, zIndex: zIndex || 0,
+                          position: position, 
+                          connectable: isConnectable,
+                      } as unknown as CustomNodeType;
+                      setSelectedElementForDetails(nodeObjectForDetailView);
+                      e.stopPropagation();
+                  }}
+                  title="View Details"
+              >
+                  <InfoIcon className="h-3 w-3 text-primary/80" />
+              </Button>
+              )}
+            </div>
+        )}
     </>
   );
 };
