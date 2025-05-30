@@ -76,80 +76,125 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
 
         ws.on("message", async (message) => {
             const messageString = message.toString();
-            console.log("Received message from client:", messageString);
-            let dataToWrite: Record<string, any>;
+            // console.log("Received message from client:", messageString);
+            let parsedMessage: any;
+
             try {
-                dataToWrite = JSON.parse(messageString);
-                if (typeof dataToWrite !== 'object' || dataToWrite === null || Object.keys(dataToWrite).length !== 1) {
-                    throw new Error("Invalid message format. Expected object with one key-value pair.");
+                parsedMessage = JSON.parse(messageString);
+                if (typeof parsedMessage !== 'object' || parsedMessage === null) {
+                    throw new Error("Invalid message format. Expected a JSON object.");
                 }
             } catch (parseError) {
                 console.error("Failed to parse message from client:", messageString, parseError);
-                sendStatusToClient(ws, 'error', 'unknown', 'Invalid message format received.');
+                // Consider sending a generic parse error back to client if needed
+                // ws.send(JSON.stringify({ status: 'error', error: 'Invalid JSON message' }));
                 return;
             }
-            const nodeId = Object.keys(dataToWrite)[0];
-            const value = dataToWrite[nodeId];
 
-            // Corrected check: Rely on session and client existence
-            if (!opcuaClient || !opcuaSession) {
-                console.error(`Cannot write to OPC UA: No active client or session for Node ID ${nodeId}.`);
-                sendStatusToClient(ws, 'error', nodeId, 'OPC UA session not active or client disconnected.');
-                // Corrected check for attempting reconnect
-                if (!isConnectingOpcua && (!opcuaClient || !opcuaSession)) {
-                    attemptReconnect("write_attempt_no_session_or_client");
+            // Check for the new message type from ImportBackupDialogContent
+            if (parsedMessage.type === 'save-sld-widget-layout' && parsedMessage.payload) {
+                const { key, layout } = parsedMessage.payload;
+                console.log(`Received SLD layout save request for key: ${key}`);
+                // TODO: Implement the actual saving logic for SLD layout here
+                // This could involve:
+                // 1. Saving to a database (PostgreSQL, MongoDB, etc.)
+                // 2. Saving to a file on the server (less ideal for Vercel ephemeral filesystem)
+                // 3. Storing in a persistent key-value store (Redis, Vercel KV store, etc.)
+                // For now, let's just acknowledge it and send a confirmation/error.
+
+                try {
+                    // ---- SIMULATE SAVING LOGIC ----
+                    // Example: You might have a function `saveLayoutToPersistentStore(key, layout)`
+                    console.log(`Pretending to save SLD layout for key: ${key}`);
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate async save
+                    // ---------------------------------
+
+                    // Send a confirmation back to the client
+                    ws.send(JSON.stringify({
+                        type: 'layout-saved-confirmation',
+                        payload: { key, message: 'SLD Layout saved successfully server-side.' }
+                    }));
+                } catch (saveError: any) {
+                    console.error(`Error saving SLD layout for key ${key}:`, saveError);
+                    ws.send(JSON.stringify({
+                        type: 'layout-save-error',
+                        payload: { key, error: `Failed to save SLD layout: ${saveError.message}` }
+                    }));
                 }
-                return;
+                return; // Handled this message type, so exit
             }
 
-            const dataPointConfig = dataPoints.find(dp => dp.nodeId === nodeId);
-            if (!dataPointConfig) {
-                console.error(`Received write request for unknown or unconfigured Node ID: ${nodeId}`);
-                sendStatusToClient(ws, 'error', nodeId, 'Node ID not configured for writing.');
-                return;
-            }
+            // Original OPC UA write logic (now as an else-if or default case)
+            // Let's assume if it's not 'save-sld-widget-layout', it's an OPC UA write attempt
+            // This also means a message like {"someNodeId": value} will be processed here.
+            if (Object.keys(parsedMessage).length === 1) {
+                const nodeId = Object.keys(parsedMessage)[0];
+                const value = parsedMessage[nodeId];
 
-            let opcuaDataType: DataType;
-            switch (dataPointConfig.dataType) {
-                case 'Boolean': opcuaDataType = DataType.Boolean; break;
-                case 'Float': opcuaDataType = DataType.Double; break;
-                case 'Int16': opcuaDataType = DataType.Int16; break;
-                default:
-                    console.error(`Unsupported data type '${dataPointConfig.dataType}' for writing to ${nodeId}`);
-                    sendStatusToClient(ws, 'error', nodeId, `Unsupported dataType: ${dataPointConfig.dataType}`);
+                if (!opcuaClient || !opcuaSession) {
+                    console.error(`Cannot write to OPC UA: No active client or session for Node ID ${nodeId}.`);
+                    sendStatusToClient(ws, 'error', nodeId, 'OPC UA session not active or client disconnected.');
+                    if (!isConnectingOpcua && (!opcuaClient || !opcuaSession)) {
+                        attemptReconnect("write_attempt_no_session_or_client");
+                    }
                     return;
-            }
-            const nodeToWrite = { nodeId, attributeId: AttributeIds.Value, value: new DataValue({ value: { dataType: opcuaDataType, value } }) };
-            try {
-                console.log(`Attempting to write to Node ID ${nodeId} with value:`, value);
-                const statusCode = await opcuaSession.write(nodeToWrite);
-                if (statusCode.isGood()) {
-                    console.log(`Successfully wrote value ${value} to Node ID ${nodeId}`);
-                    sendStatusToClient(ws, 'success', nodeId);
-                    const immediateUpdate: Record<string, any> = {};
-                    const factor = dataPointConfig.factor ?? 1;
-                    let displayValue = value;
-                    if (typeof value === 'number') {
-                        // Ensure DataPoint type in config/dataPoints.ts includes decimalPlaces?: number;
-                        const decimalPlaces = dataPointConfig.decimalPlaces ?? 2;
-                        displayValue = !Number.isInteger(value * factor) ? parseFloat((value * factor).toFixed(decimalPlaces)) : value * factor;
-                    }
+                }
 
-                    if (nodeDataCache[nodeId] !== displayValue) {
-                        nodeDataCache[nodeId] = displayValue;
-                        immediateUpdate[nodeId] = displayValue;
-                        broadcast(JSON.stringify(immediateUpdate));
+                const dataPointConfig = dataPoints.find(dp => dp.nodeId === nodeId);
+                if (!dataPointConfig) {
+                    console.error(`Received write request for unknown or unconfigured Node ID: ${nodeId}`);
+                    sendStatusToClient(ws, 'error', nodeId, 'Node ID not configured for writing.');
+                    return;
+                }
+
+                let opcuaDataType: DataType;
+                switch (dataPointConfig.dataType) {
+                    case 'Boolean': opcuaDataType = DataType.Boolean; break;
+                    case 'Float': opcuaDataType = DataType.Double; break; // Or DataType.Float
+                    case 'Int16': opcuaDataType = DataType.Int16; break;
+                    // Add other types as needed
+                    default:
+                        console.error(`Unsupported data type '${dataPointConfig.dataType}' for writing to ${nodeId}`);
+                        sendStatusToClient(ws, 'error', nodeId, `Unsupported dataType: ${dataPointConfig.dataType}`);
+                        return;
+                }
+                const nodeToWrite = { nodeId, attributeId: AttributeIds.Value, value: new DataValue({ value: { dataType: opcuaDataType, value } }) };
+                try {
+                    console.log(`Attempting to write to Node ID ${nodeId} with value:`, value);
+                    const statusCode = await opcuaSession.write(nodeToWrite);
+                    if (statusCode.isGood()) {
+                        console.log(`Successfully wrote value ${value} to Node ID ${nodeId}`);
+                        sendStatusToClient(ws, 'success', nodeId);
+
+                        // Immediately update local cache and broadcast if successful
+                        const immediateUpdate: Record<string, any> = {};
+                        const factor = dataPointConfig.factor ?? 1;
+                        let displayValue = value;
+                         if (typeof value === 'number') {
+                             const decimalPlaces = dataPointConfig.decimalPlaces ?? 2; // Ensure this prop exists on DataPoint
+                             displayValue = !Number.isInteger(value * factor) ? parseFloat((value * factor).toFixed(decimalPlaces)) : value * factor;
+                         }
+
+                        if (nodeDataCache[nodeId] !== displayValue) {
+                            nodeDataCache[nodeId] = displayValue;
+                            immediateUpdate[nodeId] = displayValue;
+                            broadcast(JSON.stringify(immediateUpdate));
+                        }
+                    } else {
+                        console.error(`Failed to write to Node ID ${nodeId}. Status: ${statusCode.toString()}`);
+                        sendStatusToClient(ws, 'error', nodeId, `OPC UA write failed: ${statusCode.toString()}`);
                     }
-                } else {
-                    console.error(`Failed to write to Node ID ${nodeId}. Status: ${statusCode.toString()}`);
-                    sendStatusToClient(ws, 'error', nodeId, `OPC UA write failed: ${statusCode.toString()}`);
+                } catch (writeError: any) {
+                    console.error(`Error during OPC UA write for ${nodeId}:`, writeError);
+                    sendStatusToClient(ws, 'error', nodeId, `OPC UA write error: ${writeError?.message || 'Unknown'}`);
+                    if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
+                        opcuaSession = null; stopDataPolling(); attemptReconnect("write_error_session_lost");
+                    }
                 }
-            } catch (writeError: any) {
-                console.error(`Error during OPC UA write for ${nodeId}:`, writeError);
-                sendStatusToClient(ws, 'error', nodeId, `OPC UA write error: ${writeError?.message || 'Unknown'}`);
-                if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
-                    opcuaSession = null; stopDataPolling(); attemptReconnect("write_error_session_lost");
-                }
+            } else {
+                // If the message is not 'save-sld-widget-layout' and doesn't have one key, it's an unhandled format
+                console.error("Received message in unhandled format:", parsedMessage);
+                 ws.send(JSON.stringify({ status: 'error', error: 'Unhandled message format on server.' }));
             }
         });
 

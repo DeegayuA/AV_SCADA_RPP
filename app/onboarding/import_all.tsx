@@ -98,6 +98,10 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
           description: message.payload.error,
         });
       }
+      // Add handling for generic error from server for unhandled message type if needed
+      else if (message.status === 'error' && message.error === 'Unhandled message format on server.') {
+          toast.error("Server Error", { description: "SLD layout message was not understood by the server." });
+      }
     }
   }, [lastJsonMessage, importStage]);
 

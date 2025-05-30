@@ -72,7 +72,7 @@ const DashboardHeader: React.FC<DashboardHeaderProps> = React.memo(
                         </TooltipProvider>
                     </div>
                     {/* Version Display */}
-                    <span className='font-mono'>v{version || '?.?.?'}</span>
+                    <span className='font-mono'>{version || '?.?.?'}</span>
                 </motion.div></>
         );
     }
