@@ -1,5 +1,5 @@
 // components/sld/nodes/GenericDeviceNode.tsx
-import React, { memo, useMemo, useState, useEffect } from 'react'; // Added useState, useEffect
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { GenericDeviceNodeData, CustomNodeType, DataPoint } from '@/types/sld'; // Added CustomNodeType, DataPoint
@@ -129,6 +129,18 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
   const deviceTypeDisplay = data.config?.deviceType || 'Device';
   const firmwareVersion = data.config?.firmwareVersion;
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(data.status);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== data.status) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = data.status;
+      return () => clearTimeout(timer);
+    }
+  }, [data.status]);
+
   return (
     <motion.div
       className={`
@@ -140,26 +152,23 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
         ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
         ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
       `}
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Construct position from xPos and yPos
-                data, 
-                selected, 
-                dragging, 
-                zIndex,
-                connectable: isConnectable,
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data, selected, dragging, zIndex, connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -168,7 +177,6 @@ const GenericDeviceNode: React.FC<NodeProps<GenericDeviceNodeData>> = (props) =>
           <InfoIcon className="h-3 w-3 text-primary/80" />
         </Button>
       )}
-
       {/* Generic devices often have both input and output */}
       <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Input"/>
       <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Output"/>

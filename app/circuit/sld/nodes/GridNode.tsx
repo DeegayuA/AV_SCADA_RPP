@@ -1,5 +1,5 @@
 // components/sld/nodes/GridNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { GridNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -88,45 +88,54 @@ const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => {
   }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, voltageOpcUaNodeId, reactiveVoltageValue, freqOpcUaNodeId, reactiveFreqValue, globalOpcUaNodeValues]);
 
   const mainDivClasses = `
-    sld-node grid-node group w-[120px] h-[60px] rounded-lg shadow-md
-    flex flex-col items-center justify-center p-2 
+    sld-node grid-node group custom-node-hover w-[120px] h-[60px] rounded-lg shadow-md
+    flex flex-col items-center justify-center /* p-2 removed, moved to content wrapper */
     border-2 ${derivedNodeStyles.borderColor ? '' : borderClass} 
-    ${derivedNodeStyles.backgroundColor ? '' : bgClass}
-    bg-card dark:bg-neutral-800 
-    transition-all duration-150
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-    ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+    /* specific bgClass, bg-card removed, moved to content wrapper */
+    /* transition-all duration-150 is part of custom-node-hover */
+    /* selected ring styles removed */
+    ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+    /* hover:shadow-lg removed */
   `;
-  const effectiveIconColor = derivedNodeStyles.color || iconColorClass;
-  const effectiveTextColor = derivedNodeStyles.color || textClass;
+  // effectiveIconColor and effectiveTextColor will be applied to the node-content-wrapper or inherited
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   return (
     <motion.div
       className={mainDivClasses}
-      style={derivedNodeStyles}
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={{
+        borderColor: derivedNodeStyles.borderColor || undefined,
+        opacity: derivedNodeStyles.opacity || undefined,
+        // backgroundColor and color are now primarily for the node-content-wrapper
+      }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                width, 
-                height, 
-                connectable: isConnectable,
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data, selected, dragging, zIndex, width, height, connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -136,22 +145,36 @@ const GridNode: React.FC<NodeProps<GridNodeData>> = (props) => {
         </Button>
       )}
 
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Grid Output"/>
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Grid Input (Bidirectional)"/>
-
-      <div className="flex items-center justify-center pointer-events-none">
-        <Icon size={22} className={`mr-2 transition-colors`} style={{color: effectiveIconColor}} />
-        {/* Optional second icon, e.g. for flow direction, could also be data-driven */}
-        { (processedStatus === 'online' || processedStatus === 'connected') && 
-            <ArrowDownToLineIcon size={18} className={`opacity-70 transition-colors`} style={{color: effectiveIconColor}} />
-        }
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" title="Grid Output"/>
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" title="Grid Input (Bidirectional)"/>
+      
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div
+        className={`node-content-wrapper flex flex-col items-center justify-center p-2 w-full h-full rounded-md
+                    ${derivedNodeStyles.backgroundColor ? '' : bgClass}
+                    ${derivedNodeStyles.color ? '' : textClass}
+                    bg-card dark:bg-neutral-800
+                    ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
+        style={{
+          backgroundColor: derivedNodeStyles.backgroundColor || undefined,
+          color: derivedNodeStyles.color || undefined, 
+        }}
+      >
+        <div className="flex items-center justify-center pointer-events-none">
+          {/* Icon color will be inherited from parent (node-content-wrapper) */}
+          <Icon size={22} className="mr-2 transition-colors" style={{ color: derivedNodeStyles.color || iconColorClass }} />
+          { (processedStatus === 'online' || processedStatus === 'connected') && 
+              <ArrowDownToLineIcon size={18} className="opacity-70 transition-colors" style={{ color: derivedNodeStyles.color || iconColorClass }} />
+          }
+        </div>
+        <p className="text-[10px] font-semibold text-center truncate w-full mt-1" title={data.label}>
+          {data.label}
+        </p>
+        <p className="text-[8px] leading-none" title={displayInfo}>
+          {displayInfo}
+        </p>
       </div>
-      <p className={`text-[10px] font-semibold text-center truncate w-full mt-1 ${effectiveTextColor}`} title={data.label}>
-        {data.label}
-      </p>
-      <p className={`text-[8px] leading-none ${effectiveTextColor}`} title={displayInfo}>
-        {displayInfo}
-      </p>
     </motion.div>
   );
 };

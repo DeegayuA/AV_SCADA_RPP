@@ -1,5 +1,5 @@
 // components/sld/nodes/BatteryNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { BatteryNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -108,37 +108,48 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedN
   // Icon color can be specifically set by derived styles or fallback to textClass
   const iconFinalColor = derivedNodeStyles.color || ''; // textClass will apply if this is empty
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
+
   return (
     <motion.div
       className={`
-        sld-node battery-node group w-[75px] h-[85px] rounded-xl shadow-lg
-        flex flex-col items-center justify-between p-2 
-        border-2 ${derivedNodeStyles.borderColor ? '' : borderClass} ${derivedNodeStyles.backgroundColor ? '' : bgClass}
-        bg-card dark:bg-neutral-800
-        transition-all duration-200
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-        ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
+        sld-node battery-node group custom-node-hover w-[75px] h-[85px] rounded-xl shadow-lg
+        flex flex-col items-center justify-between /* p-2 removed, moved to content wrapper */
+        border-2 ${derivedNodeStyles.borderColor ? '' : borderClass}
+        /* bg-card and specific bgClass removed, moved to content wrapper */
+        /* transition-all duration-200 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        /* hover:shadow-xl removed */
       `}
-      style={componentStyle}
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={{ borderColor: componentStyle.borderColor /* Keep only border related from componentStyle for outer */ }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data, selected, dragging, zIndex, 
                 width: width === null ? undefined : width, 
                 height: height === null ? undefined : height, 
                 connectable: isConnectable,
@@ -151,33 +162,46 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedN
         </Button>
       )}
 
-      {/* Handles */}
-      <Handle type="target" position={Position.Top} id="top_in_charge" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Charge Input"/>
-      <Handle type="source" position={Position.Bottom} id="bottom_out_discharge" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Discharge Output"/>
-      <Handle type="source" position={Position.Left} id="left_dc_bus" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style !-ml-1" title="DC Bus"/>
-      <Handle type="source" position={Position.Right} id="right_dc_bus" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style !-mr-1" title="DC Bus"/>
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="top_in_charge" isConnectable={isConnectable} className="sld-handle-style" title="Charge Input"/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out_discharge" isConnectable={isConnectable} className="sld-handle-style" title="Discharge Output"/>
+      <Handle type="source" position={Position.Left} id="left_dc_bus" isConnectable={isConnectable} className="sld-handle-style !-ml-1" title="DC Bus"/>
+      <Handle type="source" position={Position.Right} id="right_dc_bus" isConnectable={isConnectable} className="sld-handle-style !-mr-1" title="DC Bus"/>
 
-      <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : textClass}`} title={data.label}>
-        {data.label}
-      </p>
-      
-      <motion.div
-        animate={processedStatus === 'discharging' ? { opacity: [1, 0.7, 1] } : {}}
-        transition={processedStatus === 'discharging' ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div 
+        className={`node-content-wrapper flex flex-col items-center justify-between p-2 w-full h-full rounded-md /* Use rounded-md if outer is rounded-xl for slight inner curve */
+                    ${derivedNodeStyles.backgroundColor ? '' : bgClass} 
+                    ${derivedNodeStyles.color ? '' : textClass}
+                    bg-card dark:bg-neutral-800
+                    ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
+        style={{ 
+          backgroundColor: derivedNodeStyles.backgroundColor || undefined, // Explicitly set from DPL or let class apply
+          color: derivedNodeStyles.color || undefined, // Explicitly set from DPL or let class apply
+        }}
       >
-        <StatusIcon 
-          size={30} 
-          className={`my-1 transition-colors ${iconFinalColor ? '' : textClass} ${animationClass}`} 
-          style={{ color: iconFinalColor }} 
-        />
-      </motion.div>
-      
-      <p className={`text-[9px] font-medium text-center truncate w-full leading-tight ${derivedNodeStyles.color ? '' : textClass}`} title={`Status: ${processedStatus}`}>
-        {String(processedStatus).toUpperCase()}
-      </p>
-      <p className={`text-[10px] font-bold text-center ${derivedNodeStyles.color ? '' : textClass}`} title={`SOC: ${displaySoc}`}>
-        {displaySoc}
-      </p>
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label}
+        </p>
+        
+        <motion.div
+          animate={processedStatus === 'discharging' ? { opacity: [1, 0.7, 1] } : {}}
+          transition={processedStatus === 'discharging' ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
+        >
+          <StatusIcon 
+            size={30} 
+            className={`my-1 transition-colors ${animationClass}`} // textClass removed as it's on parent, iconFinalColor applied via style
+            style={{ color: iconFinalColor || undefined }} // Use iconFinalColor from componentStyle or let CSS inherit
+          />
+        </motion.div>
+        
+        <p className="text-[9px] font-medium text-center truncate w-full leading-tight" title={`Status: ${processedStatus}`}>
+          {String(processedStatus).toUpperCase()}
+        </p>
+        <p className="text-[10px] font-bold text-center" title={`SOC: ${displaySoc}`}>
+          {displaySoc}
+        </p>
+      </div>
     </motion.div>
   );
 };

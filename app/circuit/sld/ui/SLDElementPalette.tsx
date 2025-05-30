@@ -150,7 +150,39 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
 
     event.dataTransfer.setData('application/reactflow-palette-item', elementTypeString);
     event.dataTransfer.setData('application/reactflow-palette-data', JSON.stringify(nodeInitialData));
-    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.effectAllowed = 'move'; // Standard cursor hint
+
+    // Attempt to set grabbing cursor directly on the dragged element
+    const draggedElement = event.target as HTMLLIElement;
+    draggedElement.style.cursor = 'grabbing';
+
+    // Clone the element for setDragImage
+    const clone = draggedElement.cloneNode(true) as HTMLLIElement;
+    // Apply styles for the drag image
+    clone.style.position = 'absolute';
+    clone.style.top = '-9999px'; // Position off-screen to prevent flicker
+    clone.style.width = `${draggedElement.offsetWidth}px`;
+    clone.style.height = `${draggedElement.offsetHeight}px`;
+    clone.style.transform = 'scale(1.05)';
+    clone.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+    // Ensure background and padding are copied to avoid transparent or misaligned drag image
+    const computedStyle = getComputedStyle(draggedElement);
+    clone.style.backgroundColor = computedStyle.backgroundColor;
+    clone.style.padding = computedStyle.padding;
+    clone.style.margin = '0'; // Reset margin for the clone if any
+    clone.classList.add(...Array.from(draggedElement.classList)); // Copy classes for consistent styling
+
+    document.body.appendChild(clone);
+
+    // Set the drag image, using a slight offset to better position it under the cursor
+    event.dataTransfer.setDragImage(clone, 10, 10);
+
+    // Cleanup clone after a short delay to ensure it's used for drag image
+    // and reset cursor on original element
+    setTimeout(() => {
+      document.body.removeChild(clone);
+      draggedElement.style.cursor = 'grab'; // Reset cursor on original element
+    }, 0);
   };
 
   const allComponentOptions: ComboboxOption[] = useMemo(() => {
@@ -184,10 +216,16 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
           const elementNode = elementRefs.current[elementKey];
           elementNode?.scrollIntoView({ behavior: 'smooth', block: 'center' });
            if(elementNode){
-            elementNode.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'transition-all', 'duration-300');
+            // Enhanced temporary highlight: thicker ring, different offset, longer duration
+            elementNode.classList.add('ring-4', 'ring-primary/70', 'ring-offset-1', 'ring-offset-background', 'transition-all', 'duration-500', 'ease-out');
             setTimeout(() => {
-                elementNode.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
-            }, 2000);
+                elementNode.classList.remove('ring-4', 'ring-primary/70', 'ring-offset-1', 'ring-offset-background', 'ease-out');
+                // Ensure the persistent selection ring is re-asserted if it was removed by the above class changes
+                if (searchTerm === selectedElementType) {
+                    // Re-apply the standard selection ring
+                    elementNode.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background');
+                }
+            }, 2500); // Increased duration for visibility
            }
         }, 100);
       }
@@ -246,22 +284,27 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                         title={`Drag to add ${component.label}`}
                         className={`
                           group/palette-item cursor-grab p-2.5
-                          bg-card dark:bg-neutral-700/20
-                          shadow-sm hover:shadow-md dark:hover:shadow-neutral-900/50
+                          bg-card dark:bg-neutral-700/20 hover:bg-accent/50 dark:hover:bg-accent/40
+                          shadow-sm hover:shadow-lg dark:hover:shadow-black/20 dark:hover:shadow-neutral-900/60 
                           rounded-md
                           border border-border dark:border-neutral-700/50
-                          hover:border-primary/70 dark:hover:border-primary/70
+                          hover:border-primary/70 dark:hover:border-primary/80
                           text-center text-[11px] font-medium text-foreground/80 dark:text-neutral-300
                           flex flex-col items-center justify-center gap-1.5 min-h-[60px]
-                          transition-all duration-200 ease-out
-                          ${searchTerm === component.type ? 'ring-2 ring-primary ring-offset-1' : ''}
+                          transition-all duration-150 ease-in-out
+                          active:cursor-grabbing
+                          ${searchTerm === component.type ? 'ring-2 ring-primary ring-offset-2 ring-offset-background' : ''}
                         `}
                       >
-                        <motion.div // You can still use motion for internal layout or hover effects
-                           variants={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.98 } }}
-                           whileHover="hover"
-                           whileTap="tap"
-                           className="flex flex-col items-center justify-center gap-1.5 w-full h-full" // Ensure motion div fills the li
+                        {/* motion.div is kept for potential future use or if specific inner animations are desired,
+                            but primary hover/drag effects are now mostly CSS driven on the <li> */}
+                        <motion.div
+                           // Direct motion hover/tap scaling can be re-enabled if preferred over CSS effects or for combined effects.
+                           // For now, relying on CSS for hover scale via group-hover on parent <li>
+                           // variants={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.98 } }}
+                           // whileHover="hover"
+                           // whileTap="tap"
+                           className="flex flex-col items-center justify-center gap-1.5 w-full h-full"
                         >
                           {component.icon &&
                            <span className={`

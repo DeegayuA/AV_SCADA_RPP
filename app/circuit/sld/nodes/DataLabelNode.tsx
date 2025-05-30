@@ -1,5 +1,5 @@
 // components/sld/nodes/DataLabelNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position, useReactFlow, Node as ReactFlowNode } from 'reactflow'; // Reverted, added ReactFlowNode for clarity
 import { motion } from 'framer-motion';
 import { CustomNodeType, DataPointLink, DataPoint, TextLabelNodeData as TextLabelNodeDataType } from '@/types/sld'; // Added CustomNodeType, TextLabelNodeData
@@ -146,64 +146,109 @@ const DataLabelNode: React.FC<NodeProps<DataLabelNodeType>> = (props) => { // Re
   const NodeContent = (
     <div
       className={`
-        sld-node data-label-node
+        sld-node data-label-node node-content-wrapper group custom-node-hover /* Added node-content-wrapper, group, custom-node-hover */
         whitespace-pre-wrap leading-tight outline-none
-        transition-all duration-150 ease-in-out
-        ${isEditMode ? 'cursor-pointer hover:ring-1 hover:ring-blue-400/70 focus:ring-1 focus:ring-blue-500' : ''}
-        ${selected && isEditMode ? 'ring-1 ring-blue-500 shadow-sm' : ''}
-        ${selected && !isEditMode ? 'ring-1 ring-blue-300/30' : ''}
+        transition-all duration-150 ease-in-out /* This is also in custom-node-hover, can be reviewed */
+        ${isEditMode ? 'cursor-pointer focus:ring-1 focus:ring-blue-500' : ''} /* Removed hover:ring, selected ring styles */
+        /* Existing selected styles removed, will be handled by .reactflow-node.selected .node-content-wrapper */
         ${!data.styleConfig?.padding ? 'p-1' : ''} 
         ${!data.styleConfig?.fontSize ? 'text-sm' : ''}
-        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''}
+        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''} /* This might be overridden by node-content-wrapper selection style if it sets a bg */
       `}
       style={finalNodeStyle}
       tabIndex={isEditMode ? 0 : -1}
     >
-      {showHandles && <Handle type="target" position={Position.Top} className="!bg-teal-500 !w-1.5 !h-1.5" />}
+      {showHandles && <Handle type="target" position={Position.Top} className="sld-handle-style" />}
       {/* For DataLabelNode, displayText (from DataPointLink or fallback) is primary */}
       {data.label && <span className="font-medium whitespace-nowrap opacity-90 mr-1">{data.label}:</span>}
       <span className="font-semibold font-mono whitespace-nowrap">{displayText}</span>
       {unitText && <span className="text-[0.9em] opacity-70 whitespace-nowrap ml-0.5">{unitText}</span>}
-      {showHandles && <Handle type="source" position={Position.Bottom} className="!bg-rose-500 !w-1.5 !h-1.5" />}
+      {showHandles && <Handle type="source" position={Position.Bottom} className="sld-handle-style" />}
     </div>
   );
 
+  // The outer structure for DataLabelNode usually doesn't need to be a motion.div itself unless specific animations are planned for the entire node block
+  // If hover/selection effects are primarily on NodeContent, the outer fragment is fine.
+  // For consistency with other nodes that have an outer motion.div for layout or effects, one could be added,
+  // but TextLabel/DataLabel are often styled more like content blocks.
+  // The current structure with NodeContent receiving hover/selection styles is fine.
+
+  const [isRecentChange, setIsRecentChange] = useState(false);
+  const prevDisplayValueRef = useRef(displayText);
+
+  useEffect(() => {
+    if (prevDisplayValueRef.current !== displayText) {
+      setIsRecentChange(true);
+      const timer = setTimeout(() => setIsRecentChange(false), 700); // Match animation duration
+      prevDisplayValueRef.current = displayText;
+      return () => clearTimeout(timer);
+    }
+  }, [displayText]);
+
+  // Update NodeContent className to include animation
+  const NodeContentWithAnimation = (
+    <div
+      className={`
+        sld-node data-label-node node-content-wrapper group custom-node-hover 
+        whitespace-pre-wrap leading-tight outline-none
+        transition-all duration-150 ease-in-out 
+        ${isEditMode ? 'cursor-pointer focus:ring-1 focus:ring-blue-500' : ''} 
+        ${!data.styleConfig?.padding ? 'p-1' : ''} 
+        ${!data.styleConfig?.fontSize ? 'text-sm' : ''}
+        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''}
+        ${isRecentChange ? 'animate-status-highlight' : ''}
+      `}
+      style={finalNodeStyle}
+      tabIndex={isEditMode ? 0 : -1}
+    >
+      {showHandles && <Handle type="target" position={Position.Top} className="sld-handle-style" />}
+      {data.label && <span className="font-medium whitespace-nowrap opacity-90 mr-1">{data.label}:</span>}
+      <span className="font-semibold font-mono whitespace-nowrap">{displayText}</span>
+      {unitText && <span className="text-[0.9em] opacity-70 whitespace-nowrap ml-0.5">{unitText}</span>}
+      {showHandles && <Handle type="source" position={Position.Bottom} className="sld-handle-style" />}
+    </div>
+  );
+
+
   return (
     <> 
-      {isEditMode && false ? ( // DataLabelNode doesn't use TextLabelConfigPopover
+      {/* Popover logic is currently disabled with 'isEditMode && false' */}
+      {isEditMode && false ? ( 
           <TextLabelConfigPopover
-            node={nodeForPopover as unknown as ReactFlowNode<TextLabelNodeDataType>} // Double cast to avoid type incompatibility
+            node={nodeForPopover as unknown as ReactFlowNode<TextLabelNodeDataType>} 
             onUpdateNodeStyle={handleStyleConfigUpdate}
-            onUpdateNodeLabel={handleLabelUpdate} // Keep if 'label' is editable for TextLabels
-            onUpdateNodeText={handleTextUpdate}   // Keep if 'text' is editable for TextLabels
+            onUpdateNodeLabel={handleLabelUpdate} 
+            onUpdateNodeText={handleTextUpdate}   
             isEditMode={isEditMode} 
           >
-            {NodeContent}
+            {NodeContentWithAnimation}
           </TextLabelConfigPopover>
         ) : (
-          NodeContent // Render DataLabelNode content directly, or TextLabel if not in edit mode
-      )}
-      {/* Info button for DataLabel (and potentially TextLabel if not in edit mode) */}
-      {!isEditMode && (
-        <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-            style={{top: '2px', right: '2px'}}
-            onClick={(e) => {
-                const nodeObjectForDetailView = {
-                    id, type, data, selected: !!selected, dragging: !!dragging, zIndex: zIndex || 0,
-                    position: position, 
-                    connectable: isConnectable,
-                } as unknown as CustomNodeType;
-                setSelectedElementForDetails(nodeObjectForDetailView);
-                e.stopPropagation();
-            }}
-            title="View Details"
-        >
-            <InfoIcon className="h-3 w-3 text-primary/80" />
-        </Button>
-      )}
+          <div className="relative">
+            {NodeContentWithAnimation} {/* Render DataLabelNode content directly */}
+            {/* Info button for DataLabel */}
+            {!isEditMode && (
+              <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
+                  style={{top: '2px', right: '2px'}}
+                  onClick={(e) => {
+                      const nodeObjectForDetailView = {
+                          id, type, data, selected: !!selected, dragging: !!dragging, zIndex: zIndex || 0,
+                          position: position, 
+                          connectable: isConnectable,
+                      } as unknown as CustomNodeType;
+                      setSelectedElementForDetails(nodeObjectForDetailView);
+                      e.stopPropagation();
+                  }}
+                  title="View Details"
+              >
+                  <InfoIcon className="h-3 w-3 text-primary/80" />
+              </Button>
+              )}
+            </div>
+        )}
     </>
   );
 };

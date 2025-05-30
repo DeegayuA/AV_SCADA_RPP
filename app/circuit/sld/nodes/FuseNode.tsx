@@ -1,5 +1,5 @@
 // components/sld/nodes/FuseNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position, Node } from 'reactflow'; // Added Node type
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added SLDElementType
@@ -107,44 +107,59 @@ const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
   };
   
   const mainDivClasses = `
-    sld-node fuse-node group w-[60px] h-[75px] rounded-md shadow-md
-    flex flex-col items-center justify-between p-1.5
+    sld-node fuse-node group custom-node-hover w-[60px] h-[75px] rounded-md shadow-md
+    flex flex-col items-center justify-between /* p-1.5 removed, moved to content wrapper */
     border-2 ${derivedNodeStyles.borderColor ? '' : baseClasses.split(' ')[0]} 
-    ${derivedNodeStyles.backgroundColor ? '' : baseClasses.split(' ')[1]}
-    bg-card dark:bg-neutral-800 
-    transition-all duration-150
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-    ${isNodeEditable ? 'cursor-grab hover:shadow-lg' : 'cursor-default'}
+    /* specific bgClass from baseClasses, bg-card removed, moved to content wrapper */
+    /* transition-all duration-150 is part of custom-node-hover */
+    /* selected ring styles removed */
+    ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+    /* hover:shadow-lg removed */
   `;
-  const effectiveSymbolColor = derivedNodeStyles.color || baseClasses.split(' ')[2];
-  const effectiveTextColor = derivedNodeStyles.color || baseClasses.split(' ')[2];
+  // effectiveSymbolColor and effectiveTextColor will be applied to the node-content-wrapper or inherited
+  
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
 
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   return (
     <motion.div
       className={mainDivClasses}
-      style={derivedNodeStyles}
-      variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={{
+        borderColor: derivedNodeStyles.borderColor || undefined, // Apply border from derived or let class handle
+        opacity: derivedNodeStyles.opacity || undefined,
+        // backgroundColor and color are now primarily for the node-content-wrapper
+      }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                // Width and height are not available from NodeProps
-                width: undefined, 
-                height: undefined, 
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data, selected, 
+                width: undefined, height: undefined, 
                 connectable: isConnectable,
+                // dragging and zIndex are not part of CustomNodeType but are in props
+                dragging: props.dragging, 
+                zIndex: props.zIndex,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
@@ -154,30 +169,46 @@ const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
         </Button>
       )}
 
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" />
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
 
-      <p className={`text-[9px] font-semibold text-center truncate w-full ${derivedNodeStyles.color ? '' : 'text-foreground dark:text-neutral-200'}`} title={data.label}>
-        {data.label}
-      </p>
-      
-      <div className="my-0.5 pointer-events-none relative">
-        <FuseSymbolSVG className={`transition-colors ${effectiveSymbolColor}`} isBlown={isBlown} />
-        {BlownOverlayIcon && (
-            <motion.div 
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={{ opacity: (isBlown || isWarning) ? 0.8 : 0, scale: (isBlown || isWarning) ? 1 : 0.5 }}
-                transition={{duration: 0.2}}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
-            >
-                <BlownOverlayIcon size={12} className={`${effectiveSymbolColor}`} />
-            </motion.div>
-        )}
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div 
+        className={`node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-sm
+                    ${derivedNodeStyles.backgroundColor ? '' : baseClasses.split(' ')[1]} /* bg from baseClasses */
+                    ${derivedNodeStyles.color ? '' : baseClasses.split(' ')[2]} /* text color from baseClasses */
+                    bg-card dark:bg-neutral-800
+                    ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
+        style={{
+          backgroundColor: derivedNodeStyles.backgroundColor || undefined,
+          color: derivedNodeStyles.color || undefined, 
+        }}
+      >
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label} {/* Text color will be inherited from parent */}
+        </p>
+        
+        <div className="my-0.5 pointer-events-none relative">
+          {/* SVG color will be inherited from parent's text color */}
+          <FuseSymbolSVG className="transition-colors" isBlown={isBlown} /> 
+          {BlownOverlayIcon && (
+              <motion.div 
+                  initial={{ opacity: 0, scale: 0.5 }}
+                  animate={{ opacity: (isBlown || isWarning) ? 0.8 : 0, scale: (isBlown || isWarning) ? 1 : 0.5 }}
+                  transition={{duration: 0.2}}
+                  className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
+              >
+                  {/* Icon color will be inherited */}
+                  <BlownOverlayIcon size={12} /> 
+              </motion.div>
+          )}
+        </div>
+        
+        <p className="text-[9px] text-center truncate w-full leading-tight" title={data.config?.ratingAmps ? `${data.config.ratingAmps}A` : statusText}>
+          {data.config?.ratingAmps ? `${data.config.ratingAmps}A` : statusText}
+        </p>
       </div>
-      
-      <p className={`text-[9px] text-center truncate w-full leading-tight ${effectiveTextColor}`} title={data.config?.ratingAmps ? `${data.config.ratingAmps}A` : statusText}>
-        {data.config?.ratingAmps ? `${data.config.ratingAmps}A` : statusText}
-      </p>
     </motion.div>
   );
 };

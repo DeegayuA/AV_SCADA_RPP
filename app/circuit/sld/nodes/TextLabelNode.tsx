@@ -1,5 +1,5 @@
 // components/sld/nodes/TextLabelNode.tsx
-import React, { memo, useMemo, useState, useLayoutEffect } from 'react';
+import React, { memo, useMemo, useState, useLayoutEffect, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position, useReactFlow, Node } from 'reactflow'; // Added Node
 import { TextLabelNodeData, TextNodeStyleConfig, SLDElementType } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
@@ -147,26 +147,24 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({
   const NodeContent = (
     <div
       className={`
-        sld-node text-label-node
+        sld-node text-label-node node-content-wrapper group custom-node-hover /* Added node-content-wrapper, group, custom-node-hover */
         whitespace-pre-wrap leading-tight outline-none
         box-border 
-        transition-all duration-150 ease-in-out
-        ${isEditMode ? 'cursor-pointer hover:ring-1 hover:ring-blue-400/70 focus:ring-1 focus:ring-blue-500' : ''}
-        ${selected && isEditMode ? 'ring-1 ring-blue-500 shadow-sm' : ''}
-        ${selected && !isEditMode ? 'ring-1 ring-blue-300/30' : ''}
-        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''}
+        transition-all duration-150 ease-in-out /* This is also in custom-node-hover, can be reviewed */
+        ${isEditMode ? 'cursor-pointer focus:ring-1 focus:ring-blue-500' : ''} /* Removed hover:ring, selected ring styles */
+        /* Existing selected styles removed, will be handled by .reactflow-node.selected .node-content-wrapper */
+        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''} /* This might be overridden by node-content-wrapper selection style if it sets a bg */
       `}
       style={nodeStyle} // This now includes width and height
       tabIndex={isEditMode ? 0 : -1}
     >
-      {/* Handles are optional and primarily for visual connection points if needed.
-          For a pure label, they might be omitted or hidden unless actively connecting. */}
+      {/* Handles are optional and primarily for visual connection points if needed. */}
       {isEditMode && (
         <>
-          <Handle type="target" position={Position.Top} className="!bg-teal-500 !w-1.5 !h-1.5 opacity-50 hover:opacity-100" />
-          <Handle type="source" position={Position.Bottom} className="!bg-rose-500 !w-1.5 !h-1.5 opacity-50 hover:opacity-100" />
-          <Handle type="target" position={Position.Left} className="!bg-teal-500 !w-1.5 !h-1.5 opacity-50 hover:opacity-100" />
-          <Handle type="source" position={Position.Right} className="!bg-rose-500 !w-1.5 !h-1.5 opacity-50 hover:opacity-100" />
+          <Handle type="target" position={Position.Top} className="sld-handle-style" />
+          <Handle type="source" position={Position.Bottom} className="sld-handle-style" />
+          <Handle type="target" position={Position.Left} className="sld-handle-style" />
+          <Handle type="source" position={Position.Right} className="sld-handle-style" />
         </>
       )}
      
@@ -186,6 +184,44 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({
     // relying on useLayoutEffect to quickly set them.
   }
 
+  const [isRecentChange, setIsRecentChange] = useState(false);
+  const prevTextRef = useRef(data.text);
+
+  useEffect(() => {
+    if (prevTextRef.current !== data.text) {
+      setIsRecentChange(true);
+      const timer = setTimeout(() => setIsRecentChange(false), 700); // Match animation duration
+      prevTextRef.current = data.text;
+      return () => clearTimeout(timer);
+    }
+  }, [data.text]);
+
+  // Update NodeContent className to include animation
+  const NodeContentWithAnimation = (
+    <div
+      className={`
+        sld-node text-label-node node-content-wrapper group custom-node-hover 
+        whitespace-pre-wrap leading-tight outline-none
+        box-border 
+        transition-all duration-150 ease-in-out 
+        ${isEditMode ? 'cursor-pointer focus:ring-1 focus:ring-blue-500' : ''} 
+        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''}
+        ${isRecentChange ? 'animate-status-highlight' : ''}
+      `}
+      style={nodeStyle} // This now includes width and height
+      tabIndex={isEditMode ? 0 : -1}
+    >
+      {isEditMode && (
+        <>
+          <Handle type="target" position={Position.Top} className="sld-handle-style" />
+          <Handle type="source" position={Position.Bottom} className="sld-handle-style" />
+          <Handle type="target" position={Position.Left} className="sld-handle-style" />
+          <Handle type="source" position={Position.Right} className="sld-handle-style" />
+        </>
+      )}
+      {data.text || data.label || ''}
+    </div>
+  );
 
   return (
     // The Popover should not interfere with the node's own sizing.
@@ -197,7 +233,7 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({
       onUpdateNodeText={handleTextUpdate}
       isEditMode={!!isEditMode}
     >
-      {NodeContent}
+      {NodeContentWithAnimation}
     </TextLabelConfigPopover>
   );
 };

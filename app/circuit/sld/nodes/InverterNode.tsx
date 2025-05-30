@@ -1,5 +1,5 @@
 // components/sld/nodes/InverterNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position, Node } from 'reactflow'; // Added Node type
 import { motion } from 'framer-motion';
 import { InverterNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -116,86 +116,100 @@ const InverterNode: React.FC<NodeProps<InverterNodeData> & Partial<Node<Inverter
     borderColor: derivedNodeStyles.borderColor || statusStyles.borderColor,
     backgroundColor: derivedNodeStyles.backgroundColor || statusStyles.backgroundColor,
     color: derivedNodeStyles.color || statusStyles.textColor, // For text within the node
+    iconColor: derivedNodeStyles.color || statusStyles.iconColor, // Added for explicit icon color control
     // any other style props...
   };
+
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   return (
     <motion.div
       className={`
-        sld-node inverter-node group w-[90px] h-[70px] rounded-lg shadow-sm
-        flex flex-col items-center justify-between p-2
+        sld-node inverter-node group custom-node-hover w-[90px] h-[70px] rounded-lg shadow-sm
+        flex flex-col items-center justify-between /* p-2 removed, will be on content wrapper */
         border-2 
-        transition-all duration-150
-        ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-neutral-900' : 
-          selected ? 'ring-1 ring-accent dark:ring-offset-neutral-900' : ''}
-        ${isNodeEditable ? 'cursor-pointer hover:shadow-lg' : 'cursor-default'}
+        /* transition-all duration-150 is part of custom-node-hover */
+        /* selected ring styles removed */
+        ${isNodeEditable ? 'cursor-pointer' : 'cursor-default'}
+        /* hover:shadow-lg removed */
       `}
-      style={componentStyle} // Apply combined dynamic styles
-      variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover"
+      style={{ borderColor: componentStyle.borderColor, /* other non-layout styles for outer div if any */ }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
     >
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => {
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
+      <Button
+        variant="ghost"
+        size="icon"
+        className="absolute top-1 right-1 h-5 w-5 text-primary/80 z-10" // Ensure button is above content
+        onClick={(e) => {
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject: CustomNodeType = {
-                id, 
-                type, 
-                position: position || { x: 0, y: 0 }, // Provide default position if undefined
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                width, 
-                height, 
-                connectable: isConnectable,
+                id, type, 
+                position: position || { x: 0, y: 0 }, 
+                data, selected, dragging, zIndex, width, height, connectable: isConnectable,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
           title="View Details"
         >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
+          <InfoIcon className="h-full w-full" />
         </Button>
 
-      {/* DC Input */}
+      {/* Handles are outside node-content-wrapper */}
       <Handle
         type="target"
         position={Position.Top}
         id="top_dc_in"
         isConnectable={isConnectable}
-        className="!w-3 !h-3 !bg-sky-500/60 border-2 !border-sky-600 group-hover:!bg-sky-500 react-flow__handle-common"
+        className="react-flow__handle-common sld-handle-style"
         title="DC Input"
       />
-      {/* AC Output */}
       <Handle
         type="source"
         position={Position.Bottom}
         id="bottom_ac_out"
         isConnectable={isConnectable}
-        className="!w-3 !h-3 !bg-amber-500/60 border-2 !border-amber-600 group-hover:!bg-amber-500 react-flow__handle-common"
+        className="react-flow__handle-common sld-handle-style"
         title="AC Output"
       />
 
-      <div className="flex items-center justify-center pointer-events-none mt-0.5">
-        <motion.div
-          animate={isDeviceRunning && StatusIcon === RefreshCwIcon ? { rotate: 360 } : { rotate: 0 }}
-          transition={isDeviceRunning && StatusIcon === RefreshCwIcon ? { loop: Infinity, ease: "linear", duration: 4 } : { duration: 0.5 }}
-        >
-          <StatusIcon size={18} className={statusStyles.iconColor} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} />
-        </motion.div>
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div 
+        className={`node-content-wrapper flex flex-col items-center justify-between p-2 w-full h-full ${isRecentStatusChange ? 'animate-status-highlight' : ''}`}
+        style={{ backgroundColor: componentStyle.backgroundColor, color: componentStyle.color }}
+      >
+        <div className="flex items-center justify-center pointer-events-none mt-0.5">
+          <motion.div
+            animate={isDeviceRunning && StatusIcon === RefreshCwIcon ? { rotate: 360 } : { rotate: 0 }}
+            transition={isDeviceRunning && StatusIcon === RefreshCwIcon ? { loop: Infinity, ease: "linear", duration: 4 } : { duration: 0.5 }}
+          >
+            {/* Applied iconColor directly here from componentStyle, which includes derived or status based */}
+            <StatusIcon size={18} style={{ color: componentStyle.iconColor }} />
+          </motion.div>
+        </div>
+        <p className="text-[9px] font-medium leading-tight text-center truncate w-full">
+          {String(processedStatus).toUpperCase()}
+        </p>
+        <p className="text-[10px] font-semibold leading-tight mt-0.5 text-center truncate w-full" title={data.label}>
+          {data.label}
+        </p>
+        <p className="text-[9px] leading-tight text-center truncate w-full" title={`Power: ${powerOutput}`}>
+            {powerOutput}
+        </p>
       </div>
-      <p className="text-[9px] font-medium leading-tight text-center truncate w-full" style={{ color: derivedNodeStyles.color || statusStyles.textColor }}>
-        {String(processedStatus).toUpperCase()}
-      </p>
-      <p className="text-[10px] font-semibold leading-tight mt-0.5 text-center truncate w-full" title={data.label} style={{ color: derivedNodeStyles.color || statusStyles.textColor }}>
-        {data.label}
-      </p>
-      
-      <p className="text-[9px] leading-tight text-center truncate w-full" style={{ color: derivedNodeStyles.color || statusStyles.textColor }} title={`Power: ${powerOutput}`}>
-          {powerOutput}
-      </p>
     </motion.div>
   );
 };

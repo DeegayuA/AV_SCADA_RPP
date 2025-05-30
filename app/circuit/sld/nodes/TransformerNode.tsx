@@ -1,5 +1,5 @@
 // components/sld/nodes/TransformerNode.tsx
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
 import { motion } from 'framer-motion';
 import { TransformerNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
@@ -109,44 +109,58 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { /
   const iconEffectiveColorClass = derivedNodeStyles.color ? '' : statusStyles.symbolColorClass;
 
   const mainDivClasses = `
-    sld-node transformer-node group w-[80px] h-[85px] rounded-lg shadow-lg
-    flex flex-col items-center justify-between p-1.5
+    sld-node transformer-node group custom-node-hover w-[80px] h-[85px] rounded-lg shadow-lg
+    flex flex-col items-center justify-between /* p-1.5 removed */
     border-2 ${derivedNodeStyles.borderColor ? '' : statusStyles.borderClass} 
-    ${derivedNodeStyles.backgroundColor ? '' : statusStyles.bgClass}
-    bg-card dark:bg-neutral-800 
-    transition-all duration-150
-    ${selected && isNodeEditable ? 'ring-2 ring-primary ring-offset-1' : selected ? 'ring-1 ring-accent' : ''}
-    ${isNodeEditable ? 'cursor-grab hover:shadow-xl' : 'cursor-default'}
+    /* bg-card and statusStyles.bgClass removed, moved to content wrapper */
+    /* transition-all duration-150 is part of custom-node-hover */
+    /* selected ring styles removed */
+    ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+    /* hover:shadow-xl removed */
   `;
-  const textEffectiveClass = derivedNodeStyles.color ? '' : statusStyles.textClass;
+  // const textEffectiveClass = derivedNodeStyles.color ? '' : statusStyles.textClass; // Will be applied to content wrapper
 
+  const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
+  const prevStatusRef = useRef(processedStatus);
+
+  useEffect(() => {
+    if (prevStatusRef.current !== processedStatus) {
+      setIsRecentStatusChange(true);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      prevStatusRef.current = processedStatus;
+      return () => clearTimeout(timer);
+    }
+  }, [processedStatus]);
 
   return (
     <motion.div
       className={mainDivClasses}
-      style={derivedNodeStyles} // Apply all derived styles; specific properties can be overridden by classes if needed
-      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
-      whileHover="hover" initial="initial"
+      style={{
+        borderColor: derivedNodeStyles.borderColor || undefined, // DPL can override border
+        opacity: derivedNodeStyles.opacity || undefined,
+      }}
+      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      // whileHover="hover" // Prefer CSS hover
+      initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
+      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation();
+            e.stopPropagation(); // Prevent node selection
             const fullNodeObject = {
-                id, 
-                type, 
-                position: { x: xPos, y: yPos }, // Use xPos, yPos for position
-                data, 
-                selected, 
-                dragging, 
-                zIndex, 
-                connectable: isConnectable
+                id, type, 
+                position: { x: xPos, y: yPos }, 
+                data, selected, dragging, zIndex, connectable: isConnectable,
+                // Ensure width and height are passed if available, though not strictly needed by CustomNodeType
+                width: (props as any).width, 
+                height: (props as any).height,
             };
-            setSelectedElementForDetails(fullNodeObject);
+            setSelectedElementForDetails(fullNodeObject as CustomNodeType);
           }}
           title="View Details"
         >
@@ -154,29 +168,44 @@ const TransformerNode: React.FC<NodeProps<TransformerNodeData>> = (props) => { /
         </Button>
       )}
 
-      <Handle type="target" position={Position.Top} id="primary_in" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Primary"/>
-      <Handle type="source" position={Position.Bottom} id="secondary_out" isConnectable={isConnectable} className="!w-3 !h-3 sld-handle-style" title="Secondary"/>
+      {/* Handles are outside node-content-wrapper */}
+      <Handle type="target" position={Position.Top} id="primary_in" isConnectable={isConnectable} className="sld-handle-style" title="Primary"/>
+      <Handle type="source" position={Position.Bottom} id="secondary_out" isConnectable={isConnectable} className="sld-handle-style" title="Secondary"/>
 
-      <p className={`text-[9px] font-semibold text-center truncate w-full ${textEffectiveClass}`} title={data.label}>
-        {data.label}
-      </p>
-      
-      <div className="my-0.5 pointer-events-none">
-        <motion.div
-          animate={isCriticalStatus && DisplayIcon === AlertTriangleIcon ? { scale: [1, 1.05, 1], transition: { duration: 1.5, repeat: Infinity } } : {}}
-        >
-          <DisplayIcon 
-            className={`transition-colors ${iconEffectiveColorClass}`} 
-            style={{ color: derivedNodeStyles.color || '' }} // Apply derived color to icon if present
-            // Pass isEnergized to TransformerSymbolSVG if it's the current DisplayIcon
-            {...(DisplayIcon === TransformerSymbolSVG && { isEnergized: isTransformerEnergized })}
-          />
-        </motion.div>
+      {/* node-content-wrapper for selection styles, padding, and internal layout */}
+      <div className={`
+          node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-sm
+          ${derivedNodeStyles.backgroundColor ? '' : statusStyles.bgClass}
+          ${derivedNodeStyles.color ? '' : statusStyles.textClass}
+          bg-card dark:bg-neutral-800
+          ${isRecentStatusChange ? 'animate-status-highlight' : ''}
+        `}
+        style={{
+          backgroundColor: derivedNodeStyles.backgroundColor || undefined, // DPL override for background
+          color: derivedNodeStyles.color || undefined, // DPL override for text
+        }}
+      >
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+          {data.label} {/* Text color will be inherited */}
+        </p>
+        
+        <div className="my-0.5 pointer-events-none">
+          <motion.div
+            animate={isCriticalStatus && DisplayIcon === AlertTriangleIcon ? { scale: [1, 1.05, 1], transition: { duration: 1.5, repeat: Infinity } } : {}}
+          >
+            {/* Icon color will be inherited or use iconEffectiveColorClass as fallback if DPL doesn't set text color */}
+            <DisplayIcon 
+              className={`transition-colors`} 
+              style={{ color: derivedNodeStyles.color || iconEffectiveColorClass }}
+              {...(DisplayIcon === TransformerSymbolSVG && { isEnergized: isTransformerEnergized })}
+            />
+          </motion.div>
+        </div>
+        
+        <p className="text-[8px] text-center truncate w-full leading-tight" title={additionalInfo}>
+          {additionalInfo} {/* Text color will be inherited */}
+        </p>
       </div>
-      
-      <p className={`text-[8px] text-center truncate w-full leading-tight ${textEffectiveClass}`} title={additionalInfo}>
-        {additionalInfo}
-      </p>
     </motion.div>
   );
 };
