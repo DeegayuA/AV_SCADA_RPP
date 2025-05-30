@@ -1,4 +1,4 @@
-// components/sld/ui/TextLabelConfigPopover.tsx
+// app/circuit/sld/ui/TextLabelConfigPopover.tsx
 "use client";
 
 import React, { useState, useEffect } from 'react';
@@ -21,12 +21,13 @@ import { Separator } from "@/components/ui/separator";
 import { Palette, TextQuote, AlignLeft, AlignCenter, AlignRight, Baseline, CaseSensitive, Blend } from 'lucide-react';
 import { TextNodeStyleConfig, TextLabelNodeData } from '@/types/sld';
 import { Node } from 'reactflow';
+
 interface TextLabelConfigPopoverProps {
   node: Node<TextLabelNodeData>;
   onUpdateNodeStyle: (newStyleConfig: TextNodeStyleConfig) => void;
   onUpdateNodeLabel?: (newLabel: string) => void;
   onUpdateNodeText?: (newText: string) => void;
-  children: React.ReactNode; // The PopoverTrigger
+  children: React.ReactElement; // MODIFIED: Changed from React.ReactNode
   isEditMode: boolean;
 }
 
@@ -102,14 +103,33 @@ export const TextLabelConfigPopover: React.FC<TextLabelConfigPopoverProps> = ({
     onUpdateNodeStyle(newStyle);
   };
 
-  // Debounce or throttle updates if performance becomes an issue for live updates
   useEffect(() => {
     if(isOpen) handleStyleChange();
   }, [fontSize, customFontSize, textColor, fontWeight, fontStyle, textAlign, backgroundColor, padding]);
 
   if (!isEditMode) {
-    return <>{children}</>; // Just render children if not in edit mode
+    // When not in edit mode, children prop is rendered directly.
+    // Wrap in a fragment if it helps ensure a single return node, though often not strictly necessary here.
+    return <>{children}</>;
   }
+
+  // --- MODIFIED SECTION: Runtime guard for children ---
+  // `PopoverTrigger asChild` requires its `children` prop to be a single, valid React element.
+  const isSingleValidChild = React.isValidElement(children) && React.Children.count(children) === 1;
+
+  if (!isSingleValidChild) {
+    console.error(
+      "[TextLabelConfigPopover] Runtime Error: `PopoverTrigger asChild` expected a single React element child for its `children` prop, but received an invalid value. ",
+      "Received children:", children,
+      "Count:", React.Children.count(children),
+      "isValidElement:", React.isValidElement(children)
+    );
+    // Fallback: Render the children directly without Popover functionality to prevent a crash.
+    // This makes the popover inaccessible if children are invalid but keeps the app running.
+    // You might choose a different fallback based on UX needs (e.g., render nothing, or an error indicator).
+    return <>{children}</>;
+  }
+  // --- END MODIFIED SECTION ---
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -137,7 +157,7 @@ export const TextLabelConfigPopover: React.FC<TextLabelConfigPopoverProps> = ({
             <Input
               id="node-label-input"
               value={node.data.label}
-              onChange={(e) => onUpdateNodeLabel?.(e.target.value)} // Use dedicated handler for label updates
+              onChange={(e) => onUpdateNodeLabel?.(e.target.value)}
               className="h-8 text-xs"
               placeholder="Node identifier"
             />

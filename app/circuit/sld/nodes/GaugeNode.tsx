@@ -145,8 +145,14 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
   const nodeWidth = 90;
   const nodeHeight = 75; // Adjusted height
 
-  const nodeWidth = 90;
-  const nodeHeight = 75; // Adjusted height
+  // Derive style properties from data point links or use defaults
+  const derivedNodeStyles = useMemo(() => {
+    return {
+      borderColor: data.config?.borderColor || 'inherit',
+      backgroundColor: data.config?.backgroundColor || '',
+      color: data.config?.textColor || ''
+    };
+  }, [data.config]);
 
   const [isRecentChange, setIsRecentChange] = useState(false);
   const prevFormattedValueRef = useRef(formattedValue);

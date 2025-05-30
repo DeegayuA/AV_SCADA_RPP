@@ -193,14 +193,21 @@ export default function AnimatedFlowEdge({
   }
   const finalStatus: string = statusValueFromLink || String(data?.status || '').toUpperCase(); // Prefer DPLinked status
 
+  // --- Base Style Initialization ---
+  // Initialize the style object before applying conditional styling
+  let finalBasePathStyle: React.CSSProperties = {
+    ...style,
+    stroke: edgeStrokeColor,
+    strokeWidth: edgeStrokeWidth,
+    strokeLinecap: 'round',
+  };
+
   if (finalStatus === 'FAULT') {
     edgeStrokeColor = flowColors.FAULT;
     animationName = 'faultPulse'; 
     animationDuration = '1s';
     // Set CSS variable for base stroke width for the animation
-    if (finalBasePathStyle) { // Ensure finalBasePathStyle is defined
-        (finalBasePathStyle as any)['--base-stroke-width'] = `${edgeStrokeWidth}px`;
-    }
+    (finalBasePathStyle as any)['--base-stroke-width'] = `${edgeStrokeWidth}px`;
     // animationDirection can remain as previously calculated for fault context, or default to 'normal'
   } else if (finalStatus === 'WARNING') {
     if(edgeStrokeColor !== flowColors.FAULT) edgeStrokeColor = flowColors.WARNING; // Don't let warning override fault color
@@ -226,17 +233,15 @@ export default function AnimatedFlowEdge({
         animationName = 'subtlePulse'; 
         animationDuration = '2s';
     }
-    // Apply SVG filter for selected state
-    if (finalBasePathStyle) { // Ensure finalBasePathStyle is defined
-        (finalBasePathStyle as any).filter = `url(#selected-edge-glow-${id})`;
-    }
   }
-
+  
   // --- Final Style Assembly for the Base Path ---
-  // finalBasePathStyle is initialized before this block if selected is true
-  // This ensures that if it wasn't initialized (selected is false), it gets initialized here.
-  // Or, more cleanly, initialize it once before the 'selected' block.
-  const finalBasePathStyle: React.CSSProperties = { // Initialized or re-initialized here for clarity
+  // Update the finalBasePathStyle with current values as they may have changed
+  finalBasePathStyle.stroke = edgeStrokeColor;
+  finalBasePathStyle.strokeWidth = edgeStrokeWidth;
+  
+  // Apply filter if selected
+  finalBasePathStyle = {
     ...style,
     stroke: edgeStrokeColor,
     strokeWidth: edgeStrokeWidth,

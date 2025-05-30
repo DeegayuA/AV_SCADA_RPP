@@ -130,10 +130,7 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
         <Button
           variant="ghost"
           size="icon"
-          className="absolute top-0 right-0 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0" // Adjusted for busbar, typically small
-          // Adjust button positioning if needed, ensure it's outside the main interaction area or handled.
-          // Using a common pattern for positioning the button slightly outside or at a corner.
-          className="absolute -top-1 -right-1 h-5 w-5 rounded-full z-20 bg-background/70 hover:bg-secondary/90 p-0.5"
+          className="absolute -top-1 -right-1 h-5 w-5 rounded-full z-20 bg-background/70 hover:bg-secondary/90 p-0.5" // Adjusted for busbar
           onClick={(e) => {
             e.stopPropagation(); // Prevent node selection/drag
             const fullNodeObject: CustomNodeType = {

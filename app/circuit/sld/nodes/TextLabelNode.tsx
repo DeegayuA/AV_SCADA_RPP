@@ -233,7 +233,7 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({
       onUpdateNodeText={handleTextUpdate}
       isEditMode={!!isEditMode}
     >
-      {NodeContentWithAnimation} {/* Use updated NodeContent */}
+      {NodeContentWithAnimation}
     </TextLabelConfigPopover>
   );
 };
