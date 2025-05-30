@@ -21,7 +21,6 @@ import { UserRole } from '@/types/auth'; // Assuming this path is correct for Us
 import { toast } from 'sonner';
 
 import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as clearIdbBeforeImport } from '@/lib/idb-store';
-import { APP_NAME } from '@/config/appConfig';
 import { PLANT_NAME } from '@/config/constants';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 
@@ -33,7 +32,7 @@ const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
   'dashboardSoundEnabled',
   // Consider 'theme' separately, usually user preference
 ];
-const EXPECTED_BACKUP_SCHEMA_VERSION = "1.0.0";
+const EXPECTED_BACKUP_SCHEMA_VERSION = "2.0.0";
 
 interface BackupFileContent {
   backupSchemaVersion: string;

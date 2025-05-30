@@ -6,7 +6,8 @@ import { getDataPointValue, applyValueMapping } from '../nodes/nodeUtils';
 import {
     CustomFlowEdgeData,
     AnimationFlowConfig,
-    GlobalSLDAnimationSettings
+    GlobalSLDAnimationSettings,
+    DynamicFlowType // Import the new type
 } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
 
@@ -40,7 +41,6 @@ const SELECTED_STROKE_WIDTH_INCREASE = 1.5;
 const ANIMATED_DASH_WIDTH_FACTOR = 0.6;
 const MIN_ANIMATED_DASH_WIDTH = 1.8;
 
-// Interface for style object that includes our CSS custom property
 interface AnimatedPathStyle extends React.CSSProperties {
   '--edge-animation-dashoffset-end'?: string;
 }
@@ -62,82 +62,128 @@ export default function AnimatedFlowEdge({
     sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
   });
 
-  // --- Stage 1: Initial animation properties ---
   let s1_isConceptuallyActive = false;
   let s1_isDashdrawCandidate = false;
   let s1_dashdrawDirection: 'normal' | 'reverse' = 'normal';
-  let s1_dashdrawDuration = '5s'; // Your default duration
+  let s1_dashdrawDuration = '5s';
 
-  const animConfig = data?.animationSettings;
-  const masterGlobalInvertActive = (animConfig as GlobalSLDAnimationSettings)?.globallyInvertDefaultDynamicFlowLogic ?? false;
-  const currentAnimationType = animConfig?.animationType || 'none';
+  const typedAnimConfig = data?.animationSettings as (AnimationFlowConfig & Partial<GlobalSLDAnimationSettings>) | undefined;
+  const masterGlobalInvertActive = typedAnimConfig?.globallyInvertDefaultDynamicFlowLogic ?? false;
+  const currentAnimationType = typedAnimConfig?.animationType || 'none';
 
   if (currentAnimationType === 'dynamic_power_flow') {
-    let netFlowValue = 0;
-    if (animConfig?.gridNetFlowDataPointId) {
-      const rawGridNetValue = getDataPointValue(animConfig.gridNetFlowDataPointId, dataPoints, opcUaNodeValues);
-      netFlowValue = typeof rawGridNetValue === 'number' && !isNaN(rawGridNetValue) ? rawGridNetValue : 0;
-    } else if (animConfig?.generationDataPointId && animConfig?.usageDataPointId) {
-      const rawGenValue = getDataPointValue(animConfig.generationDataPointId, dataPoints, opcUaNodeValues);
-      const rawUsageValue = getDataPointValue(animConfig.usageDataPointId, dataPoints, opcUaNodeValues);
-      const genValue = typeof rawGenValue === 'number' && !isNaN(rawGenValue) ? rawGenValue : 0;
-      const usageValue = typeof rawUsageValue === 'number' && !isNaN(rawUsageValue) ? rawUsageValue : 0;
-      netFlowValue = genValue - usageValue;
-    }
+    s1_isConceptuallyActive = true; // Dynamic flow implies it's conceptually active if configured
+    let flowMagnitude = 0;
+    let baseDirectionDetermination: 'normal' | 'reverse' = 'normal'; // Used for bidirectional
+    let applyMasterInvert = false;
 
-    let baseCalculatedDirection: 'normal' | 'reverse' = 'normal';
-    if (netFlowValue > 0) baseCalculatedDirection = 'reverse';
-    else if (netFlowValue < 0) baseCalculatedDirection = 'normal';
-    
-    s1_isConceptuallyActive = true;
-    s1_isDashdrawCandidate = netFlowValue !== 0;
+    const dynamicFlowTypeResolved: DynamicFlowType = typedAnimConfig?.dynamicFlowType ?? 'bidirectional_from_net'; // Fallback
 
-    let directionAfterGlobalInvert = baseCalculatedDirection;
-    if (masterGlobalInvertActive && s1_isDashdrawCandidate) {
-      directionAfterGlobalInvert = (baseCalculatedDirection === 'normal') ? 'reverse' : 'normal';
-    }
-    s1_dashdrawDirection = directionAfterGlobalInvert;
-    if (animConfig?.invertFlowDirection && s1_isDashdrawCandidate) {
-      s1_dashdrawDirection = (directionAfterGlobalInvert === 'normal') ? 'reverse' : 'normal';
-    }
-    
-if (s1_isDashdrawCandidate) {
-      const differenceMagnitude = Math.abs(netFlowValue);
-      const safeSpeedMultiplier = Math.max(0.1, animConfig?.speedMultiplier ?? 10); // Ensure a minimum multiplier to avoid zero speed
-      const BASE_SPEED_ADJUSTMENT_FACTOR = 5; // Keep this low for slower base speed
-      const speedFactor = differenceMagnitude * safeSpeedMultiplier * BASE_SPEED_ADJUSTMENT_FACTOR;
+    switch (dynamicFlowTypeResolved) {
+      case 'bidirectional_gen_vs_usage':
+        if (typedAnimConfig?.generationDataPointId && typedAnimConfig?.usageDataPointId) {
+          const rawGen = getDataPointValue(typedAnimConfig.generationDataPointId, dataPoints, opcUaNodeValues);
+          const rawUsage = getDataPointValue(typedAnimConfig.usageDataPointId, dataPoints, opcUaNodeValues);
+          const gen = typeof rawGen === 'number' && !isNaN(rawGen) ? rawGen : 0;
+          const usage = typeof rawUsage === 'number' && !isNaN(rawUsage) ? rawUsage : 0;
+          const netFlow = gen - usage;
+          flowMagnitude = Math.abs(netFlow);
+          s1_isDashdrawCandidate = netFlow !== 0;
+          if (netFlow > 0) baseDirectionDetermination = 'reverse'; // Export T->S
+          else if (netFlow < 0) baseDirectionDetermination = 'normal'; // Import S->T
+          applyMasterInvert = true;
+        }
+        break;
+
+      case 'bidirectional_from_net':
+        if (typedAnimConfig?.gridNetFlowDataPointId) {
+          const rawNet = getDataPointValue(typedAnimConfig.gridNetFlowDataPointId, dataPoints, opcUaNodeValues);
+          const netFlow = typeof rawNet === 'number' && !isNaN(rawNet) ? rawNet : 0;
+          flowMagnitude = Math.abs(netFlow);
+          s1_isDashdrawCandidate = netFlow !== 0;
+          if (netFlow > 0) baseDirectionDetermination = 'reverse'; // Export T->S
+          else if (netFlow < 0) baseDirectionDetermination = 'normal'; // Import S->T
+          applyMasterInvert = true;
+        }
+        break;
+
+      case 'unidirectional_export':
+        if (typedAnimConfig?.dynamicMagnitudeDataPointId) {
+          const rawMag = getDataPointValue(typedAnimConfig.dynamicMagnitudeDataPointId, dataPoints, opcUaNodeValues);
+          flowMagnitude = typeof rawMag === 'number' && !isNaN(rawMag) ? Math.abs(rawMag) : 0; // Ensure positive magnitude
+          s1_isDashdrawCandidate = flowMagnitude > 0.001; // Activate if magnitude is significant
+          baseDirectionDetermination = 'reverse'; // Default export direction: Target -> Source
+          applyMasterInvert = false; // Master invert does not apply to fixed direction types
+        }
+        break;
+        
+      case 'unidirectional_import':
+        if (typedAnimConfig?.dynamicMagnitudeDataPointId) {
+          const rawMag = getDataPointValue(typedAnimConfig.dynamicMagnitudeDataPointId, dataPoints, opcUaNodeValues);
+          flowMagnitude = typeof rawMag === 'number' && !isNaN(rawMag) ? Math.abs(rawMag) : 0; // Ensure positive magnitude
+          s1_isDashdrawCandidate = flowMagnitude > 0.001;
+          baseDirectionDetermination = 'normal'; // Default import direction: Source -> Target
+          applyMasterInvert = false; // Master invert does not apply to fixed direction types
+        }
+        break;
       
+      default: // Fallback, treat as bidirectional_from_net or none
+        s1_isDashdrawCandidate = false;
+    }
+
+    // Determine final direction
+    let directionAfterGlobalInvert = baseDirectionDetermination;
+    if (applyMasterInvert && masterGlobalInvertActive && s1_isDashdrawCandidate) {
+        directionAfterGlobalInvert = (baseDirectionDetermination === 'normal') ? 'reverse' : 'normal';
+    }
+    
+    s1_dashdrawDirection = directionAfterGlobalInvert;
+    if (typedAnimConfig?.invertFlowDirection && s1_isDashdrawCandidate) {
+        s1_dashdrawDirection = (directionAfterGlobalInvert === 'normal') ? 'reverse' : 'normal';
+    }
+
+    // Calculate duration (common for all dynamic types if candidate)
+    if (s1_isDashdrawCandidate) {
+      const safeSpeedMultiplier = Math.max(0.1, typedAnimConfig?.speedMultiplier ?? 10);
+      const BASE_SPEED_ADJUSTMENT_FACTOR = 5;
+      const speedFactor = flowMagnitude * safeSpeedMultiplier * BASE_SPEED_ADJUSTMENT_FACTOR;
+
+      const minDuration = typedAnimConfig?.minDynamicDuration ?? 0.5;
+      const maxDuration = typedAnimConfig?.maxDynamicDuration ?? 60;
+      const baseDivisor = typedAnimConfig?.dynamicSpeedBaseDivisor ?? 30;
+
       if (speedFactor > 0.001) {
-        const clampedSpeedFactor = Math.max(0.02, Math.min(speedFactor, 200)); // Lower min clamp for even slower possibility
-        // Duration calculation: Using '30 / clampedSpeedFactor' to give longer base duration
-        // Min duration 5s, Max 80s. Very slow flows can be very long.
-        s1_dashdrawDuration = `${Math.max(5, Math.min(80, 30 / clampedSpeedFactor))}s`; 
+        const clampedSpeedFactor = Math.max(0.02, Math.min(speedFactor, 200));
+        s1_dashdrawDuration = `${Math.max(minDuration, Math.min(maxDuration, baseDivisor / clampedSpeedFactor)).toFixed(2)}s`;
       } else {
-        // If speed factor is negligible, make it a very slow, long animation or turn off
-        // s1_isDashdrawCandidate = false; // Option 1: Turn off animation if too slow
-        s1_dashdrawDuration = '80s';    // Option 2: Make it extremely slow
+        s1_dashdrawDuration = `${maxDuration.toFixed(2)}s`; // Use max duration for negligible flow
       }
     }
   } else if (currentAnimationType === 'constant_unidirectional') {
-    s1_dashdrawDirection = animConfig?.constantFlowDirection === 'reverse' ? 'reverse' : 'normal';
-    const speedSetting = animConfig?.constantFlowSpeed;
+    // ... (constant_unidirectional logic remains the same)
+    s1_dashdrawDirection = typedAnimConfig?.constantFlowDirection === 'reverse' ? 'reverse' : 'normal';
+    const speedSetting = typedAnimConfig?.constantFlowSpeed;
+
     if (speedSetting === 'slow') s1_dashdrawDuration = '4s';
     else if (speedSetting === 'medium') s1_dashdrawDuration = '2s';
     else if (speedSetting === 'fast') s1_dashdrawDuration = '1s';
     else if (typeof speedSetting === 'number' && speedSetting > 0) {
-      s1_dashdrawDuration = `${Math.max(0.2, Math.min(15, speedSetting))}s`;
+      const minCD = typedAnimConfig?.minConstantDuration ?? 0.2;
+      const maxCD = typedAnimConfig?.maxConstantDuration ?? 15;
+      s1_dashdrawDuration = `${Math.max(minCD, Math.min(maxCD, speedSetting)).toFixed(2)}s`;
     } else {
-      s1_dashdrawDuration = '2s'; // Default for constant
+      s1_dashdrawDuration = '2s'; 
     }
 
-    if (animConfig?.constantFlowActivationDataPointId) {
-      const rawActivationValue = getDataPointValue(animConfig.constantFlowActivationDataPointId, dataPoints, opcUaNodeValues);
+    if (typedAnimConfig?.constantFlowActivationDataPointId) {
+      const rawActivationValue = getDataPointValue(typedAnimConfig.constantFlowActivationDataPointId, dataPoints, opcUaNodeValues);
       s1_isConceptuallyActive = !!rawActivationValue;
     } else {
       s1_isConceptuallyActive = true;
     }
     s1_isDashdrawCandidate = s1_isConceptuallyActive;
-  } else { // 'none' or fallback animation logic
+
+  } else { // 'none' or fallback
     const isEnergizedLink = data?.dataPointLinks?.find(l => l.targetProperty === 'isEnergized');
     if (isEnergizedLink) {
         const rawIsEnergized = getDataPointValue(isEnergizedLink.dataPointId, dataPoints, opcUaNodeValues);
@@ -146,10 +192,11 @@ if (s1_isDashdrawCandidate) {
         s1_isConceptuallyActive = data?.isEnergized ?? false; 
     }
     s1_isDashdrawCandidate = s1_isConceptuallyActive;
-    s1_dashdrawDuration = '5s'; // Uses your default 5s
+    s1_dashdrawDuration = '5s';
     s1_dashdrawDirection = 'normal';
   }
 
+  // Stages 2, 3, 4, and SVG rendering logic remain largely the same.
   // --- Stage 2: Base color and width for solid path (logic remains similar) ---
   let s2_solidPathStrokeColor = flowColors.OFFLINE;
   let strokeWidthKey: keyof typeof flowTypeStrokeWidths = 'DEFAULT';
@@ -174,7 +221,6 @@ if (s1_isDashdrawCandidate) {
         s2_solidPathStrokeColor = flowColors.ENERGIZED_DEFAULT;
     }
   } else { // Not conceptually active
-    // Show static color if type is defined, otherwise OFFLINE
     if (data?.flowType === 'CONTROL_SIGNAL') s2_solidPathStrokeColor = flowColors.CONTROL_SIGNAL;
     else if (data?.flowType === 'DATA_BUS') s2_solidPathStrokeColor = flowColors.DATA_BUS;
     else if (data?.flowType === 'AUX_POWER') s2_solidPathStrokeColor = flowColors.AUX_POWER;
@@ -210,9 +256,10 @@ if (s1_isDashdrawCandidate) {
     }
   }
   
-  if (s3_isDashdrawActive && !s1_isConceptuallyActive) {
+  if (s3_isDashdrawActive && !s1_isConceptuallyActive && currentAnimationType !== 'dynamic_power_flow') { // dynamic_power_flow sets its own s1_isConceptuallyActive
     s3_isDashdrawActive = false;
   }
+
 
   // --- Stage 4: Selection Styling & Final Animated Dash Color (logic remains similar) ---
   let s4_finalSolidPathStrokeColor = s3_currentSolidPathStrokeColor;
@@ -224,7 +271,9 @@ if (s1_isDashdrawCandidate) {
     s4_finalSolidPathStrokeWidth = s2_solidPathStrokeWidth + SELECTED_STROKE_WIDTH_INCREASE;
     s4_animatedDashColor = 'var(--edge-animated-dash-on-selected)';
 
-    if (!s3_isDashdrawActive && s3_solidPathPulseType === 'none' && s1_isConceptuallyActive) {
+    // Keep pulse on select if conceptually active (true for dynamic flow unless not animating)
+    const canPulseOnSelect = s1_isConceptuallyActive || (currentAnimationType === 'dynamic_power_flow' && s1_isDashdrawCandidate);
+    if (!s3_isDashdrawActive && s3_solidPathPulseType === 'none' && canPulseOnSelect) {
       s3_solidPathPulseType = 'subtlePulse';
       s3_solidPathPulseDuration = '1.8s';
     }
@@ -251,12 +300,10 @@ if (s1_isDashdrawCandidate) {
     solidPathStyle.animationIterationCount = 'infinite';
     solidPathStyle.animationTimingFunction = 'ease-in-out';
   }
-
-  // Animated path properties for smoother flow
-  // Key change: `linecap: 'round'` for all animated patterns.
+  
   const animatedPathDashArrayConfig = {
     DEFAULT:        { array: '10 6', sum: 16, linecap: 'round' as const },
-    DATA_BUS:       { array: '2 7', sum: 9, linecap: 'round' as const }, // Shorter "dots" for data
+    DATA_BUS:       { array: '2 7', sum: 9, linecap: 'round' as const },
     CONTROL_SIGNAL: { array: '6 6', sum: 12, linecap: 'round' as const },
   };
   
@@ -264,36 +311,36 @@ if (s1_isDashdrawCandidate) {
   if (data?.flowType === 'DATA_BUS') currentDashConfig = animatedPathDashArrayConfig.DATA_BUS;
   else if (data?.flowType === 'CONTROL_SIGNAL') currentDashConfig = animatedPathDashArrayConfig.CONTROL_SIGNAL;
 
-  // Use the AnimatedPathStyle interface here for type safety with the CSS custom property
   const animatedPathStyle: AnimatedPathStyle = {
     stroke: s4_animatedDashColor,
     strokeWidth: Math.max(MIN_ANIMATED_DASH_WIDTH, s4_finalSolidPathStrokeWidth * ANIMATED_DASH_WIDTH_FACTOR),
-    strokeLinecap: currentDashConfig.linecap, // Apply round caps here
+    strokeLinecap: currentDashConfig.linecap,
     fill: 'none',
     pointerEvents: 'none',
   };
 
   if (s3_isDashdrawActive) {
     animatedPathStyle.strokeDasharray = currentDashConfig.array;
-    // Set the CSS custom property for the animation offset
     animatedPathStyle['--edge-animation-dashoffset-end'] = `-${currentDashConfig.sum}px`;
     animatedPathStyle.animationName = 'dashdraw';
     animatedPathStyle.animationDuration = s1_dashdrawDuration;
     animatedPathStyle.animationDirection = s1_dashdrawDirection;
     animatedPathStyle.animationIterationCount = 'infinite';
-    animatedPathStyle.animationTimingFunction = 'linear'; // Linear is best for continuous flow
+    animatedPathStyle.animationTimingFunction = 'linear';
   }
   
-  // --- Edge Label Styling (logic remains similar) ---
-  const labelBorderColor = selected
-    ? flowColors.SELECTED_STROKE
-    : (s1_isConceptuallyActive || finalStatus === 'FAULT' || finalStatus === 'WARNING')
-      ? s4_finalSolidPathStrokeColor
-      : 'var(--edge-label-border-inactive)';
-  
-  const labelBackground = (s4_finalSolidPathStrokeColor === flowColors.OFFLINE && !s1_isConceptuallyActive)
-    ? 'var(--edge-label-bg-inactive)'
-    : 'var(--edge-label-bg)';
+    const isActuallyActiveForLabel = s1_isConceptuallyActive || (currentAnimationType === 'dynamic_power_flow' && s1_isDashdrawCandidate);
+
+    const labelBorderColor = selected
+        ? flowColors.SELECTED_STROKE
+        : (isActuallyActiveForLabel || finalStatus === 'FAULT' || finalStatus === 'WARNING')
+        ? s4_finalSolidPathStrokeColor
+        : 'var(--edge-label-border-inactive)';
+
+    const labelBackground = (s4_finalSolidPathStrokeColor === flowColors.OFFLINE && !isActuallyActiveForLabel)
+        ? 'var(--edge-label-bg-inactive)'
+        : 'var(--edge-label-bg)';
+
 
   return (
     <>
@@ -307,7 +354,7 @@ if (s1_isDashdrawCandidate) {
       {s3_isDashdrawActive && (
         <path
           d={edgePath}
-          style={animatedPathStyle} // This style object now correctly typed
+          style={animatedPathStyle}
           className="react-flow__edge-path-animated-foreground"
         />
       )}
@@ -325,7 +372,7 @@ if (s1_isDashdrawCandidate) {
               fontWeight: 500,
               boxShadow: '0 2px 5px var(--edge-label-shadow-color)',
               pointerEvents: 'all',
-              opacity: selected || s1_isConceptuallyActive || finalStatus !== '' ? 1 : 0.8,
+              opacity: selected || isActuallyActiveForLabel || finalStatus !== '' ? 1 : 0.8,
               transition: 'opacity 0.25s ease, border-color 0.25s ease, background-color 0.25s ease',
               border: `1.5px solid ${labelBorderColor}`,
             }}

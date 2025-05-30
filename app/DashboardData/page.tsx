@@ -26,7 +26,7 @@ const PlaceholderHeader: React.FC = () => {
             <div className="flex items-center space-x-2 sm:space-x-3">
                 <ThemeToggle />
                 <span className='text-xs sm:text-sm text-muted-foreground font-mono whitespace-nowrap'>
-                    v{VERSION || '?.?.?'}
+                    {VERSION || '?.?.?'}
                 </span>
             </div>
         </motion.header>

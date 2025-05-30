@@ -9,8 +9,8 @@ import LoadingScreen from '@/components/LoadingScreen';
 // useRouter might not be needed here anymore if its only purpose was for the loading screen logic
 // import { useRouter } from 'next/navigation'; 
 import { Toaster } from "@/components/ui/sonner";
-import { APP_APPLE_TOUCH_ICON, APP_DEFAULT_TITLE, APP_DESCRIPTION, APP_FAVICON, APP_KEYWORDS, APP_LOGO_PNG_HEIGHT, APP_LOGO_PNG_WIDTH, APP_NAME, APP_OG_IMAGE_URL, APP_PUBLISHER, APP_THEME_COLOR_DARK, APP_THEME_COLOR_LIGHT, APP_URL } from '@/config/appConfig';
-import { APP_AUTHOR } from '@/config/constants';
+import { APP_DEFAULT_TITLE, APP_DESCRIPTION, APP_FAVICON, APP_KEYWORDS, APP_LOGO_PNG_HEIGHT, APP_LOGO_PNG_WIDTH, APP_OG_IMAGE_URL, APP_PUBLISHER, APP_THEME_COLOR_DARK, APP_THEME_COLOR_LIGHT, APP_URL } from '@/config/appConfig';
+import { APP_AUTHOR, APP_NAME } from '@/config/constants';
 
 
 const inter = Inter({ subsets: ['latin'] });

@@ -24,8 +24,7 @@ import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
 
 import { exportIdbData, clearOnboardingData } from '@/lib/idb-store';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
-import { APP_NAME, APP_VERSION }  from '@/config/appConfig';
-import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY } from '@/config/constants';
+import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION } from '@/config/constants';
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 
 // Define keys to include in backup
@@ -252,7 +251,7 @@ export default function ResetApplicationPage() {
       const backupData = {
         backupSchemaVersion: "1.0.0",
         createdAt: new Date().toISOString(),
-        application: { name: APP_NAME, version: APP_VERSION },
+        application: { name: APP_NAME, version: VERSION },
         plant: { name: PLANT_NAME, location: PLANT_LOCATION, capacity: PLANT_CAPACITY },
         configurations: { dataPointDefinitions: rawDataPointsDefinitions },
         browserStorage: { indexedDB: idbData, localStorage: localStorageData },

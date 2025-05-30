@@ -1,11 +1,8 @@
 // src/config/appConfig.ts
 import logo from "@/AV_logo.png"; // This is a StaticImageData object from next/image
 import logoSvg from "@/av_logo.svg"; // This is also a StaticImageData object if imported similarly
-import { APP_AUTHOR, PLANT_CAPACITY, PLANT_LOCATION, PLANT_NAME } from "./constants";
+import { APP_AUTHOR, APP_NAME, PLANT_CAPACITY, PLANT_LOCATION, PLANT_NAME } from "./constants";
 
-// Core Application Metadata
-export const APP_NAME = "Mini-Grid Control Panel";
-export const APP_VERSION = "1.1";
 
 // URLs - IMPORTANT: For SEO/OG tags, BASE_URL should be your production domain
 export const APP_BASE_URL = "https://yourwebsite.com"; // Your actual production domain. NO TRAILING SLASH.
@@ -39,19 +36,3 @@ export const APP_TERMS_OF_SERVICE_URL = `${APP_AUTHOR_URL}/terms-of-service`;
 // Theming (for PWA or mobile browser chrome)
 export const APP_THEME_COLOR_LIGHT = "#FFFFFF";
 export const APP_THEME_COLOR_DARK = "#000000"; // Or your dark theme primary bg
-
-// Web Sockets & OPC UA (already well defined)
-export const WS_PORT = 8888;
-export const WS_URL = (() => {
-    if (typeof window !== 'undefined') {
-        return `ws://${window.location.hostname}:${WS_PORT}`;
-    }
-    return `ws://localhost:${WS_PORT}`;
-})();
-export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
-export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://112.134.218.51:4840";
-
-// User Role
-export type UserRole = 'admin' | 'operator' | 'viewer';
-export const USER_ROLE: UserRole = "viewer";
-// export const USER_ROLE: UserRole = "admin";

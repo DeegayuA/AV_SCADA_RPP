@@ -274,28 +274,44 @@ export type CustomNodeData =
   | IsolatorNodeData | ATSNodeData | JunctionBoxNodeData | FuseNodeData | GaugeNodeData
   | SwitchNodeData; // Added SwitchNodeData
 
+  export type DynamicFlowType =
+  | 'bidirectional_from_net'          // Uses gridNetFlowDataPointId, +/- determines direction
+  | 'bidirectional_gen_vs_usage'    // Uses generationDataPointId & usageDataPointId, (Gen-Usage) determines direction
+  | 'unidirectional_export'         // Uses dynamicMagnitudeDataPointId, flow is always T->S (reverse) by default
+  | 'unidirectional_import';  
+
 export type AnimationType = 'none' | 'dynamic_power_flow' | 'constant_unidirectional';
 
+
 export interface AnimationFlowConfig {
-  animationType?: AnimationType; // Defaults to 'dynamic_power_flow' if DPs are set, or 'none'
+  animationType?: 'dynamic_power_flow' | 'constant_unidirectional' | 'none';
 
-  // For 'dynamic_power_flow'
-  generationDataPointId?: string;
-  usageDataPointId?: string;
-  gridNetFlowDataPointId?: string;
-  speedMultiplier?: number;       // Applied to |net flow| for dynamic speed
-  invertFlowDirection?: boolean;  // Inverts calculated dynamic direction
+  // --- Dynamic Power Flow Specific ---
+  dynamicFlowType?: DynamicFlowType;       // NEW: Determines dynamic flow behavior
+  generationDataPointId?: string;          // For 'bidirectional_gen_vs_usage'
+  usageDataPointId?: string;               // For 'bidirectional_gen_vs_usage'
+  gridNetFlowDataPointId?: string;         // For 'bidirectional_from_net'
+  dynamicMagnitudeDataPointId?: string;    // NEW: For 'unidirectional_export' & 'unidirectional_import'
+  
+  speedMultiplier?: number;                // Applies to all dynamic flow types
+  invertFlowDirection?: boolean;           // Flips the derived/defined base direction
+  minDynamicDuration?: number;
+  maxDynamicDuration?: number;
+  dynamicSpeedBaseDivisor?: number;
 
-  // For 'constant_unidirectional'
-  constantFlowDirection?: 'forward' | 'reverse'; // S->T or T->S
-  constantFlowSpeed?: 'slow' | 'medium' | 'fast' | number; // Predefined or custom ms/s
-  constantFlowActivationDataPointId?: string; // Optional boolean DP to toggle animation
+  // --- Constant Unidirectional Flow Specific ---
+  constantFlowDirection?: 'forward' | 'reverse';
+  constantFlowSpeed?: 'slow' | 'medium' | 'fast' | number;
+  constantFlowActivationDataPointId?: string;
+  minConstantDuration?: number;
+  maxConstantDuration?: number;
 }
 
 export interface GlobalSLDAnimationSettings extends AnimationFlowConfig {
-  // animationType here sets the GLOBAL DEFAULT animation type
-  isEnabled?: boolean; // Enable/disable all global settings
-  globallyInvertDefaultDynamicFlowLogic?: boolean; // Master switch for default dynamic direction logic
+  isEnabled?: boolean; // Master switch for all global animation behaviors
+  // This specifically affects 'bidirectional_from_net' and 'bidirectional_gen_vs_usage'
+  // by flipping the interpretation of positive/negative net flow.
+  globallyInvertDefaultDynamicFlowLogic?: boolean; 
 }
 
 // --- Edge Data ---
