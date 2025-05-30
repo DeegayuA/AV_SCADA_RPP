@@ -210,7 +210,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderProps> = React.memo(
                             </Button>
                         )}
                     </div>
-                    <span className='font-mono'>v{version || '?.?.?'}</span>
+                    <span className='font-mono'>{version || '?.?.?'}</span>
                 </motion.div>
             </>
         );

@@ -195,21 +195,11 @@ if (s1_isDashdrawCandidate) {
   }
   const finalStatus: string = statusValueFromLink || String(data?.status || '').toUpperCase();
 
-  // --- Base Style Initialization ---
-  // Initialize the style object before applying conditional styling
-  let finalBasePathStyle: React.CSSProperties = {
-    ...style,
-    stroke: edgeStrokeColor,
-    strokeWidth: edgeStrokeWidth,
-    strokeLinecap: 'round',
-  };
-
   if (finalStatus === 'FAULT') {
     s3_currentSolidPathStrokeColor = flowColors.FAULT;
     s3_isDashdrawActive = false;
     s3_solidPathPulseType = 'faultPulse';
     s3_solidPathPulseDuration = '0.8s';
-    
   } else if (finalStatus === 'WARNING') {
     if (s3_currentSolidPathStrokeColor !== flowColors.FAULT) {
         s3_currentSolidPathStrokeColor = flowColors.WARNING;
@@ -250,7 +240,6 @@ if (s1_isDashdrawCandidate) {
   const solidPathStyle: React.CSSProperties = {
     stroke: s4_finalSolidPathStrokeColor,
     strokeWidth: s4_finalSolidPathStrokeWidth,
-
     strokeLinecap: 'round',
     transition: 'stroke 0.2s ease-in-out, stroke-width 0.2s ease-in-out',
     ...(style || {}),
@@ -293,7 +282,6 @@ if (s1_isDashdrawCandidate) {
     animatedPathStyle.animationDirection = s1_dashdrawDirection;
     animatedPathStyle.animationIterationCount = 'infinite';
     animatedPathStyle.animationTimingFunction = 'linear'; // Linear is best for continuous flow
-
   }
   
   // --- Edge Label Styling (logic remains similar) ---
