@@ -1,50 +1,58 @@
 // components/sld/edges/AnimatedFlowEdge.tsx
 import React from 'react';
-import { EdgeProps, getSmoothStepPath, EdgeLabelRenderer, BaseEdge } from 'reactflow';
+import { EdgeProps, EdgeLabelRenderer } from 'reactflow';
+import { getSmoothStepPath } from '@xyflow/react';
 import { getDataPointValue, applyValueMapping } from '../nodes/nodeUtils';
-import { 
-    CustomFlowEdgeData, 
-    AnimationFlowConfig, // The primary config type for an edge
-    GlobalSLDAnimationSettings // For understanding the structure that SLDWidget might merge
-} from '@/types/sld'; 
+import {
+    CustomFlowEdgeData,
+    AnimationFlowConfig,
+    GlobalSLDAnimationSettings
+} from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
 
-// Centralized styling for consistency
+// --- Theming-aware Styling Constants (using CSS Variables) ---
 const flowColors = {
-  AC_HV: '#FFBF00',      // Bright Yellow-Orange
-  AC_MV: '#FFA500',      // Orange
-  AC_LV: '#FF8C00',      // DarkOrange
-  DC_HV: '#1E90FF',      // DodgerBlue
-  DC_MV: '#00BFFF',      // DeepSkyBlue
-  DC_LV: '#87CEFA',      // LightSkyBlue
-  CONTROL_SIGNAL: '#32CD32', // LimeGreen
-  AUX_POWER: '#DA70D6',  // Orchid
-  ENERGIZED_DEFAULT: '#7CFC00', // LawnGreen (generic energized)
-  OFFLINE: '#A9A9A9',    // DarkGray (de-energized, default)
-  FAULT: '#FF0000',      // Bright Red (highest priority)
-  WARNING: '#FFD700',    // Gold/Yellow (clear warning)
-  SELECTED_STROKE: '#007AFF', // iOS Blue (distinct selection)
+  AC_HV: 'var(--edge-color-ac-hv)',
+  AC_MV: 'var(--edge-color-ac-mv)',
+  AC_LV: 'var(--edge-color-ac-lv)',
+  DC_HV: 'var(--edge-color-dc-hv)',
+  DC_MV: 'var(--edge-color-dc-mv)',
+  DC_LV: 'var(--edge-color-dc-lv)',
+  CONTROL_SIGNAL: 'var(--edge-color-control-signal)',
+  DATA_BUS: 'var(--edge-color-data-bus)',
+  AUX_POWER: 'var(--edge-color-aux-power)',
+  ENERGIZED_DEFAULT: 'var(--edge-color-energized-default)',
+  OFFLINE: 'var(--edge-color-offline)',
+  FAULT: 'var(--edge-color-fault)',
+  WARNING: 'var(--edge-color-warning)',
+  SELECTED_STROKE: 'var(--edge-color-selected)',
 };
 
-const voltageStrokeWidths = {
-  HV: 4.5, MV: 3.5, LV: 2.5, ELV: 2.0, DEFAULT: 2.5,
+const flowTypeStrokeWidths = {
+  AC_HV: 4.5, AC_MV: 3.5, AC_LV: 2.5,
+  DC_HV: 4.5, DC_MV: 3.5, DC_LV: 2.5,
+  CONTROL_SIGNAL: 2.2,
+  DATA_BUS: 2.8,
+  AUX_POWER: 2.5,
+  DEFAULT: 2.5,
 };
 const SELECTED_STROKE_WIDTH_INCREASE = 1.5;
+const ANIMATED_DASH_WIDTH_FACTOR = 0.6;
+const MIN_ANIMATED_DASH_WIDTH = 1.8;
 
-// SLDWidget.tsx passes down the `animationSettings` on `data`.
-// This `animationSettings` could be edge-specific or derived from global defaults.
-// If derived from global, it might include `globallyInvertDefaultDynamicFlowLogic`.
-type EffectiveEdgeData = CustomFlowEdgeData & { // CustomFlowEdgeData.animationSettings is AnimationFlowConfig
-  // SLDWidget will merge GlobalSLDAnimationSettings into the edge's effective animationSettings
-  // if the edge is using global defaults. So animConfig below can be cast or checked for this field.
-};
+// Interface for style object that includes our CSS custom property
+interface AnimatedPathStyle extends React.CSSProperties {
+  '--edge-animation-dashoffset-end'?: string;
+}
+
+type EffectiveEdgeData = CustomFlowEdgeData & {};
 
 export default function AnimatedFlowEdge({
   id, sourceX, sourceY, targetX, targetY,
   sourcePosition, targetPosition,
-  style = {}, markerEnd, data, selected,
+  markerEnd, data, selected, style
 }: EdgeProps<EffectiveEdgeData>) {
-  
+
   const { opcUaNodeValues, dataPoints } = useAppStore(state => ({
     opcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
@@ -52,24 +60,16 @@ export default function AnimatedFlowEdge({
 
   const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition,
-    borderRadius: 5,
   });
 
-  let edgeStrokeColor = flowColors.OFFLINE;
-  let edgeStrokeWidth = voltageStrokeWidths[(data?.voltageLevel as keyof typeof voltageStrokeWidths) || 'DEFAULT'] || voltageStrokeWidths.DEFAULT;
-  const baseStrokeDasharray = '8 6'; // Updated dash pattern
+  // --- Stage 1: Initial animation properties ---
+  let s1_isConceptuallyActive = false;
+  let s1_isDashdrawCandidate = false;
+  let s1_dashdrawDirection: 'normal' | 'reverse' = 'normal';
+  let s1_dashdrawDuration = '5s'; // Your default duration
 
-  let flowActive = false; 
-  let animationName = 'none';
-  let animationDirection: 'normal' | 'reverse' = 'normal'; 
-  let animationDuration = '20s'; 
-
-  const animConfig = data?.animationSettings; // This is AnimationFlowConfig from types/sld.ts
-  // Access the global invert flag, SLDWidget should ensure this is present if applicable.
+  const animConfig = data?.animationSettings;
   const masterGlobalInvertActive = (animConfig as GlobalSLDAnimationSettings)?.globallyInvertDefaultDynamicFlowLogic ?? false;
-
-
-  // --- Determine Animation Behavior based on animationType ---
   const currentAnimationType = animConfig?.animationType || 'none';
 
   if (currentAnimationType === 'dynamic_power_flow') {
@@ -85,113 +85,115 @@ export default function AnimatedFlowEdge({
       netFlowValue = genValue - usageValue;
     }
 
-    // 1. Base Calculated Direction (NEW DEFAULT: Positive Net Flow/Export/Gen>Use => Target -> Source (reverse))
-    let baseCalculatedDirection: 'normal' | 'reverse' = 'normal'; // Default for netFlowValue === 0
-    if (netFlowValue > 0) { baseCalculatedDirection = 'reverse'; } 
-    else if (netFlowValue < 0) { baseCalculatedDirection = 'normal'; }
+    let baseCalculatedDirection: 'normal' | 'reverse' = 'normal';
+    if (netFlowValue > 0) baseCalculatedDirection = 'reverse';
+    else if (netFlowValue < 0) baseCalculatedDirection = 'normal';
     
-    flowActive = netFlowValue !== 0;
+    s1_isConceptuallyActive = true;
+    s1_isDashdrawCandidate = netFlowValue !== 0;
 
-    // 2. Apply Global Master Invert for Dynamic Flow
     let directionAfterGlobalInvert = baseCalculatedDirection;
-    if (masterGlobalInvertActive && flowActive) {
+    if (masterGlobalInvertActive && s1_isDashdrawCandidate) {
       directionAfterGlobalInvert = (baseCalculatedDirection === 'normal') ? 'reverse' : 'normal';
     }
-
-    // 3. Apply Edge-Specific Invert for Dynamic Flow
-    animationDirection = directionAfterGlobalInvert;
-    if (animConfig?.invertFlowDirection && flowActive) {
-      animationDirection = (directionAfterGlobalInvert === 'normal') ? 'reverse' : 'normal';
+    s1_dashdrawDirection = directionAfterGlobalInvert;
+    if (animConfig?.invertFlowDirection && s1_isDashdrawCandidate) {
+      s1_dashdrawDirection = (directionAfterGlobalInvert === 'normal') ? 'reverse' : 'normal';
     }
     
-    // Speed for Dynamic Flow
-    if (flowActive) {
+if (s1_isDashdrawCandidate) {
       const differenceMagnitude = Math.abs(netFlowValue);
-      const safeSpeedMultiplier = Math.max(0.01, animConfig?.speedMultiplier ?? 1);
-      const BASE_SPEED_ADJUSTMENT_FACTOR = 0.3; 
+      const safeSpeedMultiplier = Math.max(0.1, animConfig?.speedMultiplier ?? 10); // Ensure a minimum multiplier to avoid zero speed
+      const BASE_SPEED_ADJUSTMENT_FACTOR = 5; // Keep this low for slower base speed
       const speedFactor = differenceMagnitude * safeSpeedMultiplier * BASE_SPEED_ADJUSTMENT_FACTOR;
-      if (speedFactor > 0.001) { // Avoid division by zero or extremely slow if diff is tiny
-        const clampedSpeedFactor = Math.max(0.1, Math.min(speedFactor, 150)); // Adjusted max clamp for wider speed range
-        animationDuration = `${Math.max(0.3, Math.min(45, 30 / clampedSpeedFactor))}s`; // Adjusted base factors and clamps
-        animationName = 'dashdraw';
+      
+      if (speedFactor > 0.001) {
+        const clampedSpeedFactor = Math.max(0.02, Math.min(speedFactor, 200)); // Lower min clamp for even slower possibility
+        // Duration calculation: Using '30 / clampedSpeedFactor' to give longer base duration
+        // Min duration 5s, Max 80s. Very slow flows can be very long.
+        s1_dashdrawDuration = `${Math.max(5, Math.min(80, 30 / clampedSpeedFactor))}s`; 
       } else {
-        flowActive = false; 
-        animationName = 'none';
+        // If speed factor is negligible, make it a very slow, long animation or turn off
+        // s1_isDashdrawCandidate = false; // Option 1: Turn off animation if too slow
+        s1_dashdrawDuration = '80s';    // Option 2: Make it extremely slow
       }
-    } else {
-      animationName = 'none';
     }
-
   } else if (currentAnimationType === 'constant_unidirectional') {
-    animationDirection = animConfig?.constantFlowDirection === 'forward' ? 'normal' : 
-                         animConfig?.constantFlowDirection === 'reverse' ? 'reverse' : 
-                         'normal'; // Default to 'normal' if undefined
-
-    // Determine constant speed based on preset or custom numeric value
+    s1_dashdrawDirection = animConfig?.constantFlowDirection === 'reverse' ? 'reverse' : 'normal';
     const speedSetting = animConfig?.constantFlowSpeed;
-    if (speedSetting === 'slow') animationDuration = '3s';
-    else if (speedSetting === 'medium') animationDuration = '1.5s';
-    else if (speedSetting === 'fast') animationDuration = '0.8s';
+    if (speedSetting === 'slow') s1_dashdrawDuration = '4s';
+    else if (speedSetting === 'medium') s1_dashdrawDuration = '2s';
+    else if (speedSetting === 'fast') s1_dashdrawDuration = '1s';
     else if (typeof speedSetting === 'number' && speedSetting > 0) {
-      animationDuration = `${Math.max(0.3, Math.min(10, speedSetting))}s`; // Custom duration, clamped
+      s1_dashdrawDuration = `${Math.max(0.2, Math.min(15, speedSetting))}s`;
     } else {
-      animationDuration = '1.5s'; // Default to medium if speedSetting is invalid
+      s1_dashdrawDuration = '2s'; // Default for constant
     }
 
-    // Check activation DP if provided
     if (animConfig?.constantFlowActivationDataPointId) {
       const rawActivationValue = getDataPointValue(animConfig.constantFlowActivationDataPointId, dataPoints, opcUaNodeValues);
-      flowActive = !!rawActivationValue; // Active if true, inactive if false/undefined/null
+      s1_isConceptuallyActive = !!rawActivationValue;
     } else {
-      flowActive = true; // Always active if no activation DP
+      s1_isConceptuallyActive = true;
     }
-
-    animationName = flowActive ? 'dashdraw' : 'none';
-
-  } else { // animationType is 'none' or fallback for older data / incomplete config
+    s1_isDashdrawCandidate = s1_isConceptuallyActive;
+  } else { // 'none' or fallback animation logic
     const isEnergizedLink = data?.dataPointLinks?.find(l => l.targetProperty === 'isEnergized');
     if (isEnergizedLink) {
         const rawIsEnergized = getDataPointValue(isEnergizedLink.dataPointId, dataPoints, opcUaNodeValues);
-        flowActive = !!(isEnergizedLink.valueMapping ? applyValueMapping(rawIsEnergized, isEnergizedLink) : rawIsEnergized);
+        s1_isConceptuallyActive = !!(isEnergizedLink.valueMapping ? applyValueMapping(rawIsEnergized, isEnergizedLink) : rawIsEnergized);
     } else {
-        flowActive = data?.isEnergized ?? false; 
+        s1_isConceptuallyActive = data?.isEnergized ?? false; 
     }
-    animationName = flowActive ? 'dashdraw' : 'none'; // Simple on/off animation
-    animationDuration = '2s'; // Generic slow speed for this fallback
-    animationDirection = 'normal'; // Default direction
+    s1_isDashdrawCandidate = s1_isConceptuallyActive;
+    s1_dashdrawDuration = '5s'; // Uses your default 5s
+    s1_dashdrawDirection = 'normal';
   }
 
-  // --- Determine Edge Base Color (Based on flowType and flowActive state) ---
-  if (flowActive) {
-    if (data?.flowType) {
-        const ftk = `${data.flowType}_${data.voltageLevel || 'LV'}` as keyof typeof flowColors;
-        edgeStrokeColor = flowColors[ftk] || 
-                          (data.flowType === 'CONTROL_SIGNAL' ? flowColors.CONTROL_SIGNAL : 
-                           data.flowType === 'AUX_POWER' ? flowColors.AUX_POWER : 
-                           flowColors.ENERGIZED_DEFAULT);
-    } else {
-        edgeStrokeColor = flowColors.ENERGIZED_DEFAULT; 
+  // --- Stage 2: Base color and width for solid path (logic remains similar) ---
+  let s2_solidPathStrokeColor = flowColors.OFFLINE;
+  let strokeWidthKey: keyof typeof flowTypeStrokeWidths = 'DEFAULT';
+  if (data?.flowType === 'AC' || data?.flowType === 'DC') {
+    const vl = data.voltageLevel || 'LV';
+    strokeWidthKey = `${data.flowType}_${vl}` as keyof typeof flowTypeStrokeWidths;
+  } else if (data?.flowType === 'CONTROL_SIGNAL') strokeWidthKey = 'CONTROL_SIGNAL';
+  else if (data?.flowType === 'DATA_BUS') strokeWidthKey = 'DATA_BUS';
+  else if (data?.flowType === 'AUX_POWER') strokeWidthKey = 'AUX_POWER';
+  let s2_solidPathStrokeWidth = flowTypeStrokeWidths[strokeWidthKey] || flowTypeStrokeWidths.DEFAULT;
+
+  if (s1_isConceptuallyActive) {
+    const flowType = data?.flowType;
+    if (flowType) {
+        if (flowType === 'AC' || flowType === 'DC') {
+            const ftk = `${flowType}_${data.voltageLevel || 'LV'}` as keyof typeof flowColors;
+            s2_solidPathStrokeColor = (flowColors as any)[ftk] || flowColors.ENERGIZED_DEFAULT;
+        } else { // For CONTROL_SIGNAL, DATA_BUS, AUX_POWER etc.
+            s2_solidPathStrokeColor = (flowColors as any)[flowType as any] || flowColors.ENERGIZED_DEFAULT;
+        }
+    } else { // Generic energized
+        s2_solidPathStrokeColor = flowColors.ENERGIZED_DEFAULT;
     }
-  } else {
-    // Retain specific colors for CONTROL_SIGNAL or AUX_POWER even if not "flowing" (animated)
-    // to show they are present/configured, unless explicitly an offline/fault/warning status.
-    if (data?.flowType === 'CONTROL_SIGNAL' && !(data.status === 'FAULT' || data.status === 'WARNING' || data.status === 'OFFLINE' || data.isEnergized === false)) {
-        edgeStrokeColor = flowColors.CONTROL_SIGNAL;
-    } else if (data?.flowType === 'AUX_POWER' && !(data.status === 'FAULT' || data.status === 'WARNING' || data.status === 'OFFLINE' || data.isEnergized === false)) {
-        edgeStrokeColor = flowColors.AUX_POWER;
-    } else {
-        edgeStrokeColor = flowColors.OFFLINE; 
-    }
+  } else { // Not conceptually active
+    // Show static color if type is defined, otherwise OFFLINE
+    if (data?.flowType === 'CONTROL_SIGNAL') s2_solidPathStrokeColor = flowColors.CONTROL_SIGNAL;
+    else if (data?.flowType === 'DATA_BUS') s2_solidPathStrokeColor = flowColors.DATA_BUS;
+    else if (data?.flowType === 'AUX_POWER') s2_solidPathStrokeColor = flowColors.AUX_POWER;
+    else s2_solidPathStrokeColor = flowColors.OFFLINE;
   }
-  
-  // --- Status Overrides (Fault/Warning) - Highest priority for color and specific animation ---
+
+  // --- Stage 3: Status Overrides (logic remains similar) ---
+  let s3_currentSolidPathStrokeColor = s2_solidPathStrokeColor;
+  let s3_isDashdrawActive = s1_isDashdrawCandidate;
+  let s3_solidPathPulseType: 'faultPulse' | 'subtlePulse' | 'none' = 'none';
+  let s3_solidPathPulseDuration = '';
+
   const statusLink = data?.dataPointLinks?.find(link => link.targetProperty === 'status');
   let statusValueFromLink: string | null = null;
   if (statusLink) {
     const rawStatus = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues);
     statusValueFromLink = String(statusLink.valueMapping ? applyValueMapping(rawStatus, statusLink) : rawStatus).toUpperCase();
   }
-  const finalStatus: string = statusValueFromLink || String(data?.status || '').toUpperCase(); // Prefer DPLinked status
+  const finalStatus: string = statusValueFromLink || String(data?.status || '').toUpperCase();
 
   // --- Base Style Initialization ---
   // Initialize the style object before applying conditional styling
@@ -203,109 +205,143 @@ export default function AnimatedFlowEdge({
   };
 
   if (finalStatus === 'FAULT') {
-    edgeStrokeColor = flowColors.FAULT;
-    animationName = 'faultPulse'; 
-    animationDuration = '1s';
-    // Set CSS variable for base stroke width for the animation
-    (finalBasePathStyle as any)['--base-stroke-width'] = `${edgeStrokeWidth}px`;
-    // animationDirection can remain as previously calculated for fault context, or default to 'normal'
+    s3_currentSolidPathStrokeColor = flowColors.FAULT;
+    s3_isDashdrawActive = false;
+    s3_solidPathPulseType = 'faultPulse';
+    s3_solidPathPulseDuration = '0.8s';
+    
   } else if (finalStatus === 'WARNING') {
-    if(edgeStrokeColor !== flowColors.FAULT) edgeStrokeColor = flowColors.WARNING; // Don't let warning override fault color
-    // Keep general animation if active, or add subtle pulse if it was 'none' and not a fault
-    if (animationName === 'none') { // Since we're already in the WARNING branch, FAULT is not possible here
-      animationName = 'subtlePulse'; // Or specific warning pulse
-      animationDuration = '1.8s';
+    if (s3_currentSolidPathStrokeColor !== flowColors.FAULT) {
+        s3_currentSolidPathStrokeColor = flowColors.WARNING;
+    }
+    if (!s3_isDashdrawActive && s3_solidPathPulseType === 'none') { 
+      s3_solidPathPulseType = 'subtlePulse';
+      s3_solidPathPulseDuration = '1.5s';
     }
   }
   
-  // Final check: if not faultPulse and main animation is dashdraw but ended up not flowActive (e.g., Gen=Usage, or constant flow inactive), then no dash animation.
-  if (animationName === 'dashdraw' && !flowActive) {
-    animationName = 'none';
+  if (s3_isDashdrawActive && !s1_isConceptuallyActive) {
+    s3_isDashdrawActive = false;
   }
 
-  // --- Selected State Styling ---
+  // --- Stage 4: Selection Styling & Final Animated Dash Color (logic remains similar) ---
+  let s4_finalSolidPathStrokeColor = s3_currentSolidPathStrokeColor;
+  let s4_finalSolidPathStrokeWidth = s2_solidPathStrokeWidth;
+  let s4_animatedDashColor: string;
+
   if (selected) {
-    edgeStrokeColor = flowColors.SELECTED_STROKE;
-    edgeStrokeWidth += SELECTED_STROKE_WIDTH_INCREASE;
-    // If selected & should be animated but animationName is 'none' (e.g., due to 0 net flow, or constant flow paused)
-    // AND it's not a fault (faultPulse takes precedence).
-    if (animationName === 'none' && flowActive && finalStatus !== 'FAULT') { 
-        animationName = 'subtlePulse'; 
-        animationDuration = '2s';
+    s4_finalSolidPathStrokeColor = flowColors.SELECTED_STROKE;
+    s4_finalSolidPathStrokeWidth = s2_solidPathStrokeWidth + SELECTED_STROKE_WIDTH_INCREASE;
+    s4_animatedDashColor = 'var(--edge-animated-dash-on-selected)';
+
+    if (!s3_isDashdrawActive && s3_solidPathPulseType === 'none' && s1_isConceptuallyActive) {
+      s3_solidPathPulseType = 'subtlePulse';
+      s3_solidPathPulseDuration = '1.8s';
+    }
+  } else {
+    if (s3_currentSolidPathStrokeColor === flowColors.WARNING) {
+      s4_animatedDashColor = 'var(--edge-animated-dash-on-warning)';
+    } else {
+      s4_animatedDashColor = 'var(--edge-animated-dash-default)';
     }
   }
-  
-  // --- Final Style Assembly for the Base Path ---
-  // Update the finalBasePathStyle with current values as they may have changed
-  finalBasePathStyle.stroke = edgeStrokeColor;
-  finalBasePathStyle.strokeWidth = edgeStrokeWidth;
-  
-  // Apply filter if selected
-  finalBasePathStyle = {
-    ...style,
-    stroke: edgeStrokeColor,
-    strokeWidth: edgeStrokeWidth,
+
+  // --- Assemble Styles for SVG Paths ---
+  const solidPathStyle: React.CSSProperties = {
+    stroke: s4_finalSolidPathStrokeColor,
+    strokeWidth: s4_finalSolidPathStrokeWidth,
+
     strokeLinecap: 'round',
+    transition: 'stroke 0.2s ease-in-out, stroke-width 0.2s ease-in-out',
+    ...(style || {}),
+  };
+
+  if (s3_solidPathPulseType !== 'none') {
+    solidPathStyle.animationName = s3_solidPathPulseType;
+    solidPathStyle.animationDuration = s3_solidPathPulseDuration;
+    solidPathStyle.animationIterationCount = 'infinite';
+    solidPathStyle.animationTimingFunction = 'ease-in-out';
+  }
+
+  // Animated path properties for smoother flow
+  // Key change: `linecap: 'round'` for all animated patterns.
+  const animatedPathDashArrayConfig = {
+    DEFAULT:        { array: '10 6', sum: 16, linecap: 'round' as const },
+    DATA_BUS:       { array: '2 7', sum: 9, linecap: 'round' as const }, // Shorter "dots" for data
+    CONTROL_SIGNAL: { array: '6 6', sum: 12, linecap: 'round' as const },
   };
   
-  // Re-apply filter if selected, as finalBasePathStyle might have been re-initialized
-  if (selected) {
-    (finalBasePathStyle as any).filter = `url(#selected-edge-glow-${id})`;
-  }
-  // Re-apply --base-stroke-width for fault state if it was re-initialized
-  if (finalStatus === 'FAULT') {
-    (finalBasePathStyle as any)['--base-stroke-width'] = `${edgeStrokeWidth - (selected ? SELECTED_STROKE_WIDTH_INCREASE : 0)}px`; // Use original width before selection increase
-  }
+  let currentDashConfig = animatedPathDashArrayConfig.DEFAULT;
+  if (data?.flowType === 'DATA_BUS') currentDashConfig = animatedPathDashArrayConfig.DATA_BUS;
+  else if (data?.flowType === 'CONTROL_SIGNAL') currentDashConfig = animatedPathDashArrayConfig.CONTROL_SIGNAL;
 
+  // Use the AnimatedPathStyle interface here for type safety with the CSS custom property
+  const animatedPathStyle: AnimatedPathStyle = {
+    stroke: s4_animatedDashColor,
+    strokeWidth: Math.max(MIN_ANIMATED_DASH_WIDTH, s4_finalSolidPathStrokeWidth * ANIMATED_DASH_WIDTH_FACTOR),
+    strokeLinecap: currentDashConfig.linecap, // Apply round caps here
+    fill: 'none',
+    pointerEvents: 'none',
+  };
 
-  if (animationName !== 'none') {
-    finalBasePathStyle.strokeDasharray = baseStrokeDasharray;
-    finalBasePathStyle.animationName = animationName; // CSS @keyframes: 'dashdraw', 'faultPulse', 'subtlePulse'
-    finalBasePathStyle.animationDuration = animationDuration;
-    finalBasePathStyle.animationDirection = animationDirection; 
-    finalBasePathStyle.animationIterationCount = 'infinite';
-    finalBasePathStyle.animationTimingFunction = 'linear'; // Default is linear, can be overridden by specific animation if needed
-    if (animationName === 'faultPulse' || animationName === 'subtlePulse') {
-        finalBasePathStyle.animationTimingFunction = 'ease-in-out'; // Override for pulse animations
-    }
+  if (s3_isDashdrawActive) {
+    animatedPathStyle.strokeDasharray = currentDashConfig.array;
+    // Set the CSS custom property for the animation offset
+    animatedPathStyle['--edge-animation-dashoffset-end'] = `-${currentDashConfig.sum}px`;
+    animatedPathStyle.animationName = 'dashdraw';
+    animatedPathStyle.animationDuration = s1_dashdrawDuration;
+    animatedPathStyle.animationDirection = s1_dashdrawDirection;
+    animatedPathStyle.animationIterationCount = 'infinite';
+    animatedPathStyle.animationTimingFunction = 'linear'; // Linear is best for continuous flow
+
   }
   
+  // --- Edge Label Styling (logic remains similar) ---
+  const labelBorderColor = selected
+    ? flowColors.SELECTED_STROKE
+    : (s1_isConceptuallyActive || finalStatus === 'FAULT' || finalStatus === 'WARNING')
+      ? s4_finalSolidPathStrokeColor
+      : 'var(--edge-label-border-inactive)';
+  
+  const labelBackground = (s4_finalSolidPathStrokeColor === flowColors.OFFLINE && !s1_isConceptuallyActive)
+    ? 'var(--edge-label-bg-inactive)'
+    : 'var(--edge-label-bg)';
+
   return (
     <>
-      <svg style={{ position: 'absolute', width: 0, height: 0 }}>
-        <defs>
-          <filter id={`selected-edge-glow-${id}`} x="-50%" y="-50%" width="200%" height="200%">
-            {/* Using feDropShadow for a simpler glow effect */}
-            <feDropShadow dx="0" dy="0" stdDeviation="2.5" floodColor={flowColors.SELECTED_STROKE} floodOpacity="0.75" />
-          </filter>
-        </defs>
-      </svg>
-      <BaseEdge id={id} path={edgePath} markerEnd={markerEnd} style={finalBasePathStyle} />
+      <path
+        id={id}
+        className="react-flow__edge-path"
+        d={edgePath}
+        markerEnd={markerEnd}
+        style={solidPathStyle}
+      />
+      {s3_isDashdrawActive && (
+        <path
+          d={edgePath}
+          style={animatedPathStyle} // This style object now correctly typed
+          className="react-flow__edge-path-animated-foreground"
+        />
+      )}
       {data?.label && (
         <EdgeLabelRenderer>
           <div
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              background: 'var(--edge-label-bg, var(--background, #fff))', 
-              color: 'var(--edge-label-text, var(--foreground, #111))',
-              padding: '2px 6px',
-              borderRadius: '6px', 
-              fontSize: '10px',
+              background: labelBackground,
+              color: 'var(--edge-label-text)',
+              padding: '4px 8px',
+              borderRadius: '6px',
+              fontSize: '11.5px',
               fontWeight: 500,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.12)', 
-              pointerEvents: 'all', 
-              opacity: selected || animationName !== 'none' ? 1 : 0.8, 
-              transition: 'opacity 0.15s ease-in-out, border-color 0.15s ease-in-out',
-              border: `1px solid ${
-                selected 
-                ? flowColors.SELECTED_STROKE 
-                : (flowActive || finalStatus === 'FAULT' || finalStatus === 'WARNING') 
-                  ? edgeStrokeColor 
-                  : 'var(--edge-label-border-inactive, var(--border-subtle, rgba(0,0,0,0.1)))' 
-              }`,
+              boxShadow: '0 2px 5px var(--edge-label-shadow-color)',
+              pointerEvents: 'all',
+              opacity: selected || s1_isConceptuallyActive || finalStatus !== '' ? 1 : 0.8,
+              transition: 'opacity 0.25s ease, border-color 0.25s ease, background-color 0.25s ease',
+              border: `1.5px solid ${labelBorderColor}`,
             }}
-            className="nodrag nopan react-flow__edge-label" 
+            className="nodrag nopan react-flow__edge-label"
           >
             {data.label}
           </div>

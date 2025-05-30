@@ -1,7 +1,7 @@
 // components/sld/SLDWidget.tsx
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, ComponentType } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, ComponentType, KeyboardEvent as ReactKeyboardEvent } from 'react'; // Added ReactKeyboardEvent
 import ReactFlow, {
   ReactFlowProvider,
   Node, Edge, Connection, addEdge,
@@ -11,18 +11,19 @@ import ReactFlow, {
   FitViewOptions,
   Panel,
   BackgroundVariant,
-  ReactFlowJsonObject, 
+  ReactFlowJsonObject,
   NodeProps,
-  Viewport, 
+  Viewport,
+  ConnectionLineType, // Added ConnectionLineType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
-import { throttle } from 'lodash';
-import { AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; 
+import { cloneDeep, throttle } from 'lodash';
+import { ChevronDown, Save, AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; 
 import { motion } from 'framer-motion';
 
-import { Textarea } from "@/components/ui/textarea"; 
+import { Textarea } from "@/components/ui/textarea";
 import {
   SLDLayout, CustomNodeType, CustomFlowEdge, CustomNodeData,
   SLDElementType, CustomFlowEdgeData, TextLabelNodeData, DataPoint, 
@@ -80,6 +81,12 @@ import AnimationFlowConfiguratorDialog, {
   DialogGlobalAnimationSettings 
 } from './ui/AnimationFlowConfiguratorDialog';
 
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface WebSocketMessageFromServer {
   type: string;
@@ -164,8 +171,16 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
   const [currentLayoutIdKey, setCurrentLayoutIdKey] = useState<string>('');
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [importJsonString, setImportJsonString] = useState('');
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false); // For single layout import
+  const [importJsonString, setImportJsonString] = useState('');         // For single layout import
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null); // For single layout import
+  const fileInputRef = useRef<HTMLInputElement>(null);                 // For single layout import
+
+  // New states for "Import All Layouts"
+  const [isImportAllDialogOpen, setIsImportAllDialogOpen] = useState(false);
+  const [importAllJsonString, setImportAllJsonString] = useState('');
+  const [selectedAllFileName, setSelectedAllFileName] = useState<string | null>(null);
+  const importAllFileInputRef = useRef<HTMLInputElement>(null);
   
   // State for new AnimationFlowConfiguratorDialog
   const [animationConfiguratorTarget, setAnimationConfiguratorTarget] = useState<{
@@ -184,7 +199,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const storeSelectedElement = useSelectedElementForDetails();
   const { setSelectedElementForDetails } = useAppStore.getState();
 
+  const selectedNodesFromReactFlow = useMemo(() => nodes.filter(node => node.selected), [nodes]); // For UI button state
   const selectedEdgesFromReactFlow = useMemo(() => edges.filter(edge => edge.selected), [edges]);
+  const clipboardNodesRef = useRef<CustomNodeType[]>([]);
 
 
   const removePlaceholderIfNeeded = useCallback((currentNodes: CustomNodeType[]) => {
@@ -404,15 +421,19 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       persistLayout(nodes, edges, reactFlowInstance, layoutId, true);
   }, [nodes, edges, reactFlowInstance, layoutId, canEdit, isDirty, persistLayout]);
 
-
-  const handleImportLayout = useCallback(() => {
+  const handleImportLayout = useCallback((jsonStringToImport: string) => {
     if (!canEdit || !layoutId || !reactFlowInstance) {
       toast.error("Import cannot be performed at this time.");
       return;
     }
 
+    if (!jsonStringToImport.trim()) {
+        toast.error("Import content is empty.", { description: "Please paste JSON or select a file." });
+        return;
+    }
+
     try {
-      const parsedLayout = JSON.parse(importJsonString) as SLDLayout;
+      const parsedLayout = JSON.parse(jsonStringToImport) as SLDLayout;
 
       if (!parsedLayout || typeof parsedLayout !== 'object') {
         toast.error("Invalid JSON format.", { description: "The input is not a valid JSON object." });
@@ -473,15 +494,186 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       persistLayout(validatedNodes, parsedLayout.edges || [], reactFlowInstance, layoutId, true);
       setIsDirty(false);
 
-      toast.success("Layout Imported Successfully", { description: `Content imported into layout '${layoutId.replace(/_/g, ' ')}'.` });
-      setIsImportDialogOpen(false);
-      setImportJsonString('');
+      toast.success("Layout Imported Successfully", { description: `Content from '${selectedFileName || 'pasted text'}' imported into layout '${layoutId.replace(/_/g, ' ')}'.` });
+      setIsImportDialogOpen(false); // This will trigger onOpenChange to clear states
+      // setImportJsonString(''); // Moved to onOpenChange
+      // setSelectedFileName(null); // Moved to onOpenChange
 
     } catch (error: any) {
       console.error("Error importing SLD layout:", error);
       toast.error("Import Failed", { description: error.message || "Could not parse or apply JSON." });
     }
-  }, [canEdit, layoutId, reactFlowInstance, importJsonString, persistLayout, removePlaceholderIfNeeded, fitViewOptions.duration]);
+  }, [canEdit, layoutId, reactFlowInstance, persistLayout, removePlaceholderIfNeeded, fitViewOptions.duration, selectedFileName]);
+
+  const handleFileSelectedForImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const fileContent = e.target?.result as string;
+          if (fileContent) {
+            setImportJsonString(fileContent);
+            toast.success(`File "${file.name}" loaded for import.`);
+          } else {
+            throw new Error("File content is empty or unreadable.");
+          }
+        } catch (err: any) {
+            console.error("Error reading file content:", err);
+            toast.error("Error Reading File", { description: err.message || "Could not read file content."});
+            setSelectedFileName(null);
+            setImportJsonString(''); // Clear if file reading failed
+        }
+      };
+      reader.onerror = () => {
+        console.error("FileReader error for SLD import.");
+        toast.error("File Read Error", { description: "An error occurred while reading the file." });
+        setSelectedFileName(null);
+        setImportJsonString(''); 
+      };
+      reader.readAsText(file);
+    } else {
+      setSelectedFileName(null);
+      // Optionally, clear importJsonString if you want 'cancel' in file dialog to clear text area
+      // setImportJsonString(''); 
+    }
+    // Reset file input to allow re-uploading the same file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleFileSelectedForAllImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedAllFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const fileContent = e.target?.result as string;
+          if (fileContent) {
+            setImportAllJsonString(fileContent);
+            toast.success(`File "${file.name}" loaded for "Import All".`);
+          } else {
+            throw new Error("File content is empty or unreadable.");
+          }
+        } catch (err: any) {
+            console.error("Error reading file content for all layouts import:", err);
+            toast.error("Error Reading File", { description: err.message || "Could not read file content."});
+            setSelectedAllFileName(null);
+            setImportAllJsonString('');
+        }
+      };
+      reader.onerror = () => {
+        console.error("FileReader error for all layouts SLD import.");
+        toast.error("File Read Error", { description: "An error occurred while reading the file." });
+        setSelectedAllFileName(null);
+        setImportAllJsonString(''); 
+      };
+      reader.readAsText(file);
+    } else {
+      setSelectedAllFileName(null);
+    }
+    if (importAllFileInputRef.current) {
+      importAllFileInputRef.current.value = '';
+    }
+  };
+  
+  const handleImportAllLayouts = useCallback((jsonStringToImportAll: string) => {
+    if (!canEdit) {
+      toast.error("Import is only available in edit mode.");
+      return;
+    }
+    if (!jsonStringToImportAll.trim()) {
+      toast.error("Import content is empty.", { description: "Please paste JSON or select a file for all layouts." });
+      return;
+    }
+
+    let parsedAllLayouts: Record<string, SLDLayout>;
+    try {
+      parsedAllLayouts = JSON.parse(jsonStringToImportAll);
+      if (typeof parsedAllLayouts !== 'object' || parsedAllLayouts === null) {
+        throw new Error("Input is not a valid JSON object.");
+      }
+    } catch (error: any) {
+      console.error("Error parsing all SLD layouts JSON:", error);
+      toast.error("Invalid JSON for All Layouts", { description: error.message || "Could not parse JSON object." });
+      return;
+    }
+
+    let successCount = 0;
+    let errorCount = 0;
+    let currentLayoutWasAffected = false;
+
+    for (const key in parsedAllLayouts) {
+      if (Object.prototype.hasOwnProperty.call(parsedAllLayouts, key)) {
+        const layoutData = parsedAllLayouts[key];
+        // Basic validation for each layout
+        if (
+          layoutData &&
+          typeof layoutData.layoutId === 'string' &&
+          layoutData.layoutId === key && // Ensure the key matches the layoutId within the object
+          Array.isArray(layoutData.nodes) &&
+          Array.isArray(layoutData.edges) 
+          // Add more checks if necessary, e.g., for viewport, meta
+        ) {
+          try {
+            const localStorageKey = `${LOCAL_STORAGE_KEY_PREFIX}${layoutData.layoutId}`;
+            localStorage.setItem(localStorageKey, JSON.stringify(layoutData));
+            successCount++;
+            if (layoutData.layoutId === layoutId) {
+              currentLayoutWasAffected = true;
+            }
+          } catch (storageError: any) {
+            console.error(`Error saving layout ${layoutData.layoutId} to localStorage:`, storageError);
+            errorCount++;
+          }
+        } else {
+          console.warn(`Invalid or incomplete layout data for key: ${key}. Skipping.`);
+          errorCount++;
+        }
+      }
+    }
+
+    if (successCount > 0) {
+      toast.success(`${successCount} layout(s) imported successfully.`);
+    }
+    if (errorCount > 0) {
+      toast.warning(`${errorCount} layout(s) could not be imported or had invalid data.`);
+    }
+    if (successCount === 0 && errorCount === 0) {
+      toast.info("No layouts found in the provided JSON to import.");
+    }
+
+    if (currentLayoutWasAffected) {
+      toast.info("Current Layout Updated", {
+        description: "The currently active layout was updated. Please re-select or refresh the page to see the changes.",
+        duration: 8000,
+        action: {
+            label: "Reload View",
+            onClick: () => {
+                // A simple way to trigger re-evaluation of useEffect that loads layout
+                // This assumes onLayoutIdChangeProp can handle the current layoutId to force a reload
+                if (onLayoutIdChangeProp && layoutId) {
+                    onLayoutIdChangeProp(layoutId); 
+                } else {
+                    // Fallback if direct reload isn't available (e.g. if onLayoutIdChangeProp is not passed)
+                    // This is a bit of a heavy hammer.
+                    // window.location.reload(); 
+                    // Or, if you want to just clear and make user reselect from dropdown:
+                    // setNodes([createPlaceholderNode("Please re-select layout", currentThemeHookValue)]);
+                    // setEdges([]);
+                    // setActiveGlobalAnimationSettings(undefined);
+                    // setCurrentLayoutIdKey(''); // This would trigger re-fetch if layoutId is still the same
+                    // For now, just the toast is fine as per requirements.
+                }
+            }
+        }
+      });
+    }
+    setIsImportAllDialogOpen(false); // This will trigger onOpenChange to clear states
+  }, [canEdit, layoutId, onLayoutIdChangeProp, currentThemeHookValue]);
 
 
   const handleExportAllLayouts = useCallback(() => {
@@ -529,6 +721,81 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       toast.error("Failed to export layouts.");
     }
   }, [canEdit]);
+
+  const handleExportSingleLayout = useCallback(() => {
+    if (!canEdit || !layoutId) {
+      toast.error("Export is only available in edit mode with a selected layout.");
+      return;
+    }
+
+    let layoutDataString: string | null = null;
+    let loadedFrom = "";
+    let layoutToExport: SLDLayout | null = null;
+
+    // 1. Try localStorage
+    const localStorageKey = `${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`;
+    const localData = localStorage.getItem(localStorageKey);
+
+    if (localData) {
+      try {
+        const parsed = JSON.parse(localData) as SLDLayout;
+        if (parsed && parsed.layoutId === layoutId && Array.isArray(parsed.nodes)) {
+          layoutToExport = parsed;
+          loadedFrom = "localStorage";
+        } else {
+          console.warn(`SLDWidget: Invalid layout data in LS for ${layoutId} during single export. Ignoring.`);
+        }
+      } catch (e) {
+        console.warn(`SLDWidget: Error parsing LS data for ${layoutId} during single export. Ignoring.`, e);
+      }
+    }
+
+    // 2. If not in localStorage, try constantSldLayouts
+    if (!layoutToExport && constantSldLayouts[layoutId]) {
+      layoutToExport = JSON.parse(JSON.stringify(constantSldLayouts[layoutId])); // Deep clone
+      loadedFrom = "predefined constants";
+    }
+
+    if (!layoutToExport) {
+      toast.info(`Layout '${layoutId.replace(/_/g, ' ')}' not found or is empty.`, {
+        description: "No saved data in localStorage or predefined constants for this layout ID.",
+      });
+      return;
+    }
+
+    try {
+      // Ensure viewport and globalAnimationSettings are included if missing and we are exporting the *active* layout from constants
+      // For localStorage, these should already be part of the stored SLDLayout object.
+      // For constantSldLayouts, they might be top-level in the definition but need to be in the SLDLayout object.
+      if (loadedFrom === "predefined constants") {
+        if (!layoutToExport.viewport && constantSldLayouts[layoutId]?.viewport) {
+            layoutToExport.viewport = constantSldLayouts[layoutId]!.viewport;
+        }
+        // Constant layouts don't store globalAnimationSettings within their main object usually,
+        // but if we had a mechanism to associate them, it would be here.
+        // For now, we assume constantSldLayouts are complete SLDLayout objects or their meta is handled elsewhere.
+        // If activeGlobalAnimationSettings are relevant for a constant layout being exported, this might need adjustment.
+        // However, the priority is "saved versions", so we export what's defined in constantSldLayouts.
+      }
+
+
+      layoutDataString = JSON.stringify(layoutToExport, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(layoutDataString);
+      const exportFileDefaultName = `${layoutId}_sld_layout_${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      document.body.appendChild(linkElement);
+      linkElement.click();
+      document.body.removeChild(linkElement);
+      
+      toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully from ${loadedFrom}.`);
+    } catch (error) {
+      console.error(`SLDWidget: Error during single layout export for ${layoutId}:`, error);
+      toast.error("Failed to export layout.");
+    }
+  }, [canEdit, layoutId]);
 
 
   useEffect(() => {
@@ -717,6 +984,114 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     return () => { debouncedAutoSave.cancel(); };
   }, [nodes, edges, reactFlowInstance, layoutId, canEdit, isDirty, debouncedAutoSave]);
 
+  const handleCopy = useCallback(() => {
+    if (!canEdit) return;
+    const selectedNodesToCopy = nodes.filter(node => node.selected && node.id !== PLACEHOLDER_NODE_ID);
+    if (selectedNodesToCopy.length === 0) {
+      // toast.info("No nodes selected to copy."); // Optional: if you want feedback even when nothing is copied
+      return;
+    }
+
+    clipboardNodesRef.current = selectedNodesToCopy.map(node => ({
+      // Essential properties for pasting. ID will be regenerated.
+      // Position is copied to use as a base for the new position.
+      ...node, // spread to get width, height, type etc.
+      data: cloneDeep(node.data), // Deep clone data
+      // Explicitly exclude problematic properties or ensure they are handled on paste
+      id: `original_${node.id}`, // Temporary ID, will be replaced on paste
+      selected: false, // Will be set to true for new nodes on paste
+      dragging: false,
+      // position: { x: node.position.x, y: node.position.y }, // Already spread
+    }));
+    toast.info(`Copied ${selectedNodesToCopy.length} node(s) to clipboard.`);
+  }, [canEdit, nodes]);
+
+  const handlePaste = useCallback(() => {
+    if (!canEdit || clipboardNodesRef.current.length === 0) {
+      if (canEdit && clipboardNodesRef.current.length === 0) {
+        toast.info("Clipboard is empty.");
+      }
+      return;
+    }
+
+    const newPastedNodes: CustomNodeType[] = clipboardNodesRef.current.map((copiedNode, index) => {
+      const nodeType = copiedNode.type || SLDElementType.GenericDevice; // Fallback type
+      const newId = `${nodeType}_${+new Date()}_${Math.random().toString(36).substring(2, 6)}_${index}`;
+      const newPosition = {
+        x: copiedNode.position.x + 20 + (index * 10), // Offset each pasted node slightly
+        y: copiedNode.position.y + 20 + (index * 10),
+      };
+
+      return {
+        ...copiedNode,
+        id: newId,
+        position: newPosition,
+        selected: true,
+        dragging: false, // Ensure dragging is false
+        data: cloneDeep(copiedNode.data), // Ensure data is a fresh deep copy
+        // Remove any viewport-specific temporary states if they exist from the copied node
+        positionAbsolute: undefined, // React Flow might add this, ensure it's clean for new node
+      };
+    });
+
+    setNodes((currentNodes) => {
+      const deselectedNodes = currentNodes.map(n => ({ ...n, selected: false }));
+      return removePlaceholderIfNeeded([...deselectedNodes, ...newPastedNodes]);
+    });
+
+    setIsDirty(true);
+    toast.success(`Pasted ${newPastedNodes.length} node(s).`);
+    initialFitViewDone.current = false; // To trigger fitView or other adjustments if needed
+
+    // Optional: Clear clipboard after paste to prevent pasting same items multiple times by mistake
+    // clipboardNodesRef.current = []; 
+    // Reactivate selection for the newly pasted nodes
+    setNodes(nds => nds.map(n => ({...n, selected: newPastedNodes.some(pn => pn.id === n.id) })));
+
+
+  }, [canEdit, removePlaceholderIfNeeded, setIsDirty, setNodes]);
+
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => { // Use global KeyboardEvent
+      if (!canEdit || !reactFlowWrapper.current || !reactFlowWrapper.current.contains(document.activeElement)) {
+        // Only act if SLDWidget or its children have focus and in edit mode
+        // This helps prevent global capture if user is typing in a text field outside SLDWidget
+        // A more robust check might involve checking if document.activeElement is inside reactFlowWrapper.current
+        return;
+      }
+
+      const isCmdCtrl = event.ctrlKey || event.metaKey;
+
+      if (isCmdCtrl && event.key.toLowerCase() === 'c') {
+        // Check if active element is an input field, if so, don't prevent default copy.
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable) {
+            // Allow default copy behavior for text fields
+            return; 
+        }
+        event.preventDefault();
+        handleCopy();
+      } else if (isCmdCtrl && event.key.toLowerCase() === 'v') {
+        const activeElement = document.activeElement as HTMLElement;
+        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable) {
+            // Allow default paste behavior for text fields
+            return;
+        }
+        event.preventDefault();
+        handlePaste();
+      }
+    };
+
+    const wrapperElement = reactFlowWrapper.current; // Capture current value for cleanup
+    // Add listener to the wrapper, so it only triggers when SLDWidget is "active"
+    wrapperElement?.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      wrapperElement?.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canEdit, handleCopy, handlePaste]); // reactFlowWrapper is a ref, doesn't need to be in deps
+
 
   useEffect(() => {
     if (storeSelectedElement && !canEdit) {
@@ -865,23 +1240,32 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             nodeTypes={nodeTypes} edgeTypes={edgeTypes} defaultEdgeOptions={defaultEdgeOptions}
             onDrop={onDrop} onDragOver={onDragOver} onNodeClick={handleElementClick}  onEdgeClick={handleElementClick} 
             onNodeDragStop={onNodeDragStop} onPaneClick={onPaneClick}
-            fitViewOptions={fitViewOptions} 
+            fitViewOptions={fitViewOptions}
             selectionMode={SelectionMode.Partial}
             elementsSelectable={canEdit || !isEffectivelyEmpty}
             panOnScroll panOnScrollMode={PanOnScrollMode.Free} proOptions={{ hideAttribution: true }}
             elevateNodesOnSelect={canEdit} deleteKeyCode={canEdit ? ['Backspace', 'Delete'] : null}
             nodesDraggable={canEdit} nodesConnectable={canEdit}
+            connectionLineType={ConnectionLineType.Step} // Added connectionLineType
             connectionRadius={35}
-            minZoom={0.05} maxZoom={4} 
+            minZoom={0.05} maxZoom={4}
         >
             <Controls showInteractive={canEdit} />
             <MiniMap pannable zoomable nodeColor={themedNodeColor} nodeStrokeColor={themedNodeStrokeColor} nodeStrokeWidth={2} nodeBorderRadius={2}
-                style={{ backgroundColor: colors.miniMapBg, border: `1px solid ${colors.miniMapBorder}` }} maskColor={colors.maskBg} maskStrokeColor={colors.maskStroke}/>
+                style={{ 
+                    backgroundColor: colors.miniMapBg, 
+                    border: `1px solid ${colors.miniMapBorder}`,
+                    width: 100, // Reduced width
+                    height: 75,  // Reduced height
+                }} 
+                maskColor={colors.maskBg} 
+                maskStrokeColor={colors.maskStroke}
+            />
             <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color={colors.backgroundDots} className="opacity-60" />
             
-            <Panel position="top-right" className="!m-0 !p-0">
+              <Panel position="top-right" className="!m-0 !p-0">
                 {canEdit && layoutId && ( 
-                    <motion.div className="flex items-center gap-2 p-2.5 bg-background/80 backdrop-blur-sm border-border border rounded-bl-lg shadow-lg"
+                    <motion.div className="flex flex-wrap items-center gap-2 p-2.5 bg-background/80 backdrop-blur-sm border-border border rounded-bl-lg shadow-lg"
                         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}>
                       {/* Dirty/Saving status indicators */}
                       {isWebSocketConnected && isDirty && (
@@ -896,7 +1280,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                                   <Check className="h-3.5 w-3.5 mr-1.5 opacity-80" /> Synced
                               </span></TooltipTrigger><TooltipContent><p>Layout saved and synced with server.</p></TooltipContent></Tooltip></TooltipProvider>
                       )}
-                      {!isWebSocketConnected && isDirty && ( 
+                      {!isWebSocketConnected && isDirty && (
                            <TooltipProvider delayDuration={100}><Tooltip><TooltipTrigger asChild>
                                 <span className="text-xs text-sky-600 dark:text-sky-400 font-medium py-1 px-1.5 rounded-md bg-sky-500/10 flex items-center">
                                     <Check className="h-3.5 w-3.5 mr-1.5 opacity-80" /> Saved Locally
@@ -910,58 +1294,118 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                       )}
                       
                       {/* Action Buttons */}
-                      <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                              <Button size="sm" variant="outline" title="Clear Canvas" disabled={isEffectivelyEmpty && !isDirty && currentLayoutLoadedFromServerOrInitialized.current}>
-                                  <RotateCcw className="h-4 w-4 mr-1.5"/> Clear
-                              </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                              <AlertDialogHeader><AlertDialogTitle>Reset SLD Layout?</AlertDialogTitle>
-                              <AlertDialogDescription>Clear "{layoutId?.replace(/_/g, ' ')}"? This replaces content with a placeholder and clears global animation settings for this layout. Changes saved via auto/manual save.</AlertDialogDescription></AlertDialogHeader>
-                              <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={handleResetLayout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"> Reset </AlertDialogAction>
-                              </AlertDialogFooter>
-                          </AlertDialogContent>
-                      </AlertDialog>
-                      <Button onClick={handleManualSaveLayout} size="sm" variant="secondary" title="Save Now & Sync"  disabled={!isDirty && !isEffectivelyEmpty && currentLayoutLoadedFromServerOrInitialized.current }> Save Now </Button>
-                      <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button onClick={handleExportAllLayouts} size="sm" variant="outline" title="Export All Locally Stored Layouts">
-                                    <Download className="h-4 w-4"/>
-                                </Button>
-                            </TooltipTrigger>
-                            <TooltipContent><p>Export All Stored Layouts</p></TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                       
+                      {/* Clear Button */}
+                        <AlertDialog>
+                            <TooltipProvider delayDuration={100}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <AlertDialogTrigger asChild>
+                                            <Button size="sm" variant="outline" className="h-9" disabled={isEffectivelyEmpty && !isDirty && currentLayoutLoadedFromServerOrInitialized.current}>
+                                                <RotateCcw className="h-4 w-4 md:mr-1.5"/> <span className="hidden md:inline">Clear</span>
+                                            </Button>
+                                        </AlertDialogTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent><p>Clear current layout. This action is permanent for this session unless manually saved.</p></TooltipContent>
+                                </Tooltip>
+                            </TooltipProvider>
+                            <AlertDialogContent>
+                                <AlertDialogHeader><AlertDialogTitle>Reset SLD Layout?</AlertDialogTitle>
+                                <AlertDialogDescription>Clear "{layoutId?.replace(/_/g, ' ')}"? This replaces content with a placeholder and clears global animation settings for this layout. Changes saved via auto/manual save.</AlertDialogDescription></AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleResetLayout} className="bg-destructive text-destructive-foreground hover:bg-destructive/90"> Reset </AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
+
+                      {/* Save Now Button */}
                         <TooltipProvider delayDuration={100}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <Button onClick={() => setIsImportDialogOpen(true)} size="sm" variant="outline" title="Import Layout from JSON">
-                                        <Upload className="h-4 w-4"/>
+                                    <Button onClick={handleManualSaveLayout} size="sm" variant="secondary" className="h-9" disabled={!isDirty && !isEffectivelyEmpty && currentLayoutLoadedFromServerOrInitialized.current }>
+                                        <Save className="h-4 w-4 md:mr-1.5" />
+                                        <span className="hidden md:inline">Save Now</span>
                                     </Button>
                                 </TooltipTrigger>
-                                <TooltipContent><p>Import Layout from JSON</p></TooltipContent>
+                                <TooltipContent><p>Save Now & Sync</p></TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
-                        <TooltipProvider delayDuration={100}>
-                            <Tooltip>
-                                <TooltipTrigger asChild>
-                                    <Button 
-                                        size="sm" 
-                                        variant="outline" 
-                                        title="Bulk Configure Edge Animations"
-                                        disabled={!canEdit || selectedEdgesFromReactFlow.length === 0}
-                                        onClick={handleOpenBulkAnimationConfigurator} // Use new handler
-                                    >
-                                        <ListChecks className="h-4 w-4 mr-1.5" />
-                                        Bulk Anim
-                                    </Button>
-                                </TooltipTrigger>
-                                <TooltipContent><p>Bulk Configure Edge Animations ({selectedEdgesFromReactFlow.length} selected)</p></TooltipContent>
+                      
+                      {/* Export Dropdown */}
+                      <DropdownMenu>
+                          <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                  <TooltipTrigger asChild>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button size="sm" variant="outline" disabled={!canEdit} className="h-9">
+                                              <Download className="h-4 w-4 md:mr-1.5" />
+                                              <span className="hidden md:inline">Export</span>
+                                              <ChevronDown className="h-4 w-4 ml-1 md:ml-1.5 opacity-70" />
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Export SLD layouts</p></TooltipContent>
+                              </Tooltip>
+                          </TooltipProvider>
+                          <DropdownMenuContent align="end" className="w-60">
+                              <DropdownMenuItem onClick={handleExportSingleLayout} disabled={!layoutId} className="text-xs cursor-pointer">
+                                  Export Current Layout
+                                  {layoutId && <span className="ml-auto text-muted-foreground pl-2 truncate max-w-[120px]">({layoutId.replace(/_/g, ' ')})</span>}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleExportAllLayouts} className="text-xs cursor-pointer">
+                                  Export All Local Layouts
+                              </DropdownMenuItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
+                       
+                      {/* Import Dropdown */}
+                      <DropdownMenu>
+                          <TooltipProvider delayDuration={100}>
+                              <Tooltip>
+                                  <TooltipTrigger asChild>
+                                      <DropdownMenuTrigger asChild>
+                                          <Button size="sm" variant="outline" disabled={!canEdit} className="h-9">
+                                              <Upload className="h-4 w-4 md:mr-1.5" />
+                                              <span className="hidden md:inline">Import</span>
+                                              <ChevronDown className="h-4 w-4 ml-1 md:ml-1.5 opacity-70" />
+                                          </Button>
+                                      </DropdownMenuTrigger>
+                                  </TooltipTrigger>
+                                  <TooltipContent><p>Import SLD layouts</p></TooltipContent>
+                              </Tooltip>
+                          </TooltipProvider>
+                          <DropdownMenuContent align="end" className="w-60">
+                              <DropdownMenuItem onClick={() => setIsImportDialogOpen(true)} disabled={!layoutId} className="text-xs cursor-pointer">
+                                  Import to Current Layout
+                                  {layoutId && <span className="ml-auto text-muted-foreground pl-2 truncate max-w-[120px]">({layoutId.replace(/_/g, ' ')})</span>}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setIsImportAllDialogOpen(true)} className="text-xs cursor-pointer">
+                                  Import All to Local
+                              </DropdownMenuItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {/* Bulk Anim Button */}
+                      <TooltipProvider delayDuration={100}>
+                          <Tooltip>
+                              <TooltipTrigger asChild>
+                                  <Button 
+                                      size="sm" 
+                                      variant="outline" 
+                                      disabled={!canEdit || selectedEdgesFromReactFlow.length === 0}
+                                      onClick={handleOpenBulkAnimationConfigurator}
+                                      className="h-9"
+                                  >
+                                      <ListChecks className="h-4 w-4 md:mr-1.5" />
+                                      <span className="hidden md:inline">Bulk Anim</span>
+                                      {selectedEdgesFromReactFlow.length > 0 && (
+                                          <span className="ml-1.5 hidden md:inline text-xs px-1 py-0.5 bg-muted text-muted-foreground rounded">
+                                              {selectedEdgesFromReactFlow.length}
+                                          </span>
+                                      )}
+                                </Button>
+                            </TooltipTrigger>
+                              <TooltipContent><p>Bulk Configure Edge Animations {selectedEdgesFromReactFlow.length > 0 ? ` (${selectedEdgesFromReactFlow.length} selected)` : ' (No edges selected)'}</p></TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
                     </motion.div>
@@ -971,31 +1415,150 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       </div>
       
       {canEdit && layoutId && (
-        <AlertDialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <AlertDialog 
+            open={isImportDialogOpen} 
+            onOpenChange={(open) => {
+                setIsImportDialogOpen(open);
+                if (!open) { // Reset states when dialog is closed
+                    setImportJsonString('');
+                    setSelectedFileName(null);
+                }
+            }}
+        >
             <AlertDialogContent className="max-w-xl">
                 <AlertDialogHeader>
                     <AlertDialogTitle>Import SLD Layout from JSON</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Paste the JSON content of a single SLDLayout object below. This will overwrite the current layout ({layoutId.replace(/_/g, ' ')}).
-                        The imported layout's global animation settings will also apply.
+                        Paste JSON below, or upload a .json file. This will overwrite layout '{layoutId.replace(/_/g, ' ')}'.
+                        Imported global animation settings will apply.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                <Textarea
-                    placeholder="Paste SLDLayout JSON here..."
-                    value={importJsonString}
-                    onChange={(e) => setImportJsonString(e.target.value)}
-                    className="min-h-[200px] max-h-[400px] text-xs font-mono"
-                    aria-label="SLD Layout JSON Input"
-                />
+                <div className="grid gap-4 py-4">
+                    <Textarea
+                        placeholder="Paste SLDLayout JSON here..."
+                        value={importJsonString}
+                        onChange={(e) => {
+                            setImportJsonString(e.target.value);
+                            if (selectedFileName) setSelectedFileName(null); // Clear file name if user types
+                        }}
+                        className="min-h-[150px] max-h-[300px] text-xs font-mono"
+                        aria-label="SLD Layout JSON Input"
+                    />
+                    <div>
+                        <input 
+                            type="file" 
+                            accept=".json" 
+                            id="import-single-file-input" 
+                            ref={fileInputRef}
+                            onChange={handleFileSelectedForImport}
+                            className="sr-only" 
+                            aria-label="Upload JSON file for current layout"
+                            title="Select a JSON file to import into current layout"
+                        />
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="w-full sm:w-auto"
+                        >
+                            <Upload className="h-4 w-4 mr-2"/> Upload .json File
+                        </Button>
+                        {selectedFileName && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Selected file: <span className="font-medium">{selectedFileName}</span>
+                            </p>
+                        )}
+                         {importJsonString && !selectedFileName && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Content source: <span className="font-medium">Pasted Text</span>
+                            </p>
+                        )}
+                    </div>
+                </div>
                 <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setImportJsonString('')}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleImportLayout}>Import</AlertDialogAction>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleImportLayout(importJsonString)} disabled={!importJsonString.trim()}>
+                        Import
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      )}
+      
+      {/* Dialog for Importing ALL Layouts */}
+      {canEdit && (
+        <AlertDialog
+            open={isImportAllDialogOpen}
+            onOpenChange={(open) => {
+                setIsImportAllDialogOpen(open);
+                if (!open) {
+                    setImportAllJsonString('');
+                    setSelectedAllFileName(null);
+                }
+            }}
+        >
+            <AlertDialogContent className="max-w-xl">
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Import All SLD Layouts from JSON</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        Paste JSON for multiple layouts (e.g., {"{\"layout_1\":{...}, \"layout_2\":{...}}"}) or upload a file.
+                        This will overwrite existing layouts in localStorage with matching IDs.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="grid gap-4 py-4">
+                    <Textarea
+                        placeholder="Paste JSON for all layouts here..."
+                        value={importAllJsonString}
+                        onChange={(e) => {
+                            setImportAllJsonString(e.target.value);
+                            if (selectedAllFileName) setSelectedAllFileName(null);
+                        }}
+                        className="min-h-[150px] max-h-[300px] text-xs font-mono"
+                    />
+                    <div>
+                        <input
+                            type="file"
+                            accept=".json"
+                            id="import-all-layouts-file-input"
+                            ref={importAllFileInputRef}
+                            onChange={handleFileSelectedForAllImport}
+                            className="sr-only"
+                            aria-label="Upload JSON file for all layouts"
+                            title="Select a JSON file to import all layouts"
+                            style={{ display: 'none' }}
+                        />
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => importAllFileInputRef.current?.click()}
+                            className="w-full sm:w-auto"
+                        >
+                            <Upload className="h-4 w-4 mr-2" /> Upload .json File (All Layouts)
+                        </Button>
+                        {selectedAllFileName && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                                Selected file: <span className="font-medium">{selectedAllFileName}</span>
+                            </p>
+                        )}
+                        {importAllJsonString && !selectedAllFileName && (
+                             <p className="text-xs text-muted-foreground mt-2">
+                                Content source: <span className="font-medium">Pasted Text</span>
+                            </p>
+                        )}
+                    </div>
+                </div>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => handleImportAllLayouts(importAllJsonString)} disabled={!importAllJsonString.trim()}>
+                        Import All
+                    </AlertDialogAction>
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
       )}
 
-      {canEdit && selectedElement && ( 
+
+      {canEdit && selectedElement && (
         <SLDInspectorDialog 
             isOpen={isInspectorDialogOpen} 
             onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} 
