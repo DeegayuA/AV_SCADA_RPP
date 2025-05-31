@@ -83,7 +83,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
     // --- Memoized Derived Data ---
     const allCategories = useMemo(() => {
         const categories = new Set<string>();
-        availableIndividualPoints.forEach(p => categories.add(p.category));
+        availableIndividualPoints.forEach(p => { if (p.category) categories.add(p.category); });
         availableThreePhaseGroups.forEach(g => categories.add(g.category));
         return Array.from(categories).sort();
     }, [availableIndividualPoints, availableThreePhaseGroups]);
@@ -96,7 +96,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
             if (selectedCategory && dp.category !== selectedCategory) return false;
             if (!searchTerm) return true;
             return dp.name.toLowerCase().includes(lowerSearchTerm) ||
-                   dp.category.toLowerCase().includes(lowerSearchTerm) ||
+                   (dp.category && dp.category.toLowerCase().includes(lowerSearchTerm)) ||
                    dp.id.toLowerCase().includes(lowerSearchTerm);
         };
 
@@ -130,7 +130,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
             }
         };
         availableIndividualPoints.forEach(p => {
-            if(!currentDisplayedIds.includes(p.id)) countItem(p.category)
+            if(!currentDisplayedIds.includes(p.id) && p.category) countItem(p.category)
         });
         availableThreePhaseGroups.forEach(g => {
             if(!g.ids.every(id => currentDisplayedIds.includes(id))) countItem(g.category);
@@ -187,7 +187,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
                      const categoryMatch = !selectedCategory || result.newPoint.category === selectedCategory;
                      const searchMatch = !searchTerm || 
                                         result.newPoint.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                        result.newPoint.category.toLowerCase().includes(searchTerm.toLowerCase());
+                                        (result.newPoint.category && result.newPoint.category.toLowerCase().includes(searchTerm.toLowerCase()));
 
                      if (categoryMatch && searchMatch && !currentDisplayedIds.includes(newPointId)) {
                         handleToggleIndividual(newPointId);

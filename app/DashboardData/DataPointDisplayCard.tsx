@@ -14,6 +14,13 @@ import { NodeData } from './dashboardInterfaces';
 import { HelpCircle } from 'lucide-react';
 import ValueDisplayContent from './ValueDisplayContent'; // Ensure this path is correct
 
+// Augment the DataPoint interface from its original module
+declare module '@/config/dataPoints' {
+  interface DataPoint {
+    notes?: string; // Add the optional 'notes' property
+  }
+}
+
 interface DataPointDisplayCardProps {
     point: DataPointConfig;
     // nodeValue: NodeData[string]; // Changed to nodeValues (full map)

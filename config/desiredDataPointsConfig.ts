@@ -8,7 +8,7 @@ export interface SearchCriteria {
   dataType?: DataPoint['dataType'];
   unit?: string;
   category?: DataPoint['category'] | DataPoint['category'][];
-  phase?: DataPoint['phase'] | 'any';
+  phase?: string | 'any';
   limit?: number;
   descriptionHint?: string;
   // Optional: Boost score if uiType matches (e.g., we prefer 'display' or 'gauge' for readings)

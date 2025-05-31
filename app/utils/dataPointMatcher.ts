@@ -23,15 +23,15 @@ function calculateScore(dp: DataPoint, criteria: SearchCriteria): number {
     }
   
     // Category match
-    if (criteria.category) {
+    if (criteria.category && dp.category) {
       const categories = Array.isArray(criteria.category) ? criteria.category : [criteria.category];
-      if (categories.map(c => c.toLowerCase()).includes(dp.category.toLowerCase())) { // case-insensitive category match
+      if (categories.filter((c): c is string => typeof c === 'string').map(c => c.toLowerCase()).includes(dp.category.toLowerCase())) { // case-insensitive category match
         score += 40;
       }
     }
   
     // Phase match
-    if (criteria.phase && criteria.phase !== 'any' && dp.phase === criteria.phase) {
+    if (criteria.phase && criteria.phase !== 'any' && (dp as DataPoint & { phase?: string }).phase === criteria.phase) {
       score += 30;
     }
   
@@ -75,7 +75,7 @@ function calculateScore(dp: DataPoint, criteria: SearchCriteria): number {
     // If looking for phase 'any', slightly prefer 'a','b','c' over 'x' if keywords didn't pick total
     // This is tricky, 'x' can be 'total' which is good.
     if (criteria.phase === 'any' && !criteria.keywords.some(k => /total/i.test(k.toString()))) {
-        if (dp.phase === 'x') score -=5; // Slight penalization if not explicitly looking for total.
+        if ((dp as DataPoint & { phase?: string }).phase === 'x') score -=5; // Slight penalization if not explicitly looking for total.
     }
   
   
@@ -99,7 +99,7 @@ export function findBestMatch(
       // If criteria.phase is 'any' or undefined, this specific filter doesn't apply here,
       // and keywords/other criteria determine suitability.
       if (criteria.phase && criteria.phase !== 'any') {
-          if (dp.phase !== criteria.phase) {
+          if ((dp as DataPoint & { phase?: string }).phase !== criteria.phase) {
               continue; // Skip if specific phase requested doesn't match DP's phase
           }
       }
@@ -136,7 +136,7 @@ export function findBestMatch(
         // Phase filtering specifically for findMatches (can be more nuanced if needed)
         // If criteria.phase is 'a', 'b', or 'c', only matching DPs should get a good score or pass.
         if (criteria.phase && criteria.phase !== 'any') {
-          if (dp.phase !== criteria.phase) {
+          if ((dp as DataPoint & { phase?: string }).phase !== criteria.phase) {
             score = 0; // Effectively filters out non-matching phases
           }
         }
@@ -149,7 +149,7 @@ export function findBestMatch(
       .filter(item => item.score > 20) // Minimum score threshold for a "decent" match
       .sort((a, b) => b.score - a.score);
   
-    // console.log(`All potential matches for criteria ('${criteria.descriptionHint}', phase: ${criteria.phase || 'any'}): ${scoredDataPoints.map(i => `${i.dp.id} (ph: ${i.dp.phase}, score: ${i.score})`).join('; ')}`);
+    // console.log(`All potential matches for criteria ('${criteria.descriptionHint}', phase: ${criteria.phase || 'any'}): ${scoredDataPoints.map(i => `${i.dp.id} (ph: ${(i.dp as DataPoint & { phase?: string }).phase}, score: ${i.score})`).join('; ')}`);
     
     const limit = criteria.limit || scoredDataPoints.length; // Use the criteria's limit
     return scoredDataPoints.slice(0, limit).map(item => item.dp);

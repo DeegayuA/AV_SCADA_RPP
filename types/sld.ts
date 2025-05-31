@@ -101,6 +101,8 @@ export interface InverterNodeData extends BaseNodeData {
   };
 }
 export interface PanelNodeData extends BaseNodeData {
+    width: any;
+    height: any;
     elementType: SLDElementType.Panel;
     config?: BaseNodeData['config'] & {
         technology?: 'Mono-Si' | 'Poly-Si' | 'Thin-film';
@@ -108,6 +110,8 @@ export interface PanelNodeData extends BaseNodeData {
     };
 }
 export interface BreakerNodeData extends BaseNodeData {
+    width: any;
+    height: any;
     elementType: SLDElementType.Breaker;
     config?: BaseNodeData['config'] & {
         type?: 'MCB' | 'MCCB' | 'ACB' | 'VCB' | 'SF6' | string;

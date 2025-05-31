@@ -31,7 +31,7 @@ export function useDynamicDefaultDataPointIds(allPossibleDataPoints: DataPoint[]
 
         // For 'any' phase, iterate through preferred phase order
         if (criteria.phase === 'any') {
-          const phasePriorities: DataPoint['phase'][] = ['a', 'b', 'c'];
+          const phasePriorities: string[] = ['a', 'b', 'c'];
           // If the group explicitly has a limit > 3 and 'x' might be relevant (e.g., a 4th item for total)
           if (groupLimit > 3) { 
             phasePriorities.push('x'); // Add 'x' only if limit allows and it's contextually right
@@ -82,7 +82,7 @@ export function useDynamicDefaultDataPointIds(allPossibleDataPoints: DataPoint[]
     }
     
     // Log details about what was found for which configuration entry
-    console.log("Found data points by configuration:", foundDataPoints.map(f => `${f.configId} -> ${f.dp.id} (Phase: ${f.dp.phase}, Score based on its group)`));
+    console.log("Found data points by configuration:", foundDataPoints.map(f => `${f.configId} -> ${f.dp.id} (Phase: ${(f.dp as unknown as { phase: string }).phase}, Score based on its group)`));
     console.log("Dynamically selected default IDs (count:", resultIds.length, "):", resultIds);
 
     return resultIds;

@@ -10,13 +10,13 @@ export function groupDataPoints(pointsToGroup: DataPoint[]): { threePhaseGroups:
     pointsToGroup.forEach(point => {
         const canBeGrouped =
             point.category === 'three-phase' && // Assuming 'three-phase' is a valid DataPoint['category']
-            !!point.threePhaseGroup &&
-            point.phase && ['a', 'b', 'c'].includes(point.phase.toLowerCase()) &&
-            !point.isSinglePhase &&
+            !!(point as any).threePhaseGroup &&
+            (point as any).phase && ['a', 'b', 'c'].includes(((point as any).phase as string).toLowerCase()) &&
+            !(point as any).isSinglePhase &&
             (point.uiType === 'display' || point.uiType === 'gauge');
 
-        if (canBeGrouped && point.threePhaseGroup) {
-            const groupKey = `${point.threePhaseGroup}-${point.uiType}`;
+        if (canBeGrouped && (point as any).threePhaseGroup) {
+            const groupKey = `${(point as any).threePhaseGroup}-${point.uiType}`;
             if (!groupsByKey.has(groupKey)) {
                  groupsByKey.set(groupKey, []);
             }
@@ -39,7 +39,7 @@ export function groupDataPoints(pointsToGroup: DataPoint[]): { threePhaseGroups:
         if (potentialGroup.length < 2 || potentialGroup.length > 3) {
              validGroup = false;
         } else {
-            representativePoint = potentialGroup.find(p => p.phase?.toLowerCase() === 'a') || potentialGroup[0];
+            representativePoint = potentialGroup.find(p => (((p as any).phase as string)?.toLowerCase() === 'a')) || potentialGroup[0];
             // Ensure representativePoint.uiType can be safely casted
             if (representativePoint.uiType === 'display' || representativePoint.uiType === 'gauge') {
                 commonUiType = representativePoint.uiType;
@@ -65,9 +65,9 @@ export function groupDataPoints(pointsToGroup: DataPoint[]): { threePhaseGroups:
 
             if (validGroup) { // Only proceed if commonUiType was set
                 for (const point of potentialGroup) {
-                    const phase = point.phase?.toLowerCase() as 'a' | 'b' | 'c';
+                    const phase = ((point as any).phase as string)?.toLowerCase() as 'a' | 'b' | 'c';
                     if (!phase || !['a', 'b', 'c'].includes(phase) || phases[phase] ||
-                        point.threePhaseGroup !== representativePoint.threePhaseGroup ||
+                        (point as any).threePhaseGroup !== (representativePoint as any).threePhaseGroup ||
                         point.uiType !== commonUiType) {
                         validGroup = false;
                         break;
@@ -84,7 +84,7 @@ export function groupDataPoints(pointsToGroup: DataPoint[]): { threePhaseGroups:
 
         if (validGroup && commonUiType && representativePoint && icon) {
             threePhaseGroups.push({
-                groupKey: representativePoint.threePhaseGroup!,
+                groupKey: (representativePoint as any).threePhaseGroup!,
                 title,
                 points: phases,
                 icon,

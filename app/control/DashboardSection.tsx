@@ -116,18 +116,19 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                 {isEditMode && (
                                     <div className="absolute top-1 right-1 z-10 flex flex-col items-end space-y-0.5 p-0.5 bg-background/50 rounded">
                                         <span className="text-xs text-muted-foreground mb-0.5 px-1">Remove:</span>
-                                        {Object.values(groupInfoItem.points).map((phasePointConfig) => {
+                                        {(['a', 'b', 'c'] as const).map((phaseKey) => {
+                                            const phasePointConfig = groupInfoItem.points[phaseKey];
                                             if (!phasePointConfig || !phasePointConfig.id) return null;
                                             return (
                                                 <Button
                                                     key={`remove-${groupInfoItem.groupKey}-${phasePointConfig.id}`}
                                                     variant="destructive"
-                                                    size="sm" // Custom size or smallest available
+                                                    size="sm"
                                                     className="h-5 px-1 text-xs opacity-80 hover:opacity-100"
                                                     onClick={(e) => { e.stopPropagation(); onRemoveItem(phasePointConfig.id); }}
-                                                    title={`Remove ${phasePointConfig.name || phasePointConfig.id}`}
+                                                    title={`Remove ${phasePointConfig.name || `Phase ${phaseKey.toUpperCase()}`}`}
                                                 >
-                                                    {phasePointConfig.phase?.toUpperCase() || 'X'} <XCircle className="ml-1 h-3 w-3" />
+                                                    {phaseKey.toUpperCase()} <XCircle className="ml-1 h-3 w-3" />
                                                 </Button>
                                             );
                                         })}
@@ -139,15 +140,14 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                         )}
                                     </div>
                                 )}
-
                                 <h4 className="text-sm font-semibold text-center mb-2 text-card-foreground">{groupInfoItem.title}</h4>
                                 <div className="space-y-1.5">
-                                    {(['a', 'b', 'c'] as const).map((phase) => {
-                                        const phaseConfig = groupInfoItem.points[phase];
+                                    {(['a', 'b', 'c'] as const).map((phaseKey) => { // Renamed 'phase' to 'phaseKey' for clarity in this context
+                                        const phaseConfig = groupInfoItem.points[phaseKey];
                                         if (!phaseConfig) return null;
                                         return (
-                                            <div key={`${groupInfoItem.groupKey}-${phaseConfig.id || phase}`} className="flex justify-between items-center text-xs">
-                                                <span className="text-muted-foreground capitalize w-1/2 truncate" title={phaseConfig.name || `Phase ${phase.toUpperCase()}`}>{phaseConfig.name || `Phase ${phase.toUpperCase()}`}</span>
+                                            <div key={`${groupInfoItem.groupKey}-${phaseConfig.id || phaseKey}`} className="flex justify-between items-center text-xs">
+                                                <span className="text-muted-foreground capitalize w-1/2 truncate" title={phaseConfig.name || `Phase ${phaseKey.toUpperCase()}`}>{phaseConfig.name || `Phase ${phaseKey.toUpperCase()}`}</span>
                                                 <div className="w-1/2 text-right">
                                                     <ValueDisplayContent
                                                         item={phaseConfig}

@@ -1,340 +1,338 @@
 // components/sld/nodes/BreakerNode.tsx
 import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
-import { motion } from 'framer-motion';
-import { BreakerNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
-import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore'; // Added useOpcUaNodeValue
-import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
-import { ZapOffIcon, ZapIcon, ShieldAlertIcon, ShieldCheckIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import { NodeProps, Handle, Position, XYPosition } from 'reactflow';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BreakerNodeData, CustomNodeType } from '@/types/sld';
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
+import { applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
+import { ZapOffIcon, ZapIcon, ShieldAlertIcon, ShieldCheckIcon, AlertTriangleIcon, InfoIcon, PowerIcon } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
-const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, zIndex, dragging } = props; // Using standard NodeProps properties
-  const position = (props as any).position;
-  const xPos = position?.x ?? 0;
-  const yPos = position?.y ?? 0;
-  const width = (props as any).width;
-  const height = (props as any).height;
-  const { isEditMode, currentUser, dataPoints, globalOpcUaNodeValues, setSelectedElementForDetails } = useAppStore(state => ({
-    isEditMode: state.isEditMode && state.currentUser?.role === 'admin', // Combined admin check
+const useIsDarkMode = () => {
+  const [isDark, setIsDark] = useState(() => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'));
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const cb = () => setIsDark(document.documentElement.classList.contains('dark'));
+    const observer = new MutationObserver(cb);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    cb();
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+};
+
+const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
+  const { 
+    data, selected, isConnectable, id, type, 
+    xPos, yPos, dragging, zIndex 
+  } = props;
+
+  const nodePosition = useMemo((): XYPosition => ({ x: xPos || 0, y: yPos || 0 }), [xPos, yPos]);
+  const nodeWidthFromData = data.width; 
+  const nodeHeightFromData = data.height;
+
+  const isDarkMode = useIsDarkMode();
+
+  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
+    isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
+    globalOpcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
   }));
+  
+  const isNodeEditable = useMemo(() => isEditMode && currentUser?.role === 'admin', [isEditMode, currentUser]);
 
-  const isNodeEditable = useMemo(() =>
-    isEditMode && (currentUser?.role === 'admin'),
-    [isEditMode, currentUser]
-  );
-
-  // --- Status DataPointLink Handling ---
+  // --- Reactive Data Point Links & Values ---
   const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
   const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
   const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
   const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
-
-  const processedStatus = useMemo(() => {
-    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
-      // Ensure applyValueMapping can handle various types, including boolean if status is directly represented
-      return applyValueMapping(reactiveStatusValue, statusLink);
-    }
-    // Fallback to static status if no DPLink for 'status' or data not available
-    return data.status;
-  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
-
-  // --- IsOpen DataPointLink Handling ---
-  const isOpenLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'isOpen'), [data.dataPointLinks]);
+  
+  // Handles breaker.isOpen or the more generic isOpen
+  const isOpenLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'isOpen' || link.targetProperty === 'breaker.isOpen'), [data.dataPointLinks]);
   const isOpenDataPointConfig = useMemo(() => isOpenLink ? dataPoints[isOpenLink.dataPointId] : undefined, [isOpenLink, dataPoints]);
   const isOpenOpcUaNodeId = useMemo(() => isOpenDataPointConfig?.nodeId, [isOpenDataPointConfig]);
   const reactiveIsOpenValue = useOpcUaNodeValue(isOpenOpcUaNodeId);
 
-  const isOpen = useMemo(() => {
+  // --- Processed States ---
+  const processedStatus = useMemo(() => {
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return String(applyValueMapping(reactiveStatusValue, statusLink)).toLowerCase();
+    }
+    return String(data.status || 'offline').toLowerCase();
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
+
+  const isBreakerOpen = useMemo(() => {
     if (isOpenLink && isOpenDataPointConfig && reactiveIsOpenValue !== undefined) {
       const mappedValue = applyValueMapping(reactiveIsOpenValue, isOpenLink);
-      // Interpret various "true" conditions for isOpen
-      return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || Number(mappedValue) === 1;
+      return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || String(mappedValue).toLowerCase() === 'open' || Number(mappedValue) === 1;
     }
-    // Fallback logic based on processedStatus or data.config
-    return processedStatus === 'open' || (data.config?.normallyOpen && processedStatus !== 'closed');
+    // Fallback based on processedStatus or static config
+    if (processedStatus === 'open' || processedStatus === 'tripped') return true;
+    if (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized') return false;
+    
+    // Default to normally open if configured, otherwise default to closed if status unknown
+    return data.config?.normallyOpen ?? false; 
   }, [isOpenLink, isOpenDataPointConfig, reactiveIsOpenValue, processedStatus, data.config?.normallyOpen]);
 
-  const statusStyles = useMemo(() => {
-    let currentStatus = processedStatus; // Use the processed status
-
-    if (currentStatus === 'fault' || currentStatus === 'tripped' || currentStatus === 'alarm') {
-      return { border: 'border-destructive dark:border-red-500', bg: 'bg-destructive/10 dark:bg-red-900/30', iconColor: 'text-destructive dark:text-red-400', main: 'text-destructive dark:text-red-400' };
-    }
-    if (currentStatus === 'warning') {
-      return { border: 'border-yellow-500 dark:border-yellow-400', bg: 'bg-yellow-500/10 dark:bg-yellow-900/30', iconColor: 'text-yellow-500 dark:text-yellow-400', main: 'text-yellow-600 dark:text-yellow-400' };
-    }
-    // Consider 'closed' implies energized/nominal unless specified otherwise by another DPLink
-    if (!isOpen && (currentStatus === 'closed' || currentStatus === 'nominal' || currentStatus === 'energized')) {
-      return { border: 'border-green-600 dark:border-green-500', bg: 'bg-green-600/10 dark:bg-green-900/30', iconColor: 'text-green-600 dark:text-green-500', main: 'text-green-700 dark:text-green-500' };
-    }
-    // Default for 'open', 'offline', or undefined status
-    return { border: 'border-neutral-400 dark:border-neutral-600', bg: 'bg-neutral-200/20 dark:bg-neutral-700/30', iconColor: 'text-neutral-500 dark:text-neutral-400', main: 'text-neutral-600 dark:text-neutral-400' };
-  }, [processedStatus, isOpen]);
-
-  // --- Derived Styles DataPointLink Handling (Option B approach) ---
-  const stylingLinks = useMemo(() => {
-    return data.dataPointLinks?.filter(link => 
-      ['fillColor', 'backgroundColor', 'strokeColor', 'borderColor', 'textColor', 'color', 'visible', 'visibility', 'opacity'].includes(link.targetProperty) || link.targetProperty.startsWith('--')
-    ) || [];
-  }, [data.dataPointLinks]);
-
-  // Create an object to hold reactive values for styling
-  // This is a bit complex due to hooks needing to be top-level.
-  // We'll create an array of nodeId-value pairs and then reconstruct the object.
+  // Descriptive status text for UI
+  const displayStatusText = useMemo(() => {
+    if (processedStatus === 'fault' || processedStatus === 'tripped') return "TRIPPED / FAULT";
+    if (processedStatus === 'alarm') return "ALARM";
+    if (processedStatus === 'warning') return "WARNING";
+    if (isBreakerOpen && (processedStatus === 'offline' || processedStatus === 'open')) return "OFFLINE / OPEN";
+    if (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized')) return "NOMINAL";
+    if (processedStatus === 'standby') return "STANDBY";
+    return String(processedStatus).toUpperCase(); // Default
+  }, [processedStatus, isBreakerOpen]);
   
-  // Step 1: Get all NodeIds for styling links
-  const stylingNodeIds = useMemo(() => {
-    return stylingLinks.map(link => dataPoints[link.dataPointId]?.nodeId).filter(Boolean) as string[];
-  }, [stylingLinks, dataPoints]);
+  // Centralized UI styling based on state
+  const statusUiStyles = useMemo(() => {
+    let baseBorderClass = isDarkMode ? 'border-slate-600/70' : 'border-slate-300/80';
+    let iconColorClass = isDarkMode ? 'text-slate-400' : 'text-slate-500'; // For SVG
+    let textColorClass = isDarkMode ? 'text-slate-300' : 'text-slate-600'; // For status text
+    let baseBgStartColor = isDarkMode ? 'rgba(51, 65, 85, 0.75)' : 'rgba(248, 250, 252, 0.75)';
+    let baseBgEndColor = isDarkMode ? 'rgba(51, 65, 85, 0.65)' : 'rgba(248, 250, 252, 0.65)';
+    let glowRgb = isDarkMode ? '100, 116, 139' : '148, 163, 184'; // Neutral Slate
+    let mainStatusColorClass = textColorClass; // For "OPEN"/"CLOSED" text
 
-  // Step 2: Subscribe to each nodeId individually. This is not ideal directly.
-  // Instead, we will iterate over stylingLinks and get their values within the derivedNodeStyles memo.
-  // This means derivedNodeStyles will depend on all individual reactive values if we were to subscribe one by one.
-
-  // Let's try to build the localOpcUaValues object reactively.
-  // This requires subscribing to each relevant node ID.
-  // The most straightforward way with current hook structure is to call useOpcUaNodeValue for each.
-  // This is not scalable if there are many styling links, but for a few, it's manageable.
-
-  // We need a stable list of node IDs to pass to hooks.
-  const nodeIdsForDerivedStyles = useMemo(() => {
-    return (data.dataPointLinks || [])
-      .map(link => dataPoints[link.dataPointId]?.nodeId)
-      .filter(nodeId => nodeId !== undefined) as string[];
-  }, [data.dataPointLinks, dataPoints]);
-  
-  // This part is tricky. We can't call useOpcUaNodeValue in a loop.
-  // Option B might require a slight modification to how we gather values for getDerivedStyle.
-  // If getDerivedStyle absolutely needs the { nodeId: value } map, we have to build it.
-
-  // Let's assume a limited number of style-affecting dataPointLinks, or simplify.
-  // For a more robust solution, `useOpcUaNodeValues` (plural) would be needed, or `getDerivedStyle` refactored.
-
-  // Re-approaching Option B for derivedNodeStyles:
-  // We need to collect all `reactiveValue`s that `getDerivedStyle` would care about.
-  const allRelevantDataPointLinks = useMemo(() => data.dataPointLinks || [], [data.dataPointLinks]);
-
-  // Create a map of opcUaNodeId to its reactive value.
-  // This is the tricky part with hooks. We cannot call useOpcUaNodeValue inside a loop or callback.
-  // So, we must call useOpcUaNodeValue for *every* dataPointLink's nodeId that *could* be used by getDerivedStyle.
-
-  // Let's simplify: getDerivedStyle iterates dataPointLinks internally.
-  // We need to ensure that any value it tries to get from its `opcUaNodeValues` (second param) is reactive.
-  // So, the `localOpcUaValues` passed to it must be built from `useOpcUaNodeValue`.
-
-  // Create an array of all nodeIds from data.dataPointLinks
-  const allNodeIdsFromLinks = useMemo(() => 
-    (data.dataPointLinks || [])
-    .map(link => dataPoints[link.dataPointId]?.nodeId)
-    .filter(Boolean) as string[]
-  , [data.dataPointLinks, dataPoints]);
-  
-  // This is still problematic as we can't call useOpcUaNodeValue dynamically for `allNodeIdsFromLinks`.
-
-  // Final attempt at Option B for BreakerNode:
-  // We have to identify which dataPointLinks are for styling MANUALLY for now or by convention
-  // and call useOpcUaNodeValue for them, then pass them.
-  // This means `getDerivedStyle` would need to be adapted OR we pass specific values.
-  
-  // Given the constraints, the most direct way to make `getDerivedStyle` work
-  // without changing its signature is to feed it an object of *all* possible
-  // OPC UA values it might need. This is what we removed.
-
-  // Let's assume that for BreakerNode, there aren't many (or any) *additional*
-  // dataPointLinks used exclusively for `getDerivedStyle` beyond what might already be covered
-  // by status, isOpen, etc. If there are, this will be incomplete.
-
-  // The `getDerivedStyle` function takes `opcUaNodeValues` as its second argument.
-  // We need to construct this object using our reactive values.
-  // For now, we will pass an object containing the reactive values we have already fetched:
-  // `reactiveStatusValue` and `reactiveIsOpenValue`.
-  // This is an **incomplete** implementation of Option B if other DPLs affect style.
-
-  // Subscriptions for up to 3 dedicated styling links
-  const styleLink1 = useMemo(() => stylingLinks[0], [stylingLinks]);
-  const styleLink1DataPointConfig = useMemo(() => styleLink1 ? dataPoints[styleLink1.dataPointId] : undefined, [styleLink1, dataPoints]);
-  const styleLink1OpcUaNodeId = useMemo(() => styleLink1DataPointConfig?.nodeId, [styleLink1DataPointConfig]);
-  const reactiveStyleLink1Value = useOpcUaNodeValue(styleLink1OpcUaNodeId);
-
-  const styleLink2 = useMemo(() => stylingLinks[1], [stylingLinks]);
-  const styleLink2DataPointConfig = useMemo(() => styleLink2 ? dataPoints[styleLink2.dataPointId] : undefined, [styleLink2, dataPoints]);
-  const styleLink2OpcUaNodeId = useMemo(() => styleLink2DataPointConfig?.nodeId, [styleLink2DataPointConfig]);
-  const reactiveStyleLink2Value = useOpcUaNodeValue(styleLink2OpcUaNodeId);
-
-  const styleLink3 = useMemo(() => stylingLinks[2], [stylingLinks]);
-  const styleLink3DataPointConfig = useMemo(() => styleLink3 ? dataPoints[styleLink3.dataPointId] : undefined, [styleLink3, dataPoints]);
-  const styleLink3OpcUaNodeId = useMemo(() => styleLink3DataPointConfig?.nodeId, [styleLink3DataPointConfig]);
-  const reactiveStyleLink3Value = useOpcUaNodeValue(styleLink3OpcUaNodeId);
-
-  const opcUaValuesForDerivedStyle = useMemo(() => {
-    const values: Record<string, string | number | boolean> = {};
-
-    // Add values for primary data points if their nodeIds are defined
-    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
-      values[statusOpcUaNodeId] = reactiveStatusValue;
+    if (processedStatus === 'fault' || processedStatus === 'tripped' || processedStatus === 'alarm') {
+      baseBorderClass = 'border-red-500/80 dark:border-red-500/70';
+      iconColorClass = 'text-red-500 dark:text-red-400';
+      textColorClass = 'text-red-600 dark:text-red-400 font-semibold';
+      mainStatusColorClass = iconColorClass;
+      glowRgb = '239, 68, 68'; // Red
+    } else if (processedStatus === 'warning') {
+      baseBorderClass = 'border-amber-500/80 dark:border-amber-400/70';
+      iconColorClass = 'text-amber-500 dark:text-amber-400';
+      textColorClass = 'text-amber-600 dark:text-amber-400 font-medium';
+      mainStatusColorClass = iconColorClass;
+      glowRgb = '245, 158, 11'; // Amber
+    } else if (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized')) { // Closed and healthy
+      baseBorderClass = 'border-green-600/80 dark:border-green-500/70';
+      iconColorClass = 'text-green-600 dark:text-green-500';
+      textColorClass = 'text-green-700 dark:text-green-400';
+      mainStatusColorClass = iconColorClass;
+      glowRgb = '34, 197, 94'; // Green
+    } else if (isBreakerOpen) { // Open, potentially offline
+      // Uses default slate border, but specific icon/text color if needed
+      iconColorClass = isDarkMode ? 'text-sky-400' : 'text-sky-500'; // Blue-ish for open/disconnected
+      mainStatusColorClass = iconColorClass;
+      // glowRgb remains slate for open/offline unless a more specific 'offline' glow is desired
     }
-    if (isOpenOpcUaNodeId && reactiveIsOpenValue !== undefined) {
-      values[isOpenOpcUaNodeId] = reactiveIsOpenValue;
-    }
+    
+    return { 
+        baseBorderClass, iconColorClass, textColorClass, baseBgStartColor, baseBgEndColor, mainStatusColorClass,
+        glowColor: `rgba(${glowRgb}, 0.45)`,
+        activeGlowColor: `rgba(${glowRgb}, ${(!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal')) ? 0.35 : 0})`, // Breathing glow when closed & nominal
+    };
+  }, [processedStatus, isBreakerOpen, isDarkMode]);
 
-    // Add values for dedicated styling links
-    if (styleLink1OpcUaNodeId && reactiveStyleLink1Value !== undefined) {
-      values[styleLink1OpcUaNodeId] = reactiveStyleLink1Value;
-    }
-    if (styleLink2OpcUaNodeId && reactiveStyleLink2Value !== undefined) {
-      values[styleLink2OpcUaNodeId] = reactiveStyleLink2Value;
-    }
-    if (styleLink3OpcUaNodeId && reactiveStyleLink3Value !== undefined) {
-      values[styleLink3OpcUaNodeId] = reactiveStyleLink3Value;
-    }
-    // This object now contains reactive values for primary links AND up to 3 styling links.
-    // getDerivedStyle will iterate all data.dataPointLinks and use values from this map if the link's nodeId is present.
-    return values;
-  }, [
-    statusOpcUaNodeId, reactiveStatusValue,
-    isOpenOpcUaNodeId, reactiveIsOpenValue,
-    styleLink1OpcUaNodeId, reactiveStyleLink1Value,
-    styleLink2OpcUaNodeId, reactiveStyleLink2Value,
-    styleLink3OpcUaNodeId, reactiveStyleLink3Value
-  ]);
-
-  const derivedNodeStyles = useMemo(() => {
-    // opcUaValuesForDerivedStyle already contains the reactive values for status, isOpen, and up to 3 style links.
-    // Pass these as primary, and globalOpcUaNodeValues as fallback.
-    return getDerivedStyle(data, dataPoints, opcUaValuesForDerivedStyle, globalOpcUaNodeValues);
-  }, [data, dataPoints, opcUaValuesForDerivedStyle, globalOpcUaNodeValues]);
-
-  
-  // Combine statusStyles with derivedNodeStyles. Derived styles can override.
-  // For simplicity, we'll focus on className-based statusStyles and let derivedNodeStyles apply inline.
-  // More complex merging might be needed if derivedNodeStyles also return classNames.
+  const derivedNodeStyles = useMemo(() => getDerivedStyle(data, dataPoints, {}, globalOpcUaNodeValues), [data, dataPoints, globalOpcUaNodeValues]);
+  const electricCyan = 'hsl(190, 95%, 50%)';
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevStatusRef = useRef(processedStatus);
-
+  const prevDisplayStatusRef = useRef(displayStatusText);
   useEffect(() => {
-    if (prevStatusRef.current !== processedStatus) {
+    if (prevDisplayStatusRef.current !== displayStatusText) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
-      prevStatusRef.current = processedStatus;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 1200);
+      prevDisplayStatusRef.current = displayStatusText;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+  }, [displayStatusText]);
 
+  const nodeMainStyle = useMemo((): React.CSSProperties => {
+    const dynamicBgStyle = {
+        '--bg-start-color': statusUiStyles.baseBgStartColor,
+        '--bg-end-color': statusUiStyles.baseBgEndColor,
+    } as React.CSSProperties;
+
+    let currentBoxShadow = `0 0 7px 1.5px ${statusUiStyles.glowColor}`;
+    const isNominalClosed = !isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal');
+    
+    if (isNominalClosed && !selected && !isRecentStatusChange) {
+      // Breathing glow handled by framer-motion animate prop
+    }
+    if (isRecentStatusChange) {
+        currentBoxShadow = `0 0 13px 3px ${statusUiStyles.glowColor.replace('0.45', '0.65')}`; 
+    }
+    if (selected) {
+        currentBoxShadow = `0 0 14px 2.5px ${electricCyan}, 0 0 4px 1px ${electricCyan} inset`;
+    }
+    
+    return {
+      ...dynamicBgStyle,
+      borderColor: derivedNodeStyles.borderColor || statusUiStyles.baseBorderClass.split(' ').pop(),
+      boxShadow: currentBoxShadow,
+      width: typeof nodeWidthFromData === 'number' ? `${nodeWidthFromData}px` : '70px', // Default width
+      height: typeof nodeHeightFromData === 'number' ? `${nodeHeightFromData}px` : '95px', // Default height
+    };
+  }, [statusUiStyles, derivedNodeStyles, selected, isRecentStatusChange, isBreakerOpen, processedStatus, electricCyan, nodeWidthFromData, nodeHeightFromData]);
+
+  const fullNodeObjectForDetails = useMemo((): CustomNodeType => ({
+    id, type: type || '', position: nodePosition, data,
+    selected: selected || false, dragging: dragging || false, zIndex: zIndex || 0, 
+    width: nodeWidthFromData, height: nodeHeightFromData,
+    connectable: isConnectable || false
+  }), [id, type, nodePosition, data, selected, dragging, zIndex, nodeWidthFromData, nodeHeightFromData, isConnectable]);
+  
   const breakerTypeLabel = data.config?.type || 'Breaker';
-
-  // Choose icon based on status - can be expanded with more DPLinks
-  const StatusIcon = useMemo(() => {
-    if (processedStatus === 'fault' || processedStatus === 'tripped') return ShieldAlertIcon;
-    if (processedStatus === 'alarm') return AlertTriangleIcon; // Specific alarm icon
-    if (processedStatus === 'warning') return AlertTriangleIcon; // Or a dedicated warning icon
-    if (!isOpen && (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized')) return ShieldCheckIcon; // Indicates closed and healthy
-    if (isOpen) return ZapOffIcon; // Clearly open
-    return ZapIcon; // Default or unknown state icon (could also be ZapOffIcon if default is open)
-  }, [processedStatus, isOpen]);
-
+  const tripRatingText = data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel.toUpperCase();
 
   return (
     <motion.div
       className={`
-        sld-node breaker-node group custom-node-hover w-[70px] h-[90px] rounded-md shadow-md
-        flex flex-col items-center justify-between 
-        border-2 ${statusStyles.border} 
-        bg-card dark:bg-neutral-800 
-        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+        breaker-node group sld-node relative flex flex-col items-center justify-between 
+        rounded-lg border backdrop-blur-sm
+        transition-colors duration-300 ease-in-out
+        ${statusUiStyles.baseBorderClass} 
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-pointer'}
+        ${selected ? `ring-2 ring-offset-2 ring-[${electricCyan}] dark:ring-[${electricCyan}] ring-offset-black/10 dark:ring-offset-white/10 shadow-lg` : 'shadow-md'}
+        overflow-hidden 
       `}
-      // Note: Removed direct hover:shadow-lg, selected ring, and statusStyles.bg from here if they conflict with node-content-wrapper approach
-      // statusStyles.bg will be applied to node-content-wrapper
-      // transition-all duration-150 is part of custom-node-hover
-      style={derivedNodeStyles} // Apply derived styles that don't conflict with wrapper (e.g. visibility, opacity)
-      variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }} // Reduced scale for subtlety, hover handled by custom-node-hover primarily
-      // whileHover="hover" // Handled by custom-node-hover CSS
-      initial="initial"
-      transition={{ type: 'spring', stiffness: 400, damping: 15 }} // Adjusted for a slightly less bouncy feel if scale is used
+      style={{
+        ...nodeMainStyle,
+        background: `linear-gradient(to bottom, var(--bg-start-color), var(--bg-end-color))`
+      }}
+      initial={{ opacity: 0, scale: 0.88, y: 15 }}
+      animate={{ 
+        opacity: 1, scale: 1, y: 0,
+        boxShadow: (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal') && !selected && !isRecentStatusChange)
+          ? [ 
+              `0 0 8px 1.5px ${statusUiStyles.activeGlowColor.replace('0.35', '0.3')}`,
+              `0 0 12px 2.5px ${statusUiStyles.activeGlowColor.replace('0.35', '0.5')}`,
+              `0 0 8px 1.5px ${statusUiStyles.activeGlowColor.replace('0.35', '0.3')}`
+            ]
+          : nodeMainStyle.boxShadow 
+      }} 
+      exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.15, ease: "easeOut"} }}
+      transition={
+        (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal') && !selected && !isRecentStatusChange)
+          ? { type: 'spring', stiffness: 260, damping: 22, boxShadow: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }
+          : { type: 'spring', stiffness: 280, damping: 25 }
+      }
+      whileHover={{ 
+        scale: isNodeEditable ? 1.035 : 1.02,
+        boxShadow: selected 
+            ? `0 0 18px 3.5px ${electricCyan}, 0 0 6px 1.5px ${electricCyan} inset`
+            : `0 0 15px 3.5px ${statusUiStyles.glowColor.replace('0.45', '0.6')}`
+      }}
+      onClick={(e) => { 
+         if (!isNodeEditable && !isEditMode) {
+            e.stopPropagation();
+            setSelectedElementForDetails(fullNodeObjectForDetails);
+        }
+      }}
     >
-      {/* Handles are outside the node-content-wrapper so selection border doesn't cover them */}
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="!w-3 !h-3 react-flow__handle-common sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="!w-3 !h-3 react-flow__handle-common sld-handle-style" />
+      <Handle 
+        type="target" position={Position.Top} id="top_in" isConnectable={isConnectable}
+        className="!w-3 !h-3 !bg-slate-500/80 dark:!bg-slate-600/80 !border-slate-600 dark:!border-slate-500 shadow
+                   !rounded-full sld-handle-style hover:!scale-150 hover:!opacity-100 transition-all duration-150 z-10"
+        title="Input"
+      />
+      <Handle 
+        type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable}
+        className="!w-3 !h-3 !bg-slate-500/80 dark:!bg-slate-600/80 !border-slate-600 dark:!border-slate-500 shadow
+                   !rounded-full sld-handle-style hover:!scale-150 hover:!opacity-100 transition-all duration-150 z-10"
+        title="Output"
+      />
 
-      {/* node-content-wrapper will get the selection styles from globals.css */}
-      <div 
-        className={`node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-sm ${statusStyles.bg} ${isRecentStatusChange ? 'animate-status-highlight' : ''}`}
-        // Apply statusStyles.bg here. Border is on the outer div, or could be moved here too if preferred.
-        // If derivedNodeStyles include background or border, they might need to be applied here or carefully merged.
-        // For now, assuming derivedNodeStyles are for text color, visibility etc.
-      >
-        {!isEditMode && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              const fullNodeObject: CustomNodeType = {
-                  id, 
-                  type, 
-                  position: { x: xPos, y: yPos },
-                  data, 
-                  selected, 
-                  dragging, 
-                  zIndex, 
-                  width: width === null ? undefined : width, 
-                  height: height === null ? undefined : height, 
-                  connectable: isConnectable,
-              };
-              setSelectedElementForDetails(fullNodeObject);
-            }}
-            title="View Details"
-          >
-            <InfoIcon className="h-3 w-3 text-primary/80" />
-          </Button>
-        )}
-
-        <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" style={{ color: derivedNodeStyles.color || statusStyles.main }} title={`${data.label} (${breakerTypeLabel})`}>
-          {data.label}
-        </p>
+      {!isEditMode && (
+        <Button variant="ghost" size="icon" title="View Details"
+          className="absolute top-1 right-1 h-6 w-6 rounded-full z-20 group/infobtn
+                     bg-slate-300/20 dark:bg-slate-700/20 hover:bg-slate-300/40 dark:hover:bg-slate-700/40
+                     p-0 backdrop-blur-sm transition-all duration-200" 
+          onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}
+        >
+          <InfoIcon className={`h-3.5 w-3.5 text-slate-500 dark:text-slate-400 
+                                group-hover/infobtn:text-[${electricCyan}] dark:group-hover/infobtn:text-[${electricCyan}] 
+                                transition-colors duration-150`} /> 
+        </Button>
+      )}
+      
+      <div className="flex flex-col items-center justify-between w-full h-full px-1.5 py-1 pointer-events-none space-y-0.5">
+        {/* Top status text (optional, small) */}
+        <div className="h-3 overflow-hidden">
+            <AnimatePresence mode="wait">
+                <motion.p
+                    key={`desc-status-${displayStatusText}`}
+                    className={`text-[8px] font-medium tracking-tight leading-tight text-center w-full ${statusUiStyles.textColorClass} transition-colors duration-200`}
+                    title={`Status: ${displayStatusText}`}
+                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18, ease: "easeInOut" }}
+                >
+                    {displayStatusText}
+                </motion.p>
+            </AnimatePresence>
+        </div>
         
+        {/* Breaker Label */}
+        <motion.p
+          className="text-xs font-bold leading-tight text-center w-full text-slate-800 dark:text-slate-100 transition-colors duration-200"
+          title={`${data.label} (${breakerTypeLabel})`}
+        >
+          {data.label}
+        </motion.p>
+
+        {/* SVG Breaker Visual */}
         <motion.svg 
           viewBox="0 0 24 24" 
-          width="32" height="32" 
-          className={`flex-grow`} 
-          style={{ color: derivedNodeStyles.color || statusStyles.iconColor }}
+          width="30" height="30" 
+          className="flex-shrink-0 my-0.5" 
+          style={{ color: statusUiStyles.iconColorClass }}
           initial={false}
+          animate={{ color: statusUiStyles.iconColorClass }} // Animate color change if needed
+          transition={{duration: 0.3}}
         >
-          <circle cx="12" cy="7" r="2.5" fill="currentColor" />
-          <circle cx="12" cy="17" r="2.5" fill="currentColor" />
-          <line x1="12" y1="9.5" x2="12" y2="14.5" stroke="currentColor" strokeWidth="1.5" />
+          {/* Terminals */}
+          <circle cx="12" cy="6" r="2.2" fill="currentColor" />
+          <circle cx="12" cy="18" r="2.2" fill="currentColor" />
+          {/* Static connection from top terminal to center body */}
+          <line x1="12" y1="8.2" x2="12" y2="11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          {/* Animated Breaker Arm */}
           <motion.line
-            key={isOpen ? "open-arm" : "closed-arm"}
-            x1="12"
-            y1="12"
+            key={isBreakerOpen ? "breaker-open-arm" : "breaker-closed-arm"}
+            x1="12" y1="12.5" /* Start point fixed slightly below center */
             initial={false}
-            animate={isOpen ? { x2: 18, y2: 8 } : { x2: 12, y2: 9.5 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
+            animate={isBreakerOpen 
+                ? { x2: 18, y2: 9, strokeWidth: 2 } // Open state: angled, slightly thinner
+                : { x2: 12, y2: 15.8, strokeWidth: 2.2 } // Closed state: vertical to bottom terminal, slightly thicker
+            }
+            transition={{ type: "spring", stiffness: 300, damping: 20, duration: 0.25 }}
             stroke="currentColor"
-            strokeWidth="2"
             strokeLinecap="round"
           />
-          <rect x="8" y="11" width="8" height="2" fill="currentColor" className="opacity-60" />
-          <motion.circle 
-            cx="12" cy="12" r="1.5" fill="currentColor"
-            initial={{ opacity: isOpen ? 0 : 1 }}
-            animate={{ opacity: isOpen ? 0 : 1 }}
-            transition={{ duration: 0.15 }}
+          {/* Center Body/Housing of the breaker arm pivot point */}
+          <rect x="9" y="10.5" width="6" height="3" rx="1" fill="currentColor" className="opacity-70" />
+          {/* Connection point for closed state (hidden when open) */}
+           <motion.circle 
+            cx="12" cy="12.5" r="1.2" 
+            fill={isDarkMode ? "hsl(220,13%,25%)" : "hsl(220,13%,85%)"} // Darker/Lighter center dot
+            initial={{ opacity: isBreakerOpen ? 0 : 1 }}
+            animate={{ opacity: isBreakerOpen ? 0 : 1 }}
+            transition={{ duration: 0.1 }}
           />
         </motion.svg>
 
-        <p className="text-[10px] font-semibold" style={{ color: derivedNodeStyles.color || statusStyles.main }}>
-          {isOpen ? 'OPEN' : 'CLOSED'}
-        </p>
+        {/* Main Open/Closed Status */}
+        <div className="h-4 overflow-hidden">
+            <AnimatePresence mode="wait">
+                <motion.p
+                    key={`main-status-${isBreakerOpen}`}
+                    className={`text-sm font-semibold leading-tight text-center w-full ${statusUiStyles.mainStatusColorClass} transition-colors duration-200`}
+                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: "easeInOut" }}
+                >
+                    {isBreakerOpen ? 'OPEN' : 'CLOSED'}
+                </motion.p>
+            </AnimatePresence>
+        </div>
 
-        <p className="text-[9px] text-muted-foreground text-center truncate w-full leading-tight" title={data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel}>
-          {data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel.toUpperCase()}
+        {/* Trip Rating / Type */}
+        <p className="text-[9px] text-muted-foreground dark:text-slate-400/80 text-center truncate w-full leading-tight font-medium" title={tripRatingText}>
+          {tripRatingText}
         </p>
       </div>
     </motion.div>
