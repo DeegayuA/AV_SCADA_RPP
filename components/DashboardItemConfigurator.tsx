@@ -244,7 +244,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
     return (
         <>
             <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-                <DialogContent className="max-w-5xl 2xl:max-w-7xl h-[90vh] flex flex-col p-0 overflow-hidden">
+                <DialogContent className="max-w-6xl 2xl:max-w-8xl h-[90vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="p-4 border-b flex-shrink-0">
                         <DialogTitle className="text-2xl font-semibold">Add Dashboard Items</DialogTitle>
                         <DialogDescription className="text-sm">

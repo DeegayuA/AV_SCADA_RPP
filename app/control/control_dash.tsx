@@ -503,7 +503,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const gaugeItems = useMemo(() => individualPoints.filter(p => p.uiType === 'gauge'), [individualPoints]);
   const otherDisplayItems = useMemo(() => individualPoints.filter(p => p.uiType === 'display' && p.category !== 'status'), [individualPoints]);
   const topSections = useMemo<SectionToRender[]>(() => { /* ... unchanged ... */ const s: SectionToRender[] = []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const bC=controlItems.length>CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; const bS=statusDisplayItems.length>CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; if(bC||bS){if(statusDisplayItems.length>0)s.push({title:"Status Readings",items:statusDisplayItems,gridCols:cGC}); if(controlItems.length>0)s.push({title:"Controls",items:controlItems,gridCols:cGC});}else{const cI=[...statusDisplayItems,...controlItems];if(cI.length>0)s.push({title:"Controls & Status",items:cI,gridCols:cGC});} return s; }, [controlItems, statusDisplayItems]);
-  const gaugesOverviewSectionDefinition = useMemo<SectionToRender | null>(() => { /* ... unchanged ... */ if(gaugeItems.length>0)return{title:"Gauges & Overview",items:gaugeItems,gridCols:'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'};return null;},[gaugeItems]);
+  const gaugesOverviewSectionDefinition = useMemo<SectionToRender | null>(() => { /* ... unchanged ... */ if(gaugeItems.length>0)return{title:"Gauges & Overview",items:gaugeItems,gridCols:'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'};return null;},[gaugeItems]);
   const bottomReadingsSections = useMemo<SectionToRender[]>(() => { /* ... unchanged ... */ if(otherDisplayItems.length===0)return[];const cGC='grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6';const s:SectionToRender[]=[];const dBC=otherDisplayItems.reduce((acc,p)=>{const k=p.category||'miscellaneous';if(!acc[k])acc[k]=[];acc[k].push(p);return acc;},{}as Record<string,DataPoint[]>);const gORP:DataPoint[]=[];Object.entries(dBC).sort(([a],[b])=>a.localeCompare(b)).forEach(([cat,pts])=>{if(pts.length>OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD)s.push({title:`${cat.charAt(0).toUpperCase()+cat.slice(1)} Readings`,items:pts,gridCols:cGC});else gORP.push(...pts);});if(gORP.length>0){const oRS:SectionToRender={title:"Other Readings",items:gORP,gridCols:cGC};if(s.some(sec=>sec.title!=="Other Readings"))s.push(oRS);else s.unshift(oRS);}return s.filter(sec=>sec.items.length>0);},[otherDisplayItems]);
   const cardHoverEffect = useMemo(() => (resolvedTheme === 'dark' ? { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } } : { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } }), [resolvedTheme]);
   const handleResetToDefault = useCallback(() => { /* ... unchanged ... */ if(currentUserRole!==UserRole.ADMIN)return;const sD=getSmartDefaults();setDisplayedDataPointIds(sD.length>0?sD:getHardcodedDefaultDataPointIds());toast.info("Layout reset.");},[getSmartDefaults,getHardcodedDefaultDataPointIds,currentUserRole]);
@@ -513,8 +513,8 @@ const UnifiedDashboardPage: React.FC = () => {
   const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => { /* ... unchanged ... */ const g:Record<string,ConfiguratorThreePhaseGroup>={},i:DataPoint[]=[];const cS=new Set(displayedDataPointIds);allPossibleDataPoints.forEach(dp=>{if(dp.threePhaseGroup&&dp.phase&&['a','b','c','x','total'].includes(dp.phase)){if(!g[dp.threePhaseGroup]){let rN=dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig,'').trim().replace(/ \([ABCX]\)$/i,'').trim();g[dp.threePhaseGroup]={name:dp.threePhaseGroup,representativeName:rN||dp.threePhaseGroup,ids:[],category:dp.category};}g[dp.threePhaseGroup].ids.push(dp.id);}else if(!dp.threePhaseGroup){i.push(dp);}});const aGA=Array.from(new Set(Object.values(g).flatMap(grp=>grp.ids)));const tIP=i.filter(ind=>!aGA.includes(ind.id));const cDA=Array.from(cS);return{threePhaseGroupsForConfig:Object.values(g).filter(grp=>grp.ids.some(id=>!cDA.includes(id))).sort((a,b)=>a.representativeName.localeCompare(b.representativeName)),individualPointsForConfig:tIP.filter(dp=>!cDA.includes(dp.id)).sort((a,b)=>a.name.localeCompare(b.name))};}, [allPossibleDataPoints, displayedDataPointIds]);
   
   const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
-  const sldSectionMinHeight = "min-h-[400px] sm:min-h-[450px]";
-const sldInternalMaxHeight = `calc(70vh - 3.5rem)`;
+  const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
+const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
 
   const commonRenderingProps = {
     isEditMode: isGlobalEditMode,
@@ -573,7 +573,7 @@ const sldInternalMaxHeight = `calc(70vh - 3.5rem)`;
 
   return (
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
-      <div className="max-w-screen-2xl mx-auto">
+      <div className="max-w-screen-4xl mx-auto">
         <HeaderConnectivityComponent
           plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
           soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} currentTime={currentTime} delay={delay}
@@ -586,8 +586,8 @@ const sldInternalMaxHeight = `calc(70vh - 3.5rem)`;
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 xl:gap-6 my-4 md:my-6">
-          <Card className={cn("lg:col-span-2 shadow-lg", sldSectionMinHeight)}>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 xl:gap-4 my-4 md:my-6">
+          <Card className={cn("lg:col-span-3 shadow-lg", sldSectionMinHeight)}>
             <CardContent className="p-3 sm:p-4 h-full flex flex-col">
               <div className="flex justify-between items-center mb-2 sm:mb-3">
                 <div className="flex items-center gap-2">

@@ -1,39 +1,65 @@
 // components/sld/nodes/PanelNode.tsx
-import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
-import { motion } from 'framer-motion';
-import { PanelNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
-import { useAppStore } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { SunIcon, AlertTriangleIcon, CheckCircleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import React, { memo, useMemo, useEffect, useRef, useState } from 'react';
+import { NodeProps, Handle, Position } from 'reactflow';
+import { motion, AnimatePresence } from 'framer-motion';
+import { PanelNodeData, CustomNodeType } from '@/types/sld';
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
+import { applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
+import { SunIcon, AlertTriangleIcon, InfoIcon, ZapOffIcon, PowerIcon, TrendingUpIcon } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
-import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
+// Helper for theme detection (ensure this accurately reflects your app's theme state)
+const useIsDarkMode = () => {
+  const [isDark, setIsDark] = useState(() => {
+    // Ensure initial state is correct even if observer hasn't fired
+    if (typeof window !== 'undefined') {
+      return document.documentElement.classList.contains('dark');
+    }
+    return false; // Default if SSR or window not available
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const cb = () => {
+      setIsDark(document.documentElement.classList.contains('dark'));
+    };
+    const observer = new MutationObserver(cb);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    
+    // Call immediately in case the class was set before this effect ran
+    cb(); 
+    
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+};
+
 
 interface ExtendedNodeProps extends Omit<NodeProps<PanelNodeData>, 'xPos' | 'yPos'> {
-  // Add properties with our desired optionality
   xPos?: number;
   yPos?: number;
-  width?: number;
-  height?: number;
+  // width & height are already part of NodeProps, but can be undefined if not set by layout engine
 }
 
 const PanelNode: React.FC<ExtendedNodeProps> = (props) => {
-  const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props;
+  const { data, selected, isConnectable, id, type, position, /* zIndex, dragging, width, height are in props */ } = props;
+  const xPos = position?.x; // For details button
+  const yPos = position?.y; // For details button
+
+  const isDarkMode = useIsDarkMode();
+
   const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    globalOpcUaNodeValues: state.opcUaNodeValues, // Renamed for clarity
+    globalOpcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
   }));
 
-  const isNodeEditable = useMemo(() => 
-    isEditMode && (currentUser?.role === 'admin'),
-    [isEditMode, currentUser]
-  );
+  const isNodeEditable = useMemo(() => isEditMode && currentUser?.role === 'admin', [isEditMode, currentUser]);
 
-  // --- Reactive Data Point Handling ---
+  // --- Reactive Data Points (condensed) ---
   const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
   const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
   const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
@@ -44,193 +70,278 @@ const PanelNode: React.FC<ExtendedNodeProps> = (props) => {
   const powerOpcUaNodeId = useMemo(() => powerDataPointConfig?.nodeId, [powerDataPointConfig]);
   const reactivePowerValue = useOpcUaNodeValue(powerOpcUaNodeId);
 
-  const processedStatus = useMemo(() => {
+  const animationPowerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'panel.powerGeneration'), [data.dataPointLinks]);
+  const animationPowerDataPointConfig = useMemo(() => animationPowerLink ? dataPoints[animationPowerLink.dataPointId] : undefined, [animationPowerLink, dataPoints]);
+  const animationPowerOpcUaNodeId = useMemo(() => animationPowerDataPointConfig?.nodeId, [animationPowerDataPointConfig]);
+  const reactiveAnimationPowerValue = useOpcUaNodeValue(animationPowerOpcUaNodeId);
+  
+  const processedStatus = useMemo(() => { /* ... as before ... */ 
     if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
       return applyValueMapping(reactiveStatusValue, statusLink);
     }
-    return data.status || 'offline'; // Fallback to static status or default
+    return data.status || 'offline';
   }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
-  const powerOutput = useMemo(() => {
+  const powerOutput = useMemo(() => { /* ... as before ... */
     if (powerLink && powerDataPointConfig && reactivePowerValue !== undefined) {
       const mappedValue = applyValueMapping(reactivePowerValue, powerLink);
       return formatDisplayValue(mappedValue, powerLink.format, powerDataPointConfig?.dataType);
     }
     return data.config?.powerRatingWp ? `${data.config.powerRatingWp} Wp (rated)` : 'N/A';
   }, [powerLink, powerDataPointConfig, reactivePowerValue, data.config?.powerRatingWp]);
-  
-  // Determine status-based styling
-  const statusClasses = useMemo(() => {
+
+  const numericAnimationPower = useMemo(() => { /* ... as before ... */ 
+    let powerForAnimation: number | undefined = undefined;
+    if (animationPowerLink && animationPowerDataPointConfig && reactiveAnimationPowerValue !== undefined) {
+      const mappedValue = applyValueMapping(reactiveAnimationPowerValue, animationPowerLink);
+      if (typeof mappedValue === 'number') powerForAnimation = mappedValue;
+      else if (typeof mappedValue === 'string') { const parsed = parseFloat(mappedValue); if (!isNaN(parsed)) powerForAnimation = parsed; }
+      else if (typeof mappedValue === 'boolean') powerForAnimation = mappedValue ? (data.config?.powerRatingWp || 100) : 0;
+    }
+    if (powerForAnimation === undefined && powerLink && powerDataPointConfig && reactivePowerValue !== undefined) {
+      const mappedValue = applyValueMapping(reactivePowerValue, powerLink);
+      if (typeof mappedValue === 'number') powerForAnimation = mappedValue;
+      else if (typeof mappedValue === 'string') { const parsed = parseFloat(mappedValue); if (!isNaN(parsed)) powerForAnimation = parsed; }
+      else if (typeof mappedValue === 'boolean') powerForAnimation = mappedValue ? (data.config?.powerRatingWp || 100) : 0;
+    }
+    return Math.max(0, powerForAnimation ?? 0);
+  }, [animationPowerLink, animationPowerDataPointConfig, reactiveAnimationPowerValue, powerLink, powerDataPointConfig, reactivePowerValue, data.config?.powerRatingWp]);
+
+
+  // --- THEME TRANSITION: statusStyles now return Tailwind classes primarily ---
+  const statusUiStyles = useMemo(() => {
+    let baseBorderClass = isDarkMode ? 'border-slate-700' : 'border-slate-300';
+    let iconColorClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+    let textColorClass = isDarkMode ? 'text-slate-300' : 'text-slate-600';
+    let baseBgClass = isDarkMode ? 'bg-slate-800/70' : 'bg-white/70'; // With opacity for backdrop
+    let glowRgb = isDarkMode ? '71, 85, 105' : '148, 163, 184'; // slate-500 / slate-400 for boxShadow
+
     switch (processedStatus) {
-      case 'alarm':
-      case 'fault':
-        return 'border-destructive dark:border-red-400 bg-destructive/10 dark:bg-red-900/20 text-destructive-foreground';
+      case 'alarm': case 'fault':
+        baseBorderClass = 'border-red-500 dark:border-red-500'; // Stays same or explicitly set
+        iconColorClass = 'text-red-500 dark:text-red-400';
+        textColorClass = 'text-red-600 dark:text-red-400';
+        glowRgb = '239, 68, 68';
+        break;
       case 'warning':
-        return 'border-yellow-500 dark:border-yellow-400 bg-yellow-500/10 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300';
-      case 'nominal':
-      case 'producing':
-      case 'online':
-        return 'border-green-600 dark:border-green-500 bg-green-600/5 dark:bg-green-900/10 text-green-700 dark:text-green-300';
-      default: // Default for 'offline', 'standby' or unknown
-        return 'border-neutral-500 dark:border-neutral-600 bg-neutral-500/10 dark:bg-neutral-900/20 text-neutral-700 dark:text-neutral-300';
+        baseBorderClass = 'border-amber-500 dark:border-amber-400';
+        iconColorClass = 'text-amber-500 dark:text-amber-400';
+        textColorClass = 'text-amber-600 dark:text-amber-400';
+        glowRgb = '245, 158, 11';
+        break;
+      case 'nominal': case 'producing': case 'online':
+        baseBorderClass = 'border-green-500 dark:border-green-400';
+        iconColorClass = numericAnimationPower > 0 
+          ? (isDarkMode ? 'text-yellow-400' : 'text-yellow-500') 
+          : (isDarkMode ? 'text-green-400' : 'text-green-500');
+        textColorClass = isDarkMode ? 'text-green-300' : 'text-green-700';
+        glowRgb = numericAnimationPower > 0 
+          ? (isDarkMode ? '250, 204, 21' : '234, 179, 8') // yellow
+          : (isDarkMode ? '74, 222, 128' : '34, 197, 94'); // green
+        break;
+      default: break;
     }
-  }, [processedStatus]);
+    return { baseBorderClass, iconColorClass, textColorClass, baseBgClass, glowColor: `rgba(${glowRgb}, 0.4)` };
+  }, [processedStatus, numericAnimationPower, isDarkMode]);
 
-  const derivedNodeStyles = useMemo(() => {
-    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
-    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
-      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
-    }
-    if (powerOpcUaNodeId && reactivePowerValue !== undefined) {
-      primaryOpcUaValues[powerOpcUaNodeId] = reactivePowerValue;
-    }
-    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
-  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, powerOpcUaNodeId, reactivePowerValue, globalOpcUaNodeValues]);
-
-  const StatusIcon = useMemo(() => {
+  const StatusIconComponent = useMemo(() => { /* ... as before ... */ 
     if (processedStatus === 'fault' || processedStatus === 'alarm') return AlertTriangleIcon;
-    if (processedStatus === 'warning') return AlertTriangleIcon; 
-    return SunIcon; // SunIcon for producing, nominal, online, or even offline (color will change)
-  }, [processedStatus]);
+    if (processedStatus === 'warning') return AlertTriangleIcon;
+    if ((processedStatus === 'offline' || processedStatus === 'standby') && numericAnimationPower <= 0) return ZapOffIcon;
+    if (numericAnimationPower > 0) return SunIcon;
+    return PowerIcon;
+  }, [processedStatus, numericAnimationPower]);
 
-  const iconColor = useMemo(() => {
-    if (derivedNodeStyles.color) return derivedNodeStyles.color; 
-    if (processedStatus === 'producing' || processedStatus === 'nominal' || processedStatus === 'online') return 'text-yellow-500 dark:text-yellow-400';
-    if (processedStatus === 'fault' || processedStatus === 'alarm') return 'text-destructive dark:text-red-400';
-    if (processedStatus === 'warning') return 'text-yellow-600 dark:text-yellow-400';
-    return 'text-gray-400 dark:text-gray-500'; 
-  }, [processedStatus, derivedNodeStyles.color]);
+  const canAnimateIconPulse = useMemo(() => {/* ... as before ... */ 
+    return numericAnimationPower > 0 && StatusIconComponent === SunIcon && !['fault', 'alarm', 'warning', 'offline', 'standby'].includes(processedStatus);
+  },[numericAnimationPower, StatusIconComponent, processedStatus]);
 
-  const isProducing = useMemo(() => {
-    // A simple heuristic: if powerOutput is not "N/A" and not "0 W" (or similar zero values)
-    // This might need refinement based on actual formatted values from formatDisplayValue
-    if (powerOutput === 'N/A') return false;
-    const numericValue = parseFloat(powerOutput); // Extracts leading number
-    return !isNaN(numericValue) && numericValue > 0;
-  }, [powerOutput]);
-
-
-  // Merged styles for the main div
-  const componentStyle: React.CSSProperties = {
-    ...derivedNodeStyles, // Apply all derived styles
-    // Explicitly override border and background if not set by derived styles, to ensure statusClasses apply
-    borderColor: derivedNodeStyles.borderColor || undefined, // Let className handle if not in derived
-    backgroundColor: derivedNodeStyles.backgroundColor || undefined, // Let className handle
-    color: derivedNodeStyles.color || undefined, // Let className handle
-  };
+  const animationPulseDuration = useMemo(() => { /* ... as before ... */ 
+    if (!canAnimateIconPulse) return 2.5;
+    const baseDuration = 3.0;
+    const minDuration = 0.6;
+    const powerScaleForSpeed = data.config?.powerRatingWp ? (data.config.powerRatingWp / 2.5) : 200;
+    const speedFactor = Math.max(0, numericAnimationPower / Math.max(1, powerScaleForSpeed));
+    return Math.max(minDuration, baseDuration / (1 + speedFactor * 2));
+  }, [numericAnimationPower, canAnimateIconPulse, data.config?.powerRatingWp]);
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
   const prevStatusRef = useRef(processedStatus);
-
-  useEffect(() => {
+  useEffect(() => { /* ... as before ... */
     if (prevStatusRef.current !== processedStatus) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 1200);
       prevStatusRef.current = processedStatus;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+   }, [processedStatus]);
 
+  const derivedNodeStyles = useMemo(() => getDerivedStyle(data, dataPoints, {}, globalOpcUaNodeValues), [data, dataPoints, globalOpcUaNodeValues]);
+  const electricCyan = 'hsl(190, 95%, 55%)';
 
+  // THEME TRANSITION: boxShadow is dynamic and Framer Motion handles its transitions.
+  // borderColor is handled by Tailwind classes + CSS transition.
+  // Background color is also handled by Tailwind classes + CSS transition.
+  const nodeMainStyle: React.CSSProperties = {
+    // derivedNodeStyles.borderColor could override Tailwind, so ensure it's compatible with CSS transitions if set
+    borderColor: derivedNodeStyles.borderColor || undefined, // Let Tailwind class take precedence
+    boxShadow: selected 
+        ? `0 0 18px 3px ${electricCyan}, 0 0 5px 1px ${electricCyan} inset` 
+        : isRecentStatusChange 
+          ? `0 0 16px 3px ${statusUiStyles.glowColor.replace('0.4', '0.65')}` // Brighter pulse
+          : `0 0 10px 1.5px ${statusUiStyles.glowColor}`, // Regular glow
+    minWidth: '128px',
+    minHeight: '100px',
+    // width/height can be set by React Flow layout engine or props
+    ...(props.width && { width: `${props.width}px` }),
+    ...(props.height && { height: `${props.height}px` }),
+  };
+  
+  // Framer motion 'transition' prop for properties animated by Framer.
+  // CSS 'transition-colors duration-300' on className for Tailwind controlled colors.
   return (
     <motion.div
       className={`
-        sld-node panel-node group custom-node-hover w-[100px] h-[60px] rounded-lg shadow-lg
-        flex flex-col items-center justify-center relative 
-        border-2 
-        ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-        ${statusClasses.split(' ').filter(c => c.startsWith('border-')).join(' ')} /* Keep only border from statusClasses */
-        bg-card dark:bg-neutral-800 /* Base background, specific bg moved to wrapper */
+        panel-node group sld-node relative flex flex-col items-center justify-center 
+        rounded-xl border-2 backdrop-blur-md 
+        ${statusUiStyles.baseBgClass} 
+        ${statusUiStyles.baseBorderClass}
+        transition-colors duration-300 ease-in-out /* Key for smooth theme color changes */
+        ${isNodeEditable ? 'cursor-grab' : 'cursor-pointer'}
+        ${selected ? `ring-2 ring-offset-2 ring-[${electricCyan}] dark:ring-[${electricCyan}] ring-offset-transparent` : ''} 
       `}
-      // Removed transition-all, hover:shadow-md, selected ring/shadow from here.
-      // componentStyle will apply derived styles. statusClasses for border is applied.
-      style={componentStyle} 
-      // variants for framer-motion hover scale effect (subtle)
-      variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }}
-      // whileHover="hover" // Let CSS handle hover effects via custom-node-hover
-      initial="initial"
-      transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+      style={nodeMainStyle} // Framer handles transitions for `boxShadow` here if it changes.
+      initial={{ opacity: 0, scale: 0.85, y: 10 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      // This transition is for initial mount/unmount and hover (for scale and Framer-animated boxShadow)
+      transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+      whileHover={{ 
+        scale: isNodeEditable ? 1.04 : 1.02,
+        boxShadow: selected 
+            ? `0 0 22px 4px ${electricCyan}, 0 0 7px 2px ${electricCyan} inset`
+            : `0 0 20px 4px ${statusUiStyles.glowColor.replace('0.4', '0.6')}` // More intense glow on hover
+      }}
+      onClick={(e) => { /* ... as before ... */ 
+         if (!isNodeEditable && !isEditMode) {
+            e.stopPropagation();
+            setSelectedElementForDetails({
+                id, type, position: props.position, data, 
+                selected: props.selected, dragging: props.dragging, zIndex: props.zIndex, 
+                width: props.width, height: props.height, connectable: props.connectable
+            } as CustomNodeType);
+        }
+      }}
     >
-      {/* Handles are outside the node-content-wrapper */}
+      {/* THEME TRANSITION: Handle colors will transition via Tailwind classes and CSS transition */}
       <Handle
-        type="target" 
-        position={Position.Top}
-        id="top_in"
-        isConnectable={isConnectable}
-        className="!w-3 !h-3 !-translate-y-1/2 !rounded-full react-flow__handle-common sld-handle-style"
-        title="DC Input (Optional)"
+        type="target" position={Position.Top} id="top_in" isConnectable={isConnectable}
+        className="!w-3.5 !h-3.5 !bg-sky-400/70 dark:!bg-sky-600/70 !border-sky-500 dark:!border-sky-400
+                   !rounded-full sld-handle-style hover:!scale-125 hover:!opacity-100 transition-all duration-200"
+        title="DC Input"
       />
       <Handle
-        type="source"
-        position={Position.Bottom}
-        id="bottom_out"
-        isConnectable={isConnectable}
-        className="!w-3 !h-3 !translate-y-1/2 !rounded-full react-flow__handle-common sld-handle-style"
+        type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable}
+        className="!w-3.5 !h-3.5 !bg-sky-400/70 dark:!bg-sky-600/70 !border-sky-500 dark:!border-sky-400
+                   !rounded-full sld-handle-style hover:!scale-125 hover:!opacity-100 transition-all duration-200"
         title="DC Output"
       />
 
-      {/* node-content-wrapper for selection styles and specific background */}
-      <div className={`
-          node-content-wrapper flex flex-col items-center justify-center w-full h-full p-1 rounded-md
-          ${statusClasses.split(' ').filter(c => c.startsWith('bg-') || c.startsWith('text-')).join(' ')} /* Keep bg and text from statusClasses */
-          ${isRecentStatusChange ? 'animate-status-highlight' : ''}
-        `}
-      >
-        {!isEditMode && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-            onClick={(e) => {
-              e.stopPropagation();
-              const fullNodeObject: CustomNodeType = {
-                  id, 
-                  type, 
-                  position: { x: xPos ?? 0, y: yPos ?? 0 },
-                  data, 
-                  selected, 
-                  dragging, 
-                  zIndex, 
-                  width, 
-                  height, 
-                  connectable: isConnectable,
-              };
-              setSelectedElementForDetails(fullNodeObject);
-            }}
-            title="View Details"
-          >
-            <InfoIcon className="h-3 w-3 text-primary/80" />
-          </Button>
-        )}
+      {/* THEME TRANSITION: Info button BG and icon color transition via Tailwind classes */}
+      {!isEditMode && (
+        <Button
+          variant="ghost" size="icon" title="View Details"
+          className="absolute top-1.5 right-1.5 h-7 w-7 rounded-full z-20 
+                     bg-black/10 dark:bg-white/10 hover:bg-black/20 dark:hover:bg-white/20
+                     p-0 backdrop-blur-sm transition-colors duration-300" // Added transition-colors
+          onClick={(e) => { /* ... as before ... */ 
+             e.stopPropagation();
+             setSelectedElementForDetails({
+                id, type, position: props.position, data,
+                selected: props.selected, dragging: props.dragging, zIndex: props.zIndex, 
+                width: props.width, height: props.height, connectable: props.connectable
+            } as CustomNodeType);
+           }}
+        >
+          <InfoIcon className={`h-4 w-4 text-slate-600 dark:text-slate-300 transition-colors duration-300`} /> {/* Added transition-colors */}
+        </Button>
+      )}
+      
+      <div className="flex flex-col items-center justify-center w-full h-full p-2.5 space-y-1 pointer-events-none">
+        <div className="relative h-9 w-9 flex items-center justify-center mb-1">
+            <AnimatePresence mode="wait">
+                <motion.div
+                    key={StatusIconComponent.displayName || StatusIconComponent.name}
+                    initial={{ opacity: 0, scale: 0.7 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.7 }}
+                    transition={{ duration: 0.25 }}
+                    className="absolute"
+                >
+                    {/* THEME TRANSITION: Icon color from statusUiStyles.iconColorClass, transitions via CSS */}
+                    <StatusIconComponent 
+                        size={30}
+                        className={`${statusUiStyles.iconColorClass} transition-colors duration-300`} // Added transition-colors
+                    />
+                </motion.div>
+            </AnimatePresence>
+            {StatusIconComponent === SunIcon && canAnimateIconPulse && (
+                <motion.div
+                    className="absolute inset-0 rounded-full" // Removed opacity-40, use rgba in style
+                    style={{
+                        backgroundImage: `radial-gradient(${isDarkMode ? 'rgba(250, 204, 21, 0.3)' : 'rgba(234, 179, 8, 0.25)'} 0%, transparent 70%)`
+                        // THEME TRANSITION: The backgroundImage itself won't transition smoothly with CSS 'transition-all'.
+                        // If a super smooth radial gradient transition is needed, it's complex. Often, a cross-fade or opacity
+                        // change on two overlaid elements (one for light, one for dark) is a simpler approach,
+                        // or accept that this part might swap more directly.
+                        // For now, the opacity animation helps.
+                    }}
+                    animate={{ scale: [1, 1.3, 1], opacity: [isDarkMode ? 0.35:0.3, isDarkMode? 0.65:0.5, isDarkMode? 0.35:0.3] }}
+                    transition={{ duration: animationPulseDuration, repeat: Infinity, ease: "circOut" }}
+                />
+            )}
+        </div>
+        
+        {/* THEME TRANSITION: Text colors transition via Tailwind classes */}
+        <motion.p
+          className={`text-xs font-semibold tracking-wider leading-tight text-center w-full px-1
+                     ${statusUiStyles.textColorClass} transition-colors duration-300`}
+          title={`Status: ${processedStatus}`}
+          whileHover={{ color: isDarkMode ? 'hsl(0, 0%, 100%)' : 'hsl(0, 0%, 0%)' }} // Ensure hover respects theme transitions
+        >
+          {String(processedStatus).toUpperCase()}
+        </motion.p>
+        
+        <motion.p
+          className={`text-[15px] font-bold leading-tight text-center w-full px-1
+                     text-slate-800 dark:text-slate-100 transition-colors duration-300`} // Generic theme text color
+          title={data.label}
+          whileHover={{ scale: 1.02, color: electricCyan }}
+        >
+          {data.label}
+        </motion.p>
 
-        {/* Node Visual Content - pointer-events-none ensures group-hover on parent works */}
-        <div className="flex flex-col items-center justify-center w-full h-full pointer-events-none">
-          <motion.div
-            animate={isProducing && StatusIcon === SunIcon ? { scale: [1, 1.1, 1], opacity: [1, 0.8, 1] } : {}}
-            transition={isProducing && StatusIcon === SunIcon ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
-          >
-            <StatusIcon 
-                size={22} 
-                className={`mb-0.5 transition-colors duration-300 ${iconColor}`} 
+        <div className="flex items-center space-x-1.5 text-xs font-medium" title={`Power: ${powerOutput}`}>
+            {/* THEME TRANSITION: Icon color from statusUiStyles.textColorClass */}
+            <TrendingUpIcon 
+                size={14} 
+                className={`${statusUiStyles.textColorClass} transition-colors duration-300 
+                           ${numericAnimationPower > 0 && (StatusIconComponent === SunIcon || StatusIconComponent === PowerIcon) ? (isDarkMode ? 'text-yellow-400':'text-yellow-600') : ''}`} 
             />
-          </motion.div>
-          <p 
-            className="text-[9px] font-medium leading-tight text-center truncate w-[90%]" 
-            title={`Status: ${processedStatus}`}
-            style={{ color: 'inherit' }} // Inherits from node-content-wrapper's text-* or derivedNodeStyles.color
-          >
-            {String(processedStatus).toUpperCase()}
-          </p>
-          <p 
-            className="text-[10px] font-semibold leading-tight text-center truncate w-[90%]" 
-            title={data.label}
-            style={{ color: 'inherit' }} 
-          >
-            {data.label}
-          </p>
-          <p className="text-[9px] leading-none" style={{ color: 'inherit' }} title={`Power: ${powerOutput}`}>
-              {powerOutput}
-          </p>
+            <AnimatePresence mode="wait">
+                <motion.span
+                    key={powerOutput}
+                    // THEME TRANSITION: Text color from statusUiStyles.textColorClass
+                    className={`${statusUiStyles.textColorClass} transition-colors duration-300 
+                               ${numericAnimationPower > 0 && (StatusIconComponent === SunIcon || StatusIconComponent === PowerIcon) ? (isDarkMode ? '!text-yellow-300':'!text-yellow-600 font-semibold') : ''}`}
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 4 }}
+                    transition={{ duration: 0.25 }}
+                >
+                    {powerOutput}
+                </motion.span>
+            </AnimatePresence>
         </div>
       </div>
     </motion.div>

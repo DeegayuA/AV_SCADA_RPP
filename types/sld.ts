@@ -92,6 +92,8 @@ export interface DataLabelNodeData extends BaseNodeData {
 }
 
 export interface InverterNodeData extends BaseNodeData {
+  width: any;
+  height: any;
   elementType: SLDElementType.Inverter;
   config?: BaseNodeData['config'] & {
     ratedPower?: number; 

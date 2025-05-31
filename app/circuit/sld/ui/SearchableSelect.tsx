@@ -3,8 +3,9 @@
 
 import * as React from "react";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { useCommandState } from "cmdk"; // For search term access
 
-import { cn } from "@/lib/utils"; // Your Shadcn utility function
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -20,43 +21,92 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-/**
- * Represents an option in the SearchableSelect component.
- */
 export interface ComboboxOption {
   value: string;
   label: string;
-  description?: string; // Optional description for display or accessibility
+  description?: string;
 }
 
-/**
- * Props for the SearchableSelect component.
- */
 interface SearchableSelectProps {
-  /** Array of options to display in the select. */
   options: ComboboxOption[];
-  /** The currently selected value. */
   value?: string;
-  /** Callback function triggered when the selected value changes. */
   onChange: (value: string) => void;
-  /** Placeholder text for the trigger button when no value is selected. */
   placeholder?: string;
-  /** Placeholder text for the search input within the popover. */
   searchPlaceholder?: string;
-  /** Text to display when the search yields no results. */
   notFoundText?: string;
-  /** Whether the select is disabled. */
   disabled?: boolean;
-  /** Additional CSS class names for the trigger button. */
   className?: string;
-  /** Optional CSS class names for the PopoverContent. */
   popoverContentClassName?: string;
 }
 
-/**
- * A searchable select (combobox) component built with Shadcn UI primitives.
- * It allows users to select an option from a list, with the ability to search.
- */
+// Helper component to highlight search matches
+const HighlightMatch = React.memo(({ text, query }: { text: string; query: string }) => {
+  if (!query || !text) {
+    return <>{text}</>;
+  }
+  // Escape regex special characters in query to safely use it in new RegExp
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const parts = text.split(new RegExp(`(${escapedQuery})`, 'gi'));
+
+  return (
+    <>
+      {parts.map((part, i) =>
+        // Matched parts are at odd indices due to the capturing group in split
+        i % 2 === 1 ? (
+          <mark key={i} className="bg-yellow-200 dark:bg-yellow-700 text-neutral-900 dark:text-neutral-100 rounded-sm">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  );
+});
+HighlightMatch.displayName = 'HighlightMatch'; // For better debugging
+
+// Component to render each option, allowing use of useCommandState for search query
+const OptionItem = ({
+  option,
+  isSelected,
+  onSelectCallback,
+}: {
+  option: ComboboxOption;
+  isSelected: boolean;
+  onSelectCallback: () => void;
+}) => {
+  // Access the current search query from CommandInput
+  // This hook ensures OptionItem re-renders when the search query changes
+  const search = useCommandState((state) => state.search);
+
+  return (
+    <CommandItem
+      key={option.value} // React key
+      // Do NOT pass `value` prop here.
+      // This makes `cmdk` use the item's `textContent` for filtering,
+      // allowing search on label and description.
+      onSelect={onSelectCallback}
+      aria-selected={isSelected}
+    >
+      <Check
+        className={cn(
+          "mr-2 h-4 w-4",
+          isSelected ? "opacity-100" : "opacity-0"
+        )}
+        aria-hidden="true"
+      />
+      <span className="truncate">
+        <HighlightMatch text={option.label} query={search} />
+      </span>
+      {option.description && (
+        <span className="ml-2 text-xs text-muted-foreground truncate">
+          <HighlightMatch text={option.description} query={search} />
+        </span>
+      )}
+    </CommandItem>
+  );
+};
+
 export function SearchableSelect({
   options,
   value,
@@ -70,8 +120,6 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
   const [open, setOpen] = React.useState(false);
 
-  // Memoize the displayed label to prevent re-calculating on every render
-  // if `options` or `value` haven't changed.
   const displayedLabel = React.useMemo(() => {
     if (!value) return placeholder;
     const selectedOption = options.find((option) => option.value === value);
@@ -85,11 +133,13 @@ export function SearchableSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label={placeholder} // Provides a consistent label for accessibility
+          aria-label={placeholder} // Screen readers will announce this plus the button text
           className={cn("w-full justify-between", className)}
           disabled={disabled}
         >
-          <span className="truncate">{displayedLabel}</span>
+          <span className="truncate" title={displayedLabel !== placeholder ? displayedLabel : undefined}>
+            {displayedLabel}
+          </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
@@ -98,44 +148,30 @@ export function SearchableSelect({
           "w-[--radix-popover-trigger-width] max-h-[--radix-popover-content-available-height] p-0",
           popoverContentClassName
         )}
-        // Using Radix CSS variables ensures the popover dynamically matches trigger width and available screen height.
       >
-        <Command>
+        <Command
+        // The `filter` prop on `Command` could be used for advanced fuzzy search,
+        // but for now, relying on `cmdk`'s default textContent filtering (substring match)
+        // is a good improvement and sufficient for many cases.
+        >
           <CommandInput
             placeholder={searchPlaceholder}
-            // The `CommandInput` automatically focuses when the popover opens.
           />
-          <CommandList>
-            {/* `CommandList` handles virtualization and scrolling for long lists. */}
+          <CommandList> {/* Handles virtualization and scrolling */}
             <CommandEmpty>{notFoundText}</CommandEmpty>
             <CommandGroup>
               {options.map((option) => (
-                <CommandItem
+                <OptionItem
                   key={option.value}
-                  value={option.value} // This `value` is used by Command for searching and selection state.
-                  onSelect={() => {
-                    // The `onSelect` callback provides the `value` prop of the `CommandItem`.
-                    // This logic allows deselecting by choosing the same item again.
-                    // If deselection is not desired, use `onChange(option.value)`.
+                  option={option}
+                  isSelected={value === option.value}
+                  onSelectCallback={() => {
+                    // If current option is already selected, deselect it by passing an empty string
+                    // Otherwise, select the new option's value
                     onChange(option.value === value ? "" : option.value);
                     setOpen(false);
                   }}
-                  aria-selected={value === option.value}
-                >
-                  <Check
-                    className={cn(
-                      "mr-2 h-4 w-4",
-                      value === option.value ? "opacity-100" : "opacity-0"
-                    )}
-                    aria-hidden="true" // The checkmark is decorative; selection is conveyed by aria-selected.
-                  />
-                  <span className="truncate">{option.label}</span>
-                  {option.description && (
-                    <span className="ml-2 text-xs text-muted-foreground truncate">
-                      {option.description}
-                    </span>
-                  )}
-                </CommandItem>
+                />
               ))}
             </CommandGroup>
           </CommandList>

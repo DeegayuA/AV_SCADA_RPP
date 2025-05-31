@@ -318,8 +318,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     setIsDirty(true);
   }, [canEdit]);
 
-  const handleDeleteElement = useCallback((elementId: string): void => {
+  const handleDeleteElement = useCallback((elementOrId: CustomNodeType | CustomFlowEdge | string): void => {
     if (!canEdit) return;
+    const elementId = typeof elementOrId === 'string' ? elementOrId : elementOrId.id;
+    
     setNodes((nds) => nds.filter((node) => node.id !== elementId));
     setEdges((eds) => eds.filter((edge) => edge.id !== elementId && edge.source !== elementId && edge.target !== elementId));
     setIsDirty(true); setSelectedElement(null); setIsInspectorDialogOpen(false); 
@@ -1249,21 +1251,22 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             connectionLineType={ConnectionLineType.Step} // Added connectionLineType
             connectionRadius={35}
             minZoom={0.05} maxZoom={4}
-        >
+          >
             <Controls showInteractive={canEdit} />
-            <MiniMap pannable zoomable nodeColor={themedNodeColor} nodeStrokeColor={themedNodeStrokeColor} nodeStrokeWidth={2} nodeBorderRadius={2}
+              <MiniMap pannable zoomable nodeColor={themedNodeColor} nodeStrokeColor={themedNodeStrokeColor} nodeStrokeWidth={3} nodeBorderRadius={4}
                 style={{ 
-                    backgroundColor: colors.miniMapBg, 
-                    border: `1px solid ${colors.miniMapBorder}`,
-                    width: 100, // Reduced width
-                    height: 75,  // Reduced height
+                  backgroundColor: colors.miniMapBg, 
+                  border: `1px solid ${colors.miniMapBorder}`,
+                  width: 120, // Reduced width
+                  height: 90,  // Reduced height
                 }} 
+                position="top-right"
                 maskColor={colors.maskBg} 
                 maskStrokeColor={colors.maskStroke}
-            />
-            <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color={colors.backgroundDots} className="opacity-60" />
+                />
+              <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color={colors.backgroundDots} className="opacity-60" />
             
-              <Panel position="top-right" className="!m-0 !p-0">
+            <Panel position="top-right" className="!m-0 !p-0">
                 {canEdit && layoutId && ( 
                     <motion.div className="flex flex-wrap items-center gap-2 p-2.5 bg-background/80 backdrop-blur-sm border-border border rounded-bl-lg shadow-lg"
                         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}>
@@ -1564,7 +1567,14 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} 
             selectedElement={selectedElement} 
             onUpdateElement={handleUpdateElement} 
-            onDeleteElement={handleDeleteElement} 
+            onDeleteElement={(element) => {
+              if (typeof element === 'string') {
+                handleDeleteElement(element);
+              } else if (element && typeof element === 'object' && 'id' in element) {
+                // The typeguard 'id' in element ensures element has an id property
+                handleDeleteElement((element as any).id);
+              }
+            }}
             onSetGlobalAnimationSettings={handleConfigureGlobalAnimationSettings} // Changed to match expected prop name
             onConfigureEdgeAnimation={(edgeToConfig) => { // New Prop
                 setAnimationConfiguratorTarget({ mode: 'single_edge', edge: edgeToConfig});
