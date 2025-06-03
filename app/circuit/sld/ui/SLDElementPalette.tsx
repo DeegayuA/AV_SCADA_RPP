@@ -301,9 +301,9 @@ const SLDElementPalette: React.FC<SLDElementPaletteProps> = () => {
                         <motion.div
                            // Direct motion hover/tap scaling can be re-enabled if preferred over CSS effects or for combined effects.
                            // For now, relying on CSS for hover scale via group-hover on parent <li>
-                           // variants={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.98 } }}
-                           // whileHover="hover"
-                           // whileTap="tap"
+                           variants={{ hover: { scale: 1.05, y: -2 }, tap: { scale: 0.98 } }}
+                           whileHover="hover"
+                           whileTap="tap"
                            className="flex flex-col items-center justify-center gap-1.5 w-full h-full"
                         >
                           {component.icon &&

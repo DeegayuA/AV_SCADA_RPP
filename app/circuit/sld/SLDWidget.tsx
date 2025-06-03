@@ -87,6 +87,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import RelayNode from './nodes/RelayNode';
 
 interface WebSocketMessageFromServer {
   type: string;
@@ -113,6 +114,7 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.Sensor]: SensorNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Gauge]: GaugeNode as unknown as ComponentType<NodeProps>, 
     [SLDElementType.Switch]: SwitchNode as unknown as ComponentType<NodeProps>, 
+    [SLDElementType.Relay]: RelayNode as unknown as ComponentType<NodeProps>, 
 };
 const edgeTypes: EdgeTypes = { animatedFlow: AnimatedFlowEdge };
 const defaultEdgeOptions = { type: 'animatedFlow', style: { strokeWidth: 3 }, data: {} as CustomFlowEdgeData };
@@ -188,7 +190,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     edge?: CustomFlowEdge | null // For single edge mode
   } | null>(null);
   // No longer need isBulkAnimationConfiguratorOpen; use animationConfiguratorTarget.mode
-  // const [selectedEdgesForBulkConfig, setSelectedEdgesForBulkConfig] = useState<CustomFlowEdge[]>([]); // Replaced by direct use of selectedEdges
+  const [selectedEdgesForBulkConfig, setSelectedEdgesForBulkConfig] = useState<CustomFlowEdge[]>([]); // Replaced by direct use of selectedEdges
   
   const [activeGlobalAnimationSettings, setActiveGlobalAnimationSettings] = 
     useState<GlobalSLDAnimationSettings | undefined>(undefined); // From types/sld.ts

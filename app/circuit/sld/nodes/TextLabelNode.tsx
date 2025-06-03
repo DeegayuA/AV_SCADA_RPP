@@ -1,111 +1,189 @@
 // components/sld/nodes/TextLabelNode.tsx
 import React, { memo, useMemo, useState, useLayoutEffect, useEffect, useRef } from 'react';
-import { NodeProps, Handle, Position, useReactFlow, Node } from 'reactflow'; // Added Node
-import { TextLabelNodeData, TextNodeStyleConfig, SLDElementType } from '@/types/sld';
-import { useAppStore } from '@/stores/appStore';
+import { NodeProps, Handle, Position, useReactFlow, Node as ReactFlowNode } from 'reactflow';
+import { motion, AnimatePresence } from 'framer-motion';
+import { TextLabelNodeData, TextNodeStyleConfig, SLDElementType, DataPointLink } from '@/types/sld';
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import { TextLabelConfigPopover } from '../ui/TextLabelConfigPopover';
-import { measureTextNode } from './nodeUtils'; // Import the measurement utility
+import { measureTextNode, getDerivedStyle, applyValueMapping, formatDisplayValue } from './nodeUtils';
 
-const MIN_WIDTH = 20; // Minimum width for the node
-const MIN_HEIGHT = 20; // Minimum height for the node
+const MIN_WIDTH = 20;
+const MIN_HEIGHT = 20;
 
-const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({ 
-  data, 
-  selected, 
-  id, 
-  type,
-  xPos, // from NodeProps
-  yPos, // from NodeProps
-  // React Flow will provide width and height if the node has been resized by user/fitView
-  // For auto-sizing, we calculate these initially and when content/style changes.
-}) => {
+const useIsDarkMode = () => {
+  const [isDark, setIsDark] = useState(() => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'));
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const cb = () => setIsDark(document.documentElement.classList.contains('dark'));
+    const observer = new MutationObserver(cb);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    cb();
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+};
+
+const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
+  const { 
+    data, selected, id, type, xPos, yPos, dragging, zIndex, isConnectable
+  } = props;
+
   const { setNodes } = useReactFlow();
-  const isEditMode = useAppStore((state) => state.isEditMode && state.currentUser?.role === 'admin');
+  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
+    isEditMode: state.isEditMode && state.currentUser?.role === 'admin',
+    currentUser: state.currentUser,
+    globalOpcUaNodeValues: state.opcUaNodeValues,
+    dataPoints: state.dataPoints,
+    setSelectedElementForDetails: state.setSelectedElementForDetails, // If you want an info button later
+  }));
   
-  const [calculatedDimensions, setCalculatedDimensions] = useState<{ width: number; height: number } | null>(null);
+  const isDarkMode = useIsDarkMode();
+  const electricCyan = 'hsl(190, 95%, 50%)';
+  
+  const [calculatedDimensions, setCalculatedDimensions] = useState<{ width: number; height: number }>({ width: MIN_WIDTH, height: MIN_HEIGHT });
+
+  // --- Reactive Text Content ---
+  const textLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'text'), [data.dataPointLinks]);
+  const textDataPointConfig = useMemo(() => textLink ? dataPoints[textLink.dataPointId] : undefined, [textLink, dataPoints]);
+  const textOpcUaNodeId = useMemo(() => textDataPointConfig?.nodeId, [textDataPointConfig]);
+  const reactiveTextValue = useOpcUaNodeValue(textOpcUaNodeId);
+
+  const displayText = useMemo(() => {
+    if (textLink && textDataPointConfig && reactiveTextValue !== undefined) {
+      const mappedValue = applyValueMapping(reactiveTextValue, textLink);
+      return formatDisplayValue(mappedValue, textLink.format, textDataPointConfig.dataType);
+    }
+    return data.text || data.label || '';
+  }, [textLink, textDataPointConfig, reactiveTextValue, data.text, data.label]);
+
+  // --- Derived Styles ---
+  const opcUaValuesForDerivedStyle = useMemo(() => {
+    const values: Record<string, any> = {};
+    // Include reactive text value if its nodeId is present
+    if (textOpcUaNodeId && reactiveTextValue !== undefined) {
+      values[textOpcUaNodeId] = reactiveTextValue;
+    }
+    // Include values for any other style-related dataPointLinks
+    data.dataPointLinks?.forEach(link => {
+      if (link.targetProperty !== 'text') { // Already handled above for 'text'
+        const dpConfig = dataPoints[link.dataPointId];
+        if (dpConfig?.nodeId && globalOpcUaNodeValues.hasOwnProperty(dpConfig.nodeId)) {
+          values[dpConfig.nodeId] = globalOpcUaNodeValues[dpConfig.nodeId];
+        }
+      }
+    });
+    return values;
+  }, [data.dataPointLinks, dataPoints, textOpcUaNodeId, reactiveTextValue, globalOpcUaNodeValues]);
+  
+  const derivedNodeStyles = useMemo(() => getDerivedStyle(data, dataPoints, opcUaValuesForDerivedStyle), [data, dataPoints, opcUaValuesForDerivedStyle]);
 
   useLayoutEffect(() => {
-    const { text, styleConfig = {} } = data;
-    const { fontSize, fontWeight, fontStyle, fontFamily, padding } = styleConfig;
+    const { styleConfig = {} } = data;
+    // Measurement should ideally consider the final font styles applied, whether from styleConfig or derivedNodeStyles
+    // For simplicity here, we use styleConfig for measurement, as derived styles might be more for color/bg.
+    // If derived styles change font size/weight, this might need refinement.
+    const fontToMeasure = {
+        fontFamily: styleConfig.fontFamily || 'Arial, sans-serif',
+        fontSize: styleConfig.fontSize || '14px',
+        fontWeight: styleConfig.fontWeight || 'normal',
+        fontStyle: styleConfig.fontStyle || 'normal',
+    };
 
     const dimensions = measureTextNode({
-      text: text || data.label || ' ', // Use a space if text and label are empty for min measurement
-      fontFamily: fontFamily,
-      fontSize: fontSize,
-      fontWeight: fontWeight,
-      fontStyle: fontStyle,
-      padding: padding,
+      text: displayText || ' ', // Use a space if text is empty for min measurement
+      ...fontToMeasure,
+      padding: styleConfig.padding || '4px',
     });
     
-    // Ensure minimum dimensions
     const newWidth = Math.max(MIN_WIDTH, dimensions.width);
     const newHeight = Math.max(MIN_HEIGHT, dimensions.height);
 
-    setCalculatedDimensions({ width: newWidth, height: newHeight });
+    // Check if dimensions actually changed to prevent unnecessary re-renders/updates
+    if (newWidth !== calculatedDimensions.width || newHeight !== calculatedDimensions.height) {
+        setCalculatedDimensions({ width: newWidth, height: newHeight });
+        
+        // Update the node in React Flow store IF its current dimensions don't match.
+        // This is important if React Flow itself is not aware of the auto-sized dimensions,
+        // especially on initial load or if dimensions change significantly.
+        setNodes((nds) =>
+          nds.map((n) => {
+            if (n.id === id && (n.width !== newWidth || n.height !== newHeight)) {
+              return { ...n, width: newWidth, height: newHeight, style: {...(n.style || {}), width: newWidth, height: newHeight} };
+            }
+            return n;
+          })
+        );
+    }
+  }, [displayText, data.styleConfig, id, setNodes, calculatedDimensions.width, calculatedDimensions.height]);
 
-    // Optional: If React Flow isn't picking up the size change automatically from style,
-    // you might need to update the node's width/height in the store.
-    // This is usually not needed if the node's wrapper style is updated.
-    // setNodes((nds) =>
-    //   nds.map((n) => {
-    //     if (n.id === id) {
-    //       return { ...n, width: newWidth, height: newHeight };
-    //     }
-    //     return n;
-    //   })
-    // );
 
-  }, [data.text, data.label, data.styleConfig, id, setNodes]);
+  const nodeMainStyle = useMemo((): React.CSSProperties => {
+    const { styleConfig = {} } = data;
+    let justifyContent = 'flex-start';
+    if (styleConfig.textAlign === 'center') justifyContent = 'center';
+    else if (styleConfig.textAlign === 'right') justifyContent = 'flex-end';
 
-
-  const nodeStyle = useMemo(() => {
-    const styles: React.CSSProperties = {
-        // Apply calculated dimensions if available
-        width: calculatedDimensions ? `${calculatedDimensions.width}px` : undefined,
-        height: calculatedDimensions ? `${calculatedDimensions.height}px` : undefined,
-        // User-configurable styles
-        fontSize: data.styleConfig?.fontSize || '14px', // Default if not set
-        color: data.styleConfig?.color || '#000000', // Default if not set
-        fontWeight: data.styleConfig?.fontWeight || 'normal',
-        fontStyle: data.styleConfig?.fontStyle || 'normal',
-        textAlign: data.styleConfig?.textAlign || 'left',
-        backgroundColor: data.styleConfig?.backgroundColor || 'transparent',
-        padding: data.styleConfig?.padding || '4px', // Default padding
-        fontFamily: data.styleConfig?.fontFamily || 'Arial, sans-serif', // Default font family
-        // Ensure the node itself is laid out to allow content to dictate size if width/height were 'auto'
-        display: 'flex', // Useful for aligning text content with padding
-        alignItems: 'center', // Default vertical alignment to center
-        justifyContent: data.styleConfig?.textAlign || 'flex-start', // Map textAlign to justifyContent
-    };
-    if (data.styleConfig?.textAlign === 'center') styles.justifyContent = 'center';
-    else if (data.styleConfig?.textAlign === 'right') styles.justifyContent = 'flex-end';
+    const baseBg = styleConfig.backgroundColor || 'transparent';
+    const finalBg = derivedNodeStyles.backgroundColor || baseBg;
     
-    return styles;
-  }, [data.styleConfig, calculatedDimensions]);
+    let finalBorderColor = 'transparent'; // Default border is transparent
+    if (derivedNodeStyles.borderColor) {
+        finalBorderColor = derivedNodeStyles.borderColor;
+    }
 
-  // --- MODIFIED UPDATE HANDLERS ---
-  const handleStyleConfigUpdate = (newStyleConfig: TextNodeStyleConfig) => {
-    setNodes((nds) =>
-      nds.map((n) => {
-        if (n.id === id) {
-          const updatedNodeData: TextLabelNodeData = {
-            ...n.data,
-            styleConfig: { ...(n.data.styleConfig || {}), ...newStyleConfig },
-          };
-          return { ...n, data: updatedNodeData };
-        }
-        return n;
-      })
-    );
+
+    let currentBoxShadow = 'none'; // Default no shadow
+    if (selected) {
+        currentBoxShadow = `0 0 0 1.5px ${electricCyan}`; // Simpler selection shadow for text
+    }
+
+    return {
+      width: `${calculatedDimensions.width}px`,
+      height: `${calculatedDimensions.height}px`,
+      padding: styleConfig.padding || '4px',
+      backgroundColor: finalBg,
+      borderColor: finalBorderColor,
+      borderWidth: (finalBorderColor && finalBorderColor !== 'transparent') ? '1px' : '0px',
+      borderStyle: (finalBorderColor && finalBorderColor !== 'transparent') ? 'solid' : 'none',
+      borderRadius: styleConfig.borderRadius || '4px', // Default border radius
+      display: 'flex',
+      alignItems: 'center', // Use center alignment as default
+      justifyContent: justifyContent,
+      boxShadow: currentBoxShadow,
+      opacity: derivedNodeStyles.opacity ?? 1,
+      cursor: isEditMode ? 'pointer' : 'default',
+      transition: 'box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out', // CSS transitions
+    };
+  }, [data, calculatedDimensions, selected, electricCyan, derivedNodeStyles, isEditMode]);
+
+  const textSpanStyle = useMemo((): React.CSSProperties => {
+    const { styleConfig = {} } = data;
+    const defaultColor = isDarkMode ? '#E0E0E0' : '#202020'; // Theme-aware default
+    const finalColor = derivedNodeStyles.color || styleConfig.color || defaultColor;
+
+    return {
+      fontSize: styleConfig.fontSize || '14px',
+      fontWeight: styleConfig.fontWeight || 'normal',
+      fontStyle: styleConfig.fontStyle || 'normal',
+      fontFamily: styleConfig.fontFamily || 'Arial, sans-serif',
+      color: finalColor,
+      lineHeight: 'normal', // Allow line height config
+      // textAlign is handled by parent's justifyContent
+    };
+  }, [data.styleConfig, derivedNodeStyles, isDarkMode]);
+
+  const handleUpdateWrapper = (updater: (currentNodes: ReactFlowNode<TextLabelNodeData>[]) => ReactFlowNode<TextLabelNodeData>[]) => {
+    setNodes(updater as (nodes: ReactFlowNode<any>[]) => ReactFlowNode<any>[]);
   };
 
-  const handleLabelUpdate = (newLabel: string) => {
-    setNodes((nds) =>
+  const handleStyleConfigUpdate = (newStyleConfig: Partial<TextNodeStyleConfig>) => {
+    handleUpdateWrapper((nds) =>
       nds.map((n) => {
         if (n.id === id) {
+          const oldData = n.data as TextLabelNodeData;
           const updatedNodeData: TextLabelNodeData = {
-            ...n.data,
-            label: newLabel,
+            ...oldData,
+            styleConfig: { ...(oldData.styleConfig || {}), ...newStyleConfig },
           };
           return { ...n, data: updatedNodeData };
         }
@@ -115,125 +193,87 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = ({
   };
 
   const handleTextUpdate = (newText: string) => {
-    setNodes((nds) =>
+    handleUpdateWrapper((nds) =>
       nds.map((n) => {
         if (n.id === id) {
-          const updatedNodeData: TextLabelNodeData = {
-            ...n.data,
-            text: newText,
-          };
+          const oldData = n.data as TextLabelNodeData;
+          // If primarily using reactive text, updating data.text might be for fallback or manual override
+          const updatedNodeData: TextLabelNodeData = { ...oldData, text: newText };
           return { ...n, data: updatedNodeData };
         }
         return n;
       })
     );
   };
-  // --- END MODIFIED UPDATE HANDLERS ---
-
-  // Prepare the node object for the Popover
-  const nodeForPopover: Node<TextLabelNodeData> = {
-    id,
-    type, // This is the ReactFlow node type string, e.g., 'textLabel'
-    data, // This is TextLabelNodeData
-    position: { x: xPos, y: yPos }, // Actual position from NodeProps
-    selected, // Pass selection state
-    // You could also add width/height if node.dimensions is available and Popover needs it
-    // For instance, if NodeProps includes width and height:
-    // width: props.width, 
-    // height: props.height,
-  };
-
-
-  const NodeContent = (
-    <div
-      className={`
-        sld-node text-label-node node-content-wrapper group custom-node-hover /* Added node-content-wrapper, group, custom-node-hover */
-        whitespace-pre-wrap leading-tight outline-none
-        box-border 
-        transition-all duration-150 ease-in-out /* This is also in custom-node-hover, can be reviewed */
-        ${isEditMode ? 'cursor-pointer focus:ring-1 focus:ring-blue-500' : ''} /* Removed hover:ring, selected ring styles */
-        /* Existing selected styles removed, will be handled by .reactflow-node.selected .node-content-wrapper */
-        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''} /* This might be overridden by node-content-wrapper selection style if it sets a bg */
-      `}
-      style={nodeStyle} // This now includes width and height
-      tabIndex={isEditMode ? 0 : -1}
-    >
-      {/* Handles are optional and primarily for visual connection points if needed. */}
-      {isEditMode && (
-        <>
-          <Handle type="target" position={Position.Top} className="sld-handle-style" />
-          <Handle type="source" position={Position.Bottom} className="sld-handle-style" />
-          <Handle type="target" position={Position.Left} className="sld-handle-style" />
-          <Handle type="source" position={Position.Right} className="sld-handle-style" />
-        </>
-      )}
-     
-      {/* The actual text content. Styling is applied to the parent div. */}
-      {data.text || data.label || ''}
-    </div>
-  );
-  
-  // If calculatedDimensions is null, it means the first layout effect hasn't run yet.
-  // You might want to render a placeholder or nothing to avoid a flash of unstyled/unsized content.
-  if (!calculatedDimensions) {
-    // Render a minimal placeholder or return null until dimensions are ready
-    // This helps prevent React Flow from potentially complaining about a node with no dimensions initially
-    // or rendering it at 0,0 then jumping.
-    // However, React Flow usually handles initial rendering gracefully if dimensions are set quickly.
-    // For simplicity, we'll allow the initial render with potentially undefined dimensions in style,
-    // relying on useLayoutEffect to quickly set them.
+  // The handleLabelUpdate would be similar if data.label is distinct from data.text for editing.
+  // For simplicity, assuming TextLabelConfigPopover updates 'text'. If it needs to update 'label', add a similar handler.
+  const handleLabelUpdate = (newLabel: string) => {
+     handleUpdateWrapper((nds) =>
+      nds.map((n) => {
+        if (n.id === id) {
+          const oldData = n.data as TextLabelNodeData;
+          const updatedNodeData: TextLabelNodeData = { ...oldData, label: newLabel };
+          return { ...n, data: updatedNodeData };
+        }
+        return n;
+      })
+    );
   }
 
-  const [isRecentChange, setIsRecentChange] = useState(false);
-  const prevTextRef = useRef(data.text);
 
-  useEffect(() => {
-    if (prevTextRef.current !== data.text) {
-      setIsRecentChange(true);
-      const timer = setTimeout(() => setIsRecentChange(false), 700); // Match animation duration
-      prevTextRef.current = data.text;
-      return () => clearTimeout(timer);
-    }
-  }, [data.text]);
-
-  // Update NodeContent className to include animation
-  const NodeContentWithAnimation = (
-    <div
-      className={`
-        sld-node text-label-node node-content-wrapper group custom-node-hover 
-        whitespace-pre-wrap leading-tight outline-none
-        box-border 
-        transition-all duration-150 ease-in-out 
-        ${isEditMode ? 'cursor-pointer focus:ring-1 focus:ring-blue-500' : ''} 
-        ${!data.styleConfig?.backgroundColor ? 'bg-transparent' : ''}
-        ${isRecentChange ? 'animate-status-highlight' : ''}
-      `}
-      style={nodeStyle} // This now includes width and height
-      tabIndex={isEditMode ? 0 : -1}
-    >
-      {isEditMode && (
-        <>
-          <Handle type="target" position={Position.Top} className="sld-handle-style" />
-          <Handle type="source" position={Position.Bottom} className="sld-handle-style" />
-          <Handle type="target" position={Position.Left} className="sld-handle-style" />
-          <Handle type="source" position={Position.Right} className="sld-handle-style" />
-        </>
-      )}
-      {data.text || data.label || ''}
-    </div>
-  );
+  const nodeForPopover: ReactFlowNode<TextLabelNodeData> = {
+    id, type: type || SLDElementType.TextLabel, data,
+    position: { x: xPos, y: yPos },
+    selected: selected || false, dragging: dragging || false, zIndex: zIndex || 0,
+    width: calculatedDimensions.width, height: calculatedDimensions.height,
+    connectable: isConnectable || false,
+  };
 
   return (
-    // The Popover should not interfere with the node's own sizing.
-    // It's an overlay triggered by interaction.
     <TextLabelConfigPopover
       node={nodeForPopover}
       onUpdateNodeStyle={handleStyleConfigUpdate}
+      onUpdateNodeText={handleTextUpdate} // Or separate updates for text/label
       onUpdateNodeLabel={handleLabelUpdate}
-      onUpdateNodeText={handleTextUpdate}
       isEditMode={!!isEditMode}
     >
-      {NodeContentWithAnimation}
+      <motion.div
+        className="sld-node text-label-node group" // Removed custom-node-hover, using framer's whileHover
+        style={nodeMainStyle}
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ 
+            opacity: 1, 
+            scale: 1,
+            boxShadow: nodeMainStyle.boxShadow // Ensure anirunningmat animation targets this
+        }}
+        exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+        whileHover={isEditMode && !selected ? { scale: 1.03, boxShadow: `0 0 8px 2px rgba(0,0,0,0.1)` } : undefined}
+        // tabIndex={isEditMode ? 0 : -1} // Popover typically handles focus trigger
+      >
+        {isEditMode && (
+          <>
+            <Handle type="target" position={Position.Top} className="!w-2 !h-2 sld-handle-style !bg-transparent hover:!bg-slate-400" />
+            <Handle type="source" position={Position.Bottom} className="!w-2 !h-2 sld-handle-style !bg-transparent hover:!bg-slate-400" />
+            <Handle type="target" position={Position.Left} className="!w-2 !h-2 sld-handle-style !bg-transparent hover:!bg-slate-400" />
+            <Handle type="source" position={Position.Right} className="!w-2 !h-2 sld-handle-style !bg-transparent hover:!bg-slate-400" />
+          </>
+        )}
+        
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={displayText} // Crucial for AnimatePresence to detect change
+            style={textSpanStyle}
+            className="whitespace-pre-wrap" // leading-tight removed to use configured line-height
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5, transition: {duration: 0.1} }}
+            transition={{ duration: 0.2, ease: "easeInOut" }}
+          >
+            {displayText || (isEditMode ? '...' : '')} {/* Show placeholder dots in edit mode if empty */}
+          </motion.p>
+        </AnimatePresence>
+      </motion.div>
     </TextLabelConfigPopover>
   );
 };
