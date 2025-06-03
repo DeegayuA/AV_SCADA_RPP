@@ -37,10 +37,13 @@ const APP_LOCAL_STORAGE_KEYS = [
 ];
 
 import { SLDLayout } from '@/types/sld';
-import { useWebSocket } from '@/hooks/useWebSocketListener';
+// WebSocket related imports are removed as SLD backup will use localStorage
 
 const SLD_LAYOUT_IDS_TO_BACKUP: string[] = ['main_plant'];
 const APP_LOCAL_STORAGE_KEYS_TO_PRESERVE_ON_RESET = ['theme'];
+
+// Key prefix for SLD layouts in localStorage, consistent with SLDWidget.tsx
+const SLD_LOCAL_STORAGE_KEY_PREFIX = 'sldLayout_';
 
 
 // --- Animation Variants ---
@@ -93,10 +96,9 @@ export default function ResetApplicationPage() {
   const router = useRouter();
   const storeHasHydrated = useAppStore.persist.hasHydrated();
   const directStoreUser = useAppStore((state) => state.currentUser); // Direct access to store value for auth check
-  // useCurrentUser hook is fine for UI elements after auth is settled
   const currentUserForUI = useCurrentUser(); 
   
-  const { sendJsonMessage, lastJsonMessage, isConnected, connect: connectWebSocket } = useWebSocket();
+  // WebSocket hook is removed as it's no longer used for SLD backup on this page
   const logoutUser = useAppStore((state) => state.logout);
 
   const zustandResetFn = useAppStore((state) => (state as any).resetToInitial);
@@ -115,8 +117,7 @@ export default function ResetApplicationPage() {
   const [showResetConfirmDialog, setShowResetConfirmDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
 
-  const collectedSldLayoutsRef = useRef<Record<string, SLDLayout | null>>({});
-  const resolveSldFetchRef = useRef<Map<string, (value: SLDLayout | null) => void>>(new Map());
+  // Refs for WebSocket-based SLD fetching are removed
 
   useEffect(() => {
     console.log("[Auth Check] Start | Hydrated:", storeHasHydrated, "| Direct Store User:", directStoreUser);
@@ -127,7 +128,6 @@ export default function ResetApplicationPage() {
       return; // Crucial: wait for hydration
     }
 
-    // Store is hydrated. Now check the user from the direct store access.
     if (directStoreUser && directStoreUser.email !== 'guest@example.com' && directStoreUser.role === UserRole.ADMIN) {
       setAuthStatus('admin');
       console.log("[Auth Check] Status: admin | User:", directStoreUser.email, "| Role:", directStoreUser.role);
@@ -144,97 +144,65 @@ export default function ResetApplicationPage() {
           router.replace('/login');
       }
     }
-  }, [storeHasHydrated, directStoreUser, router]); // directStoreUser ensures re-check if it changes post-hydration
+  }, [storeHasHydrated, directStoreUser, router]);
 
 
-  useEffect(() => { /* ... (WebSocket message handler - no change from your existing good version) ... */
-    if (!lastJsonMessage || resolveSldFetchRef.current.size === 0) return;
-    const message = lastJsonMessage as any;
-    const layoutKeyWithPrefix = message.payload?.key;
-    if (!layoutKeyWithPrefix || !layoutKeyWithPrefix.startsWith('sld_')) return;
-    const sldLayoutId = layoutKeyWithPrefix.substring(4);
+  // WebSocket message handler useEffect is removed as fetchAllSldLayouts is removed
+  // fetchAllSldLayouts function is removed as SLDs will be read from localStorage
 
-    if (resolveSldFetchRef.current.has(sldLayoutId)) {
-      const resolvePromise = resolveSldFetchRef.current.get(sldLayoutId);
-      if (message.type === 'layout-data') {
-        collectedSldLayoutsRef.current[sldLayoutId] = message.payload.layout;
-        resolvePromise?.(message.payload.layout);
-      } else if (message.type === 'layout-error') {
-        toast.error(`Failed to fetch SLD for backup: ${sldLayoutId}`, { description: message.payload.error });
-        collectedSldLayoutsRef.current[sldLayoutId] = null;
-        resolvePromise?.(null);
-      }
-      resolveSldFetchRef.current.delete(sldLayoutId);
-    }
-  }, [lastJsonMessage]);
-
-  const fetchAllSldLayouts = useCallback(async (): Promise<Record<string, SLDLayout | null>> => { /* ... (no change from your good version) ... */
-    if (SLD_LAYOUT_IDS_TO_BACKUP.length === 0) return {};
-    if (!isConnected && connectWebSocket) {
-        const connectToastId = toast.loading("WebSocket for SLD backup disconnected. Reconnecting...");
-        connectWebSocket();
-        await new Promise(resolve => setTimeout(resolve, 2000)); 
-        if (!isConnected) {
-            toast.error("WebSocket reconnect failed. SLDs cannot be backed up.", {id: connectToastId});
-            return SLD_LAYOUT_IDS_TO_BACKUP.reduce((acc, id) => ({...acc, [id]: null}), {});
-        }
-        toast.success("WebSocket reconnected for SLD backup.", {id: connectToastId});
-    } else if(!connectWebSocket && !isConnected) {
-         toast.error("WebSocket connection logic not available and disconnected. SLDs cannot be backed up.");
-         return SLD_LAYOUT_IDS_TO_BACKUP.reduce((acc, id) => ({...acc, [id]: null}), {});
-    }
-
-    collectedSldLayoutsRef.current = {};
-    resolveSldFetchRef.current.clear();
-    const fetchPromises = SLD_LAYOUT_IDS_TO_BACKUP.map(layoutId =>
-      new Promise<void>(resolve => {
-        const timeoutId = setTimeout(() => {
-          if (resolveSldFetchRef.current.has(layoutId)) {
-            toast.warning(`Timeout fetching SLD for backup: ${layoutId}`);
-            resolveSldFetchRef.current.get(layoutId)?.(null);
-            resolveSldFetchRef.current.delete(layoutId);
-          }
-          resolve();
-        }, 10000); 
-
-        resolveSldFetchRef.current.set(layoutId, (layoutData) => {
-          clearTimeout(timeoutId);
-          resolve();
-        });
-
-        if (sendJsonMessage) {
-          sendJsonMessage({ type: 'get-layout', payload: { key: `sld_${layoutId}` } });
-        } else {
-           toast.error(`Cannot send WS message to get SLD: ${layoutId}. 'sendJsonMessage' not available.`);
-           resolveSldFetchRef.current.get(layoutId)?.(null);
-           resolveSldFetchRef.current.delete(layoutId);
-           resolve();
-        }
-      })
-    );
-    await Promise.all(fetchPromises);
-    return { ...collectedSldLayoutsRef.current };
-  }, [isConnected, sendJsonMessage, connectWebSocket]);
-
-  const handleDownloadBackup = async () => { /* ... (no major functional change from your version, UI feedback enhanced by toast) ... */ 
+  const handleDownloadBackup = async () => { 
     setIsBackupInProgress(true);
     const backupToastId = toast.loading("Initializing backup...", {description: "Please wait a moment."});
     await new Promise(res => setTimeout(res, 300)); 
 
     try {
-      let sldDataForBackup: Record<string, SLDLayout | null> = {};
+      const sldDataForBackup: Record<string, SLDLayout | null> = {};
       if (SLD_LAYOUT_IDS_TO_BACKUP.length > 0) {
-        toast.info("Fetching SLD layouts...", { id: backupToastId, description: "This may take a few seconds..." });
-        sldDataForBackup = await fetchAllSldLayouts();
-        const successCount = Object.values(sldDataForBackup).filter(Boolean).length;
+        toast.info("Reading SLD layouts from local storage...", { id: backupToastId, description: "Processing..." });
+        
+        let successCount = 0;
         const totalToFetch = SLD_LAYOUT_IDS_TO_BACKUP.length;
-        if (successCount < totalToFetch && totalToFetch > 0) {
-          toast.warning(`Backed up ${successCount}/${totalToFetch} SLD layouts. Some might be missing.`, { id: backupToastId });
-        } else if (totalToFetch > 0) {
-          toast.success(`All ${successCount} SLD layouts retrieved for backup.`, { id: backupToastId });
-        } else {
+
+        for (const layoutId of SLD_LAYOUT_IDS_TO_BACKUP) {
+          const item = localStorage.getItem(`${SLD_LOCAL_STORAGE_KEY_PREFIX}${layoutId}`);
+          if (item) {
+            try {
+              const parsedLayout = JSON.parse(item) as SLDLayout;
+              // Basic validation for the parsed layout
+              if (parsedLayout && 
+                  typeof parsedLayout === 'object' && 
+                  parsedLayout.layoutId === layoutId && 
+                  Array.isArray(parsedLayout.nodes) // Check for nodes array as a basic integrity check
+                 ) {
+                sldDataForBackup[layoutId] = parsedLayout;
+                successCount++;
+              } else {
+                console.warn(`Invalid SLD layout data in localStorage for ${layoutId}. Skipping.`);
+                toast.warning(`Corrupted SLD data found for ${layoutId}. It will not be included in the backup.`, { duration: 5000 });
+                sldDataForBackup[layoutId] = null;
+              }
+            } catch (e) {
+              console.error(`Error parsing SLD layout for ${layoutId} from localStorage:`, e);
+              toast.warning(`Failed to parse SLD data for ${layoutId}. It will not be included in the backup.`, { duration: 5000 });
+              sldDataForBackup[layoutId] = null;
+            }
+          } else {
+            console.warn(`SLD layout ${layoutId} not found in localStorage.`);
+            sldDataForBackup[layoutId] = null; 
+          }
+        }
+
+        if (successCount < totalToFetch && totalToFetch > 0 && successCount > 0) {
+          toast.warning(`Backed up ${successCount}/${totalToFetch} SLD layouts from local storage. Some might be missing or corrupted.`, { id: backupToastId, duration: 7000 });
+        } else if (totalToFetch > 0 && successCount === totalToFetch) {
+          toast.success(`All ${successCount} SLD layouts retrieved from local storage for backup.`, { id: backupToastId, duration: 5000 });
+        } else if (totalToFetch > 0 && successCount === 0) {
+          toast.error(`None of the ${totalToFetch} specified SLD layouts could be retrieved from local storage. They will not be in the backup.`, {id: backupToastId, duration: 7000 });
+        } else if (SLD_LAYOUT_IDS_TO_BACKUP.length === 0) { // Explicitly check for zero layouts to backup
            toast.info("No SLD layouts specified for backup.", {id: backupToastId});
         }
+      } else {
+        toast.info("No SLD layouts configured for backup.", {id: backupToastId});
       }
 
       toast.info("Packaging local storage data...", { id: backupToastId });
@@ -249,7 +217,7 @@ export default function ResetApplicationPage() {
       });
 
       const backupData = {
-        backupSchemaVersion: "1.0.0",
+        backupSchemaVersion: "2.0.0", // Updated to meet expected version
         createdAt: new Date().toISOString(),
         application: { name: APP_NAME, version: VERSION },
         plant: { name: PLANT_NAME, location: PLANT_LOCATION, capacity: PLANT_CAPACITY },
@@ -259,7 +227,7 @@ export default function ResetApplicationPage() {
       };
 
       toast.info("Generating encrypted backup file...", { id: backupToastId, description: "Finalizing..." });
-      await new Promise(res => setTimeout(res, 200)); // Simulate final packaging
+      await new Promise(res => setTimeout(res, 200)); 
       const jsonData = JSON.stringify(backupData, null, 2);
       const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8' });
       saveAs(blob, `${APP_NAME.toLowerCase().replace(/\s+/g, '_')}_backup_${new Date().toISOString().replace(/:/g, '-')}.json`);
@@ -274,7 +242,7 @@ export default function ResetApplicationPage() {
     }
   };
 
-  const handleResetApplication = async () => { /* ... (UI feedback for toasts enhanced) ... */ 
+  const handleResetApplication = async () => { 
     setIsResetInProgress(true);
     const resetToastId = toast.loading("Initiating application reset...", { description: "This is irreversible." });
     await new Promise(res => setTimeout(res, 500));
@@ -287,15 +255,15 @@ export default function ResetApplicationPage() {
       APP_LOCAL_STORAGE_KEYS_TO_PRESERVE_ON_RESET.forEach(key => {
         preservedData[key] = localStorage.getItem(key);
       });
-      localStorage.clear(); // WARNING: Clears ALL localStorage for this origin
+      localStorage.clear(); 
       Object.entries(preservedData).forEach(([key, value]) => {
         if (value !== null) localStorage.setItem(key, value);
       });
       await new Promise(res => setTimeout(res, 200));
 
       toast.info("Finalizing session and store reset...", { id: resetToastId });
-      logoutUser();          // Clears user session data in Zustand
-      resetStoreToInitial(); // Resets entire Zustand store
+      logoutUser();          
+      resetStoreToInitial(); 
 
       await new Promise(res => setTimeout(res, 300));
       toast.success("Application Reset Successfully!", { 
@@ -310,7 +278,7 @@ export default function ResetApplicationPage() {
     } catch (error: any) {
       console.error("Reset operation failed:", error);
       toast.error("Reset Failed", { id: resetToastId, duration: 7000, description: error.message || "Could not complete the reset process." });
-      setIsResetInProgress(false); // Allow retry if it fails before redirect
+      setIsResetInProgress(false); 
     }
   };
   
@@ -336,7 +304,6 @@ export default function ResetApplicationPage() {
 
   if (authStatus !== 'admin') {
     return (
-      // This fallback is for the very brief moment before router.replace kicks in.
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-red-900 via-red-800 to-rose-900 text-rose-100 p-6 text-center z-50">
         <motion.div initial={{ opacity: 0, y: -20, scale: 0.8 }} animate={{ opacity: 1, y: 0, scale:1, transition:{ type:'spring', stiffness:150, damping: 10, delay: 0.1 }}}>
             <AlertTriangle className="h-16 w-16 sm:h-20 sm:w-20 text-rose-300 mb-4 animate-pulse" />
@@ -352,7 +319,7 @@ export default function ResetApplicationPage() {
     "User Interface Configurations (Dashboard, etc.)",
     "Application Settings (IndexedDB)",
     "Session and Local Storage Data (App-specific)",
-    "SLD Network Diagram Layouts (if available)",
+    `SLD Network Diagram Layouts (from LocalStorage, IDs: ${SLD_LAYOUT_IDS_TO_BACKUP.join(', ') || 'None Specified'})`,
   ];
 
   return (
@@ -396,14 +363,8 @@ export default function ResetApplicationPage() {
                 ))}
               </ul>
             </div>
-            {!isConnected && SLD_LAYOUT_IDS_TO_BACKUP.length > 0 && connectWebSocket && (
-                <motion.div initial={{opacity:0, y:5}} animate={{opacity:1,y:0}} className="p-3 mb-4 rounded-lg bg-yellow-400/10 border border-yellow-500/40 text-yellow-700 dark:text-yellow-300 text-xs sm:text-sm flex items-center">
-                    <AlertCircle className="w-5 h-5 mr-2.5 shrink-0" />
-                    <span>WebSocket offline. SLD diagrams may not be included. 
-                        <Button variant="link" size="sm" onClick={connectWebSocket} className="p-0 h-auto text-yellow-700 dark:text-yellow-300 hover:underline font-semibold ml-1.5">Attempt Reconnect</Button>
-                    </span>
-                </motion.div>
-            )}
+            {/* WebSocket offline warning for SLD backup is removed as SLDs are now sourced from localStorage */}
+            
             <motion.div variants={buttonWrapperVariants} whileHover="hover" whileTap="tap">
                 <Button onClick={handleDownloadBackup} disabled={isBackupInProgress || isResetInProgress || showImportDialog} 
                     className="w-full text-sm sm:text-base py-3 shadow-md hover:shadow-lg transition-all duration-200 bg-emerald-500 hover:bg-emerald-600 text-white group" size="lg">
