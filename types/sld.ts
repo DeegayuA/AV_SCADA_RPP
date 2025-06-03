@@ -107,6 +107,7 @@ export interface PanelNodeData extends BaseNodeData {
     config?: BaseNodeData['config'] & {
         technology?: 'Mono-Si' | 'Poly-Si' | 'Thin-film';
         powerRatingWp?: number;
+        numberOfPanels?: number;
     };
 }
 export interface BreakerNodeData extends BaseNodeData {
