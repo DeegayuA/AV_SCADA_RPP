@@ -392,3 +392,311 @@ export function measureTextNode(options: TextMeasurementOptions): TextDimensions
     padding: parsedPadding,
   };
 }
+
+// === NEW FUNCTIONS FOR STANDARDIZED STYLING ===
+
+import {
+  Zap,
+  ZapOff,
+  AlertTriangle,
+  XCircle,
+  Info as InfoIcon,
+  LucideIcon,
+  Sun, // For Panel Producing
+  Moon, // For Panel Idle Night
+  BatteryCharging as BatteryChargingIcon,
+  BatteryFull as BatteryFullIcon,
+  BatteryMedium as BatteryMediumIcon,
+  BatteryLow as BatteryLowIcon,
+  BatteryWarning as BatteryWarningIcon,
+  MinusCircle, // For generic "off" or low states
+  Gauge, // For GaugeNode default state
+  TabletsIcon, // For MeterNode
+  CircleDotIcon, // For Contactor Closed
+  CircleIcon as OpenCircleIcon, // For Contactor Open (aliased to avoid conflict if CircleIcon is used generally)
+} from 'lucide-react';
+
+/**
+ * Determines a standardized state string based on various inputs.
+ * This helps decouple raw data from styling decisions.
+ */
+export function getStandardNodeState(
+  processedStatus?: string | null, // Generic status string from data links or props
+  isEnergized?: boolean | null,    // Common for electrical components
+  isOpen?: boolean | null,         // For breakers, contactors, fuses
+  customState?: string | null,      // Allow overriding with a specific state if needed
+  panelOutputState?: 'PRODUCING_HIGH' | 'PRODUCING_MEDIUM' | 'PRODUCING_LOW' | 'IDLE_DAY' | 'IDLE_NIGHT' | null,
+  batteryAction?: 'CHARGING' | 'DISCHARGING' | 'IDLE' | null,
+  socPercent?: number | null
+): string {
+  if (customState) return customState.toUpperCase();
+
+  const statusUpper = processedStatus?.toUpperCase();
+
+  // Prioritize critical statuses from direct input or SoC
+  if (statusUpper === 'FAULT' || statusUpper === 'TRIPPED' || statusUpper === 'ALARM') return 'FAULT';
+  if (socPercent !== null && socPercent !== undefined && socPercent < 10) return 'FAULT_VERY_LOW_SOC'; // Critical SoC
+  if (statusUpper === 'WARNING' || statusUpper === 'WARN') return 'WARNING';
+  if (socPercent !== null && socPercent !== undefined && socPercent < 20) return 'WARNING_LOW_SOC'; // Warning SoC
+
+  // Handle panel-specific states next
+  if (panelOutputState) return panelOutputState;
+
+  // Handle battery-specific states
+  if (batteryAction) {
+    if (batteryAction === 'CHARGING') return 'CHARGING';
+    if (batteryAction === 'DISCHARGING') return 'DISCHARGING';
+    // If IDLE, might fall through to general standby/nominal or be specific
+    if (batteryAction === 'IDLE') return 'IDLE_BATTERY';
+  }
+
+  if (statusUpper === 'FAULT' || statusUpper === 'TRIPPED' || statusUpper === 'ALARM') return 'FAULT';
+  if (statusUpper === 'WARNING' || statusUpper === 'WARN') return 'WARNING';
+  if (statusUpper === 'OFFLINE' || statusUpper === 'UNAVAILABLE' || statusUpper === 'DISABLED') return 'OFFLINE';
+  if (statusUpper === 'STANDBY' || statusUpper === 'IDLE') return 'STANDBY';
+
+  // For elements with open/closed states (like breakers)
+  if (isOpen !== null && isOpen !== undefined) {
+    if (isEnergized === false && !statusUpper) return 'DEENERGIZED_OPEN'; // Explicitly de-energized and open
+    if (isEnergized === true && isOpen === false) return 'ENERGIZED_CLOSED'; // Common nominal state for closed breaker
+    if (isEnergized === true && isOpen === true) return 'ENERGIZED_OPEN';
+    if (isEnergized === false && isOpen === false) return 'DEENERGIZED_CLOSED'; // Might be de-energized but ready
+    return isOpen ? 'NOMINAL_OPEN' : 'NOMINAL_CLOSED'; // Fallback based on open state if energized is ambiguous
+  }
+
+  // For elements primarily defined by energization
+  if (isEnergized === true) return 'ENERGIZED';
+  if (isEnergized === false) return 'DEENERGIZED'; // Explicitly de-energized
+
+  if (statusUpper === 'NOMINAL' || statusUpper === 'NORMAL' || statusUpper === 'OK' || statusUpper === 'RUNNING' || statusUpper === 'ACTIVE') return 'NOMINAL';
+
+  return 'UNKNOWN'; // Default if no other state matches
+}
+
+export interface NodeAppearance {
+  icon: LucideIcon;
+  iconColorVar: string;
+  borderColorVar: string;
+  textColorVar: string;       // For primary label text
+  statusTextColorVar: string; // For status text, potentially different from main label
+  glowColorVar?: string;      // For glow effects, uses main status color if not specified
+  mainStatusColorVar: string; // The primary color representing the status (e.g., for backgrounds, main icon fill if not iconColorVar)
+  armColorVar?: string;       // Specific for breaker arm, defaults to iconColorVar
+}
+
+/**
+ * Returns an appearance object based on the standardized state.
+ * Contains LucideIcon component and CSS variable strings for colors.
+ */
+export function getNodeAppearanceFromState(standardState: string, elementType?: string): NodeAppearance {
+  // Default to light theme text on status for now, can be adjusted if needed
+  const defaultTextOnStatus = 'var(--sld-color-text-on-status)';
+  const defaultNodeText = 'var(--sld-color-text)';
+  const SLDElementTypeMeter = 'meter';
+  const SLDElementTypeContactor = 'contactor';
+  const SLDElementTypeFuse = 'fuse';
+
+  switch (standardState) {
+    // Panel Specific States
+    case 'PRODUCING_HIGH':
+      return {
+        icon: Sun,
+        iconColorVar: 'var(--sld-color-energized)', // Bright green or yellow
+        borderColorVar: 'var(--sld-color-energized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-energized)',
+        glowColorVar: 'var(--sld-color-energized)', // Consider a yellow/gold glow for sun
+        mainStatusColorVar: 'var(--sld-color-energized)',
+      };
+    case 'PRODUCING_MEDIUM': // Could use a slightly less intense color or same as high
+      return {
+        icon: Sun,
+        iconColorVar: 'var(--sld-color-nominal)', // Use nominal green
+        borderColorVar: 'var(--sld-color-nominal)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-nominal)',
+        glowColorVar: 'var(--sld-color-nominal)',
+        mainStatusColorVar: 'var(--sld-color-nominal)',
+      };
+    case 'PRODUCING_LOW':
+      return {
+        icon: Sun, // Could be a dimmer sun icon if available, or MinusCircle
+        iconColorVar: 'var(--sld-color-standby)', // A less active color like standby blue/gray
+        borderColorVar: 'var(--sld-color-standby)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-standby)',
+        mainStatusColorVar: 'var(--sld-color-standby)',
+      };
+    case 'IDLE_DAY': // Daytime, but no production (e.g. cloudy, or panel okay but system needs no power)
+      return {
+        icon: Sun, // Still sun, but colors indicate inactivity
+        iconColorVar: 'var(--sld-color-deenergized)',
+        borderColorVar: 'var(--sld-color-deenergized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-deenergized)',
+        mainStatusColorVar: 'var(--sld-color-deenergized)',
+      };
+    case 'IDLE_NIGHT': // Night time
+      return {
+        icon: Moon,
+        iconColorVar: 'var(--sld-color-standby)',
+        borderColorVar: 'var(--sld-color-standby)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-standby)',
+        mainStatusColorVar: 'var(--sld-color-standby)',
+      };
+    case 'DATA_DISPLAY':
+      return {
+        icon: elementType === SLDElementTypeMeter ? TabletsIcon : Gauge,
+        iconColorVar: 'var(--sld-color-accent)',
+        borderColorVar: 'var(--sld-color-deenergized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-text-muted)',
+        mainStatusColorVar: 'var(--sld-color-accent)',
+      };
+
+    // Battery Specific States
+    case 'CHARGING':
+      return {
+        icon: BatteryChargingIcon,
+        iconColorVar: 'var(--sld-color-standby)', // Blue for charging
+        borderColorVar: 'var(--sld-color-standby)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-standby)',
+        glowColorVar: 'var(--sld-color-standby)',
+        mainStatusColorVar: 'var(--sld-color-standby)',
+      };
+    case 'DISCHARGING':
+      return {
+        icon: Zap, // Using Zap for active power discharge, similar to ENERGIZED
+        iconColorVar: 'var(--sld-color-energized)',
+        borderColorVar: 'var(--sld-color-energized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-energized)',
+        glowColorVar: 'var(--sld-color-energized)',
+        mainStatusColorVar: 'var(--sld-color-energized)',
+      };
+    case 'IDLE_BATTERY': // Battery is idle/standby
+        return {
+          icon: BatteryMediumIcon, // Or just BatteryIcon if available
+          iconColorVar: 'var(--sld-color-nominal)', // Nominal color but not actively charging/discharging
+          borderColorVar: 'var(--sld-color-nominal)',
+          textColorVar: defaultNodeText,
+          statusTextColorVar: 'var(--sld-color-nominal)',
+          mainStatusColorVar: 'var(--sld-color-nominal)',
+        };
+    case 'WARNING_LOW_SOC':
+      return {
+        icon: BatteryWarningIcon,
+        iconColorVar: 'var(--sld-color-warning)',
+        borderColorVar: 'var(--sld-color-warning)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-warning)',
+        glowColorVar: 'var(--sld-color-warning)',
+        mainStatusColorVar: 'var(--sld-color-warning)',
+      };
+    case 'FAULT_VERY_LOW_SOC': // This is a critical fault due to very low SoC
+      return {
+        icon: BatteryWarningIcon, // Could also be XCircle
+        iconColorVar: 'var(--sld-color-fault)',
+        borderColorVar: 'var(--sld-color-fault)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-fault)',
+        glowColorVar: 'var(--sld-color-fault)',
+        mainStatusColorVar: 'var(--sld-color-fault)',
+      };
+
+    // General States (from previous implementation)
+    case 'FAULT':
+      return {
+        icon: XCircle,
+        iconColorVar: 'var(--sld-color-fault)',
+        borderColorVar: 'var(--sld-color-fault)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-fault)',
+        glowColorVar: 'var(--sld-color-fault)',
+        mainStatusColorVar: 'var(--sld-color-fault)',
+      };
+    case 'WARNING':
+      return {
+        icon: AlertTriangle,
+        iconColorVar: 'var(--sld-color-warning)',
+        borderColorVar: 'var(--sld-color-warning)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-warning)',
+        glowColorVar: 'var(--sld-color-warning)',
+        mainStatusColorVar: 'var(--sld-color-warning)',
+      };
+    case 'OFFLINE':
+    case 'DEENERGIZED':
+    case 'DEENERGIZED_OPEN': // Breaker specific
+    case 'DEENERGIZED_CLOSED': // Breaker specific
+      return {
+        icon: ZapOff,
+        iconColorVar: 'var(--sld-color-deenergized)',
+        borderColorVar: 'var(--sld-color-deenergized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-deenergized)',
+        mainStatusColorVar: 'var(--sld-color-deenergized)',
+        armColorVar: 'var(--sld-color-deenergized)', // For breaker
+      };
+    case 'STANDBY':
+      return {
+        icon: InfoIcon,
+        iconColorVar: 'var(--sld-color-standby)',
+        borderColorVar: 'var(--sld-color-standby)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-standby)',
+        mainStatusColorVar: 'var(--sld-color-standby)',
+      };
+    case 'ENERGIZED': // General energized state
+    case 'NOMINAL':   // General nominal state
+    case 'ENERGIZED_CLOSED':
+    case 'NOMINAL_CLOSED':
+      {
+        let icon = Zap;
+        if (elementType === SLDElementTypeMeter) icon = TabletsIcon;
+        else if (elementType === SLDElementTypeContactor) icon = CircleDotIcon;
+        else if (elementType === SLDElementTypeFuse) icon = MinusCircle; // Intact fuse
+        return {
+          icon: icon,
+        iconColorVar: 'var(--sld-color-energized)',
+        borderColorVar: 'var(--sld-color-energized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-energized)',
+        mainStatusColorVar: 'var(--sld-color-energized)',
+        armColorVar: 'var(--sld-color-energized)', // For breaker
+      };
+    case 'ENERGIZED_OPEN':
+    case 'NOMINAL_OPEN':
+      return {
+        icon: elementType === SLDElementTypeContactor ? OpenCircleIcon : (elementType === SLDElementTypeFuse ? MinusCircle : ZapOff), // Intact but open fuse (if possible state)
+        iconColorVar: 'var(--sld-color-nominal)',
+        borderColorVar: 'var(--sld-color-nominal)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-nominal)',
+        mainStatusColorVar: 'var(--sld-color-nominal)',
+        armColorVar: 'var(--sld-color-deenergized)',
+      };
+    case 'DEENERGIZED_OPEN':
+      return {
+        icon: elementType === SLDElementTypeContactor ? OpenCircleIcon : (elementType === SLDElementTypeFuse ? MinusCircle : ZapOff), // Intact but de-energized fuse (if open is possible for fuse)
+        iconColorVar: 'var(--sld-color-deenergized)',
+        borderColorVar: 'var(--sld-color-deenergized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-deenergized)',
+        mainStatusColorVar: 'var(--sld-color-deenergized)',
+        armColorVar: 'var(--sld-color-deenergized)',
+      };
+    case 'UNKNOWN':
+    default:
+      return {
+        icon: InfoIcon,
+        iconColorVar: 'var(--sld-color-deenergized)', // Default to a neutral/offline look
+        borderColorVar: 'var(--sld-color-deenergized)',
+        textColorVar: defaultNodeText,
+        statusTextColorVar: 'var(--sld-color-deenergized)',
+        mainStatusColorVar: 'var(--sld-color-deenergized)',
+      };
+  }
+}

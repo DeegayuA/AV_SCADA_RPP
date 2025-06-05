@@ -129,7 +129,49 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+
+    /* === SLD Component Style Guide Colors === */
+    /* --- Base Palette (Light Theme Values) --- */
+    --sld-palette-text-on-light-bg: #2D3748; /* Dark Gray for text on light backgrounds */
+    --sld-palette-text-on-dark-bg: #E2E8F0;  /* Light Gray for text on dark backgrounds */
+
+    --sld-palette-nominal-light: #2F855A;      /* Green 700 */
+    --sld-palette-nominal-dark: #38A169;       /* Green 600 */
+    --sld-palette-deenergized-light: #A0AEC0;  /* Gray 500 */
+    --sld-palette-deenergized-dark: #4A5568;   /* Gray 600 */
+    --sld-palette-warning-light: #DD6B20;      /* Orange 700 */
+    --sld-palette-warning-dark: #ED8936;       /* Orange 600 */
+    --sld-palette-fault-light: #C53030;        /* Red 700 */
+    --sld-palette-fault-dark: #E53E3E;         /* Red 600 */
+    --sld-palette-standby-light: #3182CE;      /* Blue 600 */
+    --sld-palette-standby-dark: #4299E1;       /* Blue 500 */
+    --sld-palette-accent-light: hsl(var(--primary)); /* Using theme primary */
+    --sld-palette-accent-dark: hsl(var(--primary));  /* Using theme primary */
+
+    --sld-palette-neutral-border-light: #CBD5E0; /* Gray 400 */
+    --sld-palette-neutral-bg-light: #E2E8F0;     /* Gray 300 */
+    --sld-palette-neutral-border-dark: #4A5568;  /* Gray 600 */
+    --sld-palette-neutral-bg-dark: #2D3748;      /* Gray 700 */
+
+    /* --- Resolved Semantic Colors (Defaults to Light Theme) --- */
+    /* These will be overridden by .dark class */
+    --sld-color-text: var(--sld-palette-text-on-light-bg);
+    --sld-color-text-on-status: var(--sld-palette-text-on-dark-bg); /* Default for text on colored status backgrounds */
+
+    --sld-color-nominal: var(--sld-palette-nominal-light);
+    --sld-color-energized: var(--sld-palette-nominal-light); /* Alias for nominal */
+    --sld-color-deenergized: var(--sld-palette-deenergized-light);
+    --sld-color-offline: var(--sld-palette-deenergized-light); /* Alias for deenergized */
+    --sld-color-warning: var(--sld-palette-warning-light);
+    --sld-color-fault: var(--sld-palette-fault-light);
+    --sld-color-standby: var(--sld-palette-standby-light);
+    --sld-color-accent: var(--sld-palette-accent-light);
+
+    --sld-color-handle-border: var(--sld-palette-neutral-border-light);
+    --sld-color-handle-bg: var(--sld-palette-neutral-bg-light);
+    --sld-color-node-bg: #FFFFFF; /* Default node background for light theme */
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -155,6 +197,26 @@
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+
+    /* === SLD Component Style Guide Colors (Dark Theme) === */
+    --sld-color-text: var(--sld-palette-text-on-dark-bg);
+    /* Text on status backgrounds might need specific overrides if contrast is an issue for a specific color */
+    /* For example, if a dark theme status color is very light, text-on-status might need to be dark. */
+    /* Defaulting to light text on status for dark theme as status colors are typically saturated. */
+    --sld-color-text-on-status: var(--sld-palette-text-on-dark-bg);
+
+    --sld-color-nominal: var(--sld-palette-nominal-dark);
+    --sld-color-energized: var(--sld-palette-nominal-dark);
+    --sld-color-deenergized: var(--sld-palette-deenergized-dark);
+    --sld-color-offline: var(--sld-palette-deenergized-dark);
+    --sld-color-warning: var(--sld-palette-warning-dark);
+    --sld-color-fault: var(--sld-palette-fault-dark);
+    --sld-color-standby: var(--sld-palette-standby-dark);
+    --sld-color-accent: var(--sld-palette-accent-dark);
+
+    --sld-color-handle-border: var(--sld-palette-neutral-border-dark);
+    --sld-color-handle-bg: var(--sld-palette-neutral-bg-dark);
+    --sld-color-node-bg: hsl(var(--card)); /* Default node background for dark theme from card var */
   }
 }
 

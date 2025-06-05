@@ -1,11 +1,17 @@
 // app/circuit/sld/nodes/SwitchNode.tsx
 import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion'; // Added AnimatePresence
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
-import { applyValueMapping, getDerivedStyle } from './nodeUtils';
-import { InfoIcon, ToggleLeftIcon, ToggleRightIcon } from 'lucide-react';
+import {
+    applyValueMapping,
+    // getDerivedStyle, // To be replaced
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    NodeAppearance
+} from './nodeUtils';
+import { InfoIcon } from 'lucide-react'; // Keep InfoIcon for button
 import { Button } from "@/components/ui/button";
 
 export interface SwitchNodeData extends BaseNodeData {
@@ -13,13 +19,11 @@ export interface SwitchNodeData extends BaseNodeData {
   config?: BaseNodeData['config'] & {
     // Specific config for SwitchNode if any in future, e.g., default state
   };
-  // The primary state of the switch (on/off) will be driven by a DataPointLink
-  // with targetProperty 'isOn' (convention) or a generic 'value'.
 }
 
 const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
   const { data, selected, isConnectable, id, type, zIndex, dragging } = props;
-  const position = (props as any).position;
+  const position = (props as any).position; // Cast to any to access position if not in NodeProps type
   const xPos = position?.x ?? 0;
   const yPos = position?.y ?? 0;
   const width = (props as any).width;
@@ -37,61 +41,44 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
     [isEditMode, currentUser]
   );
 
-  // --- IsOn State DataPointLink Handling ---
-  // Convention: The switch state is controlled by a DPL targeting 'isOn' or 'value'
   const stateLink = useMemo(() => 
     data.dataPointLinks?.find(link => link.targetProperty === 'isOn' || link.targetProperty === 'value') ||
-    // Fallback if no specific targetProperty, take the first link if available
     (data.dataPointLinks?.length === 1 ? data.dataPointLinks[0] : undefined),
     [data.dataPointLinks]
   );
 
   const stateDataPointConfig = useMemo(() => stateLink ? dataPoints[stateLink.dataPointId] : undefined, [stateLink, dataPoints]);
   const stateOpcUaNodeId = useMemo(() => stateDataPointConfig?.nodeId, [stateDataPointConfig]);
-  const reactiveStateValue = useOpcUaNodeValue(stateOpcUaNodeId); // Subscribe to OPC UA node if ID exists
+  const reactiveStateValue = useOpcUaNodeValue(stateOpcUaNodeId);
 
   const isOn = useMemo(() => {
     if (stateLink && stateDataPointConfig && reactiveStateValue !== undefined) {
       const mappedValue = applyValueMapping(reactiveStateValue, stateLink);
-      // Interpret various "true" conditions
       return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || String(mappedValue).toLowerCase() === 'on' || Number(mappedValue) !== 0;
     }
-    // Fallback: if no DPL or value, assume 'off' or a configured default
     return false; 
   }, [stateLink, stateDataPointConfig, reactiveStateValue]);
-
-  // --- Derived Styles ---
-  // Using a simplified version for derived styles, similar to BreakerNode
-  const stylingLinks = useMemo(() => {
-    return data.dataPointLinks?.filter(link => 
-      link !== stateLink && (['fillColor', 'backgroundColor', 'strokeColor', 'borderColor', 'textColor', 'color', 'visible', 'visibility', 'opacity'].includes(link.targetProperty) || link.targetProperty.startsWith('--'))
-    ) || [];
-  }, [data.dataPointLinks, stateLink]);
-
-  // For simplicity, this example won't implement multiple reactive style links like BreakerNode.
-  // It will rely on getDerivedStyle to use non-reactive values or the main stateLink's value if relevant.
-  // A more complete implementation would use multiple useOpcUaNodeValue hooks for styling DPLs.
-  const opcUaValuesForDerivedStyle = useMemo(() => {
-    const values: Record<string, string | number | boolean> = {};
-    if (stateOpcUaNodeId && reactiveStateValue !== undefined) {
-      values[stateOpcUaNodeId] = reactiveStateValue;
-    }
-    // Add other reactive style values here if implemented
-    return values;
-  }, [stateOpcUaNodeId, reactiveStateValue]);
   
-  const derivedNodeStyles = useMemo(() => {
-    return getDerivedStyle(data, dataPoints, opcUaValuesForDerivedStyle);
-  }, [data, dataPoints, opcUaValuesForDerivedStyle]);
+  const processedStatusForStateFn = useMemo(() => { // Determine a general status for getStandardNodeState
+    // This can be enhanced if SwitchNode has its own 'status' DPLink for fault/warning
+    if (data.status) return String(data.status).toLowerCase();
+    return isOn ? 'active' : 'off'; // Default to active/off based on isOn state
+  }, [data.status, isOn]);
 
-  const statusStyles = useMemo(() => {
-    if (isOn) {
-      return { border: 'border-green-600 dark:border-green-500', bg: 'bg-green-600/10 dark:bg-green-900/30', iconColor: 'text-green-600 dark:text-green-500', main: 'text-green-700 dark:text-green-500' };
-    }
-    return { border: 'border-neutral-400 dark:border-neutral-600', bg: 'bg-neutral-200/20 dark:bg-neutral-700/30', iconColor: 'text-neutral-500 dark:text-neutral-400', main: 'text-neutral-600 dark:text-neutral-400' };
+  const standardNodeState = useMemo(() => {
+    // A Switch being "ON" means it's closed, "OFF" means it's open.
+    // Assume "energized" for styling if it's ON (closed), "de-energized" if OFF (open).
+    const isEnergizedAssumption = isOn;
+    return getStandardNodeState(processedStatusForStateFn, isEnergizedAssumption, !isOn, data.status);
+  }, [processedStatusForStateFn, isOn, data.status]);
+
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState, SLDElementType.Switch), [standardNodeState]);
+  const IconComponent = useMemo(() => appearance.icon, [appearance.icon]);
+  const sldAccentVar = 'var(--sld-color-accent)';
+
+  const displayStatusText = useMemo(() => { // ON / OFF text
+    return isOn ? 'ON' : 'OFF';
   }, [isOn]);
-
-  const SwitchIcon = isOn ? ToggleRightIcon : ToggleLeftIcon;
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
   const prevIsOnRef = useRef(isOn);
@@ -99,7 +86,7 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
   useEffect(() => {
     if (prevIsOnRef.current !== isOn) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700);
       prevIsOnRef.current = isOn;
       return () => clearTimeout(timer);
     }
@@ -109,26 +96,22 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
     <motion.div
       className={`
         sld-node switch-node group custom-node-hover w-[70px] h-[70px] rounded-lg shadow-md
-        flex flex-col items-center justify-center /* p-1.5 removed */
-        border-2 ${statusStyles.border} 
-        /* bg-card and statusStyles.bg removed, moved to content wrapper */
-        /* transition-all duration-150 is part of custom-node-hover */
-        /* selected ring styles removed */
+        flex flex-col items-center justify-center
+        border-2
         ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-        /* hover:shadow-lg removed */
+        ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}
       `}
       style={{
-        borderColor: derivedNodeStyles.borderColor || statusStyles.border, // DPL override for border
-        opacity: derivedNodeStyles.opacity || undefined,
+        borderColor: appearance.borderColorVar,
+        opacity: data.opacity,
+        ringColor: selected ? sldAccentVar : 'transparent',
       }}
-      // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
-      // whileHover="hover" // Prefer CSS hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
       onDoubleClick={() => {
         if (!isEditMode) {
            const fullNodeObject: CustomNodeType = {
-                id, type, position: { x: xPos, y: yPos }, data, selected, 
+                id, type: type as SLDElementType, position: { x: xPos, y: yPos }, data, selected,
                 dragging, zIndex, width: width === null ? undefined : width, 
                 height: height === null ? undefined : height, connectable: isConnectable,
             };
@@ -136,16 +119,15 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
         }
       }}
     >
-      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation(); // Prevent node selection
+            e.stopPropagation();
              const fullNodeObject: CustomNodeType = {
-                id, type, position: { x: xPos, y: yPos }, data, selected, 
+                id, type: type as SLDElementType, position: { x: xPos, y: yPos }, data, selected,
                 dragging, zIndex, width: width === null ? undefined : width, 
                 height: height === null ? undefined : height, connectable: isConnectable,
             };
@@ -153,37 +135,48 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
           }}
           title="View Details"
         >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
+          <InfoIcon className="h-3 w-3" style={{ color: 'var(--sld-color-text-muted)'}} />
         </Button>
       )}
 
-      {/* Handles are outside node-content-wrapper */}
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
-      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="sld-handle-style" />
-      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
       
-      {/* node-content-wrapper for selection styles, padding, and internal layout */}
       <div className={`
           node-content-wrapper flex flex-col items-center justify-center p-1.5 w-full h-full rounded-sm 
-          ${statusStyles.bg} ${statusStyles.main} /* Apply status bg and text color */
-          bg-card dark:bg-neutral-800 /* Base background */
           ${isRecentStatusChange ? 'animate-status-highlight' : ''}
         `}
         style={{ 
-          backgroundColor: derivedNodeStyles.backgroundColor, // DPL override for background
-          color: derivedNodeStyles.color, // DPL override for text
+          background: 'var(--sld-color-node-bg)',
+          color: appearance.textColorVar,
         }}
       >
-        <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" title={data.label}>
+        <p className="text-[9px] font-medium text-center truncate w-full mt-0.5" title={data.label} style={{color: appearance.textColorVar}}>
           {data.label || 'Switch'}
         </p>
         
-        {/* Icon color will be inherited or overridden by DPL */}
-        <SwitchIcon size={30} className={`flex-grow transition-colors`} style={{ color: derivedNodeStyles.color || statusStyles.iconColor }} />
+        <AnimatePresence mode="wait">
+            <motion.div
+                key={standardNodeState} // Key ensures re-render if icon changes
+                initial={{ opacity:0, scale:0.7 }}
+                animate={{ opacity:1, scale:1 }}
+                exit={{ opacity:0, scale:0.7, transition:{duration:0.1} }}
+                transition={{type:'spring', stiffness:250, damping:15, duration: 0.15}}
+                className="my-1 flex-grow flex items-center justify-center"
+            >
+                <IconComponent
+                    size={30}
+                    className={`transition-colors`}
+                    style={{ color: appearance.iconColorVar }}
+                    strokeWidth={1.8}
+                />
+            </motion.div>
+        </AnimatePresence>
 
-        <p className="text-[10px] font-semibold">
-          {isOn ? 'ON' : 'OFF'}
+        <p className="text-[10px] font-semibold" style={{ color: appearance.statusTextColorVar }}>
+          {displayStatusText}
         </p>
       </div>
     </motion.div>

@@ -4,9 +4,17 @@ import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProp
 import { motion } from 'framer-motion';
 import { LoadNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { ArrowRightToLineIcon, SlidersHorizontalIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Arrow for load consumption. Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import {
+    // getDataPointValue, // May not be directly needed if status is simple
+    applyValueMapping,
+    formatDisplayValue,
+    // getDerivedStyle, // To be replaced
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    NodeAppearance
+} from './nodeUtils';
+import { InfoIcon } from 'lucide-react'; // Keep InfoIcon for button
+import { Button } from "@/components/ui/button";
 
 // Extend NodeProps with the additional properties needed
 interface ExtendedNodeProps extends NodeProps<LoadNodeData> {
@@ -52,123 +60,77 @@ const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
   const powerConsumption = useMemo(() => {
     if (powerLink && powerDataPointConfig && reactivePowerValue !== undefined) {
       const mappedValue = applyValueMapping(reactivePowerValue, powerLink);
-      return formatDisplayValue(mappedValue, powerLink.format, powerDataPointConfig?.dataType);
+      // Use powerLink.format for specific formatting if available
+      const formatToUse = powerLink.format || { type: 'number', precision: 1, suffix: 'kW' }; // Default format
+      return formatDisplayValue(mappedValue, formatToUse, powerDataPointConfig?.dataType);
     }
     return data.config?.ratedPowerkW ? `${data.config.ratedPowerkW}kW (rated)` : (data.config?.loadType || 'Load');
   }, [powerLink, powerDataPointConfig, reactivePowerValue, data.config]);
-
-  const statusStyles = useMemo(() => {
-    if (processedStatus === 'fault' || processedStatus === 'alarm') 
-      return { borderClass: 'border-destructive', bgClass: 'bg-destructive/10', iconColorClass: 'text-destructive', textClass: 'text-destructive-foreground' };
-    if (processedStatus === 'overload' || processedStatus === 'warning') 
-      return { borderClass: 'border-yellow-500', bgClass: 'bg-yellow-500/10', iconColorClass: 'text-yellow-500', textClass: 'text-yellow-600 dark:text-yellow-300' };
-    if (processedStatus === 'active' || processedStatus === 'on' || processedStatus === 'nominal') 
-      return { borderClass: 'border-indigo-500', bgClass: 'bg-indigo-500/10', iconColorClass: 'text-indigo-500', textClass: 'text-indigo-600 dark:text-indigo-400' };
-    // Offline / off / standby
-    return { borderClass: 'border-neutral-400 dark:border-neutral-600', bgClass: 'bg-muted/30', iconColorClass: 'text-muted-foreground', textClass: 'text-muted-foreground' };
-  }, [processedStatus]);
-  
-  const derivedNodeStyles = useMemo(() => {
-    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
-    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
-      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
-    }
-    if (powerOpcUaNodeId && reactivePowerValue !== undefined) {
-      primaryOpcUaValues[powerOpcUaNodeId] = reactivePowerValue;
-    }
-    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
-  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, powerOpcUaNodeId, reactivePowerValue, globalOpcUaNodeValues]);
-
-  // Resistor SVG remains, its color will be dynamic
-  const ResistorIcon = ({ className, isActive }: { className?: string, isActive?: boolean }) => {
-    const variants = {
-      active: { pathLength: [0.9, 1, 0.9], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } },
-      inactive: { pathLength: 1 },
-    };
-    return (
-      <motion.svg viewBox="0 0 24 14" width="36" height="21" className={className}
-        initial={false}
-        animate={isActive ? "active" : "inactive"}
-      >
-        <motion.path 
-          d="M1 7 H4 L6 11 L10 3 L14 11 L18 3 L20 7 H23" 
-          stroke="currentColor" strokeWidth="1.5" fill="none" 
-          strokeLinecap="round" strokeLinejoin="round"
-          variants={variants}
-        />
-      </motion.svg>
-    );
-  };
   
   const isLoadActive = useMemo(() => 
-    ['active', 'on', 'nominal'].includes(String(processedStatus).toLowerCase()),
+    ['active', 'on', 'nominal', 'energized'].includes(String(processedStatus).toLowerCase()),
     [processedStatus]
   );
+
+  const standardNodeState = useMemo(() => {
+    // Map component's specific logic to the standardized states
+    const statusUpper = processedStatus?.toUpperCase();
+    if (statusUpper === 'FAULT' || statusUpper === 'ALARM' || statusUpper === 'OVERLOAD') return 'FAULT'; // Treat OVERLOAD as FAULT for now
+    if (statusUpper === 'WARNING') return 'WARNING';
+
+    // Use isLoadActive to determine energized/de-energized states
+    if (isLoadActive) return 'ENERGIZED';
+    else return 'DEENERGIZED'; // Covers 'off', 'offline', 'standby', 'idle' etc.
+
+  }, [processedStatus, isLoadActive]);
+
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState), [standardNodeState]);
+  const IconComponent = useMemo(() => appearance.icon, [appearance.icon]); // Get icon component from appearance
+  const sldAccentVar = 'var(--sld-color-accent)';
 
   const isCriticalStatus = useMemo(() => 
-    ['fault', 'alarm', 'warning'].includes(String(processedStatus).toLowerCase()),
-    [processedStatus]
+    standardNodeState === 'FAULT' || standardNodeState === 'WARNING',
+    [standardNodeState]
   );
-  
-  // Choose a Lucide icon for fault/warning, otherwise use ResistorIcon
-  const DisplayIcon = useMemo(() => {
-    if (isCriticalStatus) return AlertTriangleIcon;
-    return ResistorIcon;
-  }, [processedStatus, isCriticalStatus]); // isCriticalStatus included for clarity
 
-  const iconEffectiveColorClass = derivedNodeStyles.color ? '' : statusStyles.iconColorClass;
-
-
-  // Merge styles: derivedNodeStyles override class-based styles
-  const componentStyle: React.CSSProperties = {
-    borderColor: derivedNodeStyles.borderColor,
-    backgroundColor: derivedNodeStyles.backgroundColor,
-    color: derivedNodeStyles.color, // Affects text if not overridden by textClass
-  };
-  // The main div classes will handle the defaults if derived styles don't provide them
   const mainDivClasses = `
     sld-node load-node group custom-node-hover w-[100px] h-[65px] rounded-lg shadow-md
-    flex flex-col items-center justify-between /* p-1.5 removed, moved to content wrapper */
-    border-2 ${derivedNodeStyles.borderColor ? '' : statusStyles.borderClass} 
-    /* specific bgClass from statusStyles, bg-card removed, moved to content wrapper */
-    /* transition-all duration-150 is part of custom-node-hover */
-    /* selected ring styles removed */
+    flex flex-col items-center justify-between
+    border-2
     ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-    /* hover:shadow-lg removed */
   `;
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevStatusRef = useRef(processedStatus);
+  const prevStatusRef = useRef(standardNodeState);
 
   useEffect(() => {
-    if (prevStatusRef.current !== processedStatus) {
+    if (prevStatusRef.current !== standardNodeState) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
-      prevStatusRef.current = processedStatus;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700);
+      prevStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+  }, [standardNodeState]);
   
   return (
     <motion.div
-      className={mainDivClasses}
+      className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
       style={{
-        borderColor: derivedNodeStyles.borderColor || componentStyle.borderColor || undefined,
-        opacity: derivedNodeStyles.opacity || undefined,
+        borderColor: appearance.borderColorVar,
+        opacity: data.opacity, // Assuming opacity is directly from data
+        ringColor: selected ? sldAccentVar : 'transparent',
       }}
-      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
-      // whileHover="hover" // Prefer CSS hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+      whileHover={{ scale: isNodeEditable ? 1.03 : 1.01 }}
     >
-      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation(); // Prevent node selection
+            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
                 id, type, 
                 position: { x: xPos, y: yPos }, 
@@ -178,45 +140,40 @@ const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
           }}
           title="View Details"
         >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
+          <InfoIcon className="h-3 w-3" style={{ color: 'var(--sld-color-text-muted)'}} />
         </Button>
       )}
 
-      {/* Handle is outside node-content-wrapper */}
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" title="Power Input"/>
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }} title="Power Input"/>
 
-      {/* node-content-wrapper for selection styles, padding, and internal layout */}
       <div
         className={`node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-md
-                    ${derivedNodeStyles.backgroundColor ? '' : statusStyles.bgClass}
-                    ${derivedNodeStyles.color ? '' : statusStyles.textClass}
-                    bg-card dark:bg-neutral-800
                     ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
         style={{
-          backgroundColor: derivedNodeStyles.backgroundColor || undefined,
-          color: derivedNodeStyles.color || undefined, 
+          background: 'var(--sld-color-node-bg)',
+          color: appearance.textColorVar,
         }}
       >
-        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
-          {data.label} {/* Text color will be inherited */}
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label} style={{ color: appearance.textColorVar }}>
+          {data.label}
         </p>
         
         <div className="my-0.5 pointer-events-none">
           <motion.div
             animate={isCriticalStatus ? { scale: [1, 1.05, 1], transition: { duration: 1.5, repeat: Infinity } } : {}}
           >
-            {/* Icon color will be inherited from parent (node-content-wrapper) or DPL */}
-            <DisplayIcon 
+            <IconComponent
               className="transition-colors" 
-              style={{ color: derivedNodeStyles.color || iconEffectiveColorClass }} // iconEffectiveColorClass is a fallback
-              {...(DisplayIcon === ResistorIcon && { isActive: isLoadActive })} 
+              style={{ color: appearance.iconColorVar }}
+              size={28} // Standardized size, adjust as needed
+              strokeWidth={isCriticalStatus ? 2.2 : 1.8}
             />
           </motion.div>
         </div>
-        <p className="text-[9px] font-medium text-center truncate w-full leading-tight" title={`Status: ${processedStatus}`}>
-          {String(processedStatus).toUpperCase()}
+        <p className="text-[9px] font-medium text-center truncate w-full leading-tight" title={`Status: ${displayStatusText}`} style={{ color: appearance.statusTextColorVar }}>
+          {displayStatusText}
         </p>
-        <p className="text-[9px] text-center truncate w-full leading-tight" title={`Power: ${powerConsumption}`}>
+        <p className="text-[9px] text-center truncate w-full leading-tight" title={`Power: ${powerConsumption}`} style={{ color: appearance.statusTextColorVar }}>
           {powerConsumption}
         </p>
       </div>
