@@ -1,8 +1,8 @@
 // components/sld/nodes/BatteryNode.tsx
 import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
-import { motion } from 'framer-motion';
-import { BatteryNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
+import { motion, AnimatePresence } from 'framer-motion'; // Added AnimatePresence
+import { BatteryNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added SLDElementType
 interface ExtendedNodeProps extends NodeProps<BatteryNodeData> {
   xPos: number;
   yPos: number;
@@ -11,11 +11,19 @@ interface ExtendedNodeProps extends NodeProps<BatteryNodeData> {
 }
 
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { BatteryChargingIcon, BatteryFullIcon, BatteryLowIcon, BatteryMediumIcon, AlertCircleIcon, ZapIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import {
+    // getDataPointValue, // May not be needed if status is simple enough
+    applyValueMapping,
+    formatDisplayValue,
+    // getDerivedStyle, // To be replaced
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    NodeAppearance
+} from './nodeUtils';
+import { InfoIcon } from 'lucide-react'; // Keep InfoIcon for button
+import { Button } from "@/components/ui/button";
 
-const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedNodeProps that includes width and height
+const BatteryNode: React.FC<ExtendedNodeProps> = (props) => {
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging, width, height } = props;
   const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
@@ -45,107 +53,87 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedN
     if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
       return applyValueMapping(reactiveStatusValue, statusLink);
     }
-    return data.status || 'idle'; // Default to idle
+    return data.status || 'idle';
   }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
-  const socValue = useMemo(() => {
+  const socPercent = useMemo(() => { // Renamed from socValue for clarity
     if (socLink && socDataPointConfig && reactiveSocValue !== undefined) {
       const mappedValue = applyValueMapping(reactiveSocValue, socLink);
-      // parseFloat will handle cases where formatDisplayValue might return "50%" -> 50
       const formatted = formatDisplayValue(mappedValue, socLink.format, socDataPointConfig?.dataType);
-      const numericVal = parseFloat(formatted);
-      return isNaN(numericVal) ? -1 : numericVal; // Return -1 if parsing fails
+      const numericVal = parseFloat(formatted); // Handles "50%" -> 50
+      return isNaN(numericVal) ? null : numericVal;
     }
-    return typeof data.config?.soc === 'number' ? data.config.soc : -1; // Fallback to config
+    return typeof data.config?.soc === 'number' ? data.config.soc : null;
   }, [socLink, socDataPointConfig, reactiveSocValue, data.config?.soc]);
 
-  const { icon: StatusIcon, borderClass, bgClass, textClass, animationClass } = useMemo(() => {
-    let animClass = '';
-    if (processedStatus === 'fault' || processedStatus === 'alarm') 
-      return { icon: AlertCircleIcon, borderClass: 'border-destructive', bgClass: 'bg-destructive/10', textClass: 'text-destructive', animationClass: animClass };
-    if (processedStatus === 'warning') 
-      return { icon: AlertCircleIcon, borderClass: 'border-yellow-500', bgClass: 'bg-yellow-500/10', textClass: 'text-yellow-500', animationClass: animClass };
-
-    if (processedStatus === 'charging') {
-      animClass = 'animate-pulse'; // Pulse for charging state (applied to icon)
-      return { icon: BatteryChargingIcon, borderClass: 'border-sky-500', bgClass: 'bg-sky-500/10', textClass: 'text-sky-500', animationClass: animClass };
-    }
-    if (processedStatus === 'discharging') {
-      // Discharging icon can vary with SOC, specific animation handled by Framer Motion on icon
-      if (socValue > 75) return { icon: BatteryFullIcon, borderClass: 'border-green-500', bgClass: 'bg-green-500/10', textClass: 'text-green-500', animationClass: animClass };
-      if (socValue > 40) return { icon: BatteryMediumIcon, borderClass: 'border-lime-500', bgClass: 'bg-lime-500/10', textClass: 'text-lime-500', animationClass: animClass };
-      if (socValue >= 0) return { icon: BatteryLowIcon, borderClass: 'border-amber-500', bgClass: 'bg-amber-500/10', textClass: 'text-amber-500', animationClass: animClass };
-      return { icon: BatteryLowIcon, borderClass: 'border-amber-500', bgClass: 'bg-amber-500/10', textClass: 'text-amber-500', animationClass: animClass };
-    }
-    
-    // Default/Idle state, icon based on SOC
-    if (socValue > 75) return { icon: BatteryFullIcon, borderClass: 'border-green-600', bgClass: 'bg-green-600/10', textClass: 'text-green-600', animationClass: animClass};
-    if (socValue > 40) return { icon: BatteryMediumIcon, borderClass: 'border-lime-500', bgClass: 'bg-lime-500/10', textClass: 'text-lime-500', animationClass: animClass};
-    if (socValue >= 0 && socValue <=40) return { icon: BatteryLowIcon, borderClass: 'border-amber-500', bgClass: 'bg-amber-500/10', textClass: 'text-amber-500', animationClass: animClass};
-      
-    return { icon: ZapIcon, borderClass: 'border-neutral-400 dark:border-neutral-600', bgClass: 'bg-muted/30', textClass: 'text-muted-foreground', animationClass: animClass }; 
-  }, [processedStatus, socValue]);
+  const batteryAction = useMemo((): 'CHARGING' | 'DISCHARGING' | 'IDLE' | null => {
+    const statusLower = String(processedStatus).toLowerCase();
+    if (statusLower === 'charging') return 'CHARGING';
+    if (statusLower === 'discharging') return 'DISCHARGING';
+    if (statusLower === 'idle' || statusLower === 'standby' || statusLower === 'nominal' || statusLower === 'ok' || statusLower === 'online') return 'IDLE';
+    return null; // Unknown action if status doesn't imply one
+  }, [processedStatus]);
   
-  const derivedNodeStyles = useMemo(() => {
-    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
-    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
-      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
-    }
-    if (socOpcUaNodeId && reactiveSocValue !== undefined) {
-      primaryOpcUaValues[socOpcUaNodeId] = reactiveSocValue;
-    }
-    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
-  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, socOpcUaNodeId, reactiveSocValue, globalOpcUaNodeValues]);
+  const standardNodeState = useMemo(() => {
+    return getStandardNodeState(processedStatus, null, null, data.status, null, batteryAction, socPercent);
+  }, [processedStatus, data.status, batteryAction, socPercent]);
 
-  const displaySoc = socValue >= 0 ? `${Math.round(socValue)}%` : (processedStatus || 'N/A');
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState, SLDElementType.Battery), [standardNodeState]);
+  const IconComponent = useMemo(() => appearance.icon, [appearance.icon]);
+  const sldAccentVar = 'var(--sld-color-accent)';
 
-  // Merge styles: derivedNodeStyles can override class-based styles
-  const componentStyle: React.CSSProperties = {
-    borderColor: derivedNodeStyles.borderColor, // Let className handle if undefined
-    backgroundColor: derivedNodeStyles.backgroundColor, // Let className handle if undefined
-    color: derivedNodeStyles.color, // Let className handle if undefined for text
-  };
-  // Icon color can be specifically set by derived styles or fallback to textClass
-  const iconFinalColor = derivedNodeStyles.color || ''; // textClass will apply if this is empty
+  const displaySoc = socPercent !== null ? `${Math.round(socPercent)}%` : (processedStatus || 'N/A');
+
+  const displayStatusText = useMemo(() => { // For text display, can be more descriptive
+    if (standardNodeState === 'FAULT_VERY_LOW_SOC') return "CRITICAL LOW SOC";
+    if (standardNodeState === 'WARNING_LOW_SOC') return "LOW SOC";
+    if (standardNodeState === 'CHARGING') return "CHARGING";
+    if (standardNodeState === 'DISCHARGING') return "DISCHARGING";
+    if (standardNodeState === 'IDLE_BATTERY') return "IDLE";
+    if (standardNodeState === 'FAULT') return "FAULT";
+    if (standardNodeState === 'WARNING') return "WARNING";
+    if (standardNodeState === 'OFFLINE') return "OFFLINE";
+    if (standardNodeState === 'STANDBY') return "STANDBY";
+    return standardNodeState.replace(/_/g, ' ');
+  },[standardNodeState]);
+
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevStatusRef = useRef(processedStatus);
+  const prevStatusRef = useRef(standardNodeState);
 
   useEffect(() => {
-    if (prevStatusRef.current !== processedStatus) {
+    if (prevStatusRef.current !== standardNodeState) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
-      prevStatusRef.current = processedStatus;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700);
+      prevStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+  }, [standardNodeState]);
 
   return (
     <motion.div
       className={`
         sld-node battery-node group custom-node-hover w-[75px] h-[85px] rounded-xl shadow-lg
-        flex flex-col items-center justify-between /* p-2 removed, moved to content wrapper */
-        border-2 ${derivedNodeStyles.borderColor ? '' : borderClass}
-        /* bg-card and specific bgClass removed, moved to content wrapper */
-        /* transition-all duration-200 is part of custom-node-hover */
-        /* selected ring styles removed */
+        flex flex-col items-center justify-between
+        border-2
         ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-        /* hover:shadow-xl removed */
+        ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}
       `}
-      style={{ borderColor: componentStyle.borderColor /* Keep only border related from componentStyle for outer */ }}
-      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
-      // whileHover="hover" // Prefer CSS hover
+      style={{
+        borderColor: appearance.borderColorVar,
+        ringColor: selected ? sldAccentVar : 'transparent',
+      }}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+      whileHover={{ scale: isNodeEditable ? 1.03 : 1.01 }}
     >
-      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation(); // Prevent node selection
+            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
                 id, type, 
                 position: { x: xPos, y: yPos }, 
@@ -158,47 +146,48 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => { // Using ExtendedN
           }}
           title="View Details"
         >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
+          <InfoIcon className="h-3 w-3" style={{ color: 'var(--sld-color-text-muted)'}} />
         </Button>
       )}
 
-      {/* Handles are outside node-content-wrapper */}
-      <Handle type="target" position={Position.Top} id="top_in_charge" isConnectable={isConnectable} className="sld-handle-style" title="Charge Input"/>
-      <Handle type="source" position={Position.Bottom} id="bottom_out_discharge" isConnectable={isConnectable} className="sld-handle-style" title="Discharge Output"/>
-      <Handle type="source" position={Position.Left} id="left_dc_bus" isConnectable={isConnectable} className="sld-handle-style !-ml-1" title="DC Bus"/>
-      <Handle type="source" position={Position.Right} id="right_dc_bus" isConnectable={isConnectable} className="sld-handle-style !-mr-1" title="DC Bus"/>
+      <Handle type="target" position={Position.Top} id="top_in_charge" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }} title="Charge Input"/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out_discharge" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }} title="Discharge Output"/>
+      <Handle type="source" position={Position.Left} id="left_dc_bus" isConnectable={isConnectable} className="sld-handle-style !-ml-1" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }} title="DC Bus"/>
+      <Handle type="source" position={Position.Right} id="right_dc_bus" isConnectable={isConnectable} className="sld-handle-style !-mr-1" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }} title="DC Bus"/>
 
-      {/* node-content-wrapper for selection styles, padding, and internal layout */}
       <div 
-        className={`node-content-wrapper flex flex-col items-center justify-between p-2 w-full h-full rounded-md /* Use rounded-md if outer is rounded-xl for slight inner curve */
-                    ${derivedNodeStyles.backgroundColor ? '' : bgClass} 
-                    ${derivedNodeStyles.color ? '' : textClass}
-                    bg-card dark:bg-neutral-800
+        className={`node-content-wrapper flex flex-col items-center justify-between p-2 w-full h-full rounded-md
                     ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
         style={{ 
-          backgroundColor: derivedNodeStyles.backgroundColor || undefined, // Explicitly set from DPL or let class apply
-          color: derivedNodeStyles.color || undefined, // Explicitly set from DPL or let class apply
+          background: 'var(--sld-color-node-bg)',
+          color: appearance.textColorVar,
         }}
       >
-        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label} style={{ color: appearance.textColorVar }}>
           {data.label}
         </p>
         
         <motion.div
-          animate={processedStatus === 'discharging' ? { opacity: [1, 0.7, 1] } : {}}
-          transition={processedStatus === 'discharging' ? { duration: 2, repeat: Infinity, ease: "easeInOut" } : {}}
+          className="my-1"
+          animate={standardNodeState === 'DISCHARGING' ? { opacity: [1, 0.7, 1] } :
+                   (standardNodeState === 'CHARGING' ? {y: [0, -1, 0, 1, 0]} : {})}
+          transition={
+            standardNodeState === 'DISCHARGING' ? { duration: 2, repeat: Infinity, ease: "easeInOut" } :
+            standardNodeState === 'CHARGING' ? { duration: 0.8, repeat: Infinity, ease: "easeInOut" } : {}
+          }
         >
-          <StatusIcon 
+          <IconComponent
             size={30} 
-            className={`my-1 transition-colors ${animationClass}`} // textClass removed as it's on parent, iconFinalColor applied via style
-            style={{ color: iconFinalColor || undefined }} // Use iconFinalColor from componentStyle or let CSS inherit
+            className={`transition-colors`}
+            style={{ color: appearance.iconColorVar }}
+            strokeWidth={1.8} // Consistent stroke width for battery icons
           />
         </motion.div>
         
-        <p className="text-[9px] font-medium text-center truncate w-full leading-tight" title={`Status: ${processedStatus}`}>
-          {String(processedStatus).toUpperCase()}
+        <p className="text-[9px] font-medium text-center truncate w-full leading-tight" title={`Status: ${displayStatusText}`} style={{ color: appearance.statusTextColorVar }}>
+          {displayStatusText}
         </p>
-        <p className="text-[10px] font-bold text-center" title={`SOC: ${displaySoc}`}>
+        <p className="text-[10px] font-bold text-center" title={`SOC: ${displaySoc}`} style={{ color: appearance.mainStatusColorVar }}>
           {displaySoc}
         </p>
       </div>

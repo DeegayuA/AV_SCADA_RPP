@@ -125,6 +125,7 @@ const getResolvedColor = (
 };
 
 
+
 const AnimatedNumber = ({ value, precision }: { value: number; precision: number }) => { 
     const spring = useSpring(value, { mass: 0.8, stiffness: 100, damping: 20 }); 
     const display = useTransform(spring, (current) => parseFloat(current.toFixed(precision))); 
@@ -167,16 +168,19 @@ const convertFromWatts = (v: number, targetUnit: PowerUnit): number => { if (typ
 
 const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     nodeValues, allPossibleDataPoints, generationDpIds, usageDpIds, exportDpIds,
-    exportMode, timeScale, isLiveSourceAvailable = true, useDemoDataSource = false,
+    exportMode, timeScale, isLive = true, useDemoData = false,
 }) => {
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const { resolvedTheme } = useTheme();
+    const liveUpdateTimer = useRef<NodeJS.Timeout | null>(null);
     const [isGraphReady, setIsGraphReady] = useState(false); 
     const [animationKey, setAnimationKey] = useState(Date.now());
     const [lastUpdatedDisplayTime, setLastUpdatedDisplayTime] = useState<string>('N/A');
     
     const displayUnitLabel = CHART_TARGET_UNIT; 
     const valuePrecision = POWER_PRECISION[CHART_TARGET_UNIT];
+
+    // Store previous usage value to smooth changes
     const prevDemoUsageRef = useRef<number | null>(null);
 
     const dataBufferRef = useRef<ChartDataPoint[]>([]);
@@ -663,6 +667,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     return (
     <TooltipProvider delayDuration={150}>
         <motion.div 
+            className={cn(
             className={cn(
                 "space-y-2 p-3 rounded-xl shadow-lg border-2 transition-colors duration-700 ease-in-out", 
                 currentValues.isSelfSufficient ? "border-green-400/60 dark:border-green-500/70" : "border-red-400/60 dark:border-red-500/70"

@@ -4,9 +4,17 @@ import { NodeProps as ReactFlowNodeProps, Handle, Position } from 'reactflow'; /
 import { motion } from 'framer-motion';
 import { BusbarNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, getDerivedStyle, formatDisplayValue } from './nodeUtils';
-import { MinusIcon, InfoIcon } from 'lucide-react'; // Simple representation for a busbar. Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import {
+    // getDataPointValue, // May not be needed if status is simple
+    applyValueMapping,
+    // getDerivedStyle, // To be replaced
+    formatDisplayValue,
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    NodeAppearance
+} from './nodeUtils';
+import { InfoIcon } from 'lucide-react'; // Keep InfoIcon for button
+import { Button } from "@/components/ui/button";
 
 // Extended NodeProps with position property
 interface NodeProps<T = any> extends ReactFlowNodeProps<T> {
@@ -53,24 +61,16 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
     return data.status || 'de-energized'; // Default status
   }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
-  const statusColorClass = useMemo(() => {
-    if (processedStatus === 'fault' || processedStatus === 'alarm') return 'bg-destructive dark:bg-red-700';
-    if (processedStatus === 'energized' || processedStatus === 'nominal') return 'bg-green-500 dark:bg-green-600';
-    return 'bg-neutral-400 dark:bg-neutral-600'; // De-energized, offline, or unknown
+  const isEnergized = useMemo(() => {
+    const upperStatus = processedStatus?.toUpperCase();
+    return upperStatus === 'ENERGIZED' || upperStatus === 'NOMINAL';
   }, [processedStatus]);
 
-  const derivedNodeStyles = useMemo(() => {
-    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
-    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
-      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
-    }
-    if (voltageOpcUaNodeId && reactiveVoltageValue !== undefined) {
-      primaryOpcUaValues[voltageOpcUaNodeId] = reactiveVoltageValue;
-    }
-    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
-  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, voltageOpcUaNodeId, reactiveVoltageValue, globalOpcUaNodeValues]);
+  const standardNodeState = useMemo(() => getStandardNodeState(processedStatus, isEnergized), [processedStatus, isEnergized]);
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState), [standardNodeState]);
+  const sldAccentVar = 'var(--sld-color-accent)';
 
-  // Display voltage or other info if linked
+  // Display voltage or other info if linked, this can remain as is or also use appearance.textColorVar
   const displayInfo = useMemo(() => {
     if (voltageLink && voltageDataPointConfig && reactiveVoltageValue !== undefined) {
       const mappedValue = applyValueMapping(reactiveVoltageValue, voltageLink);
@@ -88,51 +88,46 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
     sld-node busbar-node group custom-node-hover
     rounded shadow-sm 
     flex items-center justify-center relative
-    /* border border-transparent removed, selection border will be on node-content-wrapper */
-    /* transition-all duration-150 is part of custom-node-hover */
+    border-2
     ${isNodeEditable ? 'cursor-pointer' : 'cursor-default'}
-    /* ring styles removed, selection style will be on node-content-wrapper */
   `;
 
-  // The busbar's actual visual bar. Its background color can be set by statusColorClass or by a DPLink.
-  // Added node-content-wrapper here.
-  const busbarVisualClasses = `node-content-wrapper w-full h-full rounded-sm transition-colors duration-300 ${derivedNodeStyles.backgroundColor ? '' : statusColorClass}`;
+  // node-content-wrapper is now the busbar itself for busbar node.
+  const busbarVisualClasses = `node-content-wrapper w-full h-full rounded-sm transition-colors duration-300`;
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevStatusRef = useRef(processedStatus);
+  const prevStatusRef = useRef(standardNodeState); // Track standard state
 
   useEffect(() => {
-    if (prevStatusRef.current !== processedStatus) {
+    if (prevStatusRef.current !== standardNodeState) { // Track standard state
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
-      prevStatusRef.current = processedStatus;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700);
+      prevStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+  }, [standardNodeState]);
 
   return (
     <motion.div
-      className={mainDivClasses}
+      className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
       style={{
         width: `${busbarWidth}px`,
         height: `${busbarHeight}px`,
-        borderColor: derivedNodeStyles.borderColor, // Keep this if it's for the outer container specifically
-        opacity: derivedNodeStyles.opacity,
-        // backgroundColor for the main motion.div should be transparent or a base card color if the inner bar doesn't fill it.
-        // Given busbarVisualClasses is w-full h-full, this should be fine.
+        borderColor: appearance.borderColorVar,
+        opacity: data.opacity, // Assuming opacity is directly from data if needed, not from derived styles for now
+        ringColor: selected ? sldAccentVar : 'transparent',
       }}
-      // variants={{ hover: { scale: isNodeEditable ? 1.02 : 1 }, initial: { scale: 1 } }} // Let CSS handle hover scale through custom-node-hover if defined, or keep for framer-motion specific
-      // whileHover="hover" // Let CSS handle hover effects via custom-node-hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+      whileHover={{ scale: isNodeEditable ? 1.02 : 1.01 }} // Subtle hover
     >
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
-          className="absolute -top-1 -right-1 h-5 w-5 rounded-full z-20 bg-background/70 hover:bg-secondary/90 p-0.5" // Adjusted for busbar
+          className="absolute -top-1 -right-1 h-5 w-5 rounded-full z-20 bg-background/70 hover:bg-secondary/90 p-0.5"
           onClick={(e) => {
-            e.stopPropagation(); // Prevent node selection/drag
+            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
               id,
               type,
@@ -149,47 +144,50 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
           }}
           title="View Details"
         >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
+          <InfoIcon className="h-3 w-3" style={{ color: 'var(--sld-color-text-muted)'}} />
         </Button>
       )}
 
       <div
         className={`${busbarVisualClasses} ${isRecentStatusChange ? 'animate-status-highlight' : ''}`}
-        style={{ backgroundColor: derivedNodeStyles.backgroundColor }} // Allows DPLink to override statusColorClass
+        style={{ backgroundColor: appearance.mainStatusColorVar }}
       />
 
       {/* Handles */}
       {[0.25, 0.5, 0.75].map(pos => (
         <Handle
           key={`top-${pos}`} type="target" position={Position.Top} id={`top-${pos * 100}`}
-          style={{ left: `${pos * 100}%` }} isConnectable={isConnectable}
-          className="react-flow__handle-common sld-handle-style" // Use global style, size from global
+          style={{ left: `${pos * 100}%`, background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}
+          isConnectable={isConnectable}
+          className="sld-handle-style"
         />
       ))}
       {[0.25, 0.5, 0.75].map(pos => (
         <Handle
           key={`bottom-${pos}`} type="source" position={Position.Bottom} id={`bottom-${pos * 100}`}
-          style={{ left: `${pos * 100}%` }} isConnectable={isConnectable}
-          className="react-flow__handle-common sld-handle-style" // Use global style
+          style={{ left: `${pos * 100}%`, background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}
+          isConnectable={isConnectable}
+          className="sld-handle-style"
         />
       ))}
       <Handle
         type="target" position={Position.Left} id="left" isConnectable={isConnectable}
-        className="react-flow__handle-common sld-handle-style" // Use global style
+        className="sld-handle-style"
+        style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}
       />
       <Handle
         type="source" position={Position.Right} id="right" isConnectable={isConnectable}
-        className="react-flow__handle-common sld-handle-style" // Use global style
+        className="sld-handle-style"
+        style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}
       />
 
-      {/* Label is positioned absolutely, outside the main colored bar, so it won't get selection styling directly */}
       {(displayInfo || data.label) && (
         <div
-          className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-center pointer-events-none" // pointer-events-none for label
+          className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-center pointer-events-none"
           style={{ width: `${busbarWidth * 1.2}px` }}
         >
-          <p className="text-[9px] font-medium text-muted-foreground dark:text-neutral-400 truncate"
-            style={{ color: derivedNodeStyles.color }} 
+          <p className="text-[9px] font-medium truncate"
+            style={{ color: appearance.textColorVar }}
             title={displayInfo || data.label}
           >
             {displayInfo || data.label}

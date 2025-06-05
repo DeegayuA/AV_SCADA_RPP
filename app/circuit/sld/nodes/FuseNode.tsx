@@ -1,34 +1,41 @@
 // components/sld/nodes/FuseNode.tsx
 import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
-import { NodeProps, Handle, Position, Node } from 'reactflow'; // Added Node type
-import { motion } from 'framer-motion';
-import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added SLDElementType
+import { NodeProps, Handle, Position } from 'reactflow';
+import { motion, AnimatePresence } from 'framer-motion';
+import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld';
 
 interface ExtendedNodeProps<T = any> extends NodeProps<T> {
   position: { x: number, y: number };
   zIndex: number;
-  dragging: boolean; // Removed optional modifier (?) since NodeProps requires this to be boolean
+  dragging: boolean;
+  width?: number | null; // Added from original to ensure full CustomNodeType compatibility
+  height?: number | null; // Added from original
 }
 
-import { useAppStore } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
-import { ZapIcon, ShieldOffIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
+import {
+    applyValueMapping,
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    // NodeAppearance type can be used if needed, but appearance object is directly used
+} from './nodeUtils';
+import { InfoIcon } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
 interface FuseNodeData extends BaseNodeData {
   type?: 'Cartridge' | 'Blade' | 'HRC';
-  elementType: SLDElementType.Fuse;
+  elementType: SLDElementType.Fuse; // Ensure this is part of data if not already
 }
 
 const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
-  const { data, selected, isConnectable, id, type, position, zIndex, dragging } = props;
+  const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props;
   const xPos = position.x;
   const yPos = position.y;
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
+    opcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
   }));
 
@@ -37,51 +44,62 @@ const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
     [isEditMode, currentUser]
   );
 
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDataPointConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
   const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
-      return applyValueMapping(rawValue, statusLink);
+    if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
+      return String(applyValueMapping(reactiveStatusValue, statusLink));
     }
     return data.status || 'ok'; // Default to ok
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+  }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
-  const { statusText, baseClasses, BlownOverlayIcon, isBlown, isWarning } = useMemo(() => {
-    let icon: React.ElementType | null = null;
-    let text = String(processedStatus).toUpperCase();
-    let classes = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400'; // Nominal 'ok'
-    let blown = false;
-    let warning = false;
+  const standardNodeState = useMemo(() => {
+    const statusLower = String(processedStatus).toLowerCase();
+    let isFuseOpen = false; // A blown fuse is effectively an open circuit
+    let isEnergizedForState = true; // Assume energized unless offline
 
-    switch (String(processedStatus).toLowerCase()) {
-      case 'blown': case 'fault': case 'alarm':
-        icon = ShieldOffIcon; text = 'BLOWN';
-        classes = 'border-destructive bg-destructive/10 text-destructive';
-        blown = true;
-        break;
-      case 'warning':
-        icon = AlertTriangleIcon; text = 'WARNING';
-        classes = 'border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400';
-        warning = true;
-        break;
-      case 'ok': case 'nominal': default:
-        icon = null; text = 'OK';
-        // classes remain as initialized (green)
-        break;
+    if (statusLower === 'blown' || statusLower === 'fault' || statusLower === 'alarm') {
+      isFuseOpen = true; // Blown fuse means open circuit
+      return getStandardNodeState("FAULT", null, isFuseOpen, data.status);
     }
-    return { BlownOverlayIcon: icon, statusText: text, baseClasses: classes, isBlown: blown, isWarning: warning };
-  }, [processedStatus]);
+    if (statusLower === 'warning') {
+      return getStandardNodeState("WARNING", null, isFuseOpen, data.status);
+    }
+    if (statusLower === 'offline') {
+        isEnergizedForState = false; // Fuse itself is offline
+        return getStandardNodeState("OFFLINE", isEnergizedForState, isFuseOpen, data.status);
+    }
+    // For 'ok', 'nominal'
+    // If we don't have explicit energized status for a fuse, we can assume it's DEENERGIZED
+    // if we want a less prominent color for "OK" by default, or NOMINAL/ENERGIZED for prominent.
+    // Let's default to NOMINAL for "OK" fuses.
+    return getStandardNodeState("NOMINAL", null, isFuseOpen, data.status);
+  }, [processedStatus, data.status]);
 
-  const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, dataPoints, opcUaNodeValues), // Fixed parameter order to match function definition
-    [data, dataPoints, opcUaNodeValues]
-  );
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState, SLDElementType.Fuse), [standardNodeState]);
+  const OverlayIconComponent = useMemo(() =>
+    (standardNodeState === 'FAULT' || standardNodeState === 'WARNING') ? appearance.icon : null,
+  [standardNodeState, appearance.icon]);
+  const isBlownForSVG = useMemo(() => standardNodeState === 'FAULT', [standardNodeState]);
 
-  const FuseSymbolSVG = ({ className, isBlown }: { className?: string, isBlown?: boolean }) => {
+  const displayStatusText = useMemo(() => {
+    if (standardNodeState === 'FAULT') return 'BLOWN';
+    if (standardNodeState === 'WARNING') return 'WARNING';
+    if (standardNodeState === 'NOMINAL' || standardNodeState === 'ENERGIZED' || standardNodeState === 'DEENERGIZED') return 'OK';
+    if (standardNodeState === 'OFFLINE') return 'OFFLINE';
+    return standardNodeState.replace(/_/g, ' ');
+  }, [standardNodeState]);
+
+  const sldAccentVar = 'var(--sld-color-accent)';
+
+  const FuseSymbolSVG = ({ className, isBlownVisual, color }: { className?: string, isBlownVisual?: boolean, color: string }) => {
     const lineVariants = {
       intact: { pathLength: 1, opacity: 1 },
-      brokenVisible: { pathLength: 0.4, opacity: 1 }, // For the first segment
-      brokenHidden: { pathLength: 0, opacity: 0 },   // For the middle segment that disappears
+      brokenVisible: { pathLength: 0.4, opacity: 1 },
+      brokenHidden: { pathLength: 0, opacity: 0 },
     };
     const crossVariants = {
         hidden: { opacity: 0, scale: 0.5 },
@@ -89,15 +107,13 @@ const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
     };
 
     return (
-      <motion.svg viewBox="0 0 24 12" width="36" height="18" className={className} initial={false}>
+      <motion.svg viewBox="0 0 24 12" width="36" height="18" className={className} initial={false} style={{ color }}>
         <rect x="2" y="2" width="20" height="8" rx="2" ry="2" stroke="currentColor" strokeWidth="1.5" fill="none" />
-        {!isBlown && <motion.line key="intact-line" x1="2" y1="6" x2="22" y2="6" stroke="currentColor" strokeWidth="1.5" variants={lineVariants} animate="intact" />}
-        {isBlown && (
+        {!isBlownVisual && <motion.line key="intact-line" x1="2" y1="6" x2="22" y2="6" stroke="currentColor" strokeWidth="1.5" variants={lineVariants} animate="intact" />}
+        {isBlownVisual && (
           <>
-            {/* Two segments of the broken line */}
             <motion.line key="blown-seg1" x1="2" y1="6" x2="10" y2="6" stroke="currentColor" strokeWidth="1.5" variants={lineVariants} animate="brokenVisible" />
             <motion.line key="blown-seg2" x1="14" y1="6" x2="22" y2="6" stroke="currentColor" strokeWidth="1.5" variants={lineVariants} animate="brokenVisible" />
-            {/* Crossed lines in the middle */}
             <motion.line key="cross1" x1="10" y1="4" x2="14" y2="8" stroke="currentColor" strokeWidth="1" variants={crossVariants} animate="visible" />
             <motion.line key="cross2" x1="10" y1="8" x2="14" y2="4" stroke="currentColor" strokeWidth="1" variants={crossVariants} animate="visible" />
           </>
@@ -108,105 +124,95 @@ const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
   
   const mainDivClasses = `
     sld-node fuse-node group custom-node-hover w-[60px] h-[75px] rounded-md shadow-md
-    flex flex-col items-center justify-between /* p-1.5 removed, moved to content wrapper */
-    border-2 ${derivedNodeStyles.borderColor ? '' : baseClasses.split(' ')[0]} 
-    /* specific bgClass from baseClasses, bg-card removed, moved to content wrapper */
-    /* transition-all duration-150 is part of custom-node-hover */
-    /* selected ring styles removed */
+    flex flex-col items-center justify-between
+    border-2
     ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-    /* hover:shadow-lg removed */
   `;
-  // effectiveSymbolColor and effectiveTextColor will be applied to the node-content-wrapper or inherited
   
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevStatusRef = useRef(processedStatus);
+  const prevStatusRef = useRef(standardNodeState);
 
   useEffect(() => {
-    if (prevStatusRef.current !== processedStatus) {
+    if (prevStatusRef.current !== standardNodeState) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
-      prevStatusRef.current = processedStatus;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700);
+      prevStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+  }, [standardNodeState]);
 
   return (
     <motion.div
-      className={mainDivClasses}
+      className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
       style={{
-        borderColor: derivedNodeStyles.borderColor || undefined, // Apply border from derived or let class handle
-        opacity: derivedNodeStyles.opacity || undefined,
-        // backgroundColor and color are now primarily for the node-content-wrapper
+        borderColor: appearance.borderColorVar,
+        opacity: data.opacity,
+        ringColor: selected ? sldAccentVar : 'transparent',
       }}
-      // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
-      // whileHover="hover" // Prefer CSS hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+      whileHover={{ scale: isNodeEditable ? 1.03 : 1.01 }}
     >
-      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
           size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
           onClick={(e) => {
-            e.stopPropagation(); // Prevent node selection
+            e.stopPropagation();
             const fullNodeObject: CustomNodeType = {
-                id, type, 
+                id, type: type as SLDElementType,
                 position: { x: xPos, y: yPos }, 
                 data, selected, 
-                width: undefined, height: undefined, 
+                width: width || undefined,
+                height: height || undefined,
                 connectable: isConnectable,
-                // dragging and zIndex are not part of CustomNodeType but are in props
-                dragging: props.dragging, 
-                zIndex: props.zIndex,
+                dragging: dragging,
+                zIndex: zIndex,
             };
             setSelectedElementForDetails(fullNodeObject);
           }}
           title="View Details"
         >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
+          <InfoIcon className="h-3 w-3" style={{ color: 'var(--sld-color-text-muted)'}} />
         </Button>
       )}
 
-      {/* Handles are outside node-content-wrapper */}
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
 
-      {/* node-content-wrapper for selection styles, padding, and internal layout */}
       <div 
         className={`node-content-wrapper flex flex-col items-center justify-between p-1.5 w-full h-full rounded-sm
-                    ${derivedNodeStyles.backgroundColor ? '' : baseClasses.split(' ')[1]} /* bg from baseClasses */
-                    ${derivedNodeStyles.color ? '' : baseClasses.split(' ')[2]} /* text color from baseClasses */
-                    bg-card dark:bg-neutral-800
                     ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
         style={{
-          backgroundColor: derivedNodeStyles.backgroundColor || undefined,
-          color: derivedNodeStyles.color || undefined, 
+          background: 'var(--sld-color-node-bg)',
+          color: appearance.textColorVar,
         }}
       >
-        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
-          {data.label} {/* Text color will be inherited from parent */}
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label} style={{color: appearance.textColorVar}}>
+          {data.label}
         </p>
         
         <div className="my-0.5 pointer-events-none relative">
-          {/* SVG color will be inherited from parent's text color */}
-          <FuseSymbolSVG className="transition-colors" isBlown={isBlown} /> 
-          {BlownOverlayIcon && (
+          <FuseSymbolSVG
+            className="transition-colors"
+            isBlownVisual={isBlownForSVG}
+            color={isBlownForSVG ? appearance.iconColorVar : appearance.mainStatusColorVar } // Fault color for blown, nominal/main for intact
+          />
+          {OverlayIconComponent && ( // This will be XCircle or AlertTriangle for FAULT/WARNING
               <motion.div 
                   initial={{ opacity: 0, scale: 0.5 }}
-                  animate={{ opacity: (isBlown || isWarning) ? 0.8 : 0, scale: (isBlown || isWarning) ? 1 : 0.5 }}
+                  animate={{ opacity: 1, scale: 1 }}
                   transition={{duration: 0.2}}
                   className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
               >
-                  {/* Icon color will be inherited */}
-                  <BlownOverlayIcon size={12} /> 
+                  <OverlayIconComponent size={12} style={{color: appearance.iconColorVar}}/>
               </motion.div>
           )}
         </div>
         
-        <p className="text-[9px] text-center truncate w-full leading-tight" title={data.config?.ratingAmps ? `${data.config.ratingAmps}A` : statusText}>
-          {data.config?.ratingAmps ? `${data.config.ratingAmps}A` : statusText}
+        <p className="text-[9px] text-center truncate w-full leading-tight" title={data.config?.ratingAmps ? `${data.config.ratingAmps}A` : displayStatusText} style={{color: appearance.statusTextColorVar}}>
+          {data.config?.ratingAmps ? `${data.config.ratingAmps}A` : displayStatusText}
         </p>
       </div>
     </motion.div>

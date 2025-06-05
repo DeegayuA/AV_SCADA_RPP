@@ -1,14 +1,21 @@
 // components/sld/nodes/ContactorNode.tsx
 import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
-import { motion } from 'framer-motion';
-import { ContactorNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld'; // Added CustomNodeType
+import { motion, AnimatePresence } from 'framer-motion'; // Added AnimatePresence
+import { ContactorNodeData, CustomNodeType, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added SLDElementType
 import { useAppStore } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, getDerivedStyle } from './nodeUtils';
-import { PowerIcon, PowerOffIcon, AlertTriangleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import {
+    // getDataPointValue,
+    applyValueMapping,
+    // getDerivedStyle, // To be replaced
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    NodeAppearance
+} from './nodeUtils';
+import { InfoIcon } from 'lucide-react'; // Keep InfoIcon for button
+import { Button } from "@/components/ui/button";
 
-import { useOpcUaNodeValue } from '@/stores/appStore'; // Import useOpcUaNodeValue
+import { useOpcUaNodeValue } from '@/stores/appStore';
 
 const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
   const { data, selected, isConnectable, id, type, xPos, yPos, zIndex, dragging } = props;
@@ -41,65 +48,55 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
     if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
       return applyValueMapping(reactiveStatusValue, statusLink);
     }
-    return data.status || 'open'; // Default to open
+    return data.status || 'open';
   }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
   
-  const isClosed = useMemo(() => {
+  const isContactorClosed = useMemo(() => { // Renamed to avoid conflict
     if (isClosedLink && isClosedDataPointConfig && reactiveIsClosedValue !== undefined) {
       const mappedValue = applyValueMapping(reactiveIsClosedValue, isClosedLink);
       return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || Number(mappedValue) === 1;
     }
-    // Fallback logic based on processedStatus
-    return processedStatus === 'closed' || processedStatus === 'energized';
+    return String(processedStatus).toLowerCase() === 'closed' || String(processedStatus).toLowerCase() === 'energized';
   }, [isClosedLink, isClosedDataPointConfig, reactiveIsClosedValue, processedStatus]);
 
+  const standardNodeState = useMemo(() => {
+    // If closed, assume it's energized for styling purposes unless status says FAULT/WARNING/OFFLINE
+    // If open, assume it's de-energized for styling unless status says FAULT/WARNING
+    const statusUpper = processedStatus?.toUpperCase();
+    if (statusUpper === 'FAULT' || statusUpper === 'ALARM') return 'FAULT';
+    if (statusUpper === 'WARNING') return 'WARNING';
+    if (statusUpper === 'OFFLINE') return 'OFFLINE';
 
-  const { borderClass, bgClass, textClass, Icon } = useMemo(() => {
-    if (processedStatus === 'fault' || processedStatus === 'alarm') 
-      return { borderClass: 'border-destructive', bgClass: 'bg-destructive/10', textClass: 'text-destructive', Icon: AlertTriangleIcon };
-    if (processedStatus === 'warning') 
-      return { borderClass: 'border-yellow-500', bgClass: 'bg-yellow-500/10', textClass: 'text-yellow-500', Icon: AlertTriangleIcon };
-    if (isClosed) 
-      return { borderClass: 'border-green-600', bgClass: 'bg-green-600/10', textClass: 'text-green-600', Icon: PowerIcon };
-    return { borderClass: 'border-neutral-400 dark:border-neutral-600', bgClass: 'bg-muted/30', textClass: 'text-muted-foreground', Icon: PowerOffIcon };
-  }, [processedStatus, isClosed]);
+    const isEnergizedAssumption = isContactorClosed; // If closed, style as energized path, else de-energized path
+    return getStandardNodeState(processedStatus, isEnergizedAssumption, !isContactorClosed, data.status);
+  }, [processedStatus, isContactorClosed, data.status]);
   
-  const derivedNodeStyles = useMemo(() => {
-    const primaryOpcUaValues: Record<string, string | number | boolean> = {};
-    if (statusOpcUaNodeId && reactiveStatusValue !== undefined) {
-      primaryOpcUaValues[statusOpcUaNodeId] = reactiveStatusValue;
-    }
-    if (isClosedOpcUaNodeId && reactiveIsClosedValue !== undefined) {
-      primaryOpcUaValues[isClosedOpcUaNodeId] = reactiveIsClosedValue;
-    }
-    return getDerivedStyle(data, dataPoints, primaryOpcUaValues, globalOpcUaNodeValues);
-  }, [data, dataPoints, statusOpcUaNodeId, reactiveStatusValue, isClosedOpcUaNodeId, reactiveIsClosedValue, globalOpcUaNodeValues]);
-  
-  const contactorSymbolColor = derivedNodeStyles.color || textClass;
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState, SLDElementType.Contactor), [standardNodeState]);
+  const IconComponent = useMemo(() => appearance.icon, [appearance.icon]);
+  const sldAccentVar = 'var(--sld-color-accent)';
 
-  // Combine classes and styles
+  const displayStatusText = useMemo(() => { // OPEN / CLOSED text
+    return isContactorClosed ? 'CLOSED' : 'OPEN';
+  }, [isContactorClosed]);
+
   const mainDivClasses = `
     sld-node contactor-node group custom-node-hover w-[60px] h-[80px] rounded-md shadow-md
-    flex flex-col items-center justify-between /* p-1 removed, moved to content wrapper */
-    border-2 ${derivedNodeStyles.borderColor ? '' : borderClass} 
-    /* specific bgClass, bg-card, textClass (via derivedNodeStyles) removed, moved to content wrapper */
-    /* transition-all duration-150 is part of custom-node-hover */
-    /* selected ring styles removed */
+    flex flex-col items-center justify-between
+    border-2
     ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-    /* hover:shadow-lg removed */
   `;
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevStatusRef = useRef(processedStatus);
+  const prevStatusRef = useRef(standardNodeState);
 
   useEffect(() => {
-    if (prevStatusRef.current !== processedStatus) {
+    if (prevStatusRef.current !== standardNodeState) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700); // Match animation duration
-      prevStatusRef.current = processedStatus;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 700);
+      prevStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+  }, [standardNodeState]);
 
   const handleInfoClick = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -120,18 +117,16 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
 
   return (
     <motion.div
-      className={mainDivClasses}
+      className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
       style={{ 
-        borderColor: derivedNodeStyles.borderColor || undefined, // Apply border from derived or let class handle
-        // backgroundColor and color are now primarily for the node-content-wrapper
-        opacity: derivedNodeStyles.opacity || undefined, // Apply opacity if derived
+        borderColor: appearance.borderColorVar,
+        ringColor: selected ? sldAccentVar : 'transparent',
+        opacity: data.opacity, // Apply opacity if available in data
       }}
-      // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
-      // whileHover="hover" // Prefer CSS hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
+      whileHover={{ scale: isNodeEditable ? 1.03 : 1.01 }}
     >
-      {/* Info Button: position absolute, kept outside node-content-wrapper */}
       {!isEditMode && (
         <Button
           variant="ghost"
@@ -140,74 +135,41 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
           onClick={handleInfoClick}
           title="View Details"
         >
-          <InfoIcon className="h-3 w-3 text-primary/80" />
+          <InfoIcon className="h-3 w-3" style={{ color: 'var(--sld-color-text-muted)'}} />
         </Button>
       )}
 
-      {/* Handles are outside node-content-wrapper */}
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
 
-      {/* node-content-wrapper for selection styles, padding, and internal layout */}
       <div 
         className={`node-content-wrapper flex flex-col items-center justify-between p-1 w-full h-full rounded-sm 
-                    ${derivedNodeStyles.backgroundColor ? '' : bgClass} 
-                    ${derivedNodeStyles.color ? '' : textClass}
-                    bg-card dark:bg-neutral-800
                     ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
         style={{
-          backgroundColor: derivedNodeStyles.backgroundColor || undefined, // Explicitly set from DPL or let class apply
-          color: derivedNodeStyles.color || undefined, // Explicitly set from DPL or let class apply
+          background: 'var(--sld-color-node-bg)',
+          color: appearance.textColorVar,
         }}
       >
-        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
-          {data.label} {/* Text color will be inherited */}
+        <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label} style={{color: appearance.textColorVar}}>
+          {data.label}
         </p>
         
-        <motion.svg 
-          viewBox="0 0 24 24" 
-          width="30" height="30" 
-          className="transition-colors duration-200" // textClass removed, color inherited
-          style={{ color: 'currentColor' }} // Inherits color from parent (node-content-wrapper)
-          initial={false}
+        <motion.div
+            className="my-1 flex items-center justify-center w-[30px] h-[30px]"
+            key={standardNodeState} // Re-render if icon changes
+            initial={{ opacity: 0.8, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2 }}
         >
-          <circle cx="6" cy="8" r="2" fill="currentColor" /> 
-          <circle cx="18" cy="8" r="2" fill="currentColor" />
-          <line x1="6" y1="8" x2="18" y2="8" stroke="currentColor" strokeWidth="1.5" />
-          
-          <motion.line
-            key={`left-contact-${isClosed}`}
-            x1="6" y1="10"
-            initial={false}
-            animate={isClosed ? { x2: 6, y2: 16 } : { x2: 6, y2: 13 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            stroke="currentColor" strokeWidth="1.5"
-          />
-          {!isClosed && (
-            <motion.line
-              key="left-angled-contact"
-              x1="6" y1="13" x2="8" y2="15"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.1, delay: 0.15 }}
-              stroke="currentColor" strokeWidth="1.5"
-            />
-          )}
-          
-          <motion.line
-            key={`right-contact-${isClosed}`}
-            x1="18" y1="10"
-            initial={false}
-            animate={isClosed ? { x2: 18, y2: 16 } : { x2: 18, y2: 16 }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
-            stroke="currentColor" strokeWidth="1.5"
-          />
-          
-          <rect x="4" y="16" width="16" height="3" rx="1" fill="currentColor" className="opacity-70"/>
-        </motion.svg>
+             <IconComponent
+                size={28}
+                className="transition-colors duration-200"
+                style={{ color: appearance.iconColorVar }}
+             />
+        </motion.div>
         
-        <p className="text-[9px] font-bold"> {/* Text color will be inherited */}
-          {isClosed ? 'CLOSED' : 'OPEN'}
+        <p className="text-[9px] font-bold" style={{ color: appearance.statusTextColorVar }}>
+          {displayStatusText}
         </p>
       </div>
     </motion.div>
