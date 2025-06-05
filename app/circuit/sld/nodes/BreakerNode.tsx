@@ -4,22 +4,31 @@ import { NodeProps, Handle, Position, XYPosition } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { BreakerNodeData, CustomNodeType } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
-import { applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { ZapOffIcon, ZapIcon, ShieldAlertIcon, ShieldCheckIcon, AlertTriangleIcon, InfoIcon, PowerIcon } from 'lucide-react';
+import {
+  applyValueMapping,
+  // formatDisplayValue, // May not be needed directly if status text comes from standard state
+  // getDerivedStyle, // Will be replaced by new system
+  getStandardNodeState,
+  getNodeAppearanceFromState,
+  NodeAppearance
+} from './nodeUtils';
+// Removed direct icon imports if NodeAppearance provides them, or keep if used elsewhere.
+// For now, assume specific icons like InfoIcon for button are still needed.
+import { InfoIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-const useIsDarkMode = () => {
-  const [isDark, setIsDark] = useState(() => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'));
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const cb = () => setIsDark(document.documentElement.classList.contains('dark'));
-    const observer = new MutationObserver(cb);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    cb();
-    return () => observer.disconnect();
-  }, []);
-  return isDark;
-};
+// const useIsDarkMode = () => { // CSS variables will handle dark mode
+//   const [isDark, setIsDark] = useState(() => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'));
+//   useEffect(() => {
+//     if (typeof window === 'undefined') return;
+//     const cb = () => setIsDark(document.documentElement.classList.contains('dark'));
+//     const observer = new MutationObserver(cb);
+//     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+//     cb();
+//     return () => observer.disconnect();
+//   }, []);
+//   return isDark;
+// };
 
 const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
   const { 
@@ -31,7 +40,7 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
   const nodeWidthFromData = data.width; 
   const nodeHeightFromData = data.height;
 
-  const isDarkMode = useIsDarkMode();
+  // const isDarkMode = useIsDarkMode(); // Replaced by CSS variables
 
   const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
@@ -60,116 +69,94 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
     if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
       return String(applyValueMapping(reactiveStatusValue, statusLink)).toLowerCase();
     }
-    return String(data.status || 'offline').toLowerCase();
+    return String(data.status || 'offline').toLowerCase(); // Keep this for now, might be used by getStandardNodeState
   }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
-  const isBreakerOpen = useMemo(() => {
+  const isBreakerOpenRaw = useMemo(() => { // Renamed to avoid immediate conflict
     if (isOpenLink && isOpenDataPointConfig && reactiveIsOpenValue !== undefined) {
       const mappedValue = applyValueMapping(reactiveIsOpenValue, isOpenLink);
       return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || String(mappedValue).toLowerCase() === 'open' || Number(mappedValue) === 1;
     }
-    // Fallback based on processedStatus or static config
-    if (processedStatus === 'open' || processedStatus === 'tripped') return true;
-    if (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized') return false;
-    
-    // Default to normally open if configured, otherwise default to closed if status unknown
+    const status = processedStatus; // Use the memoized processedStatus
+    if (status === 'open' || status === 'tripped') return true;
+    if (status === 'closed' || status === 'nominal' || status === 'energized') return false;
     return data.config?.normallyOpen ?? false; 
   }, [isOpenLink, isOpenDataPointConfig, reactiveIsOpenValue, processedStatus, data.config?.normallyOpen]);
 
-  // Descriptive status text for UI
-  const displayStatusText = useMemo(() => {
-    if (processedStatus === 'fault' || processedStatus === 'tripped') return "TRIPPED / FAULT";
-    if (processedStatus === 'alarm') return "ALARM";
-    if (processedStatus === 'warning') return "WARNING";
-    if (isBreakerOpen && (processedStatus === 'offline' || processedStatus === 'open')) return "OFFLINE / OPEN";
-    if (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized')) return "NOMINAL";
-    if (processedStatus === 'standby') return "STANDBY";
-    return String(processedStatus).toUpperCase(); // Default
-  }, [processedStatus, isBreakerOpen]);
-  
-  // Centralized UI styling based on state
-  const statusUiStyles = useMemo(() => {
-    let baseBorderClass = isDarkMode ? 'border-slate-600/70' : 'border-slate-300/80';
-    let iconColorClass = isDarkMode ? 'text-slate-400' : 'text-slate-500'; // For SVG
-    let textColorClass = isDarkMode ? 'text-slate-300' : 'text-slate-600'; // For status text
-    let baseBgStartColor = isDarkMode ? 'rgba(51, 65, 85, 0.75)' : 'rgba(248, 250, 252, 0.75)';
-    let baseBgEndColor = isDarkMode ? 'rgba(51, 65, 85, 0.65)' : 'rgba(248, 250, 252, 0.65)';
-    let glowRgb = isDarkMode ? '100, 116, 139' : '148, 163, 184'; // Neutral Slate
-    let mainStatusColorClass = textColorClass; // For "OPEN"/"CLOSED" text
-
-    if (processedStatus === 'fault' || processedStatus === 'tripped' || processedStatus === 'alarm') {
-      baseBorderClass = 'border-red-500/80 dark:border-red-500/70';
-      iconColorClass = 'text-red-500 dark:text-red-400';
-      textColorClass = 'text-red-600 dark:text-red-400 font-semibold';
-      mainStatusColorClass = iconColorClass;
-      glowRgb = '239, 68, 68'; // Red
-    } else if (processedStatus === 'warning') {
-      baseBorderClass = 'border-amber-500/80 dark:border-amber-400/70';
-      iconColorClass = 'text-amber-500 dark:text-amber-400';
-      textColorClass = 'text-amber-600 dark:text-amber-400 font-medium';
-      mainStatusColorClass = iconColorClass;
-      glowRgb = '245, 158, 11'; // Amber
-    } else if (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal' || processedStatus === 'energized')) { // Closed and healthy
-      baseBorderClass = 'border-green-600/80 dark:border-green-500/70';
-      iconColorClass = 'text-green-600 dark:text-green-500';
-      textColorClass = 'text-green-700 dark:text-green-400';
-      mainStatusColorClass = iconColorClass;
-      glowRgb = '34, 197, 94'; // Green
-    } else if (isBreakerOpen) { // Open, potentially offline
-      // Uses default slate border, but specific icon/text color if needed
-      iconColorClass = isDarkMode ? 'text-sky-400' : 'text-sky-500'; // Blue-ish for open/disconnected
-      mainStatusColorClass = iconColorClass;
-      // glowRgb remains slate for open/offline unless a more specific 'offline' glow is desired
+  // --- Standardized State and Appearance ---
+  const standardNodeState = useMemo(() => {
+    // For Breaker, isEnergized might be inferred or explicitly linked.
+    // Assuming 'processedStatus' can indicate energized states like 'ENERGIZED', 'NOMINAL'.
+    // Or, a separate 'isEnergized' link could be added if available.
+    // For now, let's infer: if status is 'nominal', 'closed', 'energized' and not open, it's energized.
+    // This logic might need refinement based on actual data point availability for 'isEnergized'.
+    let isEnergizedInferred: boolean | undefined = undefined;
+    if (processedStatus === 'energized' || processedStatus === 'nominal' || processedStatus === 'closed') {
+      isEnergizedInferred = true;
+    } else if (processedStatus === 'offline' || processedStatus === 'deenergized' || processedStatus === 'open') {
+      isEnergizedInferred = false;
     }
-    
-    return { 
-        baseBorderClass, iconColorClass, textColorClass, baseBgStartColor, baseBgEndColor, mainStatusColorClass,
-        glowColor: `rgba(${glowRgb}, 0.45)`,
-        activeGlowColor: `rgba(${glowRgb}, ${(!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal')) ? 0.35 : 0})`, // Breathing glow when closed & nominal
-    };
-  }, [processedStatus, isBreakerOpen, isDarkMode]);
+    // If an explicit 'isEnergized' link exists, it should take precedence.
+    // This part is left for future enhancement if a dedicated isEnergized DP is common for breakers.
 
-  const derivedNodeStyles = useMemo(() => getDerivedStyle(data, dataPoints, {}, globalOpcUaNodeValues), [data, dataPoints, globalOpcUaNodeValues]);
-  const electricCyan = 'hsl(190, 95%, 50%)';
+    return getStandardNodeState(processedStatus, isEnergizedInferred, isBreakerOpenRaw, data.status);
+  }, [processedStatus, isBreakerOpenRaw, data.status]);
+
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState), [standardNodeState]);
+
+  // Descriptive status text for UI - can be simplified if standardState is rich enough
+  const displayStatusText = useMemo(() => {
+    // You can customize this further based on standardNodeState if needed
+    if (standardNodeState === 'FAULT') return "TRIPPED / FAULT";
+    if (standardNodeState === 'WARNING') return "WARNING";
+    if (standardNodeState.includes('OFFLINE') || standardNodeState.includes('DEENERGIZED')) return "OFFLINE / OPEN";
+    if (standardNodeState.includes('ENERGIZED_CLOSED') || standardNodeState.includes('NOMINAL_CLOSED') || standardNodeState === 'NOMINAL' || standardNodeState === 'ENERGIZED') return "NOMINAL";
+    if (standardNodeState === 'STANDBY') return "STANDBY";
+    return standardNodeState.replace(/_/g, ' '); // Default, make it readable
+  }, [standardNodeState]);
+
+  // const derivedNodeStyles = useMemo(() => getDerivedStyle(data, dataPoints, {}, globalOpcUaNodeValues), [data, dataPoints, globalOpcUaNodeValues]); // Replaced by `appearance`
+  const sldAccentVar = 'var(--sld-color-accent)'; // For selection, from globals.css
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevDisplayStatusRef = useRef(displayStatusText);
+  const prevDisplayStatusRef = useRef(standardNodeState); // Track standard state for changes
   useEffect(() => {
-    if (prevDisplayStatusRef.current !== displayStatusText) {
+    if (prevDisplayStatusRef.current !== standardNodeState) { // Check standardNodeState
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 1200);
-      prevDisplayStatusRef.current = displayStatusText;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 1200); // Animation duration for highlight
+      prevDisplayStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
-  }, [displayStatusText]);
+  }, [standardNodeState]);
 
   const nodeMainStyle = useMemo((): React.CSSProperties => {
-    const dynamicBgStyle = {
-        '--bg-start-color': statusUiStyles.baseBgStartColor,
-        '--bg-end-color': statusUiStyles.baseBgEndColor,
-    } as React.CSSProperties;
+    // CSS variables for background are not directly settable like this in inline styles for gradients.
+    // We'll rely on global CSS or Tailwind utility for background.
+    // Forcing a re-render via a key or other state might be needed if bg vars change dynamically.
+    // However, the theme switch (.dark) should handle this at a higher level.
 
-    let currentBoxShadow = `0 0 7px 1.5px ${statusUiStyles.glowColor}`;
-    const isNominalClosed = !isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal');
+    let currentBoxShadow = `0 0 7px 1.5px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.45)').replace('var(','rgba(')}`;
+
+    const isNominalClosed = standardNodeState === 'ENERGIZED_CLOSED' || standardNodeState === 'NOMINAL_CLOSED';
     
     if (isNominalClosed && !selected && !isRecentStatusChange) {
-      // Breathing glow handled by framer-motion animate prop
+      // Breathing glow handled by framer-motion animate prop using CSS variable from appearance
     }
-    if (isRecentStatusChange) {
-        currentBoxShadow = `0 0 13px 3px ${statusUiStyles.glowColor.replace('0.45', '0.65')}`; 
+    if (isRecentStatusChange) { // Stronger glow for status change
+        currentBoxShadow = `0 0 13px 3px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.65)').replace('var(','rgba(')}`;
     }
-    if (selected) {
-        currentBoxShadow = `0 0 14px 2.5px ${electricCyan}, 0 0 4px 1px ${electricCyan} inset`;
+    if (selected) { // Selection glow using accent color
+        currentBoxShadow = `0 0 14px 2.5px ${sldAccentVar.replace(')', ', 0.7)').replace('var(','rgba(')}, 0 0 4px 1px ${sldAccentVar.replace(')', ', 0.5)').replace('var(','rgba(')} inset`;
     }
     
     return {
-      ...dynamicBgStyle,
-      borderColor: derivedNodeStyles.borderColor || statusUiStyles.baseBorderClass.split(' ').pop(),
+      borderColor: appearance.borderColorVar, // Use CSS variable string directly
       boxShadow: currentBoxShadow,
-      width: typeof nodeWidthFromData === 'number' ? `${nodeWidthFromData}px` : '70px', // Default width
-      height: typeof nodeHeightFromData === 'number' ? `${nodeHeightFromData}px` : '95px', // Default height
+      width: typeof nodeWidthFromData === 'number' ? `${nodeWidthFromData}px` : '70px',
+      height: typeof nodeHeightFromData === 'number' ? `${nodeHeightFromData}px` : '95px',
+      color: appearance.textColorVar, // Default text color for the node
     };
-  }, [statusUiStyles, derivedNodeStyles, selected, isRecentStatusChange, isBreakerOpen, processedStatus, electricCyan, nodeWidthFromData, nodeHeightFromData]);
+  }, [appearance, selected, isRecentStatusChange, standardNodeState, sldAccentVar, nodeWidthFromData, nodeHeightFromData]);
 
   const fullNodeObjectForDetails = useMemo((): CustomNodeType => ({
     id, type: type || '', position: nodePosition, data,
@@ -187,37 +174,37 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
         breaker-node group sld-node relative flex flex-col items-center justify-between 
         rounded-lg border backdrop-blur-sm
         transition-colors duration-300 ease-in-out
-        ${statusUiStyles.baseBorderClass} 
         ${isNodeEditable ? 'cursor-grab' : 'cursor-pointer'}
-        ${selected ? `ring-2 ring-offset-2 ring-[${electricCyan}] dark:ring-[${electricCyan}] ring-offset-black/10 dark:ring-offset-white/10 shadow-lg` : 'shadow-md'}
+        ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10 shadow-lg` : 'shadow-md'}
         overflow-hidden 
       `}
-      style={{
+      style={{ // Apply border color from JS, ring color from CSS var for selection
         ...nodeMainStyle,
-        background: `linear-gradient(to bottom, var(--bg-start-color), var(--bg-end-color))`
+        background: `linear-gradient(to bottom, var(--sld-color-node-bg), color-mix(in srgb, var(--sld-color-node-bg) 90%, black))`, // Example gradient
+        ringColor: selected ? sldAccentVar : 'transparent', // Selection ring
       }}
       initial={{ opacity: 0, scale: 0.88, y: 15 }}
       animate={{ 
         opacity: 1, scale: 1, y: 0,
-        boxShadow: (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal') && !selected && !isRecentStatusChange)
-          ? [ 
-              `0 0 8px 1.5px ${statusUiStyles.activeGlowColor.replace('0.35', '0.3')}`,
-              `0 0 12px 2.5px ${statusUiStyles.activeGlowColor.replace('0.35', '0.5')}`,
-              `0 0 8px 1.5px ${statusUiStyles.activeGlowColor.replace('0.35', '0.3')}`
+        boxShadow: (standardNodeState === 'ENERGIZED_CLOSED' || standardNodeState === 'NOMINAL_CLOSED') && !selected && !isRecentStatusChange
+          ? [ // Breathing glow for nominal closed state
+              `0 0 8px 1.5px ${appearance.mainStatusColorVar.replace(')', ', 0.3)').replace('var(','rgba(')}`,
+              `0 0 12px 2.5px ${appearance.mainStatusColorVar.replace(')', ', 0.5)').replace('var(','rgba(')}`,
+              `0 0 8px 1.5px ${appearance.mainStatusColorVar.replace(')', ', 0.3)').replace('var(','rgba(')}`
             ]
-          : nodeMainStyle.boxShadow 
+          : nodeMainStyle.boxShadow // Use calculated shadow for other states
       }} 
       exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.15, ease: "easeOut"} }}
-      transition={
-        (!isBreakerOpen && (processedStatus === 'closed' || processedStatus === 'nominal') && !selected && !isRecentStatusChange)
+      transition={ // Animation for breathing glow
+        (standardNodeState === 'ENERGIZED_CLOSED' || standardNodeState === 'NOMINAL_CLOSED') && !selected && !isRecentStatusChange
           ? { type: 'spring', stiffness: 260, damping: 22, boxShadow: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }
-          : { type: 'spring', stiffness: 280, damping: 25 }
+          : { type: 'spring', stiffness: 280, damping: 25 } // Default transition
       }
       whileHover={{ 
         scale: isNodeEditable ? 1.035 : 1.02,
         boxShadow: selected 
-            ? `0 0 18px 3.5px ${electricCyan}, 0 0 6px 1.5px ${electricCyan} inset`
-            : `0 0 15px 3.5px ${statusUiStyles.glowColor.replace('0.45', '0.6')}`
+            ? `0 0 18px 3.5px ${sldAccentVar.replace(')', ', 0.8)').replace('var(','rgba(')}, 0 0 6px 1.5px ${sldAccentVar.replace(')', ', 0.6)').replace('var(','rgba(')} inset`
+            : `0 0 15px 3.5px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.6)').replace('var(','rgba(')}`
       }}
       onClick={(e) => { 
          if (!isNodeEditable && !isEditMode) {
@@ -228,14 +215,14 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
     >
       <Handle 
         type="target" position={Position.Top} id="top_in" isConnectable={isConnectable}
-        className="!w-3 !h-3 !bg-slate-500/80 dark:!bg-slate-600/80 !border-slate-600 dark:!border-slate-500 shadow
-                   !rounded-full sld-handle-style hover:!scale-150 hover:!opacity-100 transition-all duration-150 z-10"
+        className="sld-handle-style" // Apply shared handle style from globals.css
+        style={{ background: appearance.mainStatusColorVar === 'var(--sld-color-deenergized)' ? 'var(--sld-color-handle-bg)' : appearance.mainStatusColorVar, borderColor: 'var(--sld-color-handle-border)'}}
         title="Input"
       />
       <Handle 
         type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable}
-        className="!w-3 !h-3 !bg-slate-500/80 dark:!bg-slate-600/80 !border-slate-600 dark:!border-slate-500 shadow
-                   !rounded-full sld-handle-style hover:!scale-150 hover:!opacity-100 transition-all duration-150 z-10"
+        className="sld-handle-style"
+        style={{ background: appearance.mainStatusColorVar === 'var(--sld-color-deenergized)' ? 'var(--sld-color-handle-bg)' : appearance.mainStatusColorVar, borderColor: 'var(--sld-color-handle-border)'}}
         title="Output"
       />
 
@@ -247,7 +234,7 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
           onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}
         >
           <InfoIcon className={`h-3.5 w-3.5 text-slate-500 dark:text-slate-400 
-                                group-hover/infobtn:text-[${electricCyan}] dark:group-hover/infobtn:text-[${electricCyan}] 
+                                group-hover/infobtn:text-[var(--sld-color-accent)]
                                 transition-colors duration-150`} /> 
         </Button>
       )}
@@ -258,7 +245,8 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
             <AnimatePresence mode="wait">
                 <motion.p
                     key={`desc-status-${displayStatusText}`}
-                    className={`text-[8px] font-medium tracking-tight leading-tight text-center w-full ${statusUiStyles.textColorClass} transition-colors duration-200`}
+                    className={`text-[8px] font-medium tracking-tight leading-tight text-center w-full transition-colors duration-200`}
+                    style={{ color: appearance.statusTextColorVar }}
                     title={`Status: ${displayStatusText}`}
                     initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18, ease: "easeInOut" }}
@@ -270,7 +258,8 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
         
         {/* Breaker Label */}
         <motion.p
-          className="text-xs font-bold leading-tight text-center w-full text-slate-800 dark:text-slate-100 transition-colors duration-200"
+          className="text-xs font-bold leading-tight text-center w-full transition-colors duration-200"
+          style={{ color: appearance.textColorVar }}
           title={`${data.label} (${breakerTypeLabel})`}
         >
           {data.label}
@@ -281,9 +270,9 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
           viewBox="0 0 24 24" 
           width="30" height="30" 
           className="flex-shrink-0 my-0.5" 
-          style={{ color: statusUiStyles.iconColorClass }}
+          style={{ color: appearance.iconColorVar }} // Main color for terminals and body
           initial={false}
-          animate={{ color: statusUiStyles.iconColorClass }} // Animate color change if needed
+          animate={{ color: appearance.iconColorVar }}
           transition={{duration: 0.3}}
         >
           {/* Terminals */}
@@ -293,25 +282,23 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
           <line x1="12" y1="8.2" x2="12" y2="11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           {/* Animated Breaker Arm */}
           <motion.line
-            key={isBreakerOpen ? "breaker-open-arm" : "breaker-closed-arm"}
-            x1="12" y1="12.5" /* Start point fixed slightly below center */
+            key={isBreakerOpenRaw ? "breaker-open-arm" : "breaker-closed-arm"}
+            x1="12" y1="12.5"
             initial={false}
-            animate={isBreakerOpen 
-                ? { x2: 18, y2: 9, strokeWidth: 2 } // Open state: angled, slightly thinner
-                : { x2: 12, y2: 15.8, strokeWidth: 2.2 } // Closed state: vertical to bottom terminal, slightly thicker
+            animate={isBreakerOpenRaw
+                ? { x2: 18, y2: 9, strokeWidth: 2, stroke: appearance.armColorVar || appearance.iconColorVar }
+                : { x2: 12, y2: 15.8, strokeWidth: 2.2, stroke: appearance.armColorVar || appearance.iconColorVar }
             }
             transition={{ type: "spring", stiffness: 300, damping: 20, duration: 0.25 }}
-            stroke="currentColor"
             strokeLinecap="round"
           />
-          {/* Center Body/Housing of the breaker arm pivot point */}
+          {/* Center Body/Housing */}
           <rect x="9" y="10.5" width="6" height="3" rx="1" fill="currentColor" className="opacity-70" />
-          {/* Connection point for closed state (hidden when open) */}
            <motion.circle 
             cx="12" cy="12.5" r="1.2" 
-            fill={isDarkMode ? "hsl(220,13%,25%)" : "hsl(220,13%,85%)"} // Darker/Lighter center dot
-            initial={{ opacity: isBreakerOpen ? 0 : 1 }}
-            animate={{ opacity: isBreakerOpen ? 0 : 1 }}
+            fill={"color-mix(in srgb, currentColor 30%, var(--sld-color-node-bg))"} // Mix with node background
+            initial={{ opacity: isBreakerOpenRaw ? 0 : 1 }}
+            animate={{ opacity: isBreakerOpenRaw ? 0 : 1 }}
             transition={{ duration: 0.1 }}
           />
         </motion.svg>
@@ -320,18 +307,21 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
         <div className="h-4 overflow-hidden">
             <AnimatePresence mode="wait">
                 <motion.p
-                    key={`main-status-${isBreakerOpen}`}
-                    className={`text-sm font-semibold leading-tight text-center w-full ${statusUiStyles.mainStatusColorClass} transition-colors duration-200`}
+                    key={`main-status-${isBreakerOpenRaw}`}
+                    className={`text-sm font-semibold leading-tight text-center w-full transition-colors duration-200`}
+                    style={{ color: appearance.mainStatusColorVar }}
                     initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: "easeInOut" }}
                 >
-                    {isBreakerOpen ? 'OPEN' : 'CLOSED'}
+                    {isBreakerOpenRaw ? 'OPEN' : 'CLOSED'}
                 </motion.p>
             </AnimatePresence>
         </div>
 
         {/* Trip Rating / Type */}
-        <p className="text-[9px] text-muted-foreground dark:text-slate-400/80 text-center truncate w-full leading-tight font-medium" title={tripRatingText}>
+        <p className="text-[9px] text-muted-foreground dark:text-slate-400/80 text-center truncate w-full leading-tight font-medium" title={tripRatingText}
+           style={{ color: appearance.textColorVar === 'var(--sld-color-text)' ? 'var(--color-muted-foreground)' : appearance.textColorVar }} // Use muted if main text is default
+        >
           {tripRatingText}
         </p>
       </div>

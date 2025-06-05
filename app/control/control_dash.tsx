@@ -646,7 +646,8 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
                 exportDpIds={powerGraphExportDpIds} 
                 exportMode={powerGraphExportMode} 
                 timeScale={graphTimeScale}
-                // useDemoData={useDemoDataForGraph}
+                isLive={isConnected && plcStatus === 'online'}
+                useDemoData={useDemoDataForGraph}
               />
             ) : ( 
               <div className="flex items-center justify-center h-[300px] text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode&&currentUserRole===UserRole.ADMIN&&" Click settings."}</p></div>

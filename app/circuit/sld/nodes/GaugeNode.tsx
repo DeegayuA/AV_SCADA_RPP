@@ -4,8 +4,15 @@ import { NodeProps, Handle, Position } from 'reactflow';
 import { motion } from 'framer-motion';
 import { BaseNodeData, CustomNodeType, DataPointLink, DataPoint } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, formatDisplayValue } from './nodeUtils';
-import { GaugeIcon } from 'lucide-react'; // Placeholder icon
+import {
+    getDataPointValue,
+    applyValueMapping,
+    formatDisplayValue,
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    NodeAppearance
+} from './nodeUtils';
+// GaugeIcon from lucide-react might not be used if appearance.icon is not rendered.
 
 // Define the data structure for GaugeNode
 export interface GaugeNodeData extends BaseNodeData {
@@ -143,16 +150,12 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
   const valueArcPath = describeArc(arcCenterX, arcCenterY, arcRadius, 0, valueArcAngle);
 
   const nodeWidth = 90;
-  const nodeHeight = 75; // Adjusted height
+  const nodeHeight = 75;
 
-  // Derive style properties from data point links or use defaults
-  const derivedNodeStyles = useMemo(() => {
-    return {
-      borderColor: data.config?.borderColor || 'inherit',
-      backgroundColor: data.config?.backgroundColor || '',
-      color: data.config?.textColor || ''
-    };
-  }, [data.config]);
+  // Get standardized appearance
+  const standardNodeState = useMemo(() => getStandardNodeState(null, null, null, "DATA_DISPLAY"), []);
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState), [standardNodeState]);
+  const sldAccentVar = 'var(--sld-color-accent)'; // For selection ring
 
   const [isRecentChange, setIsRecentChange] = useState(false);
   const prevFormattedValueRef = useRef(formattedValue);
@@ -170,56 +173,55 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
     <motion.div
       className={`
         sld-node gauge-node group custom-node-hover w-[${nodeWidth}px] h-[${nodeHeight}px] rounded-lg shadow-md
-        flex flex-col items-center justify-center /* p-1 removed */
-        border-2 border-neutral-400 dark:border-neutral-600 /* Base border, can be overridden by DPL */
-        /* bg-card removed, moved to content wrapper */
-        /* transition-all duration-150 is part of custom-node-hover */
-        /* selected ring styles removed */
+        flex flex-col items-center justify-center
+        border-2
         ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-        /* hover:shadow-lg removed */
+        ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}
       `}
-      style={{ borderColor: derivedNodeStyles.borderColor }} // Allow DPL to override border color
+      style={{
+        borderColor: appearance.borderColorVar,
+        ringColor: selected ? sldAccentVar : 'transparent',
+      }}
       title={data.label}
-      // whileHover={{ scale: isNodeEditable ? 1.03 : 1 }} // Prefer CSS hover effects
       initial={{ scale: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
-      {/* Handles are outside node-content-wrapper */}
-      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" />
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" />
-      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="sld-handle-style !-ml-1.5" />
-      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="sld-handle-style !-mr-1.5" />
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="target" position={Position.Left} id="left_in" isConnectable={isConnectable} className="sld-handle-style !-ml-1.5" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="source" position={Position.Right} id="right_out" isConnectable={isConnectable} className="sld-handle-style !-mr-1.5" style={{ background: 'var(--sld-color-handle-bg)', borderColor: 'var(--sld-color-handle-border)' }}/>
 
-      {/* node-content-wrapper for selection styles, padding, and internal layout */}
       <div className={`
           node-content-wrapper flex flex-col items-center justify-center p-1 w-full h-full rounded-sm
-          bg-card dark:bg-neutral-800 text-foreground
+          text-foreground
           ${isRecentChange ? 'animate-status-highlight' : ''}
         `}
         style={{ 
-          backgroundColor: derivedNodeStyles.backgroundColor, // Allow DPL to override background
-          color: derivedNodeStyles.color, // Allow DPL to override text color
+          background: 'var(--sld-color-node-bg)', // Use CSS variable for background
+          color: appearance.textColorVar, // Default text color from appearance
+          // The 'animate-status-highlight' might need its --current-glow-color set if it uses it
+          // For now, assuming it uses a generic accent from globals.css or its own definition
         }}
       >
-        <p className="text-[9px] font-semibold text-center truncate w-full px-1" title={data.label}>
+        <p className="text-[9px] font-semibold text-center truncate w-full px-1" title={data.label} style={{ color: appearance.textColorVar }}>
           {data.label}
         </p>
 
         <div className="relative flex flex-col items-center justify-center w-full">
           <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto max-h-[${svgHeight-10}px] mt-0.5">
-            <path d={backgroundArcPath} strokeDasharray="2 2" className="stroke-gray-300 dark:stroke-gray-600" strokeWidth={arcStrokeWidth-2} fill="none" />
+            <path d={backgroundArcPath} strokeDasharray="2 2" stroke="var(--sld-color-neutral-bg-dark)" strokeWidth={arcStrokeWidth-2} fill="none" />
             {numericValue !== null && (
-              <path d={valueArcPath} className="stroke-primary" strokeWidth={arcStrokeWidth} fill="none" strokeLinecap="round"/>
+              <path d={valueArcPath} style={{ stroke: appearance.mainStatusColorVar }} strokeWidth={arcStrokeWidth} fill="none" strokeLinecap="round"/>
             )}
           </svg>
           <div className="absolute flex flex-col items-center justify-center" style={{ top: arcCenterY - arcRadius - 5}}>
-              <span className="text-[12px] font-bold text-primary" title={`${formattedValue} ${displayUnit}`}>
+              <span className="text-[12px] font-bold" style={{ color: appearance.mainStatusColorVar }} title={`${formattedValue} ${displayUnit}`}>
                   {formattedValue}
               </span>
-              {displayUnit && <span className="text-[7px] text-muted-foreground -mt-0.5">{displayUnit}</span>}
+              {displayUnit && <span className="text-[7px] -mt-0.5" style={{ color: appearance.statusTextColorVar }}>{displayUnit}</span>}
           </div>
         </div>
-         <p className="text-[7px] text-muted-foreground text-center w-full mt-auto leading-tight" title={`Range: ${minVal} - ${maxVal}`}>
+         <p className="text-[7px] text-center w-full mt-auto leading-tight" title={`Range: ${minVal} - ${maxVal}`} style={{ color: appearance.statusTextColorVar }}>
           {minVal} ... {maxVal}
         </p>
       </div>

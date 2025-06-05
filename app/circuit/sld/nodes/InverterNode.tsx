@@ -4,28 +4,22 @@ import { NodeProps, Handle, Position, XYPosition } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InverterNodeData, CustomNodeType } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
-import { applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
 import { 
-    ZapIcon as DefaultZapIcon, // Renamed to avoid conflict if ZapIcon from lucide is used directly
-    RefreshCwIcon, AlertTriangleIcon, InfoIcon, 
+    applyValueMapping,
+    formatDisplayValue,
+    // getDerivedStyle, // To be replaced
+    getStandardNodeState,
+    getNodeAppearanceFromState,
+    NodeAppearance
+} from './nodeUtils';
+import {
+    InfoIcon,
     ArrowDown01Icon, ArrowUp01Icon, ThermometerIcon, ActivityIcon,
-    ChevronRightIcon, SlidersHorizontalIcon, ZapOffIcon, PowerIcon 
-} from 'lucide-react';
+    ChevronRightIcon, SlidersHorizontalIcon
+} from 'lucide-react'; // Keep icons used for specific UI elements within the node
 import { Button } from "@/components/ui/button";
 
-// Helper for theme detection (remains the same)
-const useIsDarkMode = () => {
-  const [isDark, setIsDark] = useState(() => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'));
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const cb = () => setIsDark(document.documentElement.classList.contains('dark'));
-    const observer = new MutationObserver(cb);
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    cb();
-    return () => observer.disconnect();
-  }, []);
-  return isDark;
-};
+// const useIsDarkMode = () => { ... }; // To be removed
 
 const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
   const { 
@@ -37,7 +31,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
   const nodeWidthFromData = data.width; 
   const nodeHeightFromData = data.height;
 
-  const isDarkMode = useIsDarkMode();
+  // const isDarkMode = useIsDarkMode(); // To be removed
 
   const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
@@ -98,30 +92,47 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
   const ratedPowerKw = useMemo(() => data.config?.ratedPower, [data.config?.ratedPower]);
   
   // Is considered active if status is one of the active ones AND power is not negative (consuming)
-  const isDeviceActive = useMemo(() => 
-    ['running', 'online', 'nominal', 'active', 'inverting'].includes(processedStatus) && 
-    (currentNumericAcPower === undefined || currentNumericAcPower >= 0), // Undefined power still counts as active if status says so
-  [processedStatus, currentNumericAcPower]);
+  const isDeviceActive = useMemo(() => {
+    // Inferring active state: if status suggests activity and power isn't negative.
+    // This might need a dedicated 'isInverting' data point for precision.
+    const activeStatuses = ['running', 'online', 'nominal', 'active', 'inverting', 'producing'];
+    return activeStatuses.includes(processedStatus) && (currentNumericAcPower === undefined || currentNumericAcPower >= 0);
+  }, [processedStatus, currentNumericAcPower]);
 
-  const acPowerRatio = useMemo(() => { // Used for animation intensity, 0 to 1
+  const standardNodeState = useMemo(() => {
+    // Map component's specific logic to the standardized states
+    if (processedStatus === 'fault' || processedStatus === 'alarm') return 'FAULT';
+    if (processedStatus === 'warning') return 'WARNING';
+    if (processedStatus === 'offline') return 'OFFLINE';
+    if (processedStatus === 'standby' || processedStatus === 'idle') return 'STANDBY';
+    if (isDeviceActive) return 'ENERGIZED'; // Or 'NOMINAL' if 'ENERGIZED' is too strong for general active
+    return 'UNKNOWN'; // Fallback
+  }, [processedStatus, isDeviceActive]);
+
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState), [standardNodeState]);
+  const StatusIconComponent = useMemo(() => appearance.icon, [appearance.icon]);
+
+  const acPowerRatio = useMemo(() => {
     if (ratedPowerKw && ratedPowerKw > 0 && currentNumericAcPower !== undefined && currentNumericAcPower >= 0) {
       return Math.min(1, currentNumericAcPower / ratedPowerKw);
     }
-    return 0; // Default to 0 if no rated power or current power for ratio calculation
-  }, [currentNumericAcPower, ratedPowerKw]);
+    return isDeviceActive ? 0.5 : 0; // Default if no rating, but active
+  }, [currentNumericAcPower, ratedPowerKw, isDeviceActive]);
 
   const displayStatusText = useMemo(() => {
-    if (['fault', 'alarm'].includes(processedStatus)) return "FAULT";
-    if (processedStatus === 'warning') return "WARNING";
-    if (processedStatus === 'offline') return "OFFLINE";
-    if (processedStatus === 'standby' || processedStatus === 'idle') return "STANDBY";
-    if (isDeviceActive) return "ACTIVE"; // General active state
-    // Fallback to uppercased processedStatus if none of the above match
-    return String(processedStatus).toUpperCase();
-  }, [processedStatus, isDeviceActive]);
+    if (standardNodeState === 'FAULT') return "FAULT";
+    if (standardNodeState === 'WARNING') return "WARNING";
+    if (standardNodeState === 'OFFLINE') return "OFFLINE";
+    if (standardNodeState === 'STANDBY') return "STANDBY";
+    if (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') {
+      // Could add more detail like "INVERTING" if a specific DP confirms it
+      return "ACTIVE";
+    }
+    return standardNodeState.replace(/_/g, ' '); // Default readable format
+  }, [standardNodeState]);
 
   const temperatureValue = useMemo(() => {
-    if (!tempLink || reactiveTempValue === undefined) return null; // Ensure reactiveTempValue is defined
+    if (!tempLink || reactiveTempValue === undefined) return null;
     const mappedValue = applyValueMapping(reactiveTempValue, tempLink);
     if (typeof mappedValue === 'number') return mappedValue;
     const parsed = parseFloat(String(mappedValue));
@@ -135,145 +146,66 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     return null;
   }, [temperatureValue, tempLink, tempDpConfig]);
 
-  const tempStatus = useMemo(() => { // For styling temperature
+  const tempStatus = useMemo(() => {
     if (temperatureValue === null) return 'normal';
-    const warnTemp = data.config?.warningTemperature ?? 55; // Example default
-    const maxTemp = data.config?.maxOperatingTemperature ?? 70; // Example default
+    const warnTemp = data.config?.warningTemperature ?? 55;
+    const maxTemp = data.config?.maxOperatingTemperature ?? 70;
     if (maxTemp && temperatureValue >= maxTemp) return 'critical';
     if (warnTemp && temperatureValue >= warnTemp) return 'warning';
     return 'normal';
   }, [temperatureValue, data.config]);
-
-  const StatusIconComponent = useMemo(() => {
-    if (['fault', 'alarm'].includes(processedStatus)) return AlertTriangleIcon;
-    if (processedStatus === 'warning') return AlertTriangleIcon;
-    if (processedStatus === 'offline') return ZapOffIcon;
-    if (processedStatus === 'standby' || processedStatus === 'idle') return PowerIcon; // Using PowerIcon for standby
-    if (isDeviceActive) return RefreshCwIcon; // Main active icon
-    return DefaultZapIcon; // Default for other states
-  }, [processedStatus, isDeviceActive]);
   
-  const statusUiStyles = useMemo(() => {
-    let baseBorderClass = isDarkMode ? 'border-slate-600/70' : 'border-slate-300/80';
-    let iconColorClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-    let statusTextColorClass = isDarkMode ? 'text-slate-300' : 'text-slate-600';
-    let baseBgStartColor = isDarkMode ? 'rgba(51, 65, 85, 0.78)' : 'rgba(248, 250, 252, 0.78)'; // Darker for inverter body
-    let baseBgEndColor = isDarkMode ? 'rgba(51, 65, 85, 0.68)' : 'rgba(248, 250, 252, 0.68)';   
-    let glowRgb = isDarkMode ? '100, 116, 139' : '148, 163, 184'; // Neutral slate glow
-    let activeGlowRgb = glowRgb;
-    
-    // Power text colors based on active state more than fault state
-    let powerColorClass = isDeviceActive 
-        ? (isDarkMode ? 'text-sky-300' : 'text-sky-600') 
-        : (isDarkMode ? 'text-slate-400' : 'text-slate-500');
-    let powerIconColorClass = powerColorClass;
+  // Determine color for temperature based on its status, overriding main status if critical/warning
+  const currentTempColorVar = useMemo(() => {
+    if (tempStatus === 'critical') return 'var(--sld-color-fault)';
+    if (tempStatus === 'warning') return 'var(--sld-color-warning)';
+    return appearance.statusTextColorVar; // Default to current status text color
+  }, [tempStatus, appearance.statusTextColorVar]);
 
-    let tempColorClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-    let tempIconColorClass = tempColorClass;
-    
-    let acDetailsIconColorClass = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-    
-    if (['fault', 'alarm'].includes(processedStatus)) {
-      baseBorderClass = 'border-red-500/80 dark:border-red-500/70'; 
-      iconColorClass = 'text-red-500 dark:text-red-400';
-      statusTextColorClass = 'text-red-600 dark:text-red-400 font-semibold';
-      glowRgb = '239, 68, 68'; // Red glow
-      // For fault/alarm, power/temp texts also take on error color
-      powerColorClass = iconColorClass; 
-      powerIconColorClass = iconColorClass;
-      tempColorClass = iconColorClass;
-      tempIconColorClass = iconColorClass;
-      acDetailsIconColorClass = iconColorClass;
-    } else if (processedStatus === 'warning') {
-      baseBorderClass = 'border-amber-500/80 dark:border-amber-400/70'; 
-      iconColorClass = 'text-amber-500 dark:text-amber-400';
-      statusTextColorClass = 'text-amber-600 dark:text-amber-400 font-medium';
-      glowRgb = '245, 158, 11'; // Amber glow
-      // For warning, power/temp texts also take on warning color
-      powerColorClass = iconColorClass;
-      powerIconColorClass = iconColorClass;
-      tempColorClass = iconColorClass;
-      tempIconColorClass = iconColorClass;
-      acDetailsIconColorClass = iconColorClass;
-    } else if (isDeviceActive) {
-      baseBorderClass = 'border-sky-500/80 dark:border-sky-400/70'; 
-      iconColorClass = isDarkMode ? 'text-sky-300' : 'text-sky-500';
-      statusTextColorClass = isDarkMode ? 'text-sky-200' : 'text-sky-600';
-      glowRgb = isDarkMode ? '56, 189, 248' : '14, 165, 233'; // Sky blue glow
-      // Dynamic power color brightness based on ratio already handled for powerColorClass
-      acDetailsIconColorClass = iconColorClass; 
-    }
-    // Active glowRgb should be the one for the current state
-    activeGlowRgb = glowRgb; 
-
-    // Temperature specific styling (can override fault/warning if critical/warning temp)
-    if (tempStatus === 'critical' && !['fault', 'alarm'].includes(processedStatus)) { 
-      tempColorClass = isDarkMode ? 'text-red-400' : 'text-red-500'; 
-      tempIconColorClass = tempColorClass; 
-    } else if (tempStatus === 'warning' && !['fault', 'alarm', 'warning'].includes(processedStatus)) { 
-      tempColorClass = isDarkMode ? 'text-amber-400' : 'text-amber-500'; 
-      tempIconColorClass = tempColorClass;
-    }
-
-    return { 
-        baseBorderClass, iconColorClass, statusTextColorClass, baseBgStartColor, baseBgEndColor,
-        glowColor: `rgba(${glowRgb}, 0.45)`, 
-        activeGlowColor: `rgba(${activeGlowRgb}, ${isDeviceActive ? 0.35 : 0})`, // Breathing glow only when active
-        powerColorClass, powerIconColorClass, tempColorClass, tempIconColorClass, acDetailsIconColorClass
-    };
-  }, [processedStatus, isDarkMode, isDeviceActive, tempStatus, acPowerRatio]); // Removed currentNumericAcPower to avoid re-calc if only power value changes but active state remains.
 
   const animationRotateDuration = useMemo(() => {
-    if (!isDeviceActive || StatusIconComponent !== RefreshCwIcon) return 0; // No rotation if not active or not the Refresh icon
-    const baseDuration = 10; // Slower base rotation
-    const minDuration = 1.5;  // Faster minimum for high power
-    const maxDuration = 12; // Slower maximum for zero/low power or if undefined
+    if (!isDeviceActive || StatusIconComponent.displayName !== 'RefreshCwIcon') return 0;
+    const baseDuration = 10;
+    const minDuration = 1.5;
+    const maxDuration = 12;
     if (currentNumericAcPower === undefined || currentNumericAcPower <= 0) return maxDuration;
-    // Scale speed based on acPowerRatio (0 to 1)
-    // Higher ratio = faster rotation (smaller duration)
-    return Math.max(minDuration, baseDuration / (1 + acPowerRatio * 3)); // Apply factor to ratio effect
+    return Math.max(minDuration, baseDuration / (1 + acPowerRatio * 3));
   }, [currentNumericAcPower, acPowerRatio, isDeviceActive, StatusIconComponent]);
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevDisplayStatusRef = useRef(displayStatusText);
+  const prevDisplayStatusRef = useRef(standardNodeState); // Track standardNodeState
   useEffect(() => {
-    if (prevDisplayStatusRef.current !== displayStatusText) {
+    if (prevDisplayStatusRef.current !== standardNodeState) {
       setIsRecentStatusChange(true);
       const timer = setTimeout(() => setIsRecentStatusChange(false), 1200); 
-      prevDisplayStatusRef.current = displayStatusText; return () => clearTimeout(timer);
+      prevDisplayStatusRef.current = standardNodeState; return () => clearTimeout(timer);
     }
-  }, [displayStatusText]);
+  }, [standardNodeState]);
 
-  const derivedNodeStyles = useMemo(() => getDerivedStyle(data, dataPoints, {}, globalOpcUaNodeValues), [data, dataPoints, globalOpcUaNodeValues]);
-  const electricCyan = 'hsl(190, 95%, 50%)'; 
+  const sldAccentVar = 'var(--sld-color-accent)';
 
   const nodeMainStyle = useMemo((): React.CSSProperties => {
-    const dynamicBgStyle = { 
-        '--bg-start-color': statusUiStyles.baseBgStartColor, 
-        '--bg-end-color': statusUiStyles.baseBgEndColor 
-    } as React.CSSProperties;
-
-    let currentBoxShadow = `0 0 8px 1.8px ${statusUiStyles.glowColor}`; // Base glow
+    let currentBoxShadow = `0 0 8px 1.8px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.45)').replace('var(','rgba(')}`;
     if (isDeviceActive && !selected && !isRecentStatusChange) {
-      // Breathing glow handled by framer-motion animate prop
+      // Breathing glow handled by framer-motion
     }
     if (isRecentStatusChange) {
-        currentBoxShadow = `0 0 14px 3.5px ${statusUiStyles.glowColor.replace('0.45', '0.7')}`; // Stronger pulse for status change
+        currentBoxShadow = `0 0 14px 3.5px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.7)').replace('var(','rgba(')}`;
     }
     if (selected) {
-        currentBoxShadow = `0 0 16px 3px ${electricCyan}, 0 0 5px 1.5px ${electricCyan} inset`;
+        currentBoxShadow = `0 0 16px 3px ${sldAccentVar.replace(')', ', 0.7)').replace('var(','rgba(')}, 0 0 5px 1.5px ${sldAccentVar.replace(')', ', 0.5)').replace('var(','rgba(')} inset`;
     }
     
     return {
-      ...dynamicBgStyle, 
-      borderColor: derivedNodeStyles.borderColor || statusUiStyles.baseBorderClass.split(' ').pop(), // Get the actual color name
+      borderColor: appearance.borderColorVar,
       boxShadow: currentBoxShadow, 
+      color: appearance.textColorVar, // Default text color for node label
       minWidth: '130px', 
-      minHeight: hasAnyAcDetailLinks ? '120px' : '100px', // Keep adjusted height
+      minHeight: hasAnyAcDetailLinks ? '120px' : '100px',
       ...(nodeWidthFromData && { width: `${nodeWidthFromData}px` }), 
       ...(nodeHeightFromData && { height: `${nodeHeightFromData}px` }),
     };
-  }, [statusUiStyles, derivedNodeStyles, selected, isRecentStatusChange, isDeviceActive, electricCyan, nodeWidthFromData, nodeHeightFromData, hasAnyAcDetailLinks]);
+  }, [appearance, selected, isRecentStatusChange, isDeviceActive, sldAccentVar, nodeWidthFromData, nodeHeightFromData, hasAnyAcDetailLinks]);
   
   const fullNodeObjectForDetails = useMemo((): CustomNodeType => ({
     id, type: type || '', position: nodePosition, data, selected: selected || false, 
@@ -305,23 +237,23 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
         inverter-node group sld-node relative flex flex-col items-center 
         rounded-lg border backdrop-blur-sm 
         transition-all duration-300 ease-in-out
-        ${statusUiStyles.baseBorderClass} 
         ${isNodeEditable ? 'cursor-grab' : (hasAnyAcDetailLinks || !isEditMode ? 'cursor-pointer' : 'cursor-default')} 
-        ${selected ? `ring-2 ring-offset-2 ring-[${electricCyan}] dark:ring-[${electricCyan}] ring-offset-black/10 dark:ring-offset-white/10 shadow-xl` : 'shadow-md'} 
+        ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10 shadow-xl` : 'shadow-md'}
         overflow-hidden
       `}
       style={{ 
         ...nodeMainStyle, 
-        background: `linear-gradient(to bottom, var(--bg-start-color), var(--bg-end-color))`
+        background: `linear-gradient(to bottom, var(--sld-color-node-bg), color-mix(in srgb, var(--sld-color-node-bg) 90%, black))`,
+        ringColor: selected ? sldAccentVar : 'transparent',
       }}
       initial={{ opacity: 0, scale: 0.88, y: 18 }} 
       animate={{ 
-          opacity: 1, scale: 1, y: 0, height: nodeMainStyle.height, // Animate height if it changes
+          opacity: 1, scale: 1, y: 0, height: nodeMainStyle.height,
           boxShadow: isDeviceActive && !selected && !isRecentStatusChange 
-            ? [ // Breathing glow animation for active state
-                `0 0 9px 2px ${statusUiStyles.activeGlowColor.replace('0.35', '0.3')}`, 
-                `0 0 14px 3px ${statusUiStyles.activeGlowColor.replace('0.35', '0.5')}`, 
-                `0 0 9px 2px ${statusUiStyles.activeGlowColor.replace('0.35', '0.3')}`
+            ? [
+                `0 0 9px 2px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.3)').replace('var(','rgba(')}`,
+                `0 0 14px 3px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.5)').replace('var(','rgba(')}`,
+                `0 0 9px 2px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.3)').replace('var(','rgba(')}`
               ]
             : nodeMainStyle.boxShadow 
       }} 
@@ -334,32 +266,29 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
       whileHover={{ 
         scale: isNodeEditable ? 1.04 : ((hasAnyAcDetailLinks || !isEditMode) ? 1.03 : 1.015),
         boxShadow: selected 
-            ? `0 0 20px 4px ${electricCyan}, 0 0 7px 2px ${electricCyan} inset`
-            : `0 0 18px 4px ${statusUiStyles.glowColor.replace('0.45', '0.65')}`
+            ? `0 0 20px 4px ${sldAccentVar.replace(')', ', 0.8)').replace('var(','rgba(')}, 0 0 7px 2px ${sldAccentVar.replace(')', ', 0.6)').replace('var(','rgba(')} inset`
+            : `0 0 18px 4px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.65)').replace('var(','rgba(')}`
       }}
       // onClick for details should be handled by the AC strip or info button if present, otherwise on the node itself
       onClick={(!hasAnyAcDetailLinks && !isEditMode && !isNodeEditable) ? handleDetailsClick : undefined}
     >
-      {/* DC Input Handle (Top) - Orange for DC */}
       <Handle 
         type="target" position={Position.Top} id="top_dc_in" isConnectable={isConnectable} 
-        className="!w-3 !h-3 !bg-orange-500/90 dark:!bg-orange-600/90 !border-orange-600 dark:!border-orange-500 shadow
-                   !rounded-full sld-handle-style hover:!scale-150 hover:!opacity-100 transition-all duration-150 z-10"
+        className="sld-handle-style"
+        style={{ background: 'var(--sld-color-standby)', borderColor: 'var(--sld-color-handle-border)' }} // Example DC color
         title="DC Input"
       >
         <ArrowDown01Icon size={8} className="text-white/90 dark:text-black/80 stroke-[3]" />
       </Handle>
-      {/* AC Output Handle (Bottom) - Sky Blue for AC */}
       <Handle 
         type="source" position={Position.Bottom} id="bottom_ac_out" isConnectable={isConnectable} 
-        className="!w-3 !h-3 !bg-sky-500/90 dark:!bg-sky-600/90 !border-sky-600 dark:!border-sky-500 shadow
-                   !rounded-full sld-handle-style hover:!scale-150 hover:!opacity-100 transition-all duration-150 z-10"
+        className="sld-handle-style"
+        style={{ background: appearance.mainStatusColorVar, borderColor: 'var(--sld-color-handle-border)' }} // AC color from status
         title="AC Output"
       >
         <ArrowUp01Icon size={8} className="text-white/90 dark:text-black/80 stroke-[3]" />
       </Handle>
 
-      {/* Info Button */}
       {!isEditMode && (
         <Button variant="ghost" size="icon" title="View Details" 
           className="absolute top-1 right-1 h-6 w-6 rounded-full z-30 group/infobtn
@@ -368,7 +297,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
           onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}
         >
           <InfoIcon className={`h-3.5 w-3.5 text-slate-500 dark:text-slate-400 
-                                group-hover/infobtn:text-[${electricCyan}] dark:group-hover/infobtn:text-[${electricCyan}] 
+                                group-hover/infobtn:text-[var(--sld-color-accent)]
                                 transition-colors duration-150`} /> 
         </Button>
       )}
@@ -377,23 +306,22 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
         className="flex flex-col items-center w-full h-full px-2 py-1.5 space-y-1 pointer-events-none"
         style={{ justifyContent: hasAnyAcDetailLinks ? 'space-between' : 'center' }} 
       > 
-        {/* Top group: Icon, Status, Label */}
         <div className="flex flex-col items-center space-y-0.5">
             <div className="relative h-9 w-9 flex items-center justify-center">
                 <AnimatePresence mode="wait">
                     <motion.div 
-                        key={`${StatusIconComponent.displayName || StatusIconComponent.name}-${processedStatus}`} // Key ensures re-render on icon/status change
+                        key={standardNodeState}
                         initial={{ opacity:0, y:10, scale:0.7 }} 
                         animate={{ 
                             opacity:1, y:0, scale:1, 
-                            rotate: (isDeviceActive && StatusIconComponent === RefreshCwIcon) ? 360 : 0,
-                            filter: (isDeviceActive && StatusIconComponent === RefreshCwIcon) 
+                            rotate: (isDeviceActive && StatusIconComponent.displayName === 'RefreshCwIcon') ? 360 : 0,
+                            filter: (isDeviceActive && StatusIconComponent.displayName === 'RefreshCwIcon')
                                 ? `brightness(${0.9 + acPowerRatio * 0.6}) saturate(${1 + acPowerRatio * 0.4})` 
                                 : 'none'
                         }} 
                         exit={{ opacity:0, y:-10, scale:0.7, transition:{duration:0.15, ease:"easeIn"} }} 
                         transition={
-                            (isDeviceActive && StatusIconComponent === RefreshCwIcon)
+                            (isDeviceActive && StatusIconComponent.displayName === 'RefreshCwIcon')
                             ? { rotate: { loop: Infinity, ease:"linear", duration: animationRotateDuration }, default: {type:'spring', stiffness:190, damping:16}, filter: { duration: 0.4} }
                             : { type:'spring', stiffness:190, damping:16 }
                         }
@@ -401,42 +329,39 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                     >
                         <StatusIconComponent 
                             size={28} 
-                            className={`${statusUiStyles.iconColorClass} transition-colors duration-300`} 
+                            style={{ color: appearance.iconColorVar }}
+                            className="transition-colors duration-300"
                             strokeWidth={
-                                StatusIconComponent === AlertTriangleIcon ? 2.3 
-                                : ((isDeviceActive && StatusIconComponent === RefreshCwIcon) ? 1.8 + (acPowerRatio * 0.6) : 1.8)
+                                standardNodeState === 'FAULT' || standardNodeState === 'WARNING' ? 2.3
+                                : ((isDeviceActive && StatusIconComponent.displayName === 'RefreshCwIcon') ? 1.8 + (acPowerRatio * 0.6) : 1.8)
                             } 
                         />
                     </motion.div>
                 </AnimatePresence>
-                {/* Pulse effect for active RefreshCwIcon */}
-                {isDeviceActive && StatusIconComponent === RefreshCwIcon && (
+                {isDeviceActive && StatusIconComponent.displayName === 'RefreshCwIcon' && (
                     <motion.div
                         className="absolute inset-[-5px] rounded-full"
                         style={{
-                            boxShadow: `0 0 ${6 + acPowerRatio * 12}px ${2 + acPowerRatio * 4}px ${
-                                statusUiStyles.iconColorClass.includes('sky') 
-                                ? (isDarkMode ? 'hsla(197, 88%, 75%, 0.25)' : 'hsla(197, 80%, 65%, 0.2)')
-                                : 'transparent' // Only glow if sky-colored (active)
-                            }`
+                            boxShadow: `0 0 ${6 + acPowerRatio * 12}px ${2 + acPowerRatio * 4}px ${appearance.glowColorVar || appearance.iconColorVar.replace(')',', 0.25)').replace('var(','rgba(')}`
                         }}
                         animate={{
                             scale: [1, 1.03 + acPowerRatio * 0.2, 1],
                             opacity: [0.3 + acPowerRatio * 0.25, 0.6 + acPowerRatio * 0.3, 0.3 + acPowerRatio * 0.25]
                         }}
                         transition={{
-                            duration: Math.max(0.8, 2.5 - acPowerRatio * 1.5), // Slower, more gentle pulse
+                            duration: Math.max(0.8, 2.5 - acPowerRatio * 1.5),
                             repeat: Infinity,
                             ease: "easeInOut" 
                         }}
                     />
                 )}
             </div>
-            <div className="h-4 overflow-hidden mt-0.5"> {/* Ensure consistent height for status text animation */}
+            <div className="h-4 overflow-hidden mt-0.5">
                 <AnimatePresence mode="wait">
                     <motion.p 
                         key={`status-${displayStatusText}`} 
-                        className={`text-xs font-semibold tracking-tight leading-tight text-center w-full ${statusUiStyles.statusTextColorClass} transition-colors duration-200`} 
+                        className={`text-xs font-semibold tracking-tight leading-tight text-center w-full transition-colors duration-200`}
+                        style={{ color: appearance.statusTextColorVar }}
                         title={`Status: ${displayStatusText}`} 
                         initial={{ opacity:0, y:6 }} 
                         animate={{ opacity:1, y:0 }} 
@@ -448,22 +373,22 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                 </AnimatePresence>
             </div>
             <motion.p 
-                className={`text-sm font-bold leading-tight text-center w-full text-slate-800 dark:text-slate-100 transition-colors duration-200 mt-0.5`} 
+                className={`text-sm font-bold leading-tight text-center w-full transition-colors duration-200 mt-0.5`}
+                style={{ color: appearance.textColorVar }}
                 title={data.label}
             >
                 {data.label}
             </motion.p>
         </div>
         
-        {/* Middle group: Power and Temp */}
         <div className="flex flex-col items-center space-y-0.5">
-            {/* AC Power Output display */}
             <div className="flex items-center justify-center space-x-1 text-xs font-medium" title={`AC Power: ${formattedAcPowerOutputWithContext}`}> 
-                <ActivityIcon size={12} className={`${statusUiStyles.powerIconColorClass} transition-colors duration-200`} />
+                <ActivityIcon size={12} style={{ color: appearance.statusTextColorVar }} className="transition-colors duration-200" />
                 <AnimatePresence mode="popLayout">
                     <motion.span 
                         key={`acp-${formattedAcPowerOutputWithContext}`} 
-                        className={`${statusUiStyles.powerColorClass} font-semibold transition-colors duration-200`} 
+                        className={`font-semibold transition-colors duration-200`}
+                        style={{ color: appearance.statusTextColorVar }}
                         initial={{ opacity:0, y:-4 }} 
                         animate={{ opacity:1, y:0 }} 
                         exit={{ opacity:0, y:4, transition:{duration:0.1} }} 
@@ -478,7 +403,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                 {powerOpcUaNodeId && currentNumericAcPower !== undefined && (
                     <motion.div 
                         className="w-1.5 h-1.5 rounded-full ml-0.5 shadow-sm"
-                        style={{ backgroundColor: statusUiStyles.powerIconColorClass }}
+                        style={{ backgroundColor: appearance.statusTextColorVar }}
                         animate={{ opacity: [0.4, 1, 0.4] }}
                         transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                         title="Live Data"
@@ -486,14 +411,14 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                 )}
             </div>
 
-            {/* Temperature Display */}
             {formattedTemperature && (
                 <div className="flex items-center justify-center space-x-1 text-xs font-medium" title={`Temperature: ${formattedTemperature}`}>
-                    <ThermometerIcon size={12} className={`${statusUiStyles.tempIconColorClass} transition-colors duration-200`} />
+                    <ThermometerIcon size={12} style={{ color: currentTempColorVar }} className="transition-colors duration-200" />
                     <AnimatePresence mode="popLayout">
                         <motion.span 
                             key={`t-${formattedTemperature}`} 
-                            className={`${statusUiStyles.tempColorClass} font-semibold transition-colors duration-200`} 
+                            className={`font-semibold transition-colors duration-200`}
+                            style={{ color: currentTempColorVar }}
                             initial={{ opacity:0, y:-4 }} 
                             animate={{ opacity:1, y:0 }} 
                             exit={{ opacity:0, y:4, transition:{duration:0.1} }} 
@@ -505,7 +430,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                     {tempOpcUaNodeId && temperatureValue !== null && (
                         <motion.div 
                             className="w-1.5 h-1.5 rounded-full ml-0.5 shadow-sm"
-                            style={{ backgroundColor: statusUiStyles.tempIconColorClass }}
+                            style={{ backgroundColor: currentTempColorVar }}
                             animate={{ opacity: [0.4, 1, 0.4] }}
                             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
                             title="Live Data"
@@ -515,17 +440,16 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
             )}
         </div>
 
-        {/* Bottom group: AC Details strip */}
         <AnimatePresence>
         {hasAnyAcDetailLinks && (
             <motion.div key="ac-details-button"
                 className={`
                     w-full mt-auto mb-0.5 py-1 flex items-center justify-center
-                    border-t ${isDarkMode ? 'border-slate-500/40' : 'border-slate-400/50'} 
-                    pointer-events-auto group/acdetails
+                    border-t pointer-events-auto group/acdetails
                     ${!isNodeEditable && !isEditMode && 'hover:bg-slate-500/10 dark:hover:bg-slate-400/10 cursor-pointer'} 
-                    transition-colors duration-150 rounded-b-[5px]  /* Slight roundness for inner strip bottom */
+                    transition-colors duration-150 rounded-b-[5px]
                 `}
+                style={{ borderColor: 'color-mix(in srgb, var(--sld-color-border) 50%, transparent)' }}
                 initial={{opacity:0, height: 0, y:5}} 
                 animate={{opacity:1, height: 'auto', y:0}} 
                 exit={{opacity:0, height: 0, y:5, transition: {duration: 0.15, ease: "easeIn"}}} 
@@ -533,9 +457,8 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                 onClick={handleDetailsClick} title="View Detailed AC Parameters"
             >
                 <div className="flex items-center space-x-1.5 text-xs">
-                    <SlidersHorizontalIcon size={13} className={`${statusUiStyles.acDetailsIconColorClass} transition-colors duration-150`} />
-                    {/* <span className={`${statusUiStyles.acDetailsIconColorClass} font-medium transition-colors duration-150`}>Details</span> */}
-                    <ChevronRightIcon size={14} className={`${statusUiStyles.acDetailsIconColorClass} group-hover/acdetails:translate-x-0.5 transition-transform duration-150`}/>
+                    <SlidersHorizontalIcon size={13} style={{ color: appearance.textColorVar }} className="transition-colors duration-150 opacity-70 group-hover/acdetails:opacity-100" />
+                    <ChevronRightIcon size={14} style={{ color: appearance.textColorVar }} className="group-hover/acdetails:translate-x-0.5 transition-transform duration-150 opacity-70 group-hover/acdetails:opacity-100"/>
                 </div>
             </motion.div>
         )}
