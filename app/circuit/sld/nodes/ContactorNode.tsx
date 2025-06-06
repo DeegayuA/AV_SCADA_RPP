@@ -120,8 +120,7 @@ const ContactorNode: React.FC<NodeProps<ContactorNodeData>> = (props) => {
       className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
       style={{ 
         borderColor: appearance.borderColorVar,
-        ringColor: selected ? sldAccentVar : 'transparent',
-        opacity: data.opacity, // Apply opacity if available in data
+        opacity: data.opacity ?? 1, // Apply opacity if available in data, default to 1
       }}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}

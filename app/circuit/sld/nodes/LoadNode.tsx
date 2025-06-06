@@ -88,6 +88,11 @@ const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
   const IconComponent = useMemo(() => appearance.icon, [appearance.icon]); // Get icon component from appearance
   const sldAccentVar = 'var(--sld-color-accent)';
 
+  const displayStatusText = useMemo(() => 
+    typeof processedStatus === 'string' ? processedStatus : String(processedStatus),
+    [processedStatus]
+  );
+
   const isCriticalStatus = useMemo(() => 
     standardNodeState === 'FAULT' || standardNodeState === 'WARNING',
     [standardNodeState]
@@ -117,9 +122,9 @@ const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
       className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
       style={{
         borderColor: appearance.borderColorVar,
-        opacity: data.opacity, // Assuming opacity is directly from data
-        ringColor: selected ? sldAccentVar : 'transparent',
-      }}
+        opacity: (data as any).opacity || 1, // Safe access with default value
+        '--tw-ring-color': selected ? sldAccentVar : 'transparent',
+      } as React.CSSProperties}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
       whileHover={{ scale: isNodeEditable ? 1.03 : 1.01 }}

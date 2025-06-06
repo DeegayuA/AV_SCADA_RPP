@@ -140,6 +140,7 @@ export interface BatteryNodeData extends BaseNodeData {
 }
 export interface ContactorNodeData extends BaseNodeData {
     elementType: SLDElementType.Contactor;
+    opacity?: number;
     config?: BaseNodeData['config'] & {
         normallyOpen?: boolean;
         coilVoltage?: string;

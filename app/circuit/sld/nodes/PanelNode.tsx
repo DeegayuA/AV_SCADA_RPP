@@ -225,8 +225,8 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
       style={{
         ...nodeMainStyle, // Includes borderColor, boxShadow, color (for text)
         background: `linear-gradient(to bottom, var(--sld-color-node-bg), color-mix(in srgb, var(--sld-color-node-bg) 90%, black))`,
-        ringColor: selected ? sldAccentVar : 'transparent',
-      }}
+        '--tw-ring-color': selected ? sldAccentVar : 'transparent',
+      } as React.CSSProperties}
       initial={{ opacity: 0, scale: 0.88, y: 18 }}
       animate={{ 
         opacity: 1, scale: 1, y: 0,

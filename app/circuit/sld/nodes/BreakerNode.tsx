@@ -178,10 +178,9 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
         ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10 shadow-lg` : 'shadow-md'}
         overflow-hidden 
       `}
-      style={{ // Apply border color from JS, ring color from CSS var for selection
+      style={{ // Apply border color from JS
         ...nodeMainStyle,
         background: `linear-gradient(to bottom, var(--sld-color-node-bg), color-mix(in srgb, var(--sld-color-node-bg) 90%, black))`, // Example gradient
-        ringColor: selected ? sldAccentVar : 'transparent', // Selection ring
       }}
       initial={{ opacity: 0, scale: 0.88, y: 15 }}
       animate={{ 

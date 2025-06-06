@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 
 export interface SwitchNodeData extends BaseNodeData {
   elementType: SLDElementType.Switch;
+  opacity?: number;
   config?: BaseNodeData['config'] & {
     // Specific config for SwitchNode if any in future, e.g., default state
   };
@@ -104,8 +105,8 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
       style={{
         borderColor: appearance.borderColorVar,
         opacity: data.opacity,
-        ringColor: selected ? sldAccentVar : 'transparent',
-      }}
+        '--tw-ring-color': selected ? sldAccentVar : 'transparent',
+      } as React.CSSProperties}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}
       onDoubleClick={() => {

@@ -121,7 +121,6 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => {
       `}
       style={{
         borderColor: appearance.borderColorVar,
-        ringColor: selected ? sldAccentVar : 'transparent',
       }}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
