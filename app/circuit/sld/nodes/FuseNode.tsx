@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 interface FuseNodeData extends BaseNodeData {
   type?: 'Cartridge' | 'Blade' | 'HRC';
   elementType: SLDElementType.Fuse; // Ensure this is part of data if not already
+  opacity?: number;
 }
 
 const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
@@ -147,7 +148,6 @@ const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
       style={{
         borderColor: appearance.borderColorVar,
         opacity: data.opacity,
-        ringColor: selected ? sldAccentVar : 'transparent',
       }}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}

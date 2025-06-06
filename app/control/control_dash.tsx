@@ -625,7 +625,7 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
                  {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
                     <>
                         <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-7 w-7" onClick={()=>setIsGraphConfiguratorOpen(true)}><Settings className="h-4 w-4"/><span className="sr-only">Config Graph</span></Button></TooltipTrigger><TooltipContent><p>Configure Graph Data</p></TooltipContent></Tooltip></TooltipProvider>
-                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant={useDemoDataForGraph?"secondary":"outline"}size="icon"className="h-7 w-7"onClick={()=>setUseDemoDataForGraph(prev => !prev)}><Orbit className={cn("h-4 w-4",useDemoDataForGraph && "animate-spin-slow")}/><span className="sr-only">Demo Data</span></Button></TooltipTrigger><TooltipContent><p>{useDemoDataForGraph?"Switch to Live Data":"Switch to Demo Data"}</p></TooltipContent></Tooltip></TooltipProvider>
+                        {/* <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant={useDemoDataForGraph?"secondary":"outline"}size="icon"className="h-7 w-7"onClick={()=>setUseDemoDataForGraph(prev => !prev)}><Orbit className={cn("h-4 w-4",useDemoDataForGraph && "animate-spin-slow")}/><span className="sr-only">Demo Data</span></Button></TooltipTrigger><TooltipContent><p>{useDemoDataForGraph?"Switch to Live Data":"Switch to Demo Data"}</p></TooltipContent></Tooltip></TooltipProvider> */}
                     </>
                  )}
                 {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
@@ -646,8 +646,7 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
                 exportDpIds={powerGraphExportDpIds} 
                 exportMode={powerGraphExportMode} 
                 timeScale={graphTimeScale}
-                isLive={isConnected && plcStatus === 'online'}
-                useDemoData={useDemoDataForGraph}
+                // useDemoData={useDemoDataForGraph}
               />
             ) : ( 
               <div className="flex items-center justify-center h-[300px] text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode&&currentUserRole===UserRole.ADMIN&&" Click settings."}</p></div>

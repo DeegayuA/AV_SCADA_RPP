@@ -130,11 +130,11 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => {
     return {
       borderColor: appearance.borderColorVar,
       boxShadow: currentBoxShadow,
-      opacity: data.opacity ?? 1,
+      opacity: (data as any).opacity ?? 1,
       width: typeof nodeWidthFromData === 'number' ? `${nodeWidthFromData}px` : '110px', 
       height: typeof nodeHeightFromData === 'number' ? `${nodeHeightFromData}px` : '95px', 
     };
-  }, [appearance, selected, isRecentStatusChange, sldAccentVar, nodeWidthFromData, nodeHeightFromData, isCriticalStatus, data.opacity]);
+  }, [appearance, selected, isRecentStatusChange, sldAccentVar, nodeWidthFromData, nodeHeightFromData, isCriticalStatus, (data as any).opacity]);
   
   const fullNodeObjectForDetails = useMemo((): CustomNodeType => ({
       id, type: type || SLDElementType.Meter, position: nodePosition, data,
@@ -157,7 +157,6 @@ const MeterNode: React.FC<NodeProps<MeterNodeData>> = (props) => {
       style={{
         ...nodeMainStyle, // borderColor, boxShadow, opacity, width, height
         background: `var(--sld-color-node-bg)`,
-        ringColor: selected ? sldAccentVar : 'transparent',
       }}
       initial={{ opacity: 0, scale: 0.9, y: 15 }}
       animate={{ 

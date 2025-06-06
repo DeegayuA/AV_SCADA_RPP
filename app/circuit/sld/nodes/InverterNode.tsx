@@ -124,7 +124,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     if (standardNodeState === 'WARNING') return "WARNING";
     if (standardNodeState === 'OFFLINE') return "OFFLINE";
     if (standardNodeState === 'STANDBY') return "STANDBY";
-    if (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') {
+    if (standardNodeState === 'ENERGIZED') {
       // Could add more detail like "INVERTING" if a specific DP confirms it
       return "ACTIVE";
     }
@@ -244,8 +244,8 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
       style={{ 
         ...nodeMainStyle, 
         background: `linear-gradient(to bottom, var(--sld-color-node-bg), color-mix(in srgb, var(--sld-color-node-bg) 90%, black))`,
-        ringColor: selected ? sldAccentVar : 'transparent',
-      }}
+        '--ring-color': selected ? sldAccentVar : 'transparent',
+      } as React.CSSProperties}
       initial={{ opacity: 0, scale: 0.88, y: 18 }} 
       animate={{ 
           opacity: 1, scale: 1, y: 0, height: nodeMainStyle.height,

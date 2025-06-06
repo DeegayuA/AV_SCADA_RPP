@@ -660,13 +660,14 @@ export function getNodeAppearanceFromState(standardState: string, elementType?: 
         else if (elementType === SLDElementTypeFuse) icon = MinusCircle; // Intact fuse
         return {
           icon: icon,
-        iconColorVar: 'var(--sld-color-energized)',
-        borderColorVar: 'var(--sld-color-energized)',
-        textColorVar: defaultNodeText,
-        statusTextColorVar: 'var(--sld-color-energized)',
-        mainStatusColorVar: 'var(--sld-color-energized)',
-        armColorVar: 'var(--sld-color-energized)', // For breaker
-      };
+          iconColorVar: 'var(--sld-color-energized)',
+          borderColorVar: 'var(--sld-color-energized)',
+          textColorVar: defaultNodeText,
+          statusTextColorVar: 'var(--sld-color-energized)',
+          mainStatusColorVar: 'var(--sld-color-energized)',
+          armColorVar: 'var(--sld-color-energized)', // For breaker
+        };
+      }
     case 'ENERGIZED_OPEN':
     case 'NOMINAL_OPEN':
       return {
