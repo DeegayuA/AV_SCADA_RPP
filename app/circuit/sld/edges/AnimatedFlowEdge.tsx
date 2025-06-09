@@ -329,18 +329,27 @@ export default function AnimatedFlowEdge({
     animatedPathStyle.animationTimingFunction = 'linear';
   }
   
-    const isActuallyActiveForLabel = s1_isConceptuallyActive || (currentAnimationType === 'dynamic_power_flow' && s1_isDashdrawCandidate);
+  const isActuallyActiveForLabel = s1_isConceptuallyActive || (currentAnimationType === 'dynamic_power_flow' && s1_isDashdrawCandidate);
 
-    const labelBorderColor = selected
-        ? flowColors.SELECTED_STROKE
-        : (isActuallyActiveForLabel || finalStatus === 'FAULT' || finalStatus === 'WARNING')
-        ? s4_finalSolidPathStrokeColor
-        : 'var(--edge-label-border-inactive)';
+  const labelBorderColor = selected
+      ? flowColors.SELECTED_STROKE
+      : (isActuallyActiveForLabel || finalStatus === 'FAULT' || finalStatus === 'WARNING')
+      ? s4_finalSolidPathStrokeColor
+      : 'var(--edge-label-border-inactive)';
 
-    const labelBackground = (s4_finalSolidPathStrokeColor === flowColors.OFFLINE && !isActuallyActiveForLabel)
-        ? 'var(--edge-label-bg-inactive)'
-        : 'var(--edge-label-bg)';
+  const labelBackground = (s4_finalSolidPathStrokeColor === flowColors.OFFLINE && !isActuallyActiveForLabel)
+      ? 'var(--edge-label-bg-inactive)'
+      : 'var(--edge-label-bg)';
 
+  // --- Label Rendering Logic ---
+  // Extract label text from data. If CustomFlowEdgeData defines label as `label?: string;`
+  // then labelText will be a string, undefined, or null.
+  const labelText = data?.label;
+
+  // Determine if the label should be shown:
+  // - labelText must be a string.
+  // - After trimming whitespace, it must not be an empty string.
+  const showLabel = typeof labelText === 'string' && labelText.trim() !== '';
 
   return (
     <>
@@ -358,7 +367,8 @@ export default function AnimatedFlowEdge({
           className="react-flow__edge-path-animated-foreground"
         />
       )}
-      {data?.label && (
+      {/* Conditionally render the label */}
+      {showLabel && (
         <EdgeLabelRenderer>
           <div
             style={{
@@ -378,7 +388,7 @@ export default function AnimatedFlowEdge({
             }}
             className="nodrag nopan react-flow__edge-label"
           >
-            {data.label}
+            {labelText} {/* Render the original labelText */}
           </div>
         </EdgeLabelRenderer>
       )}
