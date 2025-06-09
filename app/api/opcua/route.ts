@@ -1,7 +1,6 @@
 // app/api/opcua/route.ts
 import { WS_PORT, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE } from "@/config/constants";
-// Ensure DataPoint type in "@/config/dataPoints" includes "decimalPlaces?: number;"
-import { dataPoints, nodeIds, DataPoint } from "@/config/dataPoints";
+import { dataPoints, DataPoint } from "@/config/dataPoints";
 import {
   OPCUAClient,
   ClientSession,
@@ -15,10 +14,8 @@ import {
 import { WebSocketServer, WebSocket } from "ws";
 import { NextRequest, NextResponse } from 'next/server';
 
-// Variable to control if OPC UA connection should always be kept alive
 const KEEP_OPCUA_ALIVE = true;
-
-let endpointUrl: string = OPC_UA_ENDPOINT_OFFLINE; // Initialize with a default
+let endpointUrl: string = OPC_UA_ENDPOINT_OFFLINE;
 const POLLING_INTERVAL = 3000;
 const RECONNECT_DELAY = 5000;
 const SESSION_TIMEOUT = 60000;
@@ -37,13 +34,33 @@ let disconnectTimeout: NodeJS.Timeout | null = null;
 
 let localWsServer: WebSocketServer | null = null;
 let vercelWsServer: WebSocketServer | null = null;
-
 let localPingIntervalId: NodeJS.Timeout | null = null;
 let vercelPingIntervalId: NodeJS.Timeout | null = null;
 
 const nodeIdsToMonitor = (): string[] => {
-  return nodeIds.filter((nodeId): nodeId is string => nodeId !== undefined);
+  const uniqueNodeIds = new Set<string>();
+  dataPoints.forEach(dp => {
+    if (dp.nodeId && dp.nodeId.trim() !== '') {
+      uniqueNodeIds.add(dp.nodeId);
+    }
+  });
+  return Array.from(uniqueNodeIds);
 };
+
+// Helper function to send toast messages to a specific client
+function sendToastToClient(ws: WebSocket, severity: 'success' | 'error' | 'warning' | 'info' | 'default', message: string, description?: string, duration?: number, id?: string) {
+  if (ws.readyState === WebSocket.OPEN) {
+    try {
+      ws.send(JSON.stringify({ 
+        type: 'toast', 
+        payload: { severity, message, description, duration, id } 
+      }));
+    } catch (err) {
+      console.error("Error sending toast message to client:", err);
+    }
+  }
+}
+
 
 function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
     console.log(`Initializing event handlers for WebSocketServer instance (PID: ${process.pid})`);
@@ -76,7 +93,6 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
 
         ws.on("message", async (message) => {
             const messageString = message.toString();
-            // console.log("Received message from client:", messageString);
             let parsedMessage: any;
 
             try {
@@ -85,116 +101,221 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
                     throw new Error("Invalid message format. Expected a JSON object.");
                 }
             } catch (parseError) {
+                const errorMsg = "Invalid message format sent to server.";
                 console.error("Failed to parse message from client:", messageString, parseError);
-                // Consider sending a generic parse error back to client if needed
-                // ws.send(JSON.stringify({ status: 'error', error: 'Invalid JSON message' }));
+                sendToastToClient(ws, 'error', errorMsg);
                 return;
             }
-
-            // Check for the new message type from ImportBackupDialogContent
+            
             if (parsedMessage.type === 'save-sld-widget-layout' && parsedMessage.payload) {
                 const { key, layout } = parsedMessage.payload;
                 console.log(`Received SLD layout save request for key: ${key}`);
-                // TODO: Implement the actual saving logic for SLD layout here
-                // This could involve:
-                // 1. Saving to a database (PostgreSQL, MongoDB, etc.)
-                // 2. Saving to a file on the server (less ideal for Vercel ephemeral filesystem)
-                // 3. Storing in a persistent key-value store (Redis, Vercel KV store, etc.)
-                // For now, let's just acknowledge it and send a confirmation/error.
-
                 try {
-                    // ---- SIMULATE SAVING LOGIC ----
-                    // Example: You might have a function `saveLayoutToPersistentStore(key, layout)`
                     console.log(`Pretending to save SLD layout for key: ${key}`);
-                    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate async save
-                    // ---------------------------------
-
-                    // Send a confirmation back to the client
+                    await new Promise(resolve => setTimeout(resolve, 500)); 
                     ws.send(JSON.stringify({
                         type: 'layout-saved-confirmation',
                         payload: { key, message: 'SLD Layout saved successfully server-side.' }
                     }));
+                    sendToastToClient(ws, 'success', `Layout for '${key}' saved successfully.`);
                 } catch (saveError: any) {
-                    console.error(`Error saving SLD layout for key ${key}:`, saveError);
+                    const errorMsg = `Failed to save SLD layout for '${key}': ${saveError.message}`;
+                    console.error(errorMsg);
                     ws.send(JSON.stringify({
                         type: 'layout-save-error',
                         payload: { key, error: `Failed to save SLD layout: ${saveError.message}` }
                     }));
+                    sendToastToClient(ws, 'error', errorMsg);
                 }
-                return; // Handled this message type, so exit
+                return; 
             }
+            else if (parsedMessage.type === 'controlWrite' && parsedMessage.payload && typeof parsedMessage.payload === 'object') {
+                const controlPayload = parsedMessage.payload;
+                const dataPointIdsFromPayload = Object.keys(controlPayload); 
 
-            // Original OPC UA write logic (now as an else-if or default case)
-            // Let's assume if it's not 'save-sld-widget-layout', it's an OPC UA write attempt
-            // This also means a message like {"someNodeId": value} will be processed here.
-            if (Object.keys(parsedMessage).length === 1) {
-                const nodeId = Object.keys(parsedMessage)[0];
-                const value = parsedMessage[nodeId];
-
-                if (!opcuaClient || !opcuaSession) {
-                    console.error(`Cannot write to OPC UA: No active client or session for Node ID ${nodeId}.`);
-                    sendStatusToClient(ws, 'error', nodeId, 'OPC UA session not active or client disconnected.');
-                    if (!isConnectingOpcua && (!opcuaClient || !opcuaSession)) {
-                        attemptReconnect("write_attempt_no_session_or_client");
-                    }
+                if (dataPointIdsFromPayload.length === 0) {
+                    const msg = "ControlWrite payload is empty.";
+                    console.warn("Received controlWrite with empty payload.");
+                    sendStatusToClient(ws, 'error', 'N/A', msg);
+                    sendToastToClient(ws, 'warning', msg);
                     return;
                 }
+                
+                const dataPointIdFromKey = dataPointIdsFromPayload[0]; 
+                const value = controlPayload[dataPointIdFromKey];
 
-                const dataPointConfig = dataPoints.find(dp => dp.nodeId === nodeId);
+                const dataPointConfig = dataPoints.find(dp => dp.id === dataPointIdFromKey);
+
                 if (!dataPointConfig) {
-                    console.error(`Received write request for unknown or unconfigured Node ID: ${nodeId}`);
-                    sendStatusToClient(ws, 'error', nodeId, 'Node ID not configured for writing.');
+                    const msg = `DataPoint ID '${dataPointIdFromKey}' (from payload key) not configured for control.`;
+                    console.error(msg);
+                    sendStatusToClient(ws, 'error', dataPointIdFromKey, msg);
+                    sendToastToClient(ws, 'error', msg);
+                    return;
+                }
+                
+                const opcUaNodeId = dataPointConfig.nodeId; 
+                if (!opcUaNodeId || opcUaNodeId.trim() === '') {
+                    const msg = `OPC UA Node ID is missing for DataPoint '${dataPointConfig.name || dataPointIdFromKey}'. Cannot write.`;
+                    console.error(msg);
+                    sendStatusToClient(ws, 'error', dataPointIdFromKey, msg);
+                    sendToastToClient(ws, 'error', msg);
+                    return;
+                }
+                console.log(`ControlWrite: Processing DataPoint ID '${dataPointIdFromKey}', targeting OPC UA Node ID '${opcUaNodeId}' with value: ${value}`);
+
+                if (!opcuaClient || !opcuaSession) {
+                    const msg = `Cannot perform control: OPC UA is not connected. Please try again shortly.`;
+                    console.error(`OPC UA write failed for Node ID ${opcUaNodeId}: Session not active.`);
+                    sendStatusToClient(ws, 'error', opcUaNodeId, 'OPC UA session not active or client disconnected.');
+                    sendToastToClient(ws, 'error', msg);
+                    if (!isConnectingOpcua && (!opcuaClient || !opcuaSession)) {
+                        attemptReconnect("controlWrite_attempt_no_session_or_client");
+                    }
                     return;
                 }
 
                 let opcuaDataType: DataType;
                 switch (dataPointConfig.dataType) {
                     case 'Boolean': opcuaDataType = DataType.Boolean; break;
-                    case 'Float': opcuaDataType = DataType.Double; break; // Or DataType.Float
+                    case 'Float': opcuaDataType = DataType.Float; break; 
+                    case 'Double': opcuaDataType = DataType.Double; break;
                     case 'Int16': opcuaDataType = DataType.Int16; break;
-                    // Add other types as needed
+                    case 'Int32': opcuaDataType = DataType.Int32; break;
+                    case 'UInt16': opcuaDataType = DataType.UInt16; break;
+                    case 'UInt32': opcuaDataType = DataType.UInt32; break;
+                    case 'String': opcuaDataType = DataType.String; break;
                     default:
-                        console.error(`Unsupported data type '${dataPointConfig.dataType}' for writing to ${nodeId}`);
-                        sendStatusToClient(ws, 'error', nodeId, `Unsupported dataType: ${dataPointConfig.dataType}`);
+                        const msg = `Unsupported data type '${dataPointConfig.dataType}' for writing to '${dataPointConfig.name || opcUaNodeId}'.`;
+                        console.error(msg);
+                        sendStatusToClient(ws, 'error', opcUaNodeId, msg);
+                        sendToastToClient(ws, 'error', msg);
                         return;
                 }
-                const nodeToWrite = { nodeId, attributeId: AttributeIds.Value, value: new DataValue({ value: { dataType: opcuaDataType, value } }) };
+
+                const nodeToWrite = { nodeId: opcUaNodeId, attributeId: AttributeIds.Value, value: new DataValue({ value: { dataType: opcuaDataType, value } }) };
+                
                 try {
-                    console.log(`Attempting to write to Node ID ${nodeId} with value:`, value);
+                    console.log(`Attempting to write via controlWrite to OPC UA Node ID ${opcUaNodeId} with value:`, value);
                     const statusCode = await opcuaSession.write(nodeToWrite);
                     if (statusCode.isGood()) {
-                        console.log(`Successfully wrote value ${value} to Node ID ${nodeId}`);
-                        sendStatusToClient(ws, 'success', nodeId);
+                        const successMsg = `Successfully wrote value ${value} to '${dataPointConfig.name || opcUaNodeId}'.`;
+                        console.log(successMsg);
+                        sendStatusToClient(ws, 'success', opcUaNodeId, successMsg);
+                        sendToastToClient(ws, 'success', successMsg);
 
-                        // Immediately update local cache and broadcast if successful
                         const immediateUpdate: Record<string, any> = {};
                         const factor = dataPointConfig.factor ?? 1;
                         let displayValue = value;
                          if (typeof value === 'number') {
-                             const decimalPlaces = dataPointConfig.decimalPlaces ?? 2; // Ensure this prop exists on DataPoint
+                             const decimalPlaces = dataPointConfig.decimalPlaces ?? 2;
                              displayValue = !Number.isInteger(value * factor) ? parseFloat((value * factor).toFixed(decimalPlaces)) : value * factor;
                          }
+                        if (nodeDataCache[opcUaNodeId] !== displayValue) {
+                            nodeDataCache[opcUaNodeId] = displayValue;
+                            immediateUpdate[opcUaNodeId] = displayValue;
+                            broadcast(JSON.stringify(immediateUpdate));
+                        }
+                    } else {
+                        const errorMsg = `OPC UA write failed for '${dataPointConfig.name || opcUaNodeId}': ${statusCode.toString()}`;
+                        console.error(errorMsg);
+                        sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
+                        sendToastToClient(ws, 'error', errorMsg);
+                    }
+                } catch (writeError: any) {
+                    const errorMsg = `OPC UA write error for '${dataPointConfig.name || opcUaNodeId}': ${writeError?.message || 'Unknown'}`;
+                    console.error(errorMsg);
+                    sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
+                    sendToastToClient(ws, 'error', errorMsg);
+                    if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
+                        opcuaSession = null; stopDataPolling(); attemptReconnect("controlWrite_error_session_lost");
+                    }
+                }
+                return; 
+            } 
+            else if (Object.keys(parsedMessage).length === 1 && parsedMessage.type === undefined) {
+                const nodeId = Object.keys(parsedMessage)[0]; 
+                const value = parsedMessage[nodeId];
+                console.log(`Handling direct write for Node ID ${nodeId} with value: ${value}`);
 
+                if (!opcuaClient || !opcuaSession) {
+                    const msg = `(Direct Write) OPC UA is not connected. Cannot write.`;
+                    console.error(msg);
+                    sendStatusToClient(ws, 'error', nodeId, 'OPC UA session not active or client disconnected.');
+                    sendToastToClient(ws, 'error', msg);
+                    if (!isConnectingOpcua && (!opcuaClient || !opcuaSession)) {
+                        attemptReconnect("direct_write_attempt_no_session_or_client");
+                    }
+                    return;
+                }
+
+                const dataPointConfig = dataPoints.find(dp => dp.nodeId === nodeId);
+                if (!dataPointConfig) {
+                    const msg = `(Direct Write) Node ID '${nodeId}' not configured.`;
+                    console.error(msg);
+                    sendStatusToClient(ws, 'error', nodeId, msg);
+                    sendToastToClient(ws, 'error', msg);
+                    return;
+                }
+
+                let opcuaDataType: DataType;
+                switch (dataPointConfig.dataType) {
+                    case 'Boolean': opcuaDataType = DataType.Boolean; break;
+                    case 'Float': opcuaDataType = DataType.Float; break; 
+                    case 'Double': opcuaDataType = DataType.Double; break;
+                    case 'Int16': opcuaDataType = DataType.Int16; break;
+                    case 'Int32': opcuaDataType = DataType.Int32; break;
+                    case 'UInt16': opcuaDataType = DataType.UInt16; break;
+                    case 'UInt32': opcuaDataType = DataType.UInt32; break;
+                    case 'String': opcuaDataType = DataType.String; break;
+                    default:
+                        const msg = `(Direct Write) Unsupported data type '${dataPointConfig.dataType}' for writing to ${dataPointConfig.name || nodeId}`;
+                        console.error(msg);
+                        sendStatusToClient(ws, 'error', nodeId, msg);
+                         sendToastToClient(ws, 'error', msg);
+                        return;
+                }
+                const nodeToWrite = { nodeId, attributeId: AttributeIds.Value, value: new DataValue({ value: { dataType: opcuaDataType, value } }) };
+                try {
+                    const statusCode = await opcuaSession.write(nodeToWrite);
+                    if (statusCode.isGood()) {
+                        const successMsg = `(Direct Write) Successfully wrote ${value} to '${dataPointConfig.name || nodeId}'.`;
+                        console.log(successMsg);
+                        sendStatusToClient(ws, 'success', nodeId, successMsg);
+                        sendToastToClient(ws, 'success', successMsg);
+                        
+                        const immediateUpdate: Record<string, any> = {};
+                        const factor = dataPointConfig.factor ?? 1;
+                        let displayValue = value;
+                         if (typeof value === 'number') {
+                             const decimalPlaces = dataPointConfig.decimalPlaces ?? 2;
+                             displayValue = !Number.isInteger(value * factor) ? parseFloat((value * factor).toFixed(decimalPlaces)) : value * factor;
+                         }
                         if (nodeDataCache[nodeId] !== displayValue) {
                             nodeDataCache[nodeId] = displayValue;
                             immediateUpdate[nodeId] = displayValue;
                             broadcast(JSON.stringify(immediateUpdate));
                         }
                     } else {
-                        console.error(`Failed to write to Node ID ${nodeId}. Status: ${statusCode.toString()}`);
-                        sendStatusToClient(ws, 'error', nodeId, `OPC UA write failed: ${statusCode.toString()}`);
+                        const errorMsg = `(Direct Write) OPC UA write failed for '${dataPointConfig.name || nodeId}': ${statusCode.toString()}`;
+                        console.error(errorMsg);
+                        sendStatusToClient(ws, 'error', nodeId, errorMsg);
+                        sendToastToClient(ws, 'error', errorMsg);
                     }
                 } catch (writeError: any) {
-                    console.error(`Error during OPC UA write for ${nodeId}:`, writeError);
-                    sendStatusToClient(ws, 'error', nodeId, `OPC UA write error: ${writeError?.message || 'Unknown'}`);
+                    const errorMsg = `(Direct Write) OPC UA write error for '${dataPointConfig.name || nodeId}': ${writeError?.message || 'Unknown'}`;
+                    console.error(errorMsg);
+                    sendStatusToClient(ws, 'error', nodeId, errorMsg);
+                    sendToastToClient(ws, 'error', errorMsg);
                     if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
-                        opcuaSession = null; stopDataPolling(); attemptReconnect("write_error_session_lost");
+                        opcuaSession = null; stopDataPolling(); attemptReconnect("direct_write_error_session_lost");
                     }
                 }
             } else {
-                // If the message is not 'save-sld-widget-layout' and doesn't have one key, it's an unhandled format
-                console.error("Received message in unhandled format:", parsedMessage);
-                 ws.send(JSON.stringify({ status: 'error', error: 'Unhandled message format on server.' }));
+                const errorMsg = 'Unhandled message format or type on server.';
+                console.error("Received message in unhandled format or type:", parsedMessage);
+                 ws.send(JSON.stringify({ status: 'error', error: errorMsg }));
+                 sendToastToClient(ws, 'error', 'Server received an unhandled message.');
             }
         });
 
@@ -289,7 +410,6 @@ async function ensureWebSocketServerInitialized() {
 
 async function connectOPCUA() {
   endpointUrl = OPC_UA_ENDPOINT_OFFLINE;
-  // Corrected check: Rely on session and client existence
   if (opcuaClient && opcuaSession) {
     console.log("OPC UA session already active and client presumed connected.");
     if(!dataInterval) startDataPolling();
@@ -323,7 +443,6 @@ async function connectOPCUA() {
         console.log("OPC UA CEvt: Connection re-established.");
         if (!opcuaSession) { console.log("Re-creating session after re-established connection."); createSessionAndStartPolling(); }
       });
-      // Typed err parameter
       opcuaClient.on("close", (err?: Error) => { console.log(`OPC UA CEvt: Connection closed. Error: ${err ? err.message : 'No error info'}`); opcuaSession = null; stopDataPolling(); });
       opcuaClient.on("timed_out_request", (request) => console.warn("OPC UA CEvt: Request timed out:", request?.toString().substring(0,100)));
     }
@@ -335,7 +454,6 @@ async function connectOPCUA() {
     await createSessionAndStartPolling();
   } catch (err: any) {
     console.error(`Failed to connect OPC UA client to ${endpointUrl}:`, err.message);
-    // Corrected comparison with type assertion to satisfy TS strict literal checks if constants are literals
     if (endpointUrl === OPC_UA_ENDPOINT_OFFLINE && OPC_UA_ENDPOINT_ONLINE && (OPC_UA_ENDPOINT_ONLINE as string) !== (OPC_UA_ENDPOINT_OFFLINE as string)) {
       console.log("Falling back to online OPC UA endpoint...");
       endpointUrl = OPC_UA_ENDPOINT_ONLINE;
@@ -387,11 +505,8 @@ function attemptReconnect(reason: string) {
 }
 
 async function createSessionAndStartPolling() {
-  // Corrected check: Relies on opcuaClient existence. `connectOPCUA` ensures client is connected before calling this.
   if (!opcuaClient) {
       console.log("Cannot create session: OPC UA client non-existent.");
-      // It's unlikely this specific path is hit if called from connectOPCUA's success path.
-      // But as a general safeguard for other potential callers:
       attemptReconnect("session_creation_no_client");
       return;
   }
@@ -429,11 +544,11 @@ async function createSessionAndStartPolling() {
 function startDataPolling() {
   if (dataInterval) { return; }
   if (!opcuaSession) { console.log("Polling not started: No OPC UA session."); return; }
-  if (nodeIdsToMonitor().length === 0) { console.log("No nodes configured to monitor. Polling will not start effectively."); return;}
+  const monitorIds = nodeIdsToMonitor();
+  if (monitorIds.length === 0) { console.log("No nodes configured to monitor. Polling will not start effectively."); return;}
 
-  console.log("Starting data polling...");
+  console.log(`Starting data polling for ${monitorIds.length} nodes...`);
   dataInterval = setInterval(async () => {
-    // Corrected check
     if (!opcuaClient || !opcuaSession) {
         console.warn("No client or session in poll cycle, stopping polling.");
         stopDataPolling();
@@ -441,7 +556,7 @@ function startDataPolling() {
         return;
     }
     try {
-      const nodesToRead = nodeIdsToMonitor().map(nodeId => ({ nodeId, attributeId: AttributeIds.Value }));
+      const nodesToRead = monitorIds.map(nodeId => ({ nodeId, attributeId: AttributeIds.Value }));
       if (nodesToRead.length === 0) return;
 
       const dataValues = await opcuaSession.read(nodesToRead);
@@ -457,11 +572,10 @@ function startDataPolling() {
           const rawValue = dataValue.value.value;
           const dataPoint = dataPoints.find(p => p.nodeId === nodeId);
           const factor = dataPoint?.factor ?? 1;
-          // Ensure DataPoint type in config/dataPoints.ts includes decimalPlaces?: number;
           const decimalPlaces = dataPoint?.decimalPlaces ?? 2;
 
           if (typeof rawValue === "number") {
-            if (dataPoint?.dataType === 'Float' || (dataPoint?.dataType === undefined && !Number.isInteger(rawValue * factor)) ) {
+            if (dataPoint?.dataType === 'Float' || dataPoint?.dataType === 'Double' || (dataPoint?.dataType === undefined && !Number.isInteger(rawValue * factor)) ) {
                 newValue = parseFloat((rawValue * factor).toFixed(decimalPlaces));
             } else {
                 newValue = Math.round(rawValue * factor);
@@ -470,7 +584,7 @@ function startDataPolling() {
           readSuccess = true;
         } else {
           if(dataValue.statusCode !== StatusCodes.BadNodeIdUnknown && dataValue.statusCode !== StatusCodes.BadNodeIdInvalid){
-            console.warn(`Failed to read NodeId ${nodeId}: ${dataValue.statusCode.toString()}`);
+            // console.warn(`Failed to read NodeId ${nodeId}: ${dataValue.statusCode.toString()}`);
           }
           if(!readSuccess && nodeDataCache[nodeId] !== "Error") { newValue = "Error"; }
         }

@@ -1,26 +1,43 @@
 // hooks/useWebSocketListener.ts
 import { useAppStore } from '@/stores/appStore';
-// For now, the store directly uses Record<string, string | number | boolean>.
 import { WS_URL } from '@/config/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { toast } from 'sonner';
+import { toast } from 'sonner'; // Keep this for triggering toasts
 
 export interface WebSocketMessageToServer {
   type: string;
   payload?: any;
 }
 
-interface WebSocketMessageFromServer {
-  type: string;
-  payload: any; // Note: 'any' is used here; could be 'unknown' for more strictness.
+// Define a more specific structure for expected toast messages from the server
+interface ToastMessagePayload {
+  severity: 'success' | 'error' | 'warning' | 'info' | 'default'; // Added 'default'
+  message: string;
+  description?: string; // Optional description for sonner
+  duration?: number;    // Optional duration
+  id?: string;          // Optional id for the toast
 }
 
+interface WebSocketMessageFromServer {
+  type: string;
+  payload: any; 
+}
+
+// Specific type for server-sent toast messages
+interface ServerToastMessage extends WebSocketMessageFromServer {
+  type: 'toast';
+  payload: ToastMessagePayload;
+}
+
+
 export const useWebSocket = () => {
+    // lastJsonMessage can now hold any structured message from the server,
+    // including your custom 'toast' messages.
     const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessageFromServer | null>(null);
     const [isConnected, setIsConnected] = useState(false);
     const ws = useRef<WebSocket | null>(null);
     const reconnectIntervalId = useRef<NodeJS.Timeout | null>(null);
-    const maxReconnectAttempts = useRef(10); // Or Infinity
+    const maxReconnectAttempts = useRef(10);
     const currentReconnectAttempts = useRef(0);
 
     const connect = useCallback(() => {
@@ -31,7 +48,6 @@ export const useWebSocket = () => {
         }
 
         if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
-            // console.log("WebSocket: Already connected or connecting.");
             return;
         }
 
@@ -42,22 +58,21 @@ export const useWebSocket = () => {
             console.log("WebSocket: Connection established with", WS_URL);
             toast.success("Real-time Sync Active", { id: "ws-connect", duration: 3000 });
             setIsConnected(true);
-            currentReconnectAttempts.current = 0; // Reset attempts on successful connection
+            currentReconnectAttempts.current = 0; 
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
         };
 
         ws.current.onmessage = (event) => {
-            console.log("WebSocket: Raw event.data received:", event.data);
-            console.log("WebSocket: typeof event.data:", typeof event.data);
+            // console.log("WebSocket: Raw event.data received:", event.data);
+            // console.log("WebSocket: typeof event.data:", typeof event.data);
 
             let messageDataString: string;
             if (typeof event.data === 'string') {
                 messageDataString = event.data;
             } else if (event.data instanceof ArrayBuffer) {
-                console.log("WebSocket: Received ArrayBuffer, decoding to UTF-8 string.");
                 messageDataString = new TextDecoder("utf-8").decode(event.data);
             } else if (event.data instanceof Blob) {
-                console.error("WebSocket: Received Blob data, which is not directly supported for JSON parsing in this handler. Please ensure server sends string or ArrayBuffer.");
+                console.error("WebSocket: Received Blob data, which is not directly supported.");
                 toast.error("WebSocket Error", { description: "Received unexpected Blob data format." });
                 return;
             } else {
@@ -65,29 +80,53 @@ export const useWebSocket = () => {
                 toast.error("WebSocket Error", { description: "Received unexpected data type."});
                 return;
             }
-            console.log("WebSocket: Message data string for parsing:", messageDataString);
+            // console.log("WebSocket: Message data string for parsing:", messageDataString);
 
-            let parsedJson: unknown; // Use 'unknown' for safer parsing
+            let parsedJson: unknown;
             try {
                 parsedJson = JSON.parse(messageDataString);
             } catch (e) {
-                console.error("WebSocket: Error parsing JSON string. Raw string:", messageDataString, "Error:", e);
-                // Removed 'as any'. The object structure fits WebSocketMessageFromServer for an error message.
+                console.error("WebSocket: Error parsing JSON string.", { raw: messageDataString, error: e });
                 setLastJsonMessage({ type: 'parse_error', payload: { raw: messageDataString, error: (e instanceof Error ? e.message : String(e)) } });
+                // Show a generic parse error toast to the user
+                toast.error("Data Error", { description: "Received malformed data from the server." });
                 return;
             }
 
-            console.log("WebSocket: Parsed data object:", parsedJson);
-            console.log("WebSocket: typeof data after parse:", typeof parsedJson); // Log typeof the unknown variable
+            // console.log("WebSocket: Parsed data object:", parsedJson);
                 
-            // Check if parsedJson is an object and not null
             if (typeof parsedJson === 'object' && parsedJson !== null) {
-                // Cast to Record<string, any> for easier property access,
-                // this assumes a dictionary-like object structure common for JSON.
                 const data = parsedJson as Record<string, any>;
 
-                // Distinguish OPC UA data (typically doesn't have 'type' field) from structured messages
-                if (typeof data.type === 'undefined') { // More explicit check for absence of 'type'
+                // ---- HANDLE SERVER-SENT TOASTS ----
+                if (data.type === 'toast' && data.payload && typeof data.payload.message === 'string' && typeof data.payload.severity === 'string') {
+                    const toastPayload = data.payload as ToastMessagePayload;
+                    console.log("WebSocket: Received server-sent toast:", toastPayload);
+                    switch (toastPayload.severity) {
+                        case 'success':
+                            toast.success(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
+                            break;
+                        case 'error':
+                            toast.error(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
+                            break;
+                        case 'warning':
+                            toast.warning(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
+                            break;
+                        case 'info':
+                            toast.info(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
+                            break;
+                        default: // Includes 'default' or any other severity
+                            toast(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
+                            break;
+                    }
+                    // Optionally, you might still want to set it as lastJsonMessage if other parts of your app react to it
+                    // setLastJsonMessage(data as ServerToastMessage); 
+                    return; // Toast handled, no further processing of this message needed here.
+                }
+                // ---- END TOAST HANDLER ----
+
+
+                if (typeof data.type === 'undefined') { 
                     const opcDataPayload: Record<string, string | number | boolean> = {};
                     let hasValidOpcData = false;
                     for (const key in data) {
@@ -97,39 +136,35 @@ export const useWebSocket = () => {
                                 opcDataPayload[key] = value;
                                 hasValidOpcData = true;
                             } else {
-                                console.warn(`WebSocket: Received non-primitive value for OPC UA Node ID ${key}:`, value);
+                                // console.warn(`WebSocket: Received non-primitive value for OPC UA Node ID ${key}:`, value);
                             }
                         }
                     }
                     if (hasValidOpcData) {
                         useAppStore.getState().updateOpcUaNodeValues(opcDataPayload);
                     } else {
-                        // This case can occur if the object has no own properties that are primitive,
-                        // or if the object is empty.
-                        console.warn("WebSocket: Received object data without a 'type' field and no valid OPC-UA primitive values found:", data);
+                        // console.warn("WebSocket: Received object data without 'type' field and no valid OPC-UA primitive values:", data);
                     }
-                } else if (typeof data.type === 'string') { // Structured Message
-                    console.log("Structured WebSocket message received:", data);
-                    // Constructing the message explicitly to ensure it matches WebSocketMessageFromServer
-                    // and doesn't carry unintended extra properties from `data`.
-                    // `data.payload` is fine because WebSocketMessageFromServer.payload is 'any'.
+                } else if (typeof data.type === 'string') { 
+                    // console.log("Structured WebSocket message received:", data);
                     const message: WebSocketMessageFromServer = {
                         type: data.type,
-                        payload: data.payload // If data.payload might be missing, add 'payload' in data ? data.payload : undefined (or handle as error)
+                        payload: data.payload
                     };
                     setLastJsonMessage(message);
                 } else {
-                    // Parsed JSON is an object, but 'type' field is present and not a string.
                     console.warn("WebSocket: Received object data with invalid 'type' field (not a string):", data);
                 }
             } else {
-                // Parsed JSON is not an object (e.g., a string "foo", number 123, boolean true, or null, if server sent such JSON)
                 console.warn("WebSocket: Received JSON data that is not an object:", parsedJson);
             }
         };
 
         ws.current.onerror = (errorEvent) => {
             console.error("WebSocket: Error event occurred:", errorEvent);
+            // A general error toast can be shown here, but it might be redundant
+            // if onclose also fires and handles reconnection toasts.
+            // toast.error("WebSocket Error", { description: "A connection error occurred." });
         };
 
         ws.current.onclose = (event) => {
@@ -144,18 +179,25 @@ export const useWebSocket = () => {
                     console.log(`WebSocket: Will attempt reconnect #${currentReconnectAttempts.current} in ${delay / 1000}s.`);
                     if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
                     reconnectIntervalId.current = setTimeout(connect, delay);
+                    // Update toast or show a new one for retrying
                     if(currentReconnectAttempts.current === 1) {
                          toast.warning("Real-time Sync Lost", { id: "ws-disconnect-retry", description: `Attempting to reconnect... (Attempt ${currentReconnectAttempts.current})`});
+                    } else {
+                        toast.dismiss("ws-disconnect-retry"); // Dismiss old one if any
+                        toast.warning("Reconnecting...", { id: "ws-disconnect-retry", description: `Attempt #${currentReconnectAttempts.current}. Please wait.`});
                     }
                 } else {
-                    console.error("WebSocket: Maximum reconnect attempts reached. Please check server and network.");
-                    toast.error("Connection Failed Permanently", { id:"ws-max-reconnect", description: "Max reconnect attempts reached. Manual action may be required." });
+                    console.error("WebSocket: Maximum reconnect attempts reached.");
+                    toast.error("Connection Failed", { id:"ws-max-reconnect", description: "Could not connect to the real-time server. Please check your connection or try again later." });
                 }
-            } else if (event.wasClean && event.code === 1000) {
+            } else if (event.wasClean && event.code === 1000) { // Explicitly closed by server or client code
                  toast.info("Real-time Sync Disconnected", { id: "ws-disconnect-clean", duration: 3000 });
+            } else if (event.code === 1001) { // Going Away (e.g. server shutting down or browser navigating away)
+                // Usually, no toast is needed here as the user is likely leaving the page.
+                console.log("WebSocket: Connection closed because the endpoint is going away.");
             }
         };
-    }, [WS_URL]); 
+    }, [WS_URL]); // Removed maxReconnectAttempts from dependencies as it's a ref
 
     useEffect(() => {
         if (typeof window !== 'undefined') { 
@@ -170,20 +212,22 @@ export const useWebSocket = () => {
                 ws.current.onerror = null;
                 ws.current.onclose = null; 
                 if (ws.current.readyState === WebSocket.OPEN) {
+                    // Send a close code 1000 for normal closure.
+                    // Browsers often send 1001 automatically on page unload.
                     ws.current.close(1000, "Client component unmounting");
                 }
-                ws.current = null;
+                ws.current = null; // Clear the ref
             }
-            currentReconnectAttempts.current = 0;
-            setIsConnected(false);
+            currentReconnectAttempts.current = 0; // Reset on unmount
+            setIsConnected(false); // Ensure state is reset
         };
-    }, [connect]);
+    }, [connect]); // `connect` is the main dependency here
 
     const sendJsonMessage = useCallback((message: WebSocketMessageToServer) => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
             try {
                 ws.current.send(JSON.stringify(message));
-                console.log("WebSocket: Sent message:", message.type, message.payload);
+                // console.log("WebSocket: Sent message:", message.type, message.payload);
             } catch (error) {
                 console.error("WebSocket: Error serializing or sending message:", error, "Message:", message);
                 toast.error("Message Send Error", { description: "Failed to send data to the server." });
@@ -192,11 +236,11 @@ export const useWebSocket = () => {
             console.warn("WebSocket: Attempted to send message while not connected. Message:", message.type);
             toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server. Message not sent."});
             if (!isConnected && (!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
-               console.log("WebSocket: Triggering connect() from sendJsonMessage due to disconnected state.");
-               connect();
+               // console.log("WebSocket: Triggering connect() from sendJsonMessage due to disconnected state.");
+               connect(); // Attempt to reconnect if sending while disconnected
             }
         }
-    }, [/* isConnected and connect were not in dependencies previously, keep that if it was intentional */ isConnected, connect]); // Added isConnected and connect if re-connect attempt is desired here. If not, dependencies could be empty.
+    }, [isConnected, connect]); // connect is stable, isConnected makes this reactive if needed
 
     return { sendJsonMessage, lastJsonMessage, isConnected, connect };
 };

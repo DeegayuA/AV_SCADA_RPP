@@ -1622,7 +1622,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
           constantFlowSpeed: config.constantFlowSpeed,
           constantFlowActivationDataPointId: config.constantFlowActivationDataPointId,
           // Global specific flag
-          globallyInvertDefaultFlowForAllEdges: setGlobalInvertFlag, 
+          globallyInvertDefaultFlowForAllEdges: setGlobalInvertFlag ?? false, 
         };
         setActiveGlobalAnimationSettings(newGlobalSettings);
         setIsDirty(true);
