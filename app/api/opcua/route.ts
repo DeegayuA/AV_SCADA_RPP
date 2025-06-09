@@ -11,9 +11,15 @@ import {
   SecurityPolicy,
   DataType,
   DataValue,
+  BrowseDirection,
+  NodeClass,
+  BrowseDescription,
+  NodeId,
 } from "node-opcua";
 import { WebSocketServer, WebSocket } from "ws";
 import { NextRequest, NextResponse } from 'next/server';
+import { promises as fs } from 'fs';
+import path from 'path';
 
 // Variable to control if OPC UA connection should always be kept alive
 const KEEP_OPCUA_ALIVE = true;
@@ -37,6 +43,226 @@ let disconnectTimeout: NodeJS.Timeout | null = null;
 
 let localWsServer: WebSocketServer | null = null;
 let vercelWsServer: WebSocketServer | null = null;
+
+// Helper function to map DataType enum values to strings
+function getDataTypeString(dataTypeEnumValue: number): string {
+  // Check if the value exists in the DataType enum
+  if (DataType[dataTypeEnumValue]) {
+    return DataType[dataTypeEnumValue];
+  }
+  // Add custom mappings for values not directly in enum or for more readable names if necessary
+  // For example, some specific server might return values that need special handling.
+  // This basic version relies on the enum's string representation.
+  switch (dataTypeEnumValue) {
+    case DataType.Float: // Typically 10
+      return "Float";
+    case DataType.Double: // Typically 11
+      return "Double";
+    case DataType.Int16: // Typically 4
+      return "Int16";
+    case DataType.Int32: // Typically 6
+      return "Int32";
+    case DataType.Boolean: // Typically 1
+      return "Boolean";
+    case DataType.String: // Typically 12
+      return "String";
+    // Add more cases as needed based on common data types you expect
+    default:
+      return `Unknown (${dataTypeEnumValue})`;
+  }
+}
+
+// Function to map DataType NodeId to a string (more advanced, can be expanded)
+// For now, this will use the simpler getDataTypeString for basic types.
+// It takes the NodeId of the DataType attribute.
+async function mapDataTypeNodeIdToString(
+  dataTypeNodeId: NodeId,
+  session: ClientSession
+): Promise<string> {
+  if (dataTypeNodeId.namespace === 0 && typeof dataTypeNodeId.value === 'number') {
+    // It's a standard DataType enum value
+    return getDataTypeString(dataTypeNodeId.value);
+  } else {
+    // For complex/custom data types, try to read its BrowseName or DisplayName
+    try {
+      const browseNameDataValue = await session.read({ nodeId: dataTypeNodeId, attributeId: AttributeIds.BrowseName });
+      if (browseNameDataValue.statusCode.isGood() && browseNameDataValue.value?.value) {
+        return browseNameDataValue.value.value.name || `CustomType (ns=${dataTypeNodeId.namespace};i=${dataTypeNodeId.value})`;
+      }
+      const displayNameDataValue = await session.read({ nodeId: dataTypeNodeId, attributeId: AttributeIds.DisplayName });
+      if (displayNameDataValue.statusCode.isGood() && displayNameDataValue.value?.value) {
+        return displayNameDataValue.value.value.text || `CustomType (ns=${dataTypeNodeId.namespace};i=${dataTypeNodeId.value})`;
+      }
+      return `CustomType (ns=${dataTypeNodeId.namespace};s=${dataTypeNodeId.value})`;
+    } catch (error) {
+      console.error(`Error reading BrowseName/DisplayName for DataType NodeId ${dataTypeNodeId.toString()}:`, error);
+      return `UnknownCustomType (NodeId: ${dataTypeNodeId.toString()})`;
+    }
+  }
+}
+
+
+interface DiscoveredDataPoint {
+  name: string;
+  address: string;
+  initialValue: any;
+  dataType: string;
+}
+
+async function browseAllNodes(session: ClientSession): Promise<DiscoveredDataPoint[]> {
+  const discoveredPoints: DiscoveredDataPoint[] = [];
+  const nodesToVisit: BrowseDescription[] = [];
+
+  // Starting point: ObjectsFolder
+  const rootNodeToBrowse: BrowseDescription = new BrowseDescription({
+    nodeId: "ns=0;i=85", // ObjectsFolder
+    browseDirection: BrowseDirection.Forward,
+    includeSubtypes: true,
+    nodeClassMask: 0, // Browse all node classes initially
+    resultMask: 63 // All result fields
+  });
+  nodesToVisit.push(rootNodeToBrowse);
+
+  const visitedNodeIds = new Set<string>(); // To avoid re-processing or circular loops
+
+  while (nodesToVisit.length > 0) {
+    const nodeToBrowse = nodesToVisit.shift();
+    if (!nodeToBrowse || !nodeToBrowse.nodeId) continue;
+
+    const nodeIdString = nodeToBrowse.nodeId.toString();
+    if (visitedNodeIds.has(nodeIdString)) {
+      continue;
+    }
+    visitedNodeIds.add(nodeIdString);
+
+    console.log(`Browsing node: ${nodeIdString}`);
+
+    try {
+      const browseResult = await session.browse(nodeToBrowse);
+
+      if (browseResult.references) {
+        for (const reference of browseResult.references) {
+          const discoveredNodeId = reference.nodeId; // This is a NodeId object
+          const discoveredNodeIdString = discoveredNodeId.toString();
+
+          // Determine display name (prefer displayName, fallback to browseName)
+          let name = reference.displayName?.text || reference.browseName?.name || "Unknown";
+          if(reference.browseName?.namespaceIndex > 0) { // Add namespace prefix if not default
+            name = `ns=${reference.browseName.namespaceIndex}:${name}`;
+          }
+
+
+          // Process only Variable nodes for data point extraction
+          if (reference.nodeClass === NodeClass.Variable) {
+            let initialValue: any = "N/A";
+            let dataTypeString: string = "Unknown";
+
+            try {
+              const valueDataValue = await session.read({ nodeId: discoveredNodeId, attributeId: AttributeIds.Value });
+              if (valueDataValue.statusCode.isGood() && valueDataValue.value?.value !== null && valueDataValue.value?.value !== undefined) {
+                initialValue = valueDataValue.value.value;
+              } else {
+                initialValue = `Error: ${valueDataValue.statusCode.toString()}`;
+              }
+            } catch (readError: any) {
+              console.error(`Error reading value for ${discoveredNodeIdString}: ${readError.message}`);
+              initialValue = `Read Error: ${readError.message.substring(0, 50)}`;
+            }
+
+            try {
+              const dataTypeDataValue = await session.read({ nodeId: discoveredNodeId, attributeId: AttributeIds.DataType });
+              if (dataTypeDataValue.statusCode.isGood() && dataTypeDataValue.value?.value) {
+                const dataTypeNodeId = dataTypeDataValue.value.value as NodeId; // The value is the NodeId of the DataType
+                dataTypeString = await mapDataTypeNodeIdToString(dataTypeNodeId, session);
+              } else {
+                 dataTypeString = `Error: ${dataTypeDataValue.statusCode.toString()}`;
+              }
+            } catch (readError: any) {
+              console.error(`Error reading dataType for ${discoveredNodeIdString}: ${readError.message}`);
+              dataTypeString = `Read Error: ${readError.message.substring(0,50)}`;
+            }
+
+            // Ensure name uniqueness if needed, or use browseName as a key
+            // For address, using the full NodeId string is standard
+            discoveredPoints.push({
+              name: name, // Using the determined name
+              address: discoveredNodeIdString,
+              initialValue: initialValue,
+              dataType: dataTypeString,
+            });
+            console.log(`Found Variable: ${name} (${discoveredNodeIdString}), Value: ${initialValue}, DataType: ${dataTypeString}`);
+          }
+
+          // If the node is an Object or might have children, add it to the queue for further browsing
+          // Avoid browsing too deep into non-object types that are not variables themselves
+          if (reference.nodeClass === NodeClass.Object || reference.nodeClass === NodeClass.View) {
+             if (!visitedNodeIds.has(discoveredNodeIdString)) { // Check again before adding
+                const nextNodeToBrowse: BrowseDescription = new BrowseDescription({
+                    nodeId: discoveredNodeId,
+                    browseDirection: BrowseDirection.Forward,
+                    includeSubtypes: true,
+                    nodeClassMask: 0, // Continue browsing all classes
+                    resultMask: 63
+                });
+                nodesToVisit.push(nextNodeToBrowse);
+             }
+          }
+        }
+      }
+    } catch (browseError: any) {
+      console.error(`Error browsing node ${nodeIdString}: ${browseError.message}`);
+      // Optionally, add this error to a list of problematic nodes
+    }
+  }
+  console.log(`Browsing complete. Discovered ${discoveredPoints.length} variable data points.`);
+  return discoveredPoints;
+}
+
+async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ success: boolean; message: string; count: number; filePath?: string; data?: DiscoveredDataPoint[]; error?: string }> {
+  try {
+    console.log("Starting datapoint discovery process...");
+    const discoveredDataPoints = await browseAllNodes(session);
+
+    if (!discoveredDataPoints || discoveredDataPoints.length === 0) {
+      console.log("No datapoints found during browse operation.");
+      return { success: true, message: 'No datapoints found.', count: 0, data: [] };
+    }
+
+    console.log(`Discovered ${discoveredDataPoints.length} datapoints. Attempting to save to file...`);
+    const filePath = path.join('/tmp', 'discovered_datapoints.json');
+    const jsonData = JSON.stringify(discoveredDataPoints, null, 2);
+
+    try {
+      await fs.writeFile(filePath, jsonData);
+      console.log(`Successfully saved discovered datapoints to ${filePath}`);
+      return {
+        success: true,
+        message: 'Datapoints discovered and saved successfully.',
+        count: discoveredDataPoints.length,
+        filePath: filePath,
+        data: discoveredDataPoints
+      };
+    } catch (fsError: any) {
+      console.error(`Failed to save discovered datapoints to file at ${filePath}:`, fsError);
+      return {
+        success: false,
+        message: 'Failed to save discovered datapoints to file.',
+        count: discoveredDataPoints.length,
+        data: discoveredDataPoints, // Still return data even if save failed
+        error: fsError.message
+      };
+    }
+  } catch (browseError: any) {
+    console.error("Error during datapoint discovery (browseAllNodes call):", browseError);
+    return {
+      success: false,
+      message: 'Error during datapoint discovery.',
+      count: 0,
+      error: browseError.message
+    };
+  }
+}
+
 
 let localPingIntervalId: NodeJS.Timeout | null = null;
 let vercelPingIntervalId: NodeJS.Timeout | null = null;
@@ -689,3 +915,5 @@ if (typeof process !== 'undefined') {
         console.error('Reason:', reason);
     });
 }
+
+export { opcuaSession, connectOPCUA, discoverAndSaveDatapoints, DiscoveredDataPoint };
