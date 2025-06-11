@@ -23,7 +23,7 @@ export const WS_URL = (() => {
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.166.112:4840";
-export const VERSION = "- Release v2025.06.06 • 11:00 (GMT+5:30)";
+export const VERSION = "- Release v2025.06.11 • 14:00 (GMT+5:30)";
 export const PLANT_NAME= "Mini-Grid";
 export const PLANT_LOCATION = "Colombo, Sri Lanka";
 export const PLANT_TYPE = "Mini-Grid";
@@ -39,7 +39,7 @@ export const APP_LOGO2 = logo2;
 export const APP_FAVICON = "/favicon.ico";
 export const APP_AUTHOR = "Atla Vision";
 export const APP_AUTHOR_URL = "https://yourwebsite.com";
-export const APP_COPYRIGHT = "© 2025 Your Company. All rights reserved.";
+export const APP_COPYRIGHT = "© 2025 Alta Vision. All rights reserved.";
 export const APP_COPYRIGHT_URL = "https://yourwebsite.com/copyright";
 export const APP_PRIVACY_POLICY = "https://yourwebsite.com/privacy-policy";
 export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";

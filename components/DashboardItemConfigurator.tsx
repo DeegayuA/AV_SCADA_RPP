@@ -6,10 +6,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DataPoint } from '@/config/dataPoints';
-import { X, Search, RotateCcw, PackagePlus, Info, CheckCheck, PlusCircle, ListFilter, Edit3 } from 'lucide-react';
+import { X, Search, RotateCcw, PackagePlus, Info, CheckCheck, PlusCircle, ListFilter } from 'lucide-react';
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import clsx from 'clsx';
 import { VariableSizeGrid, GridChildComponentProps } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
@@ -27,9 +27,9 @@ type DataItem =
     | { itemType: 'individualItem'; data: DataPoint };
 
 // Grid configuration
-const ROW_HEIGHTS = { GRID_ITEM: 80 }; // Slightly taller for enhanced card
-const MIN_COLUMN_WIDTH = 170; // Adjusted min width
-const DEFAULT_COLUMN_COUNT = 3; // Adjusted default based on sidebar
+const ROW_HEIGHTS = { GRID_ITEM: 80 };
+const MIN_COLUMN_WIDTH = 170;
+// const DEFAULT_COLUMN_COUNT = 3; // No longer used as columnCount is dynamic via AutoSizer
 
 // --- New DataPoint Form Data ---
 export interface NewDataPointFormData {
@@ -47,27 +47,31 @@ interface DashboardItemConfiguratorProps {
     availableThreePhaseGroups: ConfiguratorThreePhaseGroup[];
     currentDisplayedIds: string[];
     onAddMultipleDataPoints: (selectedIds: string[]) => void;
-    // New prop for saving a new data point.
-    // It should handle persistence and update the availableIndividualPoints list.
-    // Returns a promise, can indicate success/failure or return the newly created point.
     onSaveNewDataPoint: (data: NewDataPointFormData) => Promise<{ success: boolean; error?: string; newPoint?: DataPoint }>;
+    itemTypeName?: string; // For "Add {itemTypeName} Items" e.g., "Widgets", "Gauges"
 }
 
 // --- Main Component ---
 const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
     isOpen, onClose, availableIndividualPoints, availableThreePhaseGroups,
     currentDisplayedIds, onAddMultipleDataPoints, onSaveNewDataPoint,
+    itemTypeName = "Dashboard", // Default item type name
 }) => {
     // --- State ---
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [selectedIndividualIds, setSelectedIndividualIds] = useState<Set<string>>(new Set());
     const [selectedGroupNames, setSelectedGroupNames] = useState<Set<string>>(new Set());
-    const [columnCount, setColumnCount] = useState(DEFAULT_COLUMN_COUNT);
+    const [columnCount, setColumnCount] = useState(3); // Initial arbitrary, will be updated
     const [isAddNewModalOpen, setIsAddNewModalOpen] = useState(false);
     const [isSavingNewPoint, setIsSavingNewPoint] = useState(false);
 
     const gridRef = useRef<VariableSizeGrid>(null);
+    
+    const capitalizedItemTypeName = useMemo(() => {
+        if (!itemTypeName) return "Items";
+        return itemTypeName.charAt(0).toUpperCase() + itemTypeName.slice(1).toLowerCase();
+    }, [itemTypeName]);
 
     // --- Effects ---
     useEffect(() => {
@@ -101,7 +105,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
         };
 
         const groupFilter = (g: ConfiguratorThreePhaseGroup) => {
-            if (g.ids.every(id => currentDisplayedIds.includes(id))) return false; // Already fully added
+            if (g.ids.every(id => currentDisplayedIds.includes(id))) return false;
             if (selectedCategory && g.category !== selectedCategory) return false;
             if (!searchTerm) return true;
             return g.representativeName.toLowerCase().includes(lowerSearchTerm) ||
@@ -117,7 +121,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
             .filter(groupFilter)
             .map(g => ({ itemType: 'groupItem', data: g }));
 
-        return [...groups, ...individuals]; // Groups first or sort as preferred
+        return [...groups, ...individuals];
     }, [availableIndividualPoints, availableThreePhaseGroups, currentDisplayedIds, searchTerm, selectedCategory]);
 
     const itemCountsPerCategory = useMemo(() => {
@@ -180,26 +184,23 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
         try {
             const result = await onSaveNewDataPoint(data);
             if (result.success) {
-                // Optionally, if the new item fits current filters, select it.
                 if (result.newPoint) {
                      const newPointId = result.newPoint.id;
-                     // Check if new item is visible with current filters
                      const categoryMatch = !selectedCategory || result.newPoint.category === selectedCategory;
                      const searchMatch = !searchTerm || 
                                         result.newPoint.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                         (result.newPoint.category && result.newPoint.category.toLowerCase().includes(searchTerm.toLowerCase()));
-
                      if (categoryMatch && searchMatch && !currentDisplayedIds.includes(newPointId)) {
                         handleToggleIndividual(newPointId);
                      }
                 }
                 setIsAddNewModalOpen(false); 
             } else {
-                alert(`Error saving: ${result.error || 'Unknown error'}`); // Replace with better error UI
+                alert(`Error saving: ${result.error || 'Unknown error'}`);
             }
         } catch (error) {
             console.error("Failed to save new data point:", error);
-            alert("An unexpected error occurred while saving."); // Replace with better error UI
+            alert("An unexpected error occurred while saving.");
         } finally {
             setIsSavingNewPoint(false);
         }
@@ -210,7 +211,6 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
         handleToggleIndividual, handleToggleGroup, getGroupItemCounts,
     }), [filteredDataItems, columnCount, selectedIndividualIds, selectedGroupNames, currentDisplayedIds, handleToggleIndividual, handleToggleGroup, getGroupItemCounts]);
 
-    // Conditional Rendering Flags
     const canSelectAnyVisible = useMemo(() => filteredDataItems.some(item => {
         if (item.itemType === 'individualItem') return !selectedIndividualIds.has(item.data.id);
         if (item.itemType === 'groupItem') return !selectedGroupNames.has(item.data.name) && !item.data.ids.every(id => currentDisplayedIds.includes(id));
@@ -238,22 +238,20 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
         setSelectedGroupNames(prev => new Set(Array.from(prev).filter(name => !visGrpNames.has(name))));
     };
 
-
     if (!isOpen) return null;
 
     return (
         <>
             <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-                <DialogContent className="max-w-6xl 2xl:max-w-8xl h-[90vh] flex flex-col p-0 overflow-hidden">
-                    <DialogHeader className="p-4 border-b flex-shrink-0">
-                        <DialogTitle className="text-2xl font-semibold">Add Dashboard Items</DialogTitle>
-                        <DialogDescription className="text-sm">
-                            Browse, search, and select items to add to your dashboard.
+                <DialogContent className="w-full max-w-full md:max-w-6xl 2xl:max-w-8xl h-full md:h-[90vh] flex flex-col p-0 overflow-hidden md:rounded-lg">
+                    <DialogHeader className="p-3 sm:p-4 border-b flex-shrink-0">
+                        <DialogTitle className="text-xl sm:text-2xl font-semibold">Add {capitalizedItemTypeName} Items</DialogTitle>
+                        <DialogDescription className="text-xs sm:text-sm">
+                            Browse, search, and select items to add to your {itemTypeName.toLowerCase()}.
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="flex flex-1 min-h-0"> {/* Main layout: Sidebar + Content */}
-                        {/* Category Sidebar */}
+                    <div className="flex flex-col md:flex-row flex-1 min-h-0"> {/* Main layout: Sidebar + Content */}
                         <CategorySidebar
                             categories={allCategories}
                             selectedCategory={selectedCategory}
@@ -262,22 +260,19 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
                             onAddNew={() => setIsAddNewModalOpen(true)}
                         />
 
-                        {/* Main Content Area */}
-                        <div className="flex-1 flex flex-col min-h-0 border-l">
-                            {/* Search and Actions Bar */}
-                            <div className="px-4 py-3 flex-shrink-0 flex items-center justify-between gap-3 border-b">
-                                <div className="relative flex-grow max-w-lg">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                    <Input type="search" placeholder="Search name, category, ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 pr-8 h-9 text-sm rounded-md" />
+                        <div className="flex-1 flex flex-col min-h-0 md:border-l"> {/* Main Content Area */}
+                            <div className="px-3 sm:px-4 py-2.5 sm:py-3 flex-shrink-0 flex flex-col xs:flex-row items-stretch xs:items-center xs:justify-between gap-2 sm:gap-3 border-b">
+                                <div className="relative flex-grow w-full xs:max-w-xs sm:max-w-sm md:max-w-md">
+                                    <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+                                    <Input type="search" placeholder="Search name, category, ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-8 sm:pl-9 pr-8 h-8 sm:h-9 text-xs sm:text-sm rounded-md" />
                                     {searchTerm && <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6" onClick={() => setSearchTerm('')}><X className="h-3.5 w-3.5" /></Button>}
                                 </div>
-                                <Button variant="outline" size="sm" onClick={() => setIsAddNewModalOpen(true)}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Data Point
+                                <Button variant="outline" size="sm" onClick={() => setIsAddNewModalOpen(true)} className="w-full xs:w-auto h-8 sm:h-9 text-xs sm:text-sm">
+                                    <PlusCircle className="mr-1.5 h-3.5 w-3.5 sm:mr-2 sm:h-4 sm:w-4" /> Add New Data Point
                                 </Button>
                             </div>
 
-                            {/* Item Grid Section */}
-                            <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-2">
+                            <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-1.5 sm:p-2">
                                 {filteredDataItems.length > 0 && (
                                     <BulkSelectionActions
                                         onSelectAll={handleSelectAllVisible}
@@ -287,7 +282,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
                                         selectionCount={effectiveDataPointsToAdd.length}
                                     />
                                 )}
-                                <div className="flex-1 relative min-h-[100px]"> {/* AutoSizer requires positive dimensions */}
+                                <div className="flex-1 relative min-h-[100px]">
                                     {gridRowCount === 0 ? (
                                         <EmptyStateMessage searchTerm={searchTerm} selectedCategory={selectedCategory} />
                                     ) : (
@@ -304,7 +299,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
                                                 }
                                                 return (
                                                     <VariableSizeGrid
-                                                        key={`grid-${columnCount}-${selectedCategory}`}
+                                                        key={`grid-${columnCount}-${selectedCategory || 'all'}-${filteredDataItems.length}`}
                                                         ref={gridRef}
                                                         height={height}
                                                         width={width}
@@ -326,16 +321,15 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
                         </div>
                     </div>
 
-                    {/* Footer */}
-                    <DialogFooter className="p-3 flex-shrink-0 bg-muted/30 border-t gap-2 items-center">
-                        <div className="text-xs text-muted-foreground mr-auto">
+                    <DialogFooter className="p-2.5 sm:p-3 flex-shrink-0 bg-muted/30 border-t gap-2 flex-col xs:flex-row items-stretch xs:items-center">
+                        <div className="text-[11px] sm:text-xs text-muted-foreground mr-auto text-center xs:text-left mb-1 xs:mb-0">
                             {totalSelectionsCount > 0 ? `${totalSelectionsCount} selected` : 'No items selected'}
                             {effectiveDataPointsToAdd.length > 0 && ` (${effectiveDataPointsToAdd.length} new to add)`}
                         </div>
-                        <Button type="button" variant="ghost" onClick={handleClearAllSelections} disabled={totalSelectionsCount === 0} size="sm"><RotateCcw className="mr-1.5 h-3.5 w-3.5" />Clear</Button>
-                        <DialogClose asChild><Button type="button" variant="outline" size="sm">Cancel</Button></DialogClose>
-                        <Button type="button" onClick={handleAddSelected} disabled={effectiveDataPointsToAdd.length === 0} size="sm" className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                            <PackagePlus className="mr-1.5 h-4 w-4" />Add ({effectiveDataPointsToAdd.length})
+                        <Button type="button" variant="ghost" onClick={handleClearAllSelections} disabled={totalSelectionsCount === 0} size="sm" className="xs:size-sm"><RotateCcw className="mr-1.5 h-3 w-3 xs:h-3.5 xs:w-3.5" />Clear</Button>
+                        <DialogClose asChild><Button type="button" variant="outline" size="sm" className="xs:size-sm">Cancel</Button></DialogClose>
+                        <Button type="button" onClick={handleAddSelected} disabled={effectiveDataPointsToAdd.length === 0} size="sm" className="xs:size-sm bg-primary hover:bg-primary/90 text-primary-foreground">
+                            <PackagePlus className="mr-1.5 h-3.5 w-3.5 xs:h-4 xs:w-4" />Add ({effectiveDataPointsToAdd.length})
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -352,52 +346,46 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
     );
 };
 
-// --- Category Sidebar Component ---
 interface CategorySidebarProps {
     categories: string[];
     selectedCategory: string | null;
     onSelectCategory: (category: string | null) => void;
     itemCounts: Record<string, number>;
-    onAddNew: () => void; // For the "Add New" button in sidebar if needed, or keep it main panel only
+    onAddNew: () => void;
 }
 const CategorySidebar: React.FC<CategorySidebarProps> = ({ categories, selectedCategory, onSelectCategory, itemCounts }) => {
     const totalAvailableItems = useMemo(() => Object.values(itemCounts).reduce((sum, count) => sum + count, 0), [itemCounts]);
 
     return (
-        <div className="w-56 flex-shrink-0 bg-muted/20 p-3 flex flex-col space-y-1 overflow-y-auto custom-scrollbar">
-            <p className="text-xs font-semibold text-muted-foreground px-2 mb-1 uppercase">Categories</p>
+        <div className="w-full md:w-56 lg:w-64 flex-shrink-0 bg-muted/20 p-2 sm:p-3 flex flex-col space-y-0.5 sm:space-y-1 overflow-y-auto custom-scrollbar border-b md:border-b-0 md:border-r max-h-[35vh] md:max-h-none">
+            <p className="text-[10px] sm:text-xs font-semibold text-muted-foreground px-1.5 sm:px-2 mb-1 uppercase">Categories</p>
             <Button
                 variant={selectedCategory === null ? "secondary" : "ghost"}
                 size="sm"
-                className="w-full justify-start text-sm"
+                className="w-full justify-start text-xs sm:text-sm h-8 sm:h-9"
                 onClick={() => onSelectCategory(null)}
             >
-                <ListFilter className="mr-2 h-4 w-4" />
+                <ListFilter className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                 All Items
-                <Badge variant="outline" className="ml-auto">{totalAvailableItems}</Badge>
+                <Badge variant="outline" className="ml-auto text-[9px] px-1 py-0 sm:text-[10px] sm:px-1.5 sm:py-0.5">{totalAvailableItems}</Badge>
             </Button>
             {categories.map(category => (
                 <Button
                     key={category}
                     variant={selectedCategory === category ? "secondary" : "ghost"}
                     size="sm"
-                    className="w-full justify-start text-sm truncate"
+                    className="w-full justify-start text-xs sm:text-sm truncate h-8 sm:h-9"
                     onClick={() => onSelectCategory(category)}
                     title={category}
                 >
                    <span className="truncate flex-1">{category}</span>
-                   <Badge variant="outline" className="ml-2">{itemCounts[category] || 0}</Badge>
+                   <Badge variant="outline" className="ml-1.5 sm:ml-2 text-[9px] px-1 py-0 sm:text-[10px] sm:px-1.5 sm:py-0.5 flex-shrink-0">{itemCounts[category] || 0}</Badge>
                 </Button>
             ))}
-             {/* Optional: Add New button here as well or instead of main panel */}
-            {/* <Button variant="outline" size="sm" className="w-full mt-auto" onClick={onAddNew}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add New Data Point
-            </Button> */}
         </div>
     );
 };
 
-// --- GridViewCell (Renders EnhancedSingleItemCard) ---
 const GridViewCell = memo(({ columnIndex, rowIndex, style, data }: GridChildComponentProps) => {
     const { items, columnCount, ...restOfData } = data;
     const itemIndex = rowIndex * columnCount + columnIndex;
@@ -408,10 +396,10 @@ const GridViewCell = memo(({ columnIndex, rowIndex, style, data }: GridChildComp
     return (
         <motion.div 
             style={style} 
-            className="flex items-center justify-center p-1.5" // Padding around each card
-            initial={{ opacity: 0, y: 20 }}
+            className="flex items-center justify-center p-1 sm:p-1.5"
+            initial={{ opacity: 0, y: 15 }} // Slightly reduced y
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, delay: (rowIndex * columnCount + columnIndex) * 0.02 }} // Stagger effect
+            transition={{ duration: 0.15, delay: (rowIndex * columnCount + columnIndex) * 0.015 }} // Faster stagger
         >
             <EnhancedSingleItemCard item={item} {...restOfData} />
         </motion.div>
@@ -419,8 +407,6 @@ const GridViewCell = memo(({ columnIndex, rowIndex, style, data }: GridChildComp
 });
 GridViewCell.displayName = 'GridViewCell';
 
-
-// --- Enhanced Single Item Card ---
 interface EnhancedSingleItemCardProps {
     item: DataItem;
     selectedIndividualIds: Set<string>;
@@ -452,7 +438,7 @@ const EnhancedSingleItemCard: React.FC<EnhancedSingleItemCardProps> = memo(({
         isFullyAddedToDashboard = displayableNow === 0 && groupData.ids.every(id => currentDisplayedIds.includes(id));
         isSelected = selectedGroupNames.has(groupData.name) && !isFullyAddedToDashboard;
 
-        tooltipText = `${groupData.representativeName} (Group) - ${groupData.category}. `;
+        tooltipText = `${groupData.representativeName} (Group) - ${groupData.category || 'Uncategorized'}. `;
         if (isFullyAddedToDashboard) {
             badgeContent = "All Added";
             tooltipText += `All ${totalInGroup} items in this group are on the dashboard.`;
@@ -462,15 +448,15 @@ const EnhancedSingleItemCard: React.FC<EnhancedSingleItemCardProps> = memo(({
         } else if (displayableNow === totalInGroup) {
             badgeContent = `${totalInGroup} Items`;
             tooltipText += `Adds all ${totalInGroup} items from this group.`;
-        } else { // displayableNow === 0, and not fully added. Potentially a configuration mismatch.
+        } else {
             badgeContent = "No new items";
             tooltipText += "No new items available to add from this group.";
         }
-    } else { // Individual Item
+    } else {
         const dpData = dataPayload as DataPoint;
         isFullyAddedToDashboard = currentDisplayedIds.includes(dpData.id);
         isSelected = selectedIndividualIds.has(dpData.id) && !isFullyAddedToDashboard;
-        tooltipText = `${dpData.name} (Item) - ${dpData.category}.`;
+        tooltipText = `${dpData.name} (Item) - ${dpData.category || 'Uncategorized'}.`;
         if (isFullyAddedToDashboard) tooltipText += " This item is already on the dashboard.";
         else tooltipText += " Click to select/deselect this item."
     }
@@ -482,60 +468,53 @@ const EnhancedSingleItemCard: React.FC<EnhancedSingleItemCardProps> = memo(({
     };
     
     const cardVariants = {
-        initial: { scale: 1, y: 0, boxShadow: "0 1px 3px rgba(0,0,0,0.1)" },
+        initial: { scale: 1, y: 0, boxShadow: "0 1px 2px rgba(0,0,0,0.07)" },
         hover: { 
-            scale: 1.03, 
-            y: -2, 
-            boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-            transition: { type: "spring", stiffness: 400, damping: 15, duration: 0.15 }
+            scale: 1.02, y: -1, boxShadow: "0 3px 8px rgba(0,0,0,0.12)",
+            transition: { type: "spring", stiffness: 350, damping: 15, duration: 0.1 }
         },
     };
 
     const cardContent = (
         <motion.div
-            variants={!isFullyAddedToDashboard ? cardVariants : { initial: cardVariants.initial }} // Disable hover animation if disabled
+            variants={!isFullyAddedToDashboard ? cardVariants : { initial: cardVariants.initial }}
             initial="initial"
             whileHover="hover"
             onClick={handleToggle}
             className={clsx(
-                "w-full h-full flex flex-col items-start justify-between p-2.5 text-left space-y-1.5",
-                "border rounded-lg shadow-sm transition-colors duration-150 cursor-pointer overflow-hidden relative group",
-                "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-none",
+                "w-full h-full flex flex-col items-start justify-between p-2 sm:p-2.5 text-left space-y-1 sm:space-y-1.5",
+                "border rounded-md sm:rounded-lg shadow-sm transition-colors duration-150 cursor-pointer overflow-hidden relative group",
+                "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
                 isFullyAddedToDashboard ? "opacity-60 bg-muted/50 border-dashed cursor-not-allowed" : "hover:border-primary/80",
-                isSelected && !isFullyAddedToDashboard ? "bg-primary/10 border-primary ring-2 ring-primary" : "bg-card border-input"
+                isSelected && !isFullyAddedToDashboard ? "bg-primary/10 border-primary ring-1 sm:ring-2 ring-primary" : "bg-card border-input"
             )}
-            role="checkbox"
-            aria-checked={isSelected}
-            aria-disabled={isFullyAddedToDashboard}
+            role="checkbox" aria-checked={isSelected} aria-disabled={isFullyAddedToDashboard}
             tabIndex={isFullyAddedToDashboard ? -1 : 0}
             onKeyDown={(e) => { if (!isFullyAddedToDashboard && (e.key === ' ' || e.key === 'Enter')) { e.preventDefault(); handleToggle(); }}}
         >
-            {/* Card Top: Name and Category */}
             <div className="w-full">
-                <h4 className="font-semibold text-sm leading-tight line-clamp-2" title={displayName}>{displayName}</h4>
-                <p className="text-muted-foreground text-xs line-clamp-1" title={category}>{category}</p>
+                <h4 className="font-semibold text-xs sm:text-sm leading-tight line-clamp-2" title={displayName}>{displayName}</h4>
+                <p className="text-muted-foreground text-[10px] sm:text-xs line-clamp-1" title={category || 'Uncategorized'}>{category || 'Uncategorized'}</p>
             </div>
-
-            {/* Card Bottom: Badge and Selection Check */}
-            <div className="w-full flex items-center justify-between mt-auto pt-1">
+            <div className="w-full flex items-center justify-between mt-auto pt-0.5 sm:pt-1">
                 {badgeContent && (
                      <Badge
                         variant={isFullyAddedToDashboard ? "outline" : (isSelected ? "default" : "secondary")}
-                        className={clsx("text-[10px] px-1.5 py-0.5", isFullyAddedToDashboard && "border-dashed")}
+                        className={clsx("text-[9px] px-1 py-0 sm:text-[10px] sm:px-1.5 sm:py-0.5", isFullyAddedToDashboard && "border-dashed")}
                     >
                         {badgeContent}
                     </Badge>
                 )}
                 {!isFullyAddedToDashboard && (
                     <div className={clsx(
-                        "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all duration-200 ml-auto",
+                        "h-4 w-4 sm:h-5 sm:w-5 rounded-full border flex sm:border-2 items-center justify-center transition-all duration-200 ml-auto",
                         isSelected ? "bg-primary border-primary" : "bg-background border-muted-foreground/50 group-hover:border-primary/70",
                     )}>
-                        {isSelected && <CheckCheck className="h-3 w-3 text-primary-foreground" />}
+                        {isSelected && <CheckCheck className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-primary-foreground" />}
                     </div>
                 )}
                 {isFullyAddedToDashboard && (
-                     <CheckCheck className="h-4 w-4 text-green-600 ml-auto" />
+                     <CheckCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 ml-auto" />
                 )}
             </div>
         </motion.div>
@@ -545,35 +524,33 @@ const EnhancedSingleItemCard: React.FC<EnhancedSingleItemCardProps> = memo(({
         <TooltipProvider delayDuration={300}>
             <Tooltip>
                 <TooltipTrigger asChild>{cardContent}</TooltipTrigger>
-                <TooltipContent side="bottom" align="start" className="text-xs max-w-xs"><p>{tooltipText}</p></TooltipContent>
+                <TooltipContent side="bottom" align="start" className="text-xs max-w-xs sm:max-w-sm"><p>{tooltipText}</p></TooltipContent>
             </Tooltip>
         </TooltipProvider>
     );
 });
 EnhancedSingleItemCard.displayName = 'EnhancedSingleItemCard';
 
-
-// --- Bulk Selection Actions --- (styling can be updated)
 const BulkSelectionActions: React.FC<{
     onSelectAll: () => void; onDeselectAll: () => void; canSelectAll: boolean; canDeselectAll: boolean; selectionCount: number;
 }> = ({ onSelectAll, onDeselectAll, canSelectAll, canDeselectAll, selectionCount }) => (
-    <div className="flex-shrink-0 flex items-center gap-1 py-1.5 border-b mb-2 text-xs mx-1">
-        <span className="mr-auto text-xs text-muted-foreground px-1">
-            {selectionCount > 0 ? `${selectionCount} new items marked for addition` : "Select items below"}
+    <div className="flex-shrink-0 flex items-center gap-1 py-1 sm:py-1.5 border-b mb-1.5 sm:mb-2 text-xs mx-0.5 sm:mx-1">
+        <span className="mr-auto text-[10px] sm:text-xs text-muted-foreground px-1">
+            {selectionCount > 0 ? `${selectionCount} new marked` : "Select items"}
         </span>
         <TooltipProvider delayDuration={150}>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" onClick={onSelectAll} disabled={!canSelectAll}>
-                        <CheckCheck className="mr-1 h-3.5 w-3.5" />All Visible
+                    <Button variant="ghost" size="sm" onClick={onSelectAll} disabled={!canSelectAll} className="text-[10px] sm:text-xs px-1.5 sm:px-2">
+                        <CheckCheck className="mr-1 h-3 w-3" />All Vis
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent><p>{canSelectAll ? "Select all visible & available items" : "All visible items already selected or none to select"}</p></TooltipContent>
             </Tooltip>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <Button variant="ghost" size="sm" onClick={onDeselectAll} disabled={!canDeselectAll}>
-                        <X className="mr-1 h-3.5 w-3.5" />None Visible
+                    <Button variant="ghost" size="sm" onClick={onDeselectAll} disabled={!canDeselectAll} className="text-[10px] sm:text-xs px-1.5 sm:px-2">
+                        <X className="mr-1 h-3 w-3" />None Vis
                     </Button>
                 </TooltipTrigger>
                 <TooltipContent><p>{canDeselectAll ? "Deselect all visible selected items" : "No visible items are selected"}</p></TooltipContent>
@@ -583,8 +560,6 @@ const BulkSelectionActions: React.FC<{
 );
 BulkSelectionActions.displayName = 'BulkSelectionActions';
 
-
-// --- Empty State Message ---
 const EmptyStateMessage: React.FC<{ searchTerm: string, selectedCategory: string | null }> = ({ searchTerm, selectedCategory }) => {
     let title = "No Available Items";
     let message = "All items might already be on your dashboard, or there are no items matching the current filters.";
@@ -596,23 +571,21 @@ const EmptyStateMessage: React.FC<{ searchTerm: string, selectedCategory: string
         message = `Your search for "${searchTerm}" did not match any available items. Try a different term or clear the search.`;
     } else if (selectedCategory) {
         title = "No items in category";
-        message = `There are no available items in the "${selectedCategory}" category. Try a different category or 'All Items'.`;
+        message = `There are no available items in the "${selectedCategory}" category. Try 'All Items'.`;
     }
-
     return (
-    <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-        <Info className="h-12 w-12 text-muted-foreground/40" />
-        <p className="text-lg font-medium text-foreground">{title}</p>
-        <p className="text-sm text-muted-foreground max-w-md">{message}</p>
+    <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 sm:p-6 space-y-2 sm:space-y-3">
+        <Info className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground/40" />
+        <p className="text-base sm:text-lg font-medium text-foreground">{title}</p>
+        <p className="text-xs sm:text-sm text-muted-foreground max-w-xs sm:max-w-md">{message}</p>
     </div>
 )};
 EmptyStateMessage.displayName = 'EmptyStateMessage';
 
-// --- Add New Data Point Modal ---
 interface AddNewDataPointModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (data: NewDataPointFormData) => Promise<void>;
+    onSave: (data: NewDataPointFormData) => Promise<void>; // Assuming onSave will close modal internally upon success if needed
     existingCategories: string[];
     isSaving: boolean;
 }
@@ -624,7 +597,7 @@ const AddNewDataPointModal: React.FC<AddNewDataPointModalProps> = ({ isOpen, onC
     const [description, setDescription] = useState('');
     const [formError, setFormError] = useState<string | null>(null);
 
-    useEffect(() => { // Reset form when opened
+    useEffect(() => {
         if (isOpen) {
             setName(''); setCategory(''); setUnit(''); setDescription(''); setFormError(null);
         }
@@ -638,45 +611,44 @@ const AddNewDataPointModal: React.FC<AddNewDataPointModalProps> = ({ isOpen, onC
         }
         setFormError(null);
         await onSave({ name: name.trim(), category: category.trim(), unit: unit.trim(), description: description.trim() });
-        // onClose(); // Parent should close on successful save if desired
     };
 
     if (!isOpen) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => { if (!open && !isSaving) onClose(); }}>
-            <DialogContent className="sm:max-w-lg" onPointerDownOutside={(e) => isSaving && e.preventDefault()}>
+            <DialogContent className="w-[90vw] max-w-md sm:max-w-lg" onPointerDownOutside={(e) => isSaving && e.preventDefault()}>
                 <DialogHeader>
-                    <DialogTitle className="text-xl">Add New Data Point</DialogTitle>
-                    <DialogDescription>Enter the details for the new data point. It will become available for selection.</DialogDescription>
+                    <DialogTitle className="text-lg sm:text-xl">Add New Data Point</DialogTitle>
+                    <DialogDescription className="text-xs sm:text-sm">Enter details for the new data point. It will then be available.</DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 py-2">
+                <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 py-2">
                     <div>
-                        <label htmlFor="dp-name" className="block text-sm font-medium text-muted-foreground mb-1">Name <span className="text-destructive">*</span></label>
-                        <Input id="dp-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Main Power Consumption" disabled={isSaving} />
+                        <label htmlFor="dp-name" className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1">Name <span className="text-destructive">*</span></label>
+                        <Input id="dp-name" value={name} onChange={e => setName(e.target.value)} placeholder="e.g., Main Power Consumption" disabled={isSaving} className="h-9 text-xs sm:text-sm"/>
                     </div>
                     <div>
-                        <label htmlFor="dp-category" className="block text-sm font-medium text-muted-foreground mb-1">Category <span className="text-destructive">*</span></label>
-                        <Input id="dp-category" list="dp-categories" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g., Power, Temperature" disabled={isSaving}/>
+                        <label htmlFor="dp-category" className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1">Category <span className="text-destructive">*</span></label>
+                        <Input id="dp-category" list="dp-categories" value={category} onChange={e => setCategory(e.target.value)} placeholder="e.g., Power, Temperature" disabled={isSaving} className="h-9 text-xs sm:text-sm"/>
                         <datalist id="dp-categories">
                             {existingCategories.map(cat => <option key={cat} value={cat} />)}
                         </datalist>
                     </div>
                      <div>
-                        <label htmlFor="dp-unit" className="block text-sm font-medium text-muted-foreground mb-1">Unit (Optional)</label>
-                        <Input id="dp-unit" value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g., kWh, °C" disabled={isSaving} />
+                        <label htmlFor="dp-unit" className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1">Unit (Optional)</label>
+                        <Input id="dp-unit" value={unit} onChange={e => setUnit(e.target.value)} placeholder="e.g., kWh, °C" disabled={isSaving} className="h-9 text-xs sm:text-sm"/>
                     </div>
                     <div>
-                        <label htmlFor="dp-description" className="block text-sm font-medium text-muted-foreground mb-1">Description (Optional)</label>
+                        <label htmlFor="dp-description" className="block text-xs sm:text-sm font-medium text-muted-foreground mb-1">Description (Optional)</label>
                         <textarea id="dp-description" value={description} onChange={e => setDescription(e.target.value)} rows={3}
-                                  className="w-full p-2 border rounded-md text-sm focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" 
-                                  placeholder="Additional details about this data point..." disabled={isSaving}/>
+                                  className="w-full p-2 border rounded-md text-xs sm:text-sm focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50" 
+                                  placeholder="Additional details..." disabled={isSaving}/>
                     </div>
-                    {formError && <p className="text-sm text-destructive">{formError}</p>}
+                    {formError && <p className="text-xs sm:text-sm text-destructive">{formError}</p>}
 
-                    <DialogFooter className="pt-2">
-                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving}>Cancel</Button>
-                        <Button type="submit" disabled={isSaving || !name.trim() || !category.trim()} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+                    <DialogFooter className="pt-2 flex-col-reverse sm:flex-row">
+                        <Button type="button" variant="outline" onClick={onClose} disabled={isSaving} className="w-full sm:w-auto" size="sm">Cancel</Button>
+                        <Button type="submit" disabled={isSaving || !name.trim() || !category.trim()} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground" size="sm">
                             {isSaving ? "Saving..." : "Save Data Point"}
                         </Button>
                     </DialogFooter>
@@ -686,6 +658,5 @@ const AddNewDataPointModal: React.FC<AddNewDataPointModalProps> = ({ isOpen, onC
     );
 };
 AddNewDataPointModal.displayName = "AddNewDataPointModal";
-
 
 export default DashboardItemConfigurator;

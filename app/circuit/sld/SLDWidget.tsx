@@ -1159,7 +1159,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
           // Its name in AnimatedFlowEdge is 'globallyInvertDefaultDynamicFlowLogic'
           // The types/sld.ts name for GlobalSLDAnimationSettings is globallyInvertDefaultFlowForAllEdges
           // Make sure AnimatedFlowEdge is using the correct property from types/sld
-          globallyInvertDefaultFlowForAllEdges: activeGlobalAnimationSettings?.globallyInvertDefaultFlowForAllEdges ?? false, 
+          globallyInvertDefaultFlowForAllEdges: (activeGlobalAnimationSettings as any)?.globallyInvertDefaultFlowForAllEdges ?? false, 
         }
       };
     });
@@ -1621,9 +1621,12 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
           constantFlowDirection: config.constantFlowDirection,
           constantFlowSpeed: config.constantFlowSpeed,
           constantFlowActivationDataPointId: config.constantFlowActivationDataPointId,
-          // Global specific flag
-          globallyInvertDefaultFlowForAllEdges: setGlobalInvertFlag, 
         };
+        
+        // Add the global invert flag if the property exists in the type
+        if (setGlobalInvertFlag !== undefined) {
+          (newGlobalSettings as any).globallyInvertDefaultFlowForAllEdges = setGlobalInvertFlag;
+        }
         setActiveGlobalAnimationSettings(newGlobalSettings);
         setIsDirty(true);
 

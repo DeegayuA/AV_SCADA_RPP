@@ -932,13 +932,13 @@ export const dataPoints: ExtendedDataPoint[] = [
   // --- Temperatures (i=101, 102) ---
   {
     id: 'dc-transformer-temperature', name: 'DC Transformer Temperature', nodeId: 'ns=4;i=101',
-    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: 0.1, phase: 'x',
+    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: (1 / 4095) * 100, phase: 'x',
     description: 'Temperature of the DC transformer component.', label: '',
     isWritable: false,
   },
   {
     id: 'heat-sink-temperature', name: 'Heat Sink Temperature', nodeId: 'ns=4;i=102',
-    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: 0.1, phase: 'x',
+    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: (1 / 4095) * 100, phase: 'x',
     description: 'Temperature of the inverter heat sink.', label: '',
     isWritable: false,
   },
@@ -947,7 +947,7 @@ export const dataPoints: ExtendedDataPoint[] = [
     id: 'on-off-status', name: 'On/Off Status', nodeId: 'ns=4;i=104',
     dataType: 'Boolean', uiType: 'display', icon: Power, category: 'status', factor: 1, phase: 'x',
     description: 'Indicates if the inverter is currently On (True/1) or Off (False/0).', label: '',
-    isWritable: false, // This is status display; actual control likely via remote commands.
+    isWritable: true, // This is status display; actual control likely via remote commands.
   },
   {
     id: 'ac-relay-status', name: 'AC Relay Status Code', nodeId: 'ns=4;i=105',
@@ -1535,10 +1535,126 @@ export const dataPoints: ExtendedDataPoint[] = [
       isWritable: true,
   },
 
+
+
   // --- Meter Status (382-384) ---
   { id: createId('Meter Active Load Timer'), name: 'Meter Active Load Timer Status', nodeId: 'ns=4;i=356', dataType: 'Boolean', uiType: 'display', icon: Info, description: 'External Meter - Status of the Active Load Timer.', category: 'status', factor: 1, phase: 'x', label: '', isWritable: false },
   { id: createId('Meter Operation Timer 1'), name: 'Meter Operation Timer 1 Status', nodeId: 'ns=4;i=357', dataType: 'Boolean', uiType: 'display', icon: Info, description: 'External Meter - Status of Operation Timer 1.', category: 'status', factor: 1, phase: 'x', label: '', isWritable: false },
   { id: createId('Meter Cycle Count Status'), name: 'Meter Cycle Count Status', nodeId: 'ns=4;i=358', dataType: 'Boolean', uiType: 'display', icon: Info, description: 'External Meter - Status related to cycle counting functionality.', category: 'status', factor: 1, phase: 'x', label: '', isWritable: false },
+
+  // Inserted based on NodeId ns=4;i=391 (Log Time: 11:23:32)
+{
+  id: createId('Backup_Supply_Contactor_Switch_Out_M'),
+  name: 'Backup Supply Contactor Switch Out M',
+  nodeId: 'ns=4;i=391',
+  dataType: 'Boolean',
+  uiType: 'switch',
+  icon: ToggleRight, // Or ToggleLeft, depending on desired representation for 'false'
+  description: 'Status/Control for Backup Supply Contactor Switch Output M.',
+  category: 'control',
+  factor: 1,
+  phase: 'x',
+  label: 'Backup Supply Contactor', // Adjusted for potential UI display
+  isWritable: true, // Assumed, as it's a switch
+  // Add other ExtendedDataPoint fields if necessary, e.g., notes: 'OPC Description: Bad_AttributeIdInvalid'
+},
+
+// Inserted based on NodeId ns=4;i=392 (Log Time: 11:22:59)
+{
+  id: createId('Deye_Grid_Supply_switch_Out_M'),
+  name: 'Deye Grid Supply Switch Out M',
+  nodeId: 'ns=4;i=392',
+  dataType: 'Boolean',
+  uiType: 'switch',
+  icon: ToggleRight,
+  description: 'Status/Control for Deye Grid Supply Switch Output M.',
+  category: 'control',
+  factor: 1,
+  phase: 'x',
+  label: 'Deye Grid Supply Switch', // Adjusted for potential UI display
+  isWritable: true,
+},
+
+// Inserted based on NodeId ns=4;i=393 (Log Time: 11:24:19)
+{
+  id: createId('Gen_Supply_M'),
+  name: 'Generator Supply M',
+  nodeId: 'ns=4;i=393',
+  dataType: 'Boolean',
+  uiType: 'switch',
+  icon: ToggleRight,
+  description: 'Status/Control for Generator Supply M.',
+  category: 'control',
+  factor: 1,
+  phase: 'x',
+  label: 'Generator Supply', // Adjusted
+  isWritable: true,
+},
+
+// Inserted based on NodeId ns=4;i=394 (Log Time: 11:24:42)
+{
+  id: createId('Grid_Supply_M'),
+  name: 'Grid Supply M',
+  nodeId: 'ns=4;i=394',
+  dataType: 'Boolean',
+  uiType: 'switch',
+  icon: ToggleRight,
+  description: 'Status/Control for Grid Supply M.',
+  category: 'control',
+  factor: 1,
+  phase: 'x',
+  label: 'Grid Supply', // Adjusted
+  isWritable: true,
+},
+
+// Inserted based on NodeId ns=4;i=395 (Log Time: 11:25:07)
+{
+  id: createId('Main_Grid_Supply_Switch_Out_M'),
+  name: 'Main Grid Supply Switch Out M',
+  nodeId: 'ns=4;i=395',
+  dataType: 'Boolean',
+  uiType: 'switch',
+  icon: ToggleRight,
+  description: 'Status/Control for Main Grid Supply Switch Output M.',
+  category: 'status',
+  factor: 1,
+  phase: 'x',
+  label: 'Main Grid Supply Switch', // Adjusted
+  isWritable: true,
+},
+
+{
+  id: createId('Deye Inverter Modbus Mode'),
+  name: 'Deye Inverter Modbus Mode',
+  nodeId: 'ns=4;i=397',
+  dataType: 'Int16',
+  uiType: 'display',
+  icon: Info, // Assuming 'Info' icon is suitable for mode status
+  description: 'Displays the current Modbus communication mode configured for the Deye inverter. The value is an integer code representing a specific mode.',
+  category: 'status', // Categorized as control since it's a writable mode value
+  factor: 1, // Default factor for Int16, assuming no scaling
+  phase: 'x', // Not phase-specific
+  label: '',    // Consistent with other data points' label initialization
+  isWritable: true, // Derived from "WriteMask None" and "UserWriteMask None"
+  notes: 'The OPC UA server reported "Bad_AttributeIdInvalid" for the Description attribute of this node. This means the server does not provide a textual description for this specific node path, but its Value (0 in example) should be readable. The value likely represents an enumeration code for different Modbus modes; check Deye documentation for code meanings.',
+  // enumSet: { 0: 'Mode A', 1: 'Mode B', /* ... */ }, // Example: Add if enum codes are known
+},
+{
+  id: createId('Goodwe Inverter Modbus Mode'),
+  name: 'Goodwe Inverter Modbus Mode',
+  nodeId: 'ns=4;i=398',
+  dataType: 'Int16',
+  uiType: 'display',
+  icon: Info, // Assuming 'Info' icon is suitable for mode status
+  description: 'Displays the current Modbus communication mode configured for the Goodwe inverter. The value is an integer code representing a specific mode.',
+  category: 'control', // Categorized as control since it's a writable mode value
+  factor: 1, // Default factor
+  phase: 'x', // Not phase-specific
+  label: '',    // Consistent with other data points
+  isWritable: true, // Derived from "WriteMask None" and "UserWriteMask None"
+  notes: 'The OPC UA server reported "Bad_AttributeIdInvalid" for the Description attribute of this node. This means the server does not provide a textual description for this specific node path, but its Value (0 in example) should be readable. The value likely represents an enumeration code for different Modbus modes; check Goodwe documentation for code meanings.',
+  // enumSet: { 0: 'Mode X', 1: 'Mode Y', /* ... */ }, // Example: Add if enum codes are known
+},
   
   // --- Simulation Data Points ---
   { id: 'sim_temp_1', name: 'Simulation Temperature', label: 'Simulation Temperature', nodeId: 'ns=2;s=SimTemp1', dataType: 'Float', unit: '°C', category: 'simulation', uiType: 'display', icon: Thermometer, isWritable: true },

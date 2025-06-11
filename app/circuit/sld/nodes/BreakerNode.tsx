@@ -2,33 +2,89 @@
 import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position, XYPosition } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
-import { BreakerNodeData, CustomNodeType } from '@/types/sld';
+import { BreakerNodeData, CustomNodeType, SLDElementType } from '@/types/sld'; // Added SLDElementType
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import {
   applyValueMapping,
-  // formatDisplayValue, // May not be needed directly if status text comes from standard state
-  // getDerivedStyle, // Will be replaced by new system
   getStandardNodeState,
   getNodeAppearanceFromState,
-  NodeAppearance
+  // NodeAppearance is implied by getNodeAppearanceFromState
 } from './nodeUtils';
-// Removed direct icon imports if NodeAppearance provides them, or keep if used elsewhere.
-// For now, assume specific icons like InfoIcon for button are still needed.
-import { InfoIcon } from 'lucide-react';
+import { InfoIcon, ShieldAlert, ShieldCheck, ZapOff, Zap } from 'lucide-react'; // Specific icons for states
 import { Button } from "@/components/ui/button";
 
-// const useIsDarkMode = () => { // CSS variables will handle dark mode
-//   const [isDark, setIsDark] = useState(() => typeof window !== 'undefined' && document.documentElement.classList.contains('dark'));
-//   useEffect(() => {
-//     if (typeof window === 'undefined') return;
-//     const cb = () => setIsDark(document.documentElement.classList.contains('dark'));
-//     const observer = new MutationObserver(cb);
-//     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-//     cb();
-//     return () => observer.disconnect();
-//   }, []);
-//   return isDark;
-// };
+// Define StandardNodeState type locally if not properly imported from nodeUtils
+type StandardNodeState = 
+    'ENERGIZED_CLOSED' | 'DEENERGIZED_OPEN' | 'DEENERGIZED_CLOSED' | 'ENERGIZED_OPEN' | // Specific breaker/switch states
+    'TRIPPED' | 'FAULT' | 'WARNING' | 'OFFLINE' | 'STANDBY' | 'UNKNOWN' | 'NOMINAL' | 'NOMINAL_CLOSED';
+
+
+// --- Inlined BreakerVisual Component ---
+interface BreakerVisualProps {
+  isOpen: boolean;
+  appearance: {
+    iconColorVar: string;      // For the conductive path when closed and energized
+    armColorVar?: string;      // Specific color for the arm, defaults to iconColorVar or a neutral
+    borderColorVar: string;    // For the chassis/fixed parts
+    mainStatusColorVar: string; // General status color, can influence arm when not specifically set
+  };
+  standardNodeState: StandardNodeState; // To potentially alter visuals for FAULT/TRIPPED further
+}
+
+const BreakerVisual: React.FC<BreakerVisualProps> = React.memo(({
+  isOpen,
+  appearance,
+  standardNodeState
+}) => {
+  const armRotation = isOpen ? -35 : 0; // Degrees for open/closed
+  const armColor = appearance.armColorVar || (isOpen || standardNodeState === 'OFFLINE' || standardNodeState === 'DEENERGIZED_OPEN' || standardNodeState === 'TRIPPED' ? 'var(--sld-color-deenergized, #A0AEC0)' : appearance.iconColorVar);
+  const chassisFill = 'var(--sld-color-node-bg-subtle, hsl(220, 15%, 96%))';
+  const terminalFill = 'var(--sld-color-border-subtle, hsl(220, 15%, 85%))';
+
+  return (
+    <svg viewBox="0 0 24 30" width="100%" height="100%" className="drop-shadow-sm">
+      {/* Main Body */}
+      <rect x="6" y="2" width="12" height="26" rx="1.5" fill={chassisFill} stroke={appearance.borderColorVar} strokeWidth="0.75" />
+
+      {/* Top Fixed Terminal */}
+      <circle cx="12" cy="5" r="2.5" fill={terminalFill} />
+      <line x1="12" y1="7.5" x2="12" y2="11" stroke={terminalFill} strokeWidth="1.5" />
+
+      {/* Bottom Fixed Terminal */}
+      <circle cx="12" cy="25" r="2.5" fill={terminalFill} />
+      <line x1="12" y1="19" x2="12" y2="22.5" stroke={terminalFill} strokeWidth="1.5" />
+      
+      {/* Pivot Point for arm */}
+      <circle cx="12" cy="15" r="1" fill={appearance.borderColorVar} />
+
+      {/* Breaker Arm (Lever) */}
+      <motion.line
+        x1="12" y1="15" // Pivot point
+        x2="12" y2="5"  // Extends towards top terminal
+        stroke={armColor}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        initial={false}
+        animate={{ rotate: armRotation, stroke: armColor }}
+        transform-origin="12 15" // SVG transform origin
+        transition={{ type: "spring", stiffness: 280, damping: 20 }}
+      />
+      
+      {/* Optional: Handle on the lever */}
+      <motion.circle 
+        cx="12" 
+        cy="5" 
+        r="1.5" 
+        fill={"color-mix(in srgb, " + armColor + " 70%, black 30%)"} 
+        initial={false}
+        animate={{ rotate: armRotation, fill: "color-mix(in srgb, " + armColor + " 70%, black 30%)"}}
+        transform-origin="12 15"
+        transition={{ type: "spring", stiffness: 280, damping: 20 }}
+      />
+    </svg>
+  );
+});
+
 
 const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
   const { 
@@ -40,13 +96,10 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
   const nodeWidthFromData = data.width; 
   const nodeHeightFromData = data.height;
 
-  // const isDarkMode = useIsDarkMode(); // Replaced by CSS variables
-
-  const { isEditMode, currentUser, globalOpcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
+  const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    globalOpcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
   }));
   
@@ -58,270 +111,173 @@ const BreakerNode: React.FC<NodeProps<BreakerNodeData>> = (props) => {
   const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
   const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
   
-  // Handles breaker.isOpen or the more generic isOpen
-  const isOpenLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'isOpen' || link.targetProperty === 'breaker.isOpen'), [data.dataPointLinks]);
+  const isOpenLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'breaker.isOpen' || link.targetProperty === 'isOpen'), [data.dataPointLinks]);
   const isOpenDataPointConfig = useMemo(() => isOpenLink ? dataPoints[isOpenLink.dataPointId] : undefined, [isOpenLink, dataPoints]);
   const isOpenOpcUaNodeId = useMemo(() => isOpenDataPointConfig?.nodeId, [isOpenDataPointConfig]);
   const reactiveIsOpenValue = useOpcUaNodeValue(isOpenOpcUaNodeId);
 
   // --- Processed States ---
-  const processedStatus = useMemo(() => {
+  const processedStatus = useMemo<string>(() => {
     if (statusLink && statusDataPointConfig && reactiveStatusValue !== undefined) {
       return String(applyValueMapping(reactiveStatusValue, statusLink)).toLowerCase();
     }
-    return String(data.status || 'offline').toLowerCase(); // Keep this for now, might be used by getStandardNodeState
+    return String(data.status || 'open').toLowerCase(); // Default to open if no status
   }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
-  const isBreakerOpenRaw = useMemo(() => { // Renamed to avoid immediate conflict
+  // Determines if the breaker is considered OPEN (true) or CLOSED (false)
+  // Handles various truthy/falsy inputs for state.
+  const isBreakerEffectivelyOpen = useMemo<boolean>(() => {
+    let valueToCheck: any;
+    // Prioritize the specific 'isOpen' or 'breaker.isOpen' link
     if (isOpenLink && isOpenDataPointConfig && reactiveIsOpenValue !== undefined) {
-      const mappedValue = applyValueMapping(reactiveIsOpenValue, isOpenLink);
-      return mappedValue === true || String(mappedValue).toLowerCase() === 'true' || String(mappedValue).toLowerCase() === 'open' || Number(mappedValue) === 1;
+        valueToCheck = applyValueMapping(reactiveIsOpenValue, isOpenLink);
+    } else {
+        // Fallback to generic 'status' if specific link not present or no value
+        valueToCheck = processedStatus; 
     }
-    const status = processedStatus; // Use the memoized processedStatus
-    if (status === 'open' || status === 'tripped') return true;
-    if (status === 'closed' || status === 'nominal' || status === 'energized') return false;
-    return data.config?.normallyOpen ?? false; 
+    const valStr = String(valueToCheck).toLowerCase();
+    // "true", 1, "on", "open", "tripped" are considered OPEN
+    if (valStr === 'true' || valStr === '1' || valStr === 'on' || valStr === 'open' || valStr === 'tripped') {
+      return true;
+    }
+    // "false", 0, "off", "closed", "energized", "nominal" are considered CLOSED
+    if (valStr === 'false' || valStr === '0' || valStr === 'off' || valStr === 'closed' || valStr === 'energized' || valStr === 'nominal') {
+      return false;
+    }
+    // Fallback to configured normallyOpen state, defaulting to true (open) if undefined
+    return data.config?.normallyOpen ?? true; 
   }, [isOpenLink, isOpenDataPointConfig, reactiveIsOpenValue, processedStatus, data.config?.normallyOpen]);
 
-  // --- Standardized State and Appearance ---
-  const standardNodeState = useMemo(() => {
-    // For Breaker, isEnergized might be inferred or explicitly linked.
-    // Assuming 'processedStatus' can indicate energized states like 'ENERGIZED', 'NOMINAL'.
-    // Or, a separate 'isEnergized' link could be added if available.
-    // For now, let's infer: if status is 'nominal', 'closed', 'energized' and not open, it's energized.
-    // This logic might need refinement based on actual data point availability for 'isEnergized'.
-    let isEnergizedInferred: boolean | undefined = undefined;
-    if (processedStatus === 'energized' || processedStatus === 'nominal' || processedStatus === 'closed') {
-      isEnergizedInferred = true;
-    } else if (processedStatus === 'offline' || processedStatus === 'deenergized' || processedStatus === 'open') {
-      isEnergizedInferred = false;
+  const standardNodeState = useMemo<StandardNodeState>(() => {
+    if (processedStatus === 'fault' || processedStatus === 'tripped_fault') return 'FAULT'; // 'TRIPPED' alone is not necessarily a FAULT state
+    if (processedStatus === 'warning') return 'WARNING';
+    if (processedStatus === 'offline') return 'OFFLINE';
+
+    if (isBreakerEffectivelyOpen) {
+      // If open due to a trip that's not a fault (e.g. manual trip, overload without fault flag)
+      if(processedStatus === 'tripped' || processedStatus === 'open_manual') return 'TRIPPED'; // Specific TRIPPED state
+      return 'DEENERGIZED_OPEN'; // General open state
+    } else { // Breaker is closed
+      // If status implies it's energized and passing power
+      if (['energized', 'nominal', 'closed_power_flow'].includes(processedStatus)) return 'ENERGIZED_CLOSED';
+      // If closed but explicitly standby or no clear indication of power flow
+      if (processedStatus === 'standby' || processedStatus === 'closed_standby') return 'STANDBY'; // Or DEENERGIZED_CLOSED if more appropriate
+      return 'NOMINAL_CLOSED'; // Default assumption for closed and healthy
     }
-    // If an explicit 'isEnergized' link exists, it should take precedence.
-    // This part is left for future enhancement if a dedicated isEnergized DP is common for breakers.
+  }, [processedStatus, isBreakerEffectivelyOpen]);
 
-    return getStandardNodeState(processedStatus, isEnergizedInferred, isBreakerOpenRaw, data.status);
-  }, [processedStatus, isBreakerOpenRaw, data.status]);
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState, SLDElementType.Breaker), [standardNodeState]);
+  const sldAccentVar = 'var(--sld-color-accent)';
 
-  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState), [standardNodeState]);
-
-  // Descriptive status text for UI - can be simplified if standardState is rich enough
-  const displayStatusText = useMemo(() => {
-    // You can customize this further based on standardNodeState if needed
-    if (standardNodeState === 'FAULT') return "TRIPPED / FAULT";
+  const displayStatusText = useMemo<string>(() => {
+    // Show the operational state, e.g. TRIPPED (if fault or manual), OPEN, CLOSED
+    if (standardNodeState === 'FAULT') return "FAULT TRIPPED";
+    if (standardNodeState === 'TRIPPED') return "TRIPPED";
     if (standardNodeState === 'WARNING') return "WARNING";
-    if (standardNodeState.includes('OFFLINE') || standardNodeState.includes('DEENERGIZED')) return "OFFLINE / OPEN";
-    if (standardNodeState.includes('ENERGIZED_CLOSED') || standardNodeState.includes('NOMINAL_CLOSED') || standardNodeState === 'NOMINAL' || standardNodeState === 'ENERGIZED') return "NOMINAL";
+    if (standardNodeState === 'OFFLINE') return "OFFLINE";
     if (standardNodeState === 'STANDBY') return "STANDBY";
-    return standardNodeState.replace(/_/g, ' '); // Default, make it readable
-  }, [standardNodeState]);
-
-  // const derivedNodeStyles = useMemo(() => getDerivedStyle(data, dataPoints, {}, globalOpcUaNodeValues), [data, dataPoints, globalOpcUaNodeValues]); // Replaced by `appearance`
-  const sldAccentVar = 'var(--sld-color-accent)'; // For selection, from globals.css
+    return isBreakerEffectivelyOpen ? 'OPEN' : 'CLOSED';
+  }, [standardNodeState, isBreakerEffectivelyOpen]);
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevDisplayStatusRef = useRef(standardNodeState); // Track standard state for changes
+  const prevDisplayStatusRef = useRef(standardNodeState);
   useEffect(() => {
-    if (prevDisplayStatusRef.current !== standardNodeState) { // Check standardNodeState
+    if (prevDisplayStatusRef.current !== standardNodeState) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 1200); // Animation duration for highlight
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 1000);
       prevDisplayStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
   }, [standardNodeState]);
+  
+  const calculatedMinWidth = 60;
+  const calculatedMinHeight = 85;
 
   const nodeMainStyle = useMemo((): React.CSSProperties => {
-    // CSS variables for background are not directly settable like this in inline styles for gradients.
-    // We'll rely on global CSS or Tailwind utility for background.
-    // Forcing a re-render via a key or other state might be needed if bg vars change dynamically.
-    // However, the theme switch (.dark) should handle this at a higher level.
-
-    let currentBoxShadow = `0 0 7px 1.5px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.45)').replace('var(','rgba(')}`;
-
-    const isNominalClosed = standardNodeState === 'ENERGIZED_CLOSED' || standardNodeState === 'NOMINAL_CLOSED';
-    
-    if (isNominalClosed && !selected && !isRecentStatusChange) {
-      // Breathing glow handled by framer-motion animate prop using CSS variable from appearance
+    let currentBoxShadow = `0 1px 2px rgba(0,0,0,0.04), 0 0.5px 1px rgba(0,0,0,0.02)`;
+    if (standardNodeState === 'FAULT' || standardNodeState === 'WARNING') {
+        currentBoxShadow = `0 0 0 1.5px ${appearance.borderColorVar}, 0 0 7px 0px ${appearance.borderColorVar}`;
     }
-    if (isRecentStatusChange) { // Stronger glow for status change
-        currentBoxShadow = `0 0 13px 3px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.65)').replace('var(','rgba(')}`;
+    if (isRecentStatusChange && (appearance.glowColorVar && appearance.glowColorVar !== 'transparent')) {
+        currentBoxShadow = `0 0 10px 2px ${appearance.glowColorVar.replace(')', ', 0.45)').replace('var(','rgba(')}`;
     }
-    if (selected) { // Selection glow using accent color
-        currentBoxShadow = `0 0 14px 2.5px ${sldAccentVar.replace(')', ', 0.7)').replace('var(','rgba(')}, 0 0 4px 1px ${sldAccentVar.replace(')', ', 0.5)').replace('var(','rgba(')} inset`;
+    if (selected) {
+        currentBoxShadow = `0 0 0 2px ${sldAccentVar.replace(')', ', 0.8)').replace('var(','rgba(')}, 0 0 10px 2px ${sldAccentVar.replace(')', ', 0.5)').replace('var(','rgba(')}`;
     }
     
     return {
-      borderColor: appearance.borderColorVar, // Use CSS variable string directly
+      borderColor: appearance.borderColorVar,
+      borderWidth: '1.5px',
       boxShadow: currentBoxShadow,
-      width: typeof nodeWidthFromData === 'number' ? `${nodeWidthFromData}px` : '70px',
-      height: typeof nodeHeightFromData === 'number' ? `${nodeHeightFromData}px` : '95px',
-      color: appearance.textColorVar, // Default text color for the node
+      color: appearance.textColorVar,
+      minWidth: `${calculatedMinWidth}px`,
+      minHeight: `${calculatedMinHeight}px`,
+      width: nodeWidthFromData ? `${nodeWidthFromData}px` : `${calculatedMinWidth}px`,
+      height: nodeHeightFromData ? `${nodeHeightFromData}px` : `${calculatedMinHeight}px`,
+      borderRadius: '0.375rem', // rounded-md
     };
-  }, [appearance, selected, isRecentStatusChange, standardNodeState, sldAccentVar, nodeWidthFromData, nodeHeightFromData]);
+  }, [appearance, selected, isRecentStatusChange, sldAccentVar, nodeWidthFromData, nodeHeightFromData, standardNodeState]);
 
   const fullNodeObjectForDetails = useMemo((): CustomNodeType => ({
-    id, type: type || '', position: nodePosition, data,
-    selected: selected || false, dragging: dragging || false, zIndex: zIndex || 0, 
-    width: nodeWidthFromData, height: nodeHeightFromData,
-    connectable: isConnectable || false
+    id, type: type || SLDElementType.Breaker, position: nodePosition, data, selected: selected || false, dragging: dragging || false, 
+    zIndex: zIndex || 0, 
+    width: nodeWidthFromData || calculatedMinWidth, 
+    height: nodeHeightFromData || calculatedMinHeight, 
+    connectable: isConnectable || false,
   }), [id, type, nodePosition, data, selected, dragging, zIndex, nodeWidthFromData, nodeHeightFromData, isConnectable]);
   
   const breakerTypeLabel = data.config?.type || 'Breaker';
-  const tripRatingText = data.config?.tripRatingAmps ? `${data.config.tripRatingAmps}A` : breakerTypeLabel.toUpperCase();
 
   return (
     <motion.div
-      className={`
-        breaker-node group sld-node relative flex flex-col items-center justify-between 
-        rounded-lg border backdrop-blur-sm
-        transition-colors duration-300 ease-in-out
-        ${isNodeEditable ? 'cursor-grab' : 'cursor-pointer'}
-        ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10 shadow-lg` : 'shadow-md'}
-        overflow-hidden 
-      `}
-      style={{ // Apply border color from JS
-        ...nodeMainStyle,
-        background: `linear-gradient(to bottom, var(--sld-color-node-bg), color-mix(in srgb, var(--sld-color-node-bg) 90%, black))`, // Example gradient
-      }}
-      initial={{ opacity: 0, scale: 0.88, y: 15 }}
-      animate={{ 
-        opacity: 1, scale: 1, y: 0,
-        boxShadow: (standardNodeState === 'ENERGIZED_CLOSED' || standardNodeState === 'NOMINAL_CLOSED') && !selected && !isRecentStatusChange
-          ? [ // Breathing glow for nominal closed state
-              `0 0 8px 1.5px ${appearance.mainStatusColorVar.replace(')', ', 0.3)').replace('var(','rgba(')}`,
-              `0 0 12px 2.5px ${appearance.mainStatusColorVar.replace(')', ', 0.5)').replace('var(','rgba(')}`,
-              `0 0 8px 1.5px ${appearance.mainStatusColorVar.replace(')', ', 0.3)').replace('var(','rgba(')}`
-            ]
-          : nodeMainStyle.boxShadow // Use calculated shadow for other states
-      }} 
-      exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.15, ease: "easeOut"} }}
-      transition={ // Animation for breathing glow
-        (standardNodeState === 'ENERGIZED_CLOSED' || standardNodeState === 'NOMINAL_CLOSED') && !selected && !isRecentStatusChange
-          ? { type: 'spring', stiffness: 260, damping: 22, boxShadow: { duration: 2.2, repeat: Infinity, ease: "easeInOut" } }
-          : { type: 'spring', stiffness: 280, damping: 25 } // Default transition
-      }
+      className={`breaker-node group sld-node relative flex flex-col items-center 
+                  border transition-all duration-150 ease-out overflow-hidden
+                  ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
+                `}
+      style={{ ...nodeMainStyle, background: 'var(--sld-color-node-bg)' }}
+      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1, boxShadow: nodeMainStyle.boxShadow }}
+      exit={{ opacity: 0, y: -8, scale: 0.95 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 22 }}
       whileHover={{ 
-        scale: isNodeEditable ? 1.035 : 1.02,
+        scale: isNodeEditable ? 1.025 : 1.01,
+        borderColor: selected ? appearance.borderColorVar : sldAccentVar,
         boxShadow: selected 
-            ? `0 0 18px 3.5px ${sldAccentVar.replace(')', ', 0.8)').replace('var(','rgba(')}, 0 0 6px 1.5px ${sldAccentVar.replace(')', ', 0.6)').replace('var(','rgba(')} inset`
-            : `0 0 15px 3.5px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.6)').replace('var(','rgba(')}`
-      }}
-      onClick={(e) => { 
-         if (!isNodeEditable && !isEditMode) {
-            e.stopPropagation();
-            setSelectedElementForDetails(fullNodeObjectForDetails);
-        }
+            ? nodeMainStyle.boxShadow 
+            : `${nodeMainStyle.boxShadow || '0 1px 2px rgba(0,0,0,0.04)'}, 0 0 9px 1px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', ', 0.3)').replace('var(','rgba(')}`
       }}
     >
-      <Handle 
-        type="target" position={Position.Top} id="top_in" isConnectable={isConnectable}
-        className="sld-handle-style" // Apply shared handle style from globals.css
-        style={{ background: appearance.mainStatusColorVar === 'var(--sld-color-deenergized)' ? 'var(--sld-color-handle-bg)' : appearance.mainStatusColorVar, borderColor: 'var(--sld-color-handle-border)'}}
-        title="Input"
-      />
-      <Handle 
-        type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable}
-        className="sld-handle-style"
-        style={{ background: appearance.mainStatusColorVar === 'var(--sld-color-deenergized)' ? 'var(--sld-color-handle-bg)' : appearance.mainStatusColorVar, borderColor: 'var(--sld-color-handle-border)'}}
-        title="Output"
-      />
-
       {!isEditMode && (
-        <Button variant="ghost" size="icon" title="View Details"
-          className="absolute top-1 right-1 h-6 w-6 rounded-full z-20 group/infobtn
-                     bg-slate-300/20 dark:bg-slate-700/20 hover:bg-slate-300/40 dark:hover:bg-slate-700/40
-                     p-0 backdrop-blur-sm transition-all duration-200" 
-          onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}
+        <Button
+          variant="ghost" size="icon"
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-transparent hover:bg-black/5 dark:hover:bg-white/5 p-0"
+          onClick={(e) => {e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails);}} title="View Details"
         >
-          <InfoIcon className={`h-3.5 w-3.5 text-slate-500 dark:text-slate-400 
-                                group-hover/infobtn:text-[var(--sld-color-accent)]
-                                transition-colors duration-150`} /> 
+          <InfoIcon className="h-2.5 w-2.5 text-gray-400 dark:text-gray-500 group-hover/infobtn:text-[var(--sld-color-accent)]" />
         </Button>
       )}
-      
-      <div className="flex flex-col items-center justify-between w-full h-full px-1.5 py-1 pointer-events-none space-y-0.5">
-        {/* Top status text (optional, small) */}
-        <div className="h-3 overflow-hidden">
-            <AnimatePresence mode="wait">
-                <motion.p
-                    key={`desc-status-${displayStatusText}`}
-                    className={`text-[8px] font-medium tracking-tight leading-tight text-center w-full transition-colors duration-200`}
-                    style={{ color: appearance.statusTextColorVar }}
-                    title={`Status: ${displayStatusText}`}
-                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.18, ease: "easeInOut" }}
-                >
-                    {displayStatusText}
-                </motion.p>
-            </AnimatePresence>
+
+      <Handle type="target" position={Position.Top} id="top_in" isConnectable={isConnectable} className="sld-handle-style" style={{ background: isBreakerEffectivelyOpen ? 'var(--sld-color-handle-bg)' : appearance.mainStatusColorVar, borderColor: 'var(--sld-color-handle-border)' }}/>
+      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" style={{ background: isBreakerEffectivelyOpen ? 'var(--sld-color-handle-bg)' : appearance.mainStatusColorVar, borderColor: 'var(--sld-color-handle-border)' }}/>
+
+      <div 
+        className={`node-content-wrapper flex flex-col items-center justify-between p-1 w-full h-full rounded-[calc(0.375rem-1.5px)] ${isRecentStatusChange ? 'animate-status-highlight' : ''}`} 
+        style={{ color: appearance.textColorVar }}
+      >
+        <p className="text-[8px] font-medium text-center truncate w-full pt-0.5" title={`${data.label} (${breakerTypeLabel})`} style={{color: appearance.textColorVar}}>
+          {data.label}
+        </p>
+        
+        <div className="w-[28px] h-[34px] my-0.5 flex-shrink-0"> {/* Slightly adjusted size for breaker visual */}
+            <BreakerVisual 
+                isOpen={isBreakerEffectivelyOpen}
+                appearance={appearance}
+                standardNodeState={standardNodeState}
+            />
         </div>
         
-        {/* Breaker Label */}
-        <motion.p
-          className="text-xs font-bold leading-tight text-center w-full transition-colors duration-200"
-          style={{ color: appearance.textColorVar }}
-          title={`${data.label} (${breakerTypeLabel})`}
-        >
-          {data.label}
-        </motion.p>
-
-        {/* SVG Breaker Visual */}
-        <motion.svg 
-          viewBox="0 0 24 24" 
-          width="30" height="30" 
-          className="flex-shrink-0 my-0.5" 
-          style={{ color: appearance.iconColorVar }} // Main color for terminals and body
-          initial={false}
-          animate={{ color: appearance.iconColorVar }}
-          transition={{duration: 0.3}}
-        >
-          {/* Terminals */}
-          <circle cx="12" cy="6" r="2.2" fill="currentColor" />
-          <circle cx="12" cy="18" r="2.2" fill="currentColor" />
-          {/* Static connection from top terminal to center body */}
-          <line x1="12" y1="8.2" x2="12" y2="11.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          {/* Animated Breaker Arm */}
-          <motion.line
-            key={isBreakerOpenRaw ? "breaker-open-arm" : "breaker-closed-arm"}
-            x1="12" y1="12.5"
-            initial={false}
-            animate={isBreakerOpenRaw
-                ? { x2: 18, y2: 9, strokeWidth: 2, stroke: appearance.armColorVar || appearance.iconColorVar }
-                : { x2: 12, y2: 15.8, strokeWidth: 2.2, stroke: appearance.armColorVar || appearance.iconColorVar }
-            }
-            transition={{ type: "spring", stiffness: 300, damping: 20, duration: 0.25 }}
-            strokeLinecap="round"
-          />
-          {/* Center Body/Housing */}
-          <rect x="9" y="10.5" width="6" height="3" rx="1" fill="currentColor" className="opacity-70" />
-           <motion.circle 
-            cx="12" cy="12.5" r="1.2" 
-            fill={"color-mix(in srgb, currentColor 30%, var(--sld-color-node-bg))"} // Mix with node background
-            initial={{ opacity: isBreakerOpenRaw ? 0 : 1 }}
-            animate={{ opacity: isBreakerOpenRaw ? 0 : 1 }}
-            transition={{ duration: 0.1 }}
-          />
-        </motion.svg>
-
-        {/* Main Open/Closed Status */}
-        <div className="h-4 overflow-hidden">
-            <AnimatePresence mode="wait">
-                <motion.p
-                    key={`main-status-${isBreakerOpenRaw}`}
-                    className={`text-sm font-semibold leading-tight text-center w-full transition-colors duration-200`}
-                    style={{ color: appearance.mainStatusColorVar }}
-                    initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }} transition={{ duration: 0.2, ease: "easeInOut" }}
-                >
-                    {isBreakerOpenRaw ? 'OPEN' : 'CLOSED'}
-                </motion.p>
-            </AnimatePresence>
-        </div>
-
-        {/* Trip Rating / Type */}
-        <p className="text-[9px] text-muted-foreground dark:text-slate-400/80 text-center truncate w-full leading-tight font-medium" title={tripRatingText}
-           style={{ color: appearance.textColorVar === 'var(--sld-color-text)' ? 'var(--color-muted-foreground)' : appearance.textColorVar }} // Use muted if main text is default
-        >
-          {tripRatingText}
+        <p className="text-[9px] font-semibold leading-tight tracking-tight" style={{ color: appearance.statusTextColorVar }}>
+          {displayStatusText}
         </p>
       </div>
     </motion.div>
