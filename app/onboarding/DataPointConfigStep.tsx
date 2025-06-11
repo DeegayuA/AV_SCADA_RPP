@@ -334,8 +334,8 @@ export default function DataPointConfigStep() {
 
   // --- JSX remains the same ---
   return (
-    <div className="space-y-6">
-      <h2 className="text-xl font-semibold">Configure Data Points</h2>
+    <div className="space-y-6 p-4 sm:p-6">
+      <h2 className="text-xl font-semibold">Add More Data Points Manu</h2>
       <p className="text-muted-foreground">
         Upload a CSV (for data points only), JSON (full config or data points array), or Excel (XLSX, for data points only) file.
         Matched `id`s update existing data points; new `id`s create new entries.
