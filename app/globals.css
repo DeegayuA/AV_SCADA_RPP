@@ -154,6 +154,17 @@
     --sld-color-battery: #10b981;
     --sld-color-fault-bg: rgba(239, 68, 68, 0.1);
     --sld-color-warning-bg: rgba(249, 115, 22, 0.1);
+
+    /* Battery/Energy Storage Specific Colors (Light Theme) */
+    --sld-color-charging-fill: #2563eb;           /* Medium blue for charging fill */
+    --sld-color-charging: #60a5fa;                /* Lighter blue for charging status */
+    --sld-color-discharging-fill: #10b981;        /* Medium green for discharging fill */
+    --sld-color-discharging: #34d399;             /* Lighter green for discharging status */
+    --sld-color-idle-full: #059669;               /* Darker satisfied green for full idle */
+    --sld-color-idle-medium: #0891b2;             /* Neutral cyan for medium idle */
+    --sld-color-warning-dim: #d97706;             /* Less intense amber for low SOC fill */
+    --sld-color-fault-dim: #dc2626;               /* Less intense red for critical SOC fill */
+    --sld-color-border-subtle: rgba(156, 163, 175, 0.3); /* Semi-transparent light gray border */
   }
 
   /* Dark Theme Variables */
@@ -228,6 +239,17 @@
     --sld-color-battery: #34d399;
     --sld-color-fault-bg: rgba(239, 68, 68, 0.2);
     --sld-color-warning-bg: rgba(249, 115, 22, 0.2);
+
+    /* Battery/Energy Storage Specific Colors (Dark Theme) */
+    --sld-color-charging-fill: #3b82f6;           /* Medium blue for charging fill */
+    --sld-color-charging: #60a5fa;                /* Lighter blue for charging status */
+    --sld-color-discharging-fill: #10b981;        /* Medium green for discharging fill */
+    --sld-color-discharging: #34d399;             /* Lighter green for discharging status */
+    --sld-color-idle-full: #059669;               /* Darker satisfied green for full idle */
+    --sld-color-idle-medium: #0891b2;             /* Neutral cyan for medium idle */
+    --sld-color-warning-dim: #92400e;             /* Less intense amber for low SOC fill */
+    --sld-color-fault-dim: #991b1b;               /* Less intense red for critical SOC fill */
+    --sld-color-border-subtle: rgba(156, 163, 175, 0.3); /* Semi-transparent light gray border */
   }
 }
 
@@ -580,4 +602,12 @@
 .faulty-edge-class {
   --base-stroke-width: 2px;
   animation: faultPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-briefly {
+  0%, 100% { filter: brightness(1) contrast(1); }
+  50% { filter: brightness(1.08) contrast(1.05); } /* Subtle pulse */
+}
+.animate-pulse-briefly {
+  animation: pulse-briefly 0.8s ease-in-out;
 }

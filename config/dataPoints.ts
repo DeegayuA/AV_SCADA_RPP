@@ -932,13 +932,13 @@ export const dataPoints: ExtendedDataPoint[] = [
   // --- Temperatures (i=101, 102) ---
   {
     id: 'dc-transformer-temperature', name: 'DC Transformer Temperature', nodeId: 'ns=4;i=101',
-    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: 0.1, phase: 'x',
+    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: (1 / 4095) * 100, phase: 'x',
     description: 'Temperature of the DC transformer component.', label: '',
     isWritable: false,
   },
   {
     id: 'heat-sink-temperature', name: 'Heat Sink Temperature', nodeId: 'ns=4;i=102',
-    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: 0.1, phase: 'x',
+    dataType: 'Int16', uiType: 'display', icon: Thermometer, unit: '°C', category: 'inverter', factor: (1 / 4095) * 100, phase: 'x',
     description: 'Temperature of the inverter heat sink.', label: '',
     isWritable: false,
   },

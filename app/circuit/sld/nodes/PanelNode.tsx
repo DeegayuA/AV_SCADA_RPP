@@ -2,27 +2,26 @@
 import React, { memo, useMemo, useEffect, useRef, useState } from 'react';
 import { NodeProps, Handle, Position, XYPosition } from 'reactflow';
 import { motion, AnimatePresence } from 'framer-motion';
-import { PanelNodeData, CustomNodeType, SLDElementType } from '@/types/sld';
+import { PanelNodeData, CustomNodeType, SLDElementType, DataPoint } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import { 
     applyValueMapping,
     formatDisplayValue,
-    getStandardNodeState,
     getNodeAppearanceFromState,
 } from './nodeUtils';
 
 // Define StandardNodeState type locally
 type StandardNodeState = 
     'ENERGIZED' | 'PRODUCING_HIGH' | 'PRODUCING_MEDIUM' | 'PRODUCING_LOW' | 
-    'IDLE_DAY' | 'IDLE_NIGHT' | 'CONSUMING' | // Added CONSUMING
+    'IDLE_DAY' | 'IDLE_NIGHT' | 'CONSUMING' | 
     'STANDBY' | 'OFFLINE' | 'FAULT' | 'WARNING' | 'UNKNOWN' | 'NOMINAL';
 
 import { InfoIcon, SunIcon, ZapIcon, CloudFogIcon, MoonStarIcon, AlertTriangleIcon, PowerOffIcon, BoltIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-// --- NEW DynamicPanelEnergyVisual Component ---
+// --- Enhanced DynamicPanelEnergyVisual Component (Code ommited for brevity - unchanged from previous version) ---
 interface DynamicPanelEnergyVisualProps {
-  appearance: { // Base appearance from nodeUtils
+  appearance: { 
     iconColorVar: string; 
     borderColorVar: string;
     mainStatusColorVar: string; 
@@ -30,129 +29,163 @@ interface DynamicPanelEnergyVisualProps {
     textColorVar: string;
     glowColorVar?: string;
   };
-  productionRatio: number; // 0 to 1, for production intensity
-  consumptionRatio: number; // 0 to 1, for consumption intensity (if panel can consume)
+  productionRatio: number; 
+  consumptionRatio: number; 
   standardNodeState: StandardNodeState;
 }
 
 const DynamicPanelEnergyVisual: React.FC<DynamicPanelEnergyVisualProps> = React.memo(({
   appearance,
   productionRatio,
-  consumptionRatio, // NEW
+  consumptionRatio,
   standardNodeState,
 }) => {
   const isProducing = standardNodeState.startsWith('PRODUCING');
-  const isConsuming = standardNodeState === 'CONSUMING'; // Specific state for consuming
+  const isConsuming = standardNodeState === 'CONSUMING';
   const isIdleDay = standardNodeState === 'IDLE_DAY';
   const isIdleNight = standardNodeState === 'IDLE_NIGHT';
   const isOffline = standardNodeState === 'OFFLINE';
   const isFaultOrWarning = standardNodeState === 'FAULT' || standardNodeState === 'WARNING';
 
-  let coreIcon = <SunIcon size={24} strokeWidth={1.75} />;
-  let coreColor = 'var(--sld-color-text-muted)'; // Default icon color for unknown state
+  let coreIcon = <SunIcon size={18} strokeWidth={1.75} />; 
+  let coreColor = 'var(--sld-color-text-muted)'; 
   let coreOpacity = 0.5;
   let auraColor = 'transparent';
   let auraSpread = 0;
-  let particleCount = 0;
-  let particleDirection = 1; // 1 for outward (producing), -1 for inward (consuming)
-  let particleSpread = 20; // Define the spread radius for particles
+  let particleCount = 10;
+  let particleDirection = 1; 
+  let currentParticleSpread = 12; 
+
+  const activeRatio = isProducing ? productionRatio : (isConsuming ? consumptionRatio : 0);
 
   if (isProducing) {
-    coreIcon = <SunIcon size={26} strokeWidth={1.5 + productionRatio * 0.75} />;
+    coreIcon = <SunIcon size={20} strokeWidth={1.5 + productionRatio * 1.0} />; 
     coreColor = 'var(--sld-color-producing-panel)';
     auraColor = 'var(--sld-color-producing-panel-glow)';
-    coreOpacity = 0.8 + productionRatio * 0.2;
-    auraSpread = 5 + productionRatio * 15;
-    particleCount = Math.floor(2 + productionRatio * 8);
+    coreOpacity = 0.85 + productionRatio * 0.15;
+    auraSpread = 6 + productionRatio * 15; 
+    particleCount = Math.floor(4 + productionRatio * 10); 
+    currentParticleSpread = 14 + productionRatio * 18; 
     particleDirection = 1;
   } else if (isConsuming) {
-    coreIcon = <ZapIcon size={24} strokeWidth={1.75} />; // Different icon for consuming
+    coreIcon = <ZapIcon size={18} strokeWidth={1.75 + consumptionRatio * 0.5} />; 
     coreColor = 'var(--sld-color-consuming-panel)';
     auraColor = 'var(--sld-color-consuming-panel-glow)';
-    coreOpacity = 0.7 + consumptionRatio * 0.3;
-    auraSpread = 3 + consumptionRatio * 10;
-    particleCount = Math.floor(1 + consumptionRatio * 6);
-    particleDirection = -1; // Particles flow inwards
+    coreOpacity = 0.75 + consumptionRatio * 0.25;
+    auraSpread = 4 + consumptionRatio * 10;
+    particleCount = Math.floor(3 + consumptionRatio * 7);
+    currentParticleSpread = 10 + consumptionRatio * 13; 
+    particleDirection = -1; 
   } else if (isIdleDay) {
-    coreIcon = <CloudFogIcon size={22} strokeWidth={1.5} />; // Cloud for idle day
+    coreIcon = <CloudFogIcon size={18} strokeWidth={1.5} />;  
     coreColor = 'var(--sld-color-idle-panel-day)';
     auraColor = 'var(--sld-color-idle-panel-day-glow)';
     coreOpacity = 0.6;
-    auraSpread = 3;
-    // particleCount = 1; // Very few, slow ambient particles for idle day
+    auraSpread = 4; 
+    particleCount = 2; 
+    currentParticleSpread = 8;
   } else if (isIdleNight) {
-    coreIcon = <MoonStarIcon size={22} strokeWidth={1.5} />;
+    coreIcon = <MoonStarIcon size={18} strokeWidth={1.5} />;
     coreColor = 'var(--sld-color-night-panel)';
     coreOpacity = 0.7;
+    auraSpread = 0; 
   } else if (isOffline) {
-    coreIcon = <PowerOffIcon size={22} strokeWidth={1.5} />;
+    coreIcon = <PowerOffIcon size={18} strokeWidth={1.5} />;
     coreColor = 'var(--sld-color-offline-panel-icon)';
     coreOpacity = 0.4;
-  } else if (standardNodeState === 'FAULT' || standardNodeState === 'WARNING') {
-    coreIcon = <AlertTriangleIcon size={24} strokeWidth={2} />;
+  } else if (isFaultOrWarning) {
+    coreIcon = <AlertTriangleIcon size={18} strokeWidth={2} />;
     coreColor = standardNodeState === 'FAULT' ? 'var(--sld-color-fault)' : 'var(--sld-color-warning)';
-    coreOpacity = 0.8;
+    auraColor = coreColor; 
+    coreOpacity = 0.9; 
+    auraSpread = 5; 
   }
   
+  const auraOpacityMin = 0.15 + activeRatio * 0.2; 
+  const auraOpacityMax = 0.35 + activeRatio * 0.4;
+  
   return (
-    <div className="relative w-full h-full flex items-center justify-center">
-      {/* Aura / Glow */}
+    <div className="relative w-full h-full flex items-center justify-center overflow-visible">
       {auraSpread > 0 && (
         <motion.div
-          className="absolute rounded-full"
+          className="absolute rounded-full z-0" 
           style={{
-            width: `${10 + auraSpread * 1.5}px`,
-            height: `${10 + auraSpread * 1.5}px`,
+            width: `${8 + auraSpread * 1.5}px`, 
+            height: `${8 + auraSpread * 1.5}px`,
             backgroundColor: auraColor,
-            filter: `blur(${2 + auraSpread * 0.2}px)`,
+            filter: `blur(${3 + auraSpread * 0.3}px)`, 
           }}
           initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: (isProducing || isConsuming) ? (0.3 + (isProducing ? productionRatio : consumptionRatio) * 0.4) : 0.15, scale: 1 }}
-          transition={{ duration: 0.7, ease: "circOut" }}
+          animate={{ 
+            opacity: (isProducing || isConsuming) ? [auraOpacityMin, auraOpacityMax, auraOpacityMin] : (isIdleDay || isFaultOrWarning ? 0.15 : 0.05),
+            scale: 1 
+          }}
+          transition={{ 
+            duration: 0.7, 
+            ease: "circOut",
+            opacity: (isProducing || isConsuming) ? { duration: 1.8 + (1 - activeRatio) * 1.7, repeat: Infinity, ease: "easeInOut" } : { duration: 0.7 }
+          }}
         />
       )}
       
-      {/* Core Icon */}
       <motion.div
-        key={`core-${standardNodeState}`} // Ensure re-animation on state change
+        key={`core-${standardNodeState}`}
+        className="relative z-10" 
         style={{ color: coreColor }}
-        initial={{opacity:0.5, scale: 0.9}}
-        animate={{ opacity: coreOpacity, scale: [1, 1.02, 1] }}
-        transition={{ scale: { duration: 2, repeat: Infinity, ease:"easeInOut" }, opacity:{duration:0.3} }}
+        initial={{opacity:0.5, scale: 0.9, filter: 'brightness(100%)'}}
+        animate={{ 
+          opacity: coreOpacity, 
+          scale: isProducing ? [1, 1.03 + productionRatio * 0.07, 1] : (isConsuming ? [1, 1.02 + consumptionRatio * 0.05, 1] : [1, 1.01, 1]), 
+          filter: (isProducing || isConsuming) ? `brightness(${100 + activeRatio * 30}%)` : (isFaultOrWarning ? 'brightness(115%)' : 'brightness(100%)')
+        }}
+        transition={{ 
+            scale: { duration: 1.7 + (1-activeRatio)*2.0, repeat: Infinity, ease:"easeInOut" }, 
+            opacity:{duration:0.35, ease: "easeOut"},
+            filter: { duration: 0.45, ease: "circOut" }
+        }}
       >
         {coreIcon}
       </motion.div>
 
-      {/* Radiating/Imploding Energy Particles */}
-      {(isProducing || isConsuming) && particleCount > 0 && (
+      {particleCount > 0 && (isProducing || isConsuming || isIdleDay) && (
           Array.from({ length: particleCount }).map((_, i) => {
-            const angle = (i / particleCount) * 2 * Math.PI;
-            const startRadius = particleDirection === 1 ? 0 : particleSpread; // Start at center if producing, at edge if consuming
-            const endRadius = particleDirection === 1 ? particleSpread : 0;
-            const duration = 1.2 + Math.random() * 0.8 + (1 - (isProducing ? productionRatio : consumptionRatio)) * 1.0;
+            const angle = (i / particleCount) * 2 * Math.PI + (Math.random() - 0.5) * 0.25; 
+            const startRadius = particleDirection === 1 ? (isIdleDay ? 1 : 0) : currentParticleSpread; 
+            const endRadius = particleDirection === 1 ? currentParticleSpread : (isIdleDay ? 1 : 0) ;
+            const durationBase = isIdleDay ? 4.0 : 1.2; 
+            const durationRandomness = isIdleDay ? 1.8 : 0.8;
+            const ratioFactor = isIdleDay ? 0 : (1 - activeRatio);
+            const duration = durationBase + Math.random() * durationRandomness + ratioFactor * 1.0; 
+            const particleColor = isIdleDay ? auraColor : coreColor; 
+            const particleBaseSize = isIdleDay ? 1.2 : 1.5; 
+            const particleSizeMultiplier = isIdleDay ? 0.7 : 2.5; 
             
             return (
                 <motion.div
-                  key={`p-particle-${i}`}
-                  className="absolute rounded-full"
-                  style={{ backgroundColor: coreColor }}
+                  key={`p-particle-${i}-${standardNodeState}`} 
+                  className="absolute rounded-full z-0" 
+                  style={{ backgroundColor: particleColor }}
                   initial={{ 
                     x: Math.cos(angle) * startRadius, 
                     y: Math.sin(angle) * startRadius,
-                    width: 1 + (isProducing ? productionRatio : consumptionRatio) * 1.5, 
-                    height: 1 + (isProducing ? productionRatio : consumptionRatio) * 1.5,
+                    width: particleBaseSize + activeRatio * particleSizeMultiplier * (particleDirection === 1 ? 0.4 : 1), 
+                    height: particleBaseSize + activeRatio * particleSizeMultiplier * (particleDirection === 1 ? 0.4 : 1),
+                    scale: 0.3, 
                     opacity: 0, 
                   }}
                   animate={{
                     x: Math.cos(angle) * endRadius,
                     y: Math.sin(angle) * endRadius,
-                    opacity: [0, 0.6, 0],
+                    opacity: isIdleDay ? [0, 0.4, 0] : [0, 0.8, 0], 
+                    scale: particleDirection === 1 ? [0.4, 1.25, isIdleDay ? 0.5 : 0.35] : [1.25, 0.4], 
+                    width: particleBaseSize + activeRatio * particleSizeMultiplier,
+                    height: particleBaseSize + activeRatio * particleSizeMultiplier,
                   }}
                   transition={{
                     duration: duration,
                     repeat: Infinity,
-                    delay: Math.random() * duration, // Stagger particles
-                    ease: particleDirection === 1 ? "easeOut" : "easeIn"
+                    delay: Math.random() * duration, 
+                    ease: particleDirection === 1 ? "circOut" : "circIn" 
                   }}
                 />
             )
@@ -161,6 +194,7 @@ const DynamicPanelEnergyVisual: React.FC<DynamicPanelEnergyVisualProps> = React.
     </div>
   );
 });
+DynamicPanelEnergyVisual.displayName = 'DynamicPanelEnergyVisual';
 
 
 const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
@@ -188,12 +222,12 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
   const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
 
   const powerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput'), [data.dataPointLinks]);
-  const powerDataPointConfig = useMemo(() => powerLink ? dataPoints[powerLink.dataPointId] : undefined, [powerLink, dataPoints]);
+  const powerDataPointConfig = useMemo<DataPoint | undefined>(() => powerLink ? dataPoints[powerLink.dataPointId] : undefined, [powerLink, dataPoints]);
   const powerOpcUaNodeId = useMemo(() => powerDataPointConfig?.nodeId, [powerDataPointConfig]);
   const reactivePowerValue = useOpcUaNodeValue(powerOpcUaNodeId);
 
   const animationPowerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'panel.powerGeneration') || powerLink, [data.dataPointLinks, powerLink]);
-  const animationPowerDataPointConfig = useMemo(() => animationPowerLink ? dataPoints[animationPowerLink.dataPointId] : undefined, [animationPowerLink, dataPoints]);
+  const animationPowerDataPointConfig = useMemo<DataPoint | undefined>(() => animationPowerLink ? dataPoints[animationPowerLink.dataPointId] : undefined, [animationPowerLink, dataPoints]);
   const animationPowerOpcUaNodeId = useMemo(() => animationPowerDataPointConfig?.nodeId, [animationPowerDataPointConfig]);
   const reactiveAnimationPowerValue = useOpcUaNodeValue(animationPowerOpcUaNodeId);
   
@@ -204,15 +238,18 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
     return String(data.status || 'offline').toLowerCase();
   }, [statusLink, statusDataPointConfig, reactiveStatusValue, data.status]);
 
-  // Prioritize 'panel.powerGeneration' for internal logic (e.g. animation intensity)
-  // This value is expected to be numeric and represent the core generation metric (like irradiance)
   const currentNumericPowerForLogic = useMemo<number | undefined>(() => {
-    const linkToUse = animationPowerLink || powerLink; // Fallback to powerOutput if specific animation link not present
+    const linkToUse = animationPowerLink || powerLink; 
     const dpConfigToUse = animationPowerDataPointConfig || powerDataPointConfig;
     const reactiveValToUse = reactiveAnimationPowerValue !== undefined ? reactiveAnimationPowerValue : reactivePowerValue;
 
     if (linkToUse && dpConfigToUse && reactiveValToUse !== undefined) {
-      const mapped = applyValueMapping(reactiveValToUse, linkToUse);
+      let valueToProcess: any = reactiveValToUse;
+      if (typeof valueToProcess === 'number' && typeof dpConfigToUse.factor === 'number') {
+        valueToProcess = valueToProcess * dpConfigToUse.factor;
+      }
+      const mapped = applyValueMapping(valueToProcess, linkToUse); 
+
       if (typeof mapped === 'number') return mapped;
       if (typeof mapped === 'string') {
         const p = parseFloat(mapped.replace(/[^\d.-]/g, ''));
@@ -224,10 +261,14 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
   }, [animationPowerLink, animationPowerDataPointConfig, reactiveAnimationPowerValue,
       powerLink, powerDataPointConfig, reactivePowerValue, data.config?.powerRatingWp]);
 
-  // Dedicated numeric power for text display (from 'powerOutput' link)
   const currentNumericPowerForDisplay = useMemo<number | undefined>(() => {
     if (powerLink && powerDataPointConfig && reactivePowerValue !== undefined) {
-        const mapped = applyValueMapping(reactivePowerValue, powerLink);
+        let valueToProcess: any = reactivePowerValue;
+        if (typeof valueToProcess === 'number' && typeof powerDataPointConfig.factor === 'number') {
+          valueToProcess = valueToProcess * powerDataPointConfig.factor;
+        }
+        const mapped = applyValueMapping(valueToProcess, powerLink); 
+
         if (typeof mapped === 'number') return mapped;
         if (typeof mapped === 'string') {
             const p = parseFloat(mapped.replace(/[^\d.-]/g, ''));
@@ -235,7 +276,7 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
         }
         if (typeof mapped === 'boolean') return mapped ? (data.config?.powerRatingWp || 100) : 0;
     }
-    return currentNumericPowerForLogic; // Fallback display to logic power if specific display power isn't linked
+    return currentNumericPowerForLogic;
   }, [powerLink, powerDataPointConfig, reactivePowerValue, currentNumericPowerForLogic, data.config?.powerRatingWp]);
   
   const powerRatingWp = useMemo(() => data.config?.powerRatingWp, [data.config?.powerRatingWp]);
@@ -245,38 +286,37 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
     if (power === undefined) return 'UNKNOWN'; 
     const isGenerallyOk = ['nominal', 'ok', 'online', 'standby', 'idle', ''].includes(processedStatus);
 
-    if (power > 0.01) { // Producing if power is distinctly positive
+    if (power > 0.01) { 
         if (!powerRatingWp || powerRatingWp <= 0) return 'PRODUCING_MEDIUM';
         const ratio = power / powerRatingWp;
         if (ratio >= 0.7) return 'PRODUCING_HIGH';
         if (ratio >= 0.15) return 'PRODUCING_MEDIUM';
         return 'PRODUCING_LOW';
-    } else if (power < -0.01) { // Consuming if power is distinctly negative
+    } else if (power < -0.01) { 
         return 'CONSUMING';
     }
-    // If power is near zero, determine Idle Day/Night
-    return isGenerallyOk ? 'IDLE_DAY' : 'IDLE_NIGHT'; // Simplified, depends on actual status if available
+    const isDayTimeAssumed = (new Date().getHours() > 6 && new Date().getHours() < 20); 
+    return isGenerallyOk ? (isDayTimeAssumed ? 'IDLE_DAY' : 'IDLE_NIGHT') : (isDayTimeAssumed ? 'IDLE_DAY' : 'IDLE_NIGHT');
     
   }, [currentNumericPowerForLogic, powerRatingWp, processedStatus]);
 
   const standardNodeState = useMemo<StandardNodeState>(() => {
     if (processedStatus === 'fault') return 'FAULT';
     if (processedStatus === 'warning') return 'WARNING';
-    if (processedStatus === 'offline') return 'OFFLINE';
+    if (processedStatus === 'offline' || processedStatus === 'off') return 'OFFLINE';
     return panelOutputStateDerived;
   }, [processedStatus, panelOutputStateDerived]);
 
   const appearance = useMemo(() => {
-      // Custom color mapping based on your new requirements
       let specificAppearance = getNodeAppearanceFromState(standardNodeState, SLDElementType.Panel);
-      if (standardNodeState === 'PRODUCING_HIGH' || standardNodeState === 'PRODUCING_MEDIUM' || standardNodeState === 'PRODUCING_LOW') {
+      if (standardNodeState.startsWith('PRODUCING')) {
         specificAppearance.iconColorVar = 'var(--sld-color-producing-panel)';
         specificAppearance.mainStatusColorVar = 'var(--sld-color-producing-panel)';
         specificAppearance.glowColorVar = 'var(--sld-color-producing-panel-glow)';
       } else if (standardNodeState === 'IDLE_NIGHT') {
         specificAppearance.iconColorVar = 'var(--sld-color-night-panel)';
         specificAppearance.mainStatusColorVar = 'var(--sld-color-night-panel)';
-        specificAppearance.glowColorVar = 'rgba(0,0,0,0)'; // No glow for night usually
+        specificAppearance.glowColorVar = 'transparent'; 
       } else if (standardNodeState === 'IDLE_DAY') {
         specificAppearance.iconColorVar = 'var(--sld-color-idle-panel-day)';
         specificAppearance.mainStatusColorVar = 'var(--sld-color-idle-panel-day)';
@@ -287,14 +327,22 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
         specificAppearance.glowColorVar = 'var(--sld-color-consuming-panel-glow)';
       } else if (standardNodeState === 'OFFLINE') {
         specificAppearance.iconColorVar = 'var(--sld-color-offline-panel-icon)';
+        specificAppearance.mainStatusColorVar = 'var(--sld-color-offline-panel-icon)';
+        specificAppearance.glowColorVar = 'transparent';
+      } else if (standardNodeState === 'FAULT' || standardNodeState === 'WARNING') {
+        const colorVar = standardNodeState === 'FAULT' ? 'var(--sld-color-fault)' : 'var(--sld-color-warning)';
+        specificAppearance.iconColorVar = colorVar;
+        specificAppearance.mainStatusColorVar = colorVar;
+        specificAppearance.glowColorVar = colorVar; 
       }
-      // Ensure text colors provide contrast against these new backgrounds/icons
-      specificAppearance.statusTextColorVar = specificAppearance.statusTextColorVar || 'var(--sld-color-text)'; // Fallback
+      specificAppearance.statusTextColorVar = specificAppearance.statusTextColorVar || 'var(--sld-color-text)';
       return specificAppearance;
 
   }, [standardNodeState]);
 
   const isProducing = useMemo(() => standardNodeState.startsWith('PRODUCING'), [standardNodeState]);
+  const isConsuming = useMemo(() => standardNodeState === 'CONSUMING', [standardNodeState]);
+
 
   const productionRatio = useMemo<number>(() => {
     const power = currentNumericPowerForLogic;
@@ -302,15 +350,15 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
       return Math.max(0, Math.min(1, power / powerRatingWp));
     }
     return 0;
-  }, [standardNodeState, currentNumericPowerForLogic, powerRatingWp, isProducing]);
+  }, [isProducing, currentNumericPowerForLogic, powerRatingWp]);
 
-  const consumptionRatio = useMemo<number>(() => { // If panels can consume
+  const consumptionRatio = useMemo<number>(() => { 
     const power = currentNumericPowerForLogic;
-     if (standardNodeState === 'CONSUMING' && powerRatingWp && powerRatingWp > 0 && power !== undefined && power < 0) {
-      return Math.max(0, Math.min(1, Math.abs(power) / (powerRatingWp * 0.2))); // Assuming max consumption is 20% of rating
+     if (isConsuming && powerRatingWp && powerRatingWp > 0 && power !== undefined && power < 0) {
+      return Math.max(0, Math.min(1, Math.abs(power) / (powerRatingWp * 0.20))); 
     }
     return 0;
-  }, [standardNodeState, currentNumericPowerForLogic, powerRatingWp]);
+  }, [isConsuming, currentNumericPowerForLogic, powerRatingWp]);
 
 
   const displayStatusText = useMemo<string>(() => {
@@ -321,28 +369,29 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
       case 'PRODUCING_HIGH': return "Peak Output";
       case 'PRODUCING_MEDIUM': return "Generating";
       case 'PRODUCING_LOW': return "Low Output";
-      case 'IDLE_DAY': return "Idle";
-      case 'IDLE_NIGHT': return "Night";
-      case 'CONSUMING': return "Consuming"; // New state
+      case 'IDLE_DAY': return "Idle (Day)";
+      case 'IDLE_NIGHT': return "Idle (Night)";
+      case 'CONSUMING': return "Consuming"; 
       case 'STANDBY': return "Standby";
+      case 'UNKNOWN': return "Status N/A";
       default: 
         const readableStatus = standardNodeState.replace(/_/g, ' ');
         return readableStatus.charAt(0).toUpperCase() + readableStatus.slice(1).toLowerCase();
     }
   }, [standardNodeState]);
 
+  const activeRatioForAnimation = isProducing ? productionRatio : (isConsuming ? consumptionRatio : 0);
   const animationGlowDuration = useMemo(() => { 
-    if (isProducing) return Math.max(0.8, 2.8 - productionRatio * 2.1);
-    if (standardNodeState === 'CONSUMING') return Math.max(0.8, 2.8 - consumptionRatio * 2.1);
+    if (isProducing || isConsuming) return Math.max(0.8, 2.8 - activeRatioForAnimation * 2.0); 
     return 3; 
-  }, [isProducing, productionRatio, standardNodeState, consumptionRatio]);
+  }, [isProducing, isConsuming, activeRatioForAnimation]);
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
   const prevStandardNodeState = useRef(standardNodeState);
   useEffect(() => {
     if (prevStandardNodeState.current !== standardNodeState) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 1200);
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 1300); 
       prevStandardNodeState.current = standardNodeState;
       return () => clearTimeout(timer);
     }
@@ -350,31 +399,33 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
   
   const sldAccentVar = 'var(--sld-color-accent)';
 
-  const calculatedMinHeight = 75; // Make it even more compact
-  const calculatedMinWidth = 85;
+  const calculatedMinHeight = 80; 
+  const calculatedMinWidth = 95;
 
   const nodeMainStyle = useMemo((): React.CSSProperties => {
-    let currentBoxShadow = `0 1px 2px rgba(0,0,0,0.03), 0 0.5px 1px rgba(0,0,0,0.02)`; 
+    let currentBoxShadow = `0 1px 2px rgba(0,0,0,0.04), 0 0.5px 1px rgba(0,0,0,0.03)`; 
+    const faultWarningColor = standardNodeState === 'FAULT' ? 'var(--sld-color-fault)' : 'var(--sld-color-warning)';
+
     if (standardNodeState === 'FAULT' || standardNodeState === 'WARNING') {
-        currentBoxShadow = `0 0 0 1.5px ${standardNodeState === 'FAULT' ? 'var(--sld-color-fault)' : 'var(--sld-color-warning)'}, 0 0 7px 0px ${standardNodeState === 'FAULT' ? 'var(--sld-color-fault)' : 'var(--sld-color-warning)'}`;
+        currentBoxShadow = `0 0 0 1.5px ${faultWarningColor}, 0 0 8px 1px ${faultWarningColor.replace(')', ', 0.7)').replace('var(','rgba(')}`;
     }
-    if (isRecentStatusChange && appearance.glowColorVar && appearance.glowColorVar !== 'transparent') {
-        currentBoxShadow = `0 0 12px 2.5px ${appearance.glowColorVar.replace(')', ', 0.5)').replace('var(','rgba(')}`;
+    if (isRecentStatusChange && appearance.glowColorVar && appearance.glowColorVar !== 'transparent' && appearance.glowColorVar !== 'rgba(0,0,0,0)') {
+        currentBoxShadow = `0 0 12px 3px ${appearance.glowColorVar.replace(')', ', 0.65)').replace('var(','rgba(')}`; 
     }
     if (selected) {
-        currentBoxShadow = `0 0 0 2px ${sldAccentVar.replace(')', ', 0.75)').replace('var(','rgba(')}, 0 0 10px 1.5px ${sldAccentVar.replace(')', ', 0.45)').replace('var(','rgba(')}`;
+        currentBoxShadow = `0 0 0 2px ${sldAccentVar.replace(')', ', 0.8)').replace('var(','rgba(')}, 0 0 12px 2px ${sldAccentVar.replace(')', ', 0.5)').replace('var(','rgba(')}`;
     }
     
     return {
-      borderColor: appearance.borderColorVar,
-      borderWidth: '1px',
+      borderColor: selected ? sldAccentVar : appearance.borderColorVar, 
+      borderWidth: selected ? '1.5px' : '1px', 
       boxShadow: currentBoxShadow,
       color: appearance.textColorVar,
       minWidth: `${calculatedMinWidth}px`,
       minHeight: `${calculatedMinHeight}px`,
       width: nodeWidthFromData ? `${nodeWidthFromData}px` : `${calculatedMinWidth}px`,
       height: nodeHeightFromData ? `${nodeHeightFromData}px` : `${calculatedMinHeight}px`,
-      borderRadius: '0.3rem', 
+      borderRadius: '0.375rem', 
     };
   }, [appearance, selected, isRecentStatusChange, sldAccentVar, nodeWidthFromData, nodeHeightFromData, standardNodeState]);
   
@@ -388,7 +439,10 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
   const formattedPowerOutputWithContext = useMemo(() => {
     const powerValForDisplay = currentNumericPowerForDisplay;
     const displaySuffix = powerLink?.format?.suffix || (powerValForDisplay && Math.abs(powerValForDisplay) >= 1000 ? 'kW' : 'W');
-    const displayPrecision = powerLink?.format?.precision ?? ((powerValForDisplay && Math.abs(powerValForDisplay) < 10 && powerValForDisplay !==0 && displaySuffix === 'W') ? 1 : 0);
+    let displayPrecision = powerDataPointConfig?.decimalPlaces ?? powerLink?.format?.precision;
+    if (displayPrecision === undefined) {
+      displayPrecision = (powerValForDisplay && Math.abs(powerValForDisplay) < 10 && powerValForDisplay !==0 && displaySuffix === 'W') ? 1 : 0;
+    }
     
     let valueToFormat = powerValForDisplay;
     if(displaySuffix === 'kW' && powerValForDisplay !== undefined) {
@@ -404,58 +458,75 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
     let powerStr = (powerValForDisplay !== undefined && valueToFormat !== undefined)
       ? formatDisplayValue(valueToFormat, displayFormatOptions, powerDataPointConfig?.dataType || 'Float')
       : (powerLink ? `--- ${displayFormatOptions.suffix}` : (powerRatingWp ? "Rated" : "N/A"));
-      if (powerValForDisplay !== undefined && displaySuffix === 'kW') {
-        // For kW values, ensure at least 2 decimal places
-        const precision = Math.max(2, displayPrecision);
+
+      if (powerValForDisplay !== undefined && displaySuffix === 'kW' && valueToFormat !== undefined) {
+        let kwPrecision = powerDataPointConfig?.decimalPlaces ?? powerLink?.format?.precision;
+        if (kwPrecision === undefined) {
+            kwPrecision = Math.max(0, (Math.abs(valueToFormat) < 1 ? 3 : (Math.abs(valueToFormat) < 10 ? 2 : 1) ));
+        }
         const displayFormatOptionsKw = { 
-        type: 'number' as const, 
-        precision: precision, 
-        suffix: displaySuffix
+            type: 'number' as const, 
+            precision: kwPrecision, 
+            suffix: displaySuffix
         };
-        powerStr = formatDisplayValue(valueToFormat!, displayFormatOptionsKw, powerDataPointConfig?.dataType || 'Float');
+        powerStr = formatDisplayValue(valueToFormat, displayFormatOptionsKw, powerDataPointConfig?.dataType || 'Float');
       }
+
     if (powerRatingWp) {
       const ratedSuffix = powerRatingWp >= 1000 ? 'kWp' : 'Wp';
       const ratedValue = ratedSuffix === 'kWp' ? powerRatingWp / 1000 : powerRatingWp;
-      const ratedFormat = { type: 'number' as const, precision: 0, suffix: ratedSuffix };
+      const ratedFormat = { type: 'number' as const, precision: ratedValue < 10 && ratedValue !== 0 ? 1 : 0, suffix: ratedSuffix }; 
       const ratedStr = formatDisplayValue(ratedValue, ratedFormat, 'Float');
       return powerStr === "Rated" ? ratedStr : `${powerStr} / ${ratedStr}`;
     }
     return powerStr;
   }, [currentNumericPowerForDisplay, powerLink, powerDataPointConfig, powerRatingWp]);
   
+  const showBreathingGlow = (isProducing || isConsuming) && 
+                            !selected && 
+                            !isRecentStatusChange && 
+                            standardNodeState !== 'FAULT' && 
+                            standardNodeState !== 'WARNING' && 
+                            appearance.glowColorVar && 
+                            appearance.glowColorVar !== 'transparent' &&
+                            appearance.glowColorVar !== 'rgba(0,0,0,0)';
+
+  const activeRatio = isProducing ? productionRatio : (isConsuming ? consumptionRatio : 0);
+  const glowBase = nodeMainStyle.boxShadow || '0 1px 2px rgba(0,0,0,0.04), 0 0.5px 1px rgba(0,0,0,0.03)';
+  const glowColorToUse = (appearance.glowColorVar || appearance.mainStatusColorVar || 'var(--sld-color-accent)');
+  
   return (
     <motion.div
       className={`panel-node group sld-node relative flex flex-col items-center 
-                  border transition-all duration-150 ease-out
+                  border transition-all duration-150 ease-out 
                   ${isNodeEditable ? 'cursor-grab' : 'cursor-pointer'}
-                  overflow-hidden`}
+                  overflow-visible`} 
       style={{ ...nodeMainStyle, background: `var(--sld-color-node-bg)` }}
-      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+      initial={{ opacity: 0, y: 12, scale: 0.92 }} 
       animate={{ 
         opacity: 1, y: 0, scale: 1,
-        boxShadow: (isProducing || standardNodeState === 'CONSUMING') && !selected && !isRecentStatusChange && standardNodeState !== 'FAULT' && standardNodeState !== 'WARNING' && appearance.glowColorVar !== 'transparent'
+        boxShadow: showBreathingGlow
           ? [ 
-              nodeMainStyle.boxShadow!,
-              `${nodeMainStyle.boxShadow!.replace(/rgba\(([^)]+)\)/g, `rgba($1,0.03)`)}, 0 0 ${1 + productionRatio * 2}px ${0.2 + productionRatio * 0.6}px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.12)').replace('var(','rgba(')}`,
-              `${nodeMainStyle.boxShadow!.replace(/rgba\(([^)]+)\)/g, `rgba($1,0.03)`)}, 0 0 ${2 + productionRatio * 4}px ${0.5 + productionRatio * 1.2}px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.22)').replace('var(','rgba(')}`,
-              `${nodeMainStyle.boxShadow!.replace(/rgba\(([^)]+)\)/g, `rgba($1,0.03)`)}, 0 0 ${1 + productionRatio * 2}px ${0.2 + productionRatio * 0.6}px ${appearance.glowColorVar || appearance.mainStatusColorVar.replace(')', ', 0.12)').replace('var(','rgba(')}`,
-              nodeMainStyle.boxShadow!,
+              glowBase,
+              `${glowBase.replace(/rgba\(([^)]+)\)/g, `rgba($1,0.02)`)}, 0 0 ${1.5 + activeRatio * 3.0}px ${0.3 + activeRatio * 1.0}px ${glowColorToUse.replace(')', `, ${0.15 + activeRatio * 0.12})`).replace('var(','rgba(')}`,
+              `${glowBase.replace(/rgba\(([^)]+)\)/g, `rgba($1,0.02)`)}, 0 0 ${2.5 + activeRatio * 5.5}px ${0.6 + activeRatio * 1.8}px ${glowColorToUse.replace(')', `, ${0.25 + activeRatio * 0.18})`).replace('var(','rgba(')}`,
+              `${glowBase.replace(/rgba\(([^)]+)\)/g, `rgba($1,0.02)`)}, 0 0 ${1.5 + activeRatio * 3.0}px ${0.3 + activeRatio * 1.0}px ${glowColorToUse.replace(')', `, ${0.15 + activeRatio * 0.12})`).replace('var(','rgba(')}`,
+              glowBase,
             ]
           : nodeMainStyle.boxShadow 
       }} 
-      exit={{ opacity: 0, y: 5, scale: 0.95, transition: { duration: 0.1, ease: "easeOut"} }}
+      exit={{ opacity: 0, y: 8, scale: 0.93, transition: { duration: 0.12, ease: "easeOut"} }}
       transition={
-        (isProducing || standardNodeState === 'CONSUMING') && !selected && !isRecentStatusChange && standardNodeState !== 'FAULT' && standardNodeState !== 'WARNING' && appearance.glowColorVar !== 'transparent'
-          ? { type: 'spring', stiffness: 190, damping: 28, boxShadow: { duration: animationGlowDuration, repeat: Infinity, ease: "easeInOut" } }
-          : { type: 'spring', stiffness: 250, damping: 20 }
+        showBreathingGlow
+          ? { type: 'spring', stiffness: 180, damping: 30, boxShadow: { duration: animationGlowDuration, repeat: Infinity, ease: "easeInOut" } } 
+          : { type: 'spring', stiffness: 260, damping: 22 } 
       }
       whileHover={{ 
-        scale: isNodeEditable ? 1.02 : 1.005, // More subtle hover scale
+        scale: isNodeEditable ? 1.025 : 1.01,  
         borderColor: selected ? appearance.borderColorVar : sldAccentVar,
-        boxShadow: selected 
+        boxShadow: selected || isRecentStatusChange || standardNodeState === 'FAULT' || standardNodeState === 'WARNING'
             ? nodeMainStyle.boxShadow
-            : `${nodeMainStyle.boxShadow || '0 1px 2px rgba(0,0,0,0.07)'}, 0 0 7px 1px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', ', 0.25)').replace('var(','rgba(')}`
+            : `${glowBase}, 0 0 10px 2px ${glowColorToUse.replace(')', `, ${0.3 + activeRatio * 0.2})`).replace('var(','rgba(')}`
       }}
       onClick={(e) => { 
          if (!isNodeEditable && !isEditMode) {
@@ -464,23 +535,34 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
         }
       }}
     >
-      <Handle type="source" position={Position.Bottom} id="dc_out" isConnectable={isConnectable}
-        className="sld-handle-style"
-        style={{ background: (isProducing || standardNodeState === 'CONSUMING') ? appearance.mainStatusColorVar : 'var(--sld-color-deenergized)', borderColor: 'var(--sld-color-handle-border)' }}
-        title="DC Output/Input" />
+      {/* --- MODIFIED HANDLE --- */}
+      <Handle 
+        type="source" // Solar panel is a source of power
+        position={Position.Top} // Outputting from the top
+        id="dc_out" 
+        isConnectable={isConnectable}
+        className="sld-handle-style !z-20"
+        style={{ 
+            background: (isProducing || standardNodeState === 'ENERGIZED') // Active if producing or generally energized
+                         ? appearance.mainStatusColorVar 
+                         : (isConsuming ? 'var(--sld-color-consuming-panel)' : 'var(--sld-color-deenergized)'), // Specific color if consuming, else deenergized
+            borderColor: 'var(--sld-color-handle-border)',
+        }}
+        title="DC Output" // Changed title to be more specific for its primary role
+      />
 
       {!isEditMode && (
         <Button variant="ghost" size="icon" title="View Details"
-          className="absolute top-0.5 right-0.5 h-4 w-4 rounded-full z-20 
-                     bg-transparent hover:bg-black/[.03] dark:hover:bg-white/[.03] p-0" 
+          className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 group/infobtn 
+                     bg-transparent hover:bg-black/[.04] dark:hover:bg-white/[.04] p-0"
           onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}
         >
-          <InfoIcon className="h-2.5 w-2.5 text-gray-400 dark:text-gray-500 group-hover/infobtn:text-[var(--sld-color-accent)] transition-colors" /> 
+          <InfoIcon className="h-3 w-3 text-gray-400 dark:text-gray-500 group-hover/infobtn:text-[var(--sld-color-accent)] transition-colors" /> 
         </Button>
       )}
       
-      <div className="flex flex-col items-center justify-between w-full h-full px-1 pt-0.5 pb-0.5 pointer-events-none select-none">
-        <div className="w-full h-[30px] mt-1 mb-px flex items-center justify-center flex-shrink-0">
+      <div className="flex flex-col items-center justify-start w-full h-full px-1 pt-1 pb-0.5 pointer-events-none select-none space-y-0.5">
+        <div className="w-full min-h-[30px] h-[30px] mb-px flex items-center justify-center flex-shrink-0">
             <DynamicPanelEnergyVisual 
                 appearance={appearance} 
                 productionRatio={productionRatio}
@@ -489,18 +571,22 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
             />
         </div>
         
-        <div className="flex flex-col items-center text-center w-full space-y-0">
-            <p className="text-[8px] font-semibold leading-tight truncate w-full" style={{ color: appearance.textColorVar }} title={data.label}>
+        <div className="flex flex-col items-center text-center w-full mt-0">
+            <p 
+                className="text-[9px] font-semibold leading-normal w-full px-0.5"
+                style={{ color: appearance.textColorVar }} 
+                title={data.label}
+            >
               {data.label}
             </p>
-            <div className="h-[10px] overflow-hidden">
+            <div className="min-h-[12px] w-full"> 
                 <AnimatePresence mode="wait">
                     <motion.p
                         key={`status-${displayStatusText}`}
-                        className="text-[6.5px] font-medium tracking-tighter leading-none truncate w-full"
+                        className="text-[7.5px] font-medium leading-normal w-full px-0.25" 
                         style={{ color: appearance.statusTextColorVar }} title={`Status: ${displayStatusText}`}
                         initial={{ opacity:0, y:2 }} animate={{ opacity:1, y:0 }}
-                        exit={{ opacity:0, y:-2 }} transition={{ duration:0.15, ease:"easeOut" }}
+                        exit={{ opacity:0, y:-2 }} transition={{ duration:0.15, ease:"circOut" }}
                     >
                         {displayStatusText}
                     </motion.p>
@@ -508,31 +594,31 @@ const PanelNode: React.FC<NodeProps<PanelNodeData>> = (props) => {
             </div>
         </div>
         
-        <div className="flex items-center justify-center space-x-0.5 text-[7px] font-semibold w-full truncate mt-auto" title={`Power: ${formattedPowerOutputWithContext}`}>
+        <div className="flex items-center justify-center space-x-0.5 text-[8px] font-semibold w-full mt-auto mb-px" title={`Power: ${formattedPowerOutputWithContext}`}>
             <BoltIcon
                 size={7} 
-                className="transition-colors duration-200 flex-shrink-0"
-                style={{ color: (isProducing || standardNodeState === 'CONSUMING') ? appearance.iconColorVar : appearance.statusTextColorVar }}
+                className="transition-colors duration-200 flex-shrink-0 mr-px"
+                style={{ color: (isProducing || isConsuming) ? appearance.iconColorVar : appearance.statusTextColorVar }}
             />
             <AnimatePresence mode="popLayout">
                 <motion.span
                     key={`power-${formattedPowerOutputWithContext}`}
-                    className="font-semibold"
+                    className="font-semibold leading-normal text-[10px]"
                     style={{ color: appearance.statusTextColorVar }}
                     initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }} transition={{ duration:0.15 }}
+                    exit={{ opacity: 0 }} transition={{ duration:0.18 }}
                 >
                     {formattedPowerOutputWithContext.split(" / ")[0]}
                     {formattedPowerOutputWithContext.includes(" / ") && (
-                        <span className="text-[6px] opacity-75 font-normal"> / {formattedPowerOutputWithContext.split(" / ")[1]}</span>
+                        <span className="text-[8px] opacity-85 font-normal"> / {formattedPowerOutputWithContext.split(" / ")[1]}</span>
                     )}
                 </motion.span>
             </AnimatePresence>
             {powerOpcUaNodeId && currentNumericPowerForDisplay !== undefined && (
                 <motion.div 
-                    className="w-0.5 h-0.5 rounded-full ml-0.5 flex-shrink-0"
+                    className="w-0.5 h-0.5 rounded-full ml-0.5 flex-shrink-0" 
                     style={{ backgroundColor: appearance.statusTextColorVar }}
-                    animate={{ opacity: [0.4, 0.9, 0.4] }}
+                    animate={{ opacity: [0.35, 1, 0.35] }} 
                     transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
                 />
             )}
