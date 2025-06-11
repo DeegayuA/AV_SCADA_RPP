@@ -8,7 +8,7 @@ import { DataPointConfig, dataPoints as actualDefaultDataPointsFromConfig } from
 import { APP_NAME, OPC_UA_ENDPOINT_OFFLINE, PLANT_CAPACITY, PLANT_LOCATION, PLANT_NAME as initialPlantNameFromConst, PLANT_TYPE } from '@/config/constants';
 import { Sparkles } from 'lucide-react';
 
-export type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5;
+export type OnboardingStep = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 export type SaveStatus = 'idle' | 'saving' | 'success' | 'error';
 export type PartialOnboardingData = Partial<Omit<AppOnboardingData, 'onboardingCompleted' | 'version'>>;
 
@@ -42,6 +42,8 @@ export interface OnboardingContextType {
   configData: OnboardingConfigData;
   updateConfigData: (partialData: Partial<OnboardingConfigData>) => void;
   isLoading: boolean;
+  isStepLoading: boolean; // New state for step-specific loading
+  setIsStepLoading: (loading: boolean) => void; // Setter
   totalSteps: number;
   onboardingData: PartialOnboardingData;
   updateOnboardingData: (data: PartialOnboardingData) => void;
@@ -59,6 +61,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState<OnboardingStep>(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
+  const [isStepLoading, setIsStepLoading] = useState(false);
 
   const [onboardingData, setOnboardingData] = useState<PartialOnboardingData>({
     plantName: initialPlantNameFromConst,
@@ -73,7 +76,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     () => JSON.parse(JSON.stringify(sourceDefaultDataPoints))
   );
 
-  const totalSteps = 6; // This seems fixed for the defined steps
+  const totalSteps = 7; // This seems fixed for the defined steps
 
   const updateOnboardingData = useCallback((data: PartialOnboardingData) => {
     setOnboardingData((prev) => ({ ...prev, ...data }));
@@ -88,7 +91,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const completeOnboarding = useCallback(async () => {
-    setCurrentStep(5); // Move to finalizing screen
+    setCurrentStep(6); // Move to finalizing screen
     setSaveStatus('saving');
     let loadingToastId: string | number | undefined;
     // Show indefinite loading toast
@@ -138,7 +141,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
       });
       setSaveStatus('error');
       // Optionally, send user back to review step or last configuration step
-      setCurrentStep(4); // Example: back to review step
+      setCurrentStep(5); // Example: back to review step (index before Review, which is OPC UA Test)
     }
   }, [onboardingData, configuredDataPoints, router]);
 
@@ -181,7 +184,9 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     configuredDataPoints,
     setConfiguredDataPoints,
     saveStatus,
-    isLoading: saveStatus === 'saving',
+    isLoading: saveStatus === 'saving' || isStepLoading,
+    isStepLoading,
+    setIsStepLoading,
     configData: {
       plantName: onboardingData.plantName,
       plantLocation: onboardingData.plantLocation,
@@ -230,8 +235,8 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     },
   }), [
     currentStep, onboardingData, updateOnboardingData, totalSteps,
-    nextStep, prevStep, goToStep, completeOnboarding, resetOnboardingDataInternal, 
-    configuredDataPoints, setConfiguredDataPoints, saveStatus, setOnboardingData
+    nextStep, prevStep, goToStep, completeOnboarding, resetOnboardingDataInternal,
+    configuredDataPoints, setConfiguredDataPoints, saveStatus, setOnboardingData, isStepLoading, setIsStepLoading
   ]);
 
   return (

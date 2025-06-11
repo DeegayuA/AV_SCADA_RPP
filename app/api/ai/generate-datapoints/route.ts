@@ -45,9 +45,6 @@ if (!GEMINI_API_KEY) {
   console.warn("GEMINI_API_KEY is not set. AI features will not be available.");
 }
 
-// Initialize GoogleGenAI instance
-const genAI = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
-
 // Define model name and safety settings as constants
 const MODEL_NAME = "gemini-2.5-flash-preview-05-20"; // Or "gemini-2.0-flash-001" as per quickstart for broader compatibility if needed
 const SAFETY_SETTINGS: SafetySetting[] = [
@@ -131,7 +128,7 @@ The final output must be a single JSON array.
 }
 
 async function generateContentWithRetry(
-  aiInstance: GoogleGenAI,
+  aiInstance: GoogleGenAI, // Modified to accept instance
   modelName: string,
   prompt: string,
   safetySettings: SafetySetting[],
@@ -179,16 +176,25 @@ async function generateContentWithRetry(
 }
 
 export async function POST(req: NextRequest) {
-  if (!GEMINI_API_KEY || !genAI) { // Check genAI instance directly
-    return NextResponse.json({ success: false, message: "AI model is not available. GEMINI_API_KEY might be missing." }, { status: 503 });
-  }
-
   console.log("POST /api/ai/generate-datapoints endpoint hit.");
   let filePath: string | undefined;
 
   try {
     const body = await req.json();
     filePath = body.filePath;
+    const userApiKey = body.geminiApiKey; // New: Get key from request
+
+    let genAIInstance;
+    if (userApiKey) {
+      console.log("Using user-provided Gemini API Key.");
+      genAIInstance = new GoogleGenAI({ apiKey: userApiKey });
+    } else if (GEMINI_API_KEY) {
+      console.log("Using environment variable Gemini API Key.");
+      genAIInstance = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+    } else {
+      console.warn("Gemini API Key is not configured either in request or environment.");
+      return NextResponse.json({ success: false, message: "AI model is not available. Gemini API Key is not configured." }, { status: 503 });
+    }
 
     if (!filePath) {
       return NextResponse.json({ success: false, message: 'File path to discovered_datapoints.json is required.' }, { status: 400 });
@@ -211,8 +217,8 @@ export async function POST(req: NextRequest) {
       const prompt = buildPrompt(batch);
       console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(discoveredDatapoints.length / batchSize)}, prompt length: ${prompt.length}`);
 
-      // Pass genAI instance, model name, prompt, and safety settings
-      const aiTextOutput = await generateContentWithRetry(genAI, MODEL_NAME, prompt, SAFETY_SETTINGS);
+      // Pass genAIInstance instance, model name, prompt, and safety settings
+      const aiTextOutput = await generateContentWithRetry(genAIInstance, MODEL_NAME, prompt, SAFETY_SETTINGS);
       
       console.log("Received response from Gemini AI.");
       // console.log("AI Text Output (first 500 chars):", aiTextOutput.substring(0, 500)); // For debugging, uncomment if needed

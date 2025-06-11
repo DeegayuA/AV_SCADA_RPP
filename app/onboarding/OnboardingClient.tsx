@@ -23,7 +23,8 @@ import WelcomeStep from './WelcomeStep';
 import PlantConfigStep from './PlantConfigStep';
 import DataPointConfigStep from './DataPointConfigStep';
 import OpcuaTestStep from './OpcuaTestStep';
-import DatapointDiscoveryStep from './DatapointDiscoveryStep'; // Import the new step
+import DatapointDiscoveryStep from './DatapointDiscoveryStep';
+import GeminiKeyConfigStep from './GeminiKeyConfigStep'; // New Step
 import ReviewStep from './ReviewStep';
 
 // Animation variants (ensure itemVariants is defined before SuccessRedirector if used)
@@ -113,18 +114,20 @@ const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> 
           <ArrowLeft className="h-4 w-4 mr-1.5 sm:mr-2" /> Previous
         </Button>
       </motion.div>
-      <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
-        <Button
-          onClick={onNext}
-          disabled={isLoading}
-          className="px-4 py-2 text-sm sm:min-w-[120px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg"
-          aria-label={isLastFunctionalStep ? "Finish and save configuration" : "Next step"}
-        >
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-1.5 sm:mr-2" />}
-          {isLastFunctionalStep ? "Finish & Save" : "Next"}
-          {!isLoading && !isLastFunctionalStep && <ArrowRight className="h-4 w-4 ml-1.5 sm:ml-2" />}
-        </Button>
-      </motion.div>
+      {!isFirstStep && (
+        <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
+          <Button
+            onClick={onNext}
+            disabled={isLoading}
+            className="px-4 py-2 text-sm sm:min-w-[120px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg"
+            aria-label={isLastFunctionalStep ? "Finish and save configuration" : "Next step"}
+          >
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-1.5 sm:mr-2" />}
+            {isLastFunctionalStep ? "Finish & Save" : "Next"}
+            {!isLoading && !isLastFunctionalStep && <ArrowRight className="h-4 w-4 ml-1.5 sm:ml-2" />}
+          </Button>
+        </motion.div>
+      )}
     </div>
   );
 });
@@ -166,9 +169,10 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
 
     const stepsConfig = [
         { component: <WelcomeStep key="welcome" />, name: "Welcome" },
+        { component: <GeminiKeyConfigStep key="gemini_key" />, name: "Gemini API Key" }, // New Step
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
         { component: <DataPointConfigStep key="datapoints_manual" />, name: "Manual Data Points" },
-        { component: <DatapointDiscoveryStep key="datapoints_auto" />, name: "Auto Discover Points" }, // New Step
+        { component: <DatapointDiscoveryStep key="datapoints_auto" />, name: "Auto Discover Points" },
         { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
@@ -267,7 +271,7 @@ const OnboardingPageContentInternal: React.FC = () => {
     const [pageState, setPageState] = useState<'loading' | 'auth_required' | 'admin_setup_pending' | 'onboarding_active' | 'finalizing' | 'error_state'>('loading');
     const [hasSyncedUrlToContext, setHasSyncedUrlToContext] = useState(false);
 
-    const totalFunctionalSteps = 6; // Updated total steps
+    const totalFunctionalSteps = 7; // Updated total steps
 
     useEffect(() => {
         if (!storeHasHydrated) {
