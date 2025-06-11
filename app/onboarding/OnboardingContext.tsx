@@ -73,7 +73,7 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     () => JSON.parse(JSON.stringify(sourceDefaultDataPoints))
   );
 
-  const totalSteps = 5; // This seems fixed for the defined steps
+  const totalSteps = 6; // This seems fixed for the defined steps
 
   const updateOnboardingData = useCallback((data: PartialOnboardingData) => {
     setOnboardingData((prev) => ({ ...prev, ...data }));

@@ -23,6 +23,7 @@ import WelcomeStep from './WelcomeStep';
 import PlantConfigStep from './PlantConfigStep';
 import DataPointConfigStep from './DataPointConfigStep';
 import OpcuaTestStep from './OpcuaTestStep';
+import DatapointDiscoveryStep from './DatapointDiscoveryStep'; // Import the new step
 import ReviewStep from './ReviewStep';
 
 // Animation variants (ensure itemVariants is defined before SuccessRedirector if used)
@@ -166,7 +167,8 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     const stepsConfig = [
         { component: <WelcomeStep key="welcome" />, name: "Welcome" },
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
-        { component: <DataPointConfigStep key="datapoints" />, name: "Data Points" },
+        { component: <DataPointConfigStep key="datapoints_manual" />, name: "Manual Data Points" },
+        { component: <DatapointDiscoveryStep key="datapoints_auto" />, name: "Auto Discover Points" }, // New Step
         { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
@@ -265,7 +267,7 @@ const OnboardingPageContentInternal: React.FC = () => {
     const [pageState, setPageState] = useState<'loading' | 'auth_required' | 'admin_setup_pending' | 'onboarding_active' | 'finalizing' | 'error_state'>('loading');
     const [hasSyncedUrlToContext, setHasSyncedUrlToContext] = useState(false);
 
-    const totalFunctionalSteps = 5;
+    const totalFunctionalSteps = 6; // Updated total steps
 
     useEffect(() => {
         if (!storeHasHydrated) {
