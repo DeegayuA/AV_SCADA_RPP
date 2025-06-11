@@ -9,6 +9,12 @@ import { useOnboarding } from './OnboardingContext';
 import { DataPointConfig } from '@/config/dataPoints'; // For setConfiguredDataPoints type
 import { toast } from 'sonner';
 
+// Simple utility to convert string to icon component (placeholder implementation)
+const getIconComponent = (iconName: string) => {
+  // Return undefined for now - this can be implemented later with proper icon mapping
+  return undefined;
+};
+
 // Define the structure of a discovered data point for the frontend
 interface DiscoveredDataPoint {
   name: string;
@@ -79,9 +85,7 @@ const DatapointDiscoveryStep: React.FC = () => {
           message: result.message
         });
         // Example: Store filepath in context if needed for next steps
-        // if (result.filePath && setDiscoveredDatapointsFile) {
-        //   setDiscoveredDatapointsFile(result.filePath);
-        // }
+        // Note: filepath is already stored in discoveryResponse state for AI generation
         // Consider showing a success toast here if a toast system is integrated
         console.log("Discovery successful:", result);
       } else {
@@ -116,14 +120,21 @@ const DatapointDiscoveryStep: React.FC = () => {
       });
 
       const result: AiApiResponse = await response.json();
-
       if (response.ok && result.success && result.data) {
-        // The AI provides icon names as strings.
-        // The DataPointConfig in context might expect LucideIcon components.
-        // For now, we pass it as is. The ReviewStep or other components
-        // will need to handle the string-to-component transformation for icons.
-        // This matches the behavior of manual configuration where icon string is stored.
-        setConfiguredDataPoints(result.data as DataPointConfig[]);
+        // Convert AI generated data points to proper DataPointConfig format
+        // Transform string icon names to icon components
+        const transformedDataPoints: DataPointConfig[] = result.data.map(dp => {
+          const { icon: iconName, ...restDp } = dp;
+          const iconComponent = iconName ? getIconComponent(iconName) : undefined;
+          const transformedDp: any = { ...restDp };
+          if (iconComponent) {
+            transformedDp.icon = iconComponent;
+          }
+          return transformedDp;
+        });
+        
+        setConfiguredDataPoints(transformedDataPoints);
+        setAiGeneratedDataPointsCount(result.data.length);
         setAiGeneratedDataPointsCount(result.data.length);
         toast.success("AI Generation Successful!", {
           description: `Successfully generated ${result.data.length} datapoint configurations.`,

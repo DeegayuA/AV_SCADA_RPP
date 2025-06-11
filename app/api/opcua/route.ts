@@ -916,4 +916,5 @@ if (typeof process !== 'undefined') {
     });
 }
 
-export { opcuaSession, connectOPCUA, discoverAndSaveDatapoints, DiscoveredDataPoint };
+export { opcuaSession, connectOPCUA, discoverAndSaveDatapoints };
+export type { DiscoveredDataPoint };

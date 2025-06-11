@@ -168,8 +168,8 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
         { component: <WelcomeStep key="welcome" />, name: "Welcome" },
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
         { component: <DataPointConfigStep key="datapoints_manual" />, name: "Manual Data Points" },
-        { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
         { component: <DatapointDiscoveryStep key="datapoints_auto" />, name: "Auto Discover Points" }, // New Step
+        { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
 

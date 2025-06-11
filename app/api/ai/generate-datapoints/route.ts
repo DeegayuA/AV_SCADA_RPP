@@ -1,7 +1,13 @@
 // app/api/ai/generate-datapoints/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
-import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
+import {
+  GoogleGenAI,
+  HarmCategory,
+  HarmBlockThreshold,
+  SafetySetting, // Import SafetySetting for typing
+  GenerateContentResponse, // For typing the response if needed, though direct access is fine
+} from '@google/genai';
 
 // Minimal DataPoint interface for this file
 // Ensure this aligns with the main DataPoint type in `config/dataPoints.ts` or a shared types location
@@ -37,29 +43,28 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 if (!GEMINI_API_KEY) {
   console.warn("GEMINI_API_KEY is not set. AI features will not be available.");
-  // Depending on policy, you might throw an error here or allow the server to run with AI disabled.
 }
 
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
-const model = genAI ? genAI.getGenerativeModel({
-    model: "gemini-1.5-flash-latest", // Or "gemini-pro" - flash is faster and cheaper for simpler tasks
-    safetySettings: [ // Adjust safety settings as needed
-        { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-        { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-    ]
-}) : null;
+// Initialize GoogleGenAI instance
+const genAI = GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null;
+
+// Define model name and safety settings as constants
+const MODEL_NAME = "gemini-2.5-flash-preview-05-20"; // Or "gemini-2.0-flash-001" as per quickstart for broader compatibility if needed
+const SAFETY_SETTINGS: SafetySetting[] = [
+    { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+    { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+    { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+    { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
+];
 
 function buildPrompt(discoveredDatapoints: DiscoveredDataPoint[]): string {
   const formattedDataPoints = discoveredDatapoints.map(dp => ({
     name: dp.name,
     address: dp.address,
-    dataType: dp.dataType, // Keep original dataType for AI to interpret
-    // initialValue: dp.initialValue // initialValue might be too verbose for the prompt, focus on structure
+    dataType: dp.dataType,
+    initialValue: dp.initialValue
   }));
 
-  // Instruction to map OPC UA data types to simplified DataPoint types
   const dataTypeMappingGuidance = `
   Map the provided 'dataType' string from OPC UA to one of the allowed TypeScript string literals in the DataPoint interface's 'dataType' field.
   Allowed types: 'Boolean', 'Float', 'Double', 'Int16', 'Int32', 'UInt16', 'UInt32', 'String', 'DateTime', 'ByteString', 'Guid', 'Byte', 'SByte', 'Int64', 'UInt64', 'StatusCode', 'LocalizedText', 'Unknown'.
@@ -110,28 +115,76 @@ ${dataTypeMappingGuidance}
 
 Based on the input array of discovered datapoints and the target interface:
 1.  Transform EACH discovered datapoint into a fully populated DataPoint object.
-2.  Pay close attention to inferring `label`, `id` (kebab-case from name), `uiType`, `icon`, `unit`, `category`, and `isWritable`.
-3.  The `dataType` in the output DataPoint object MUST be one of the allowed string literals. Use the original `dataType` from the input to make this conversion.
+2.  Pay close attention to inferring label, id (kebab-case from name), uiType, icon, unit, category, and isWritable.
+3.  The dataType in the output DataPoint object MUST be one of the allowed string literals. Use the original dataType from the input to make this conversion.
 4.  Provide the output STRICTLY as a JSON array of DataPoint objects. Do not include any explanations, comments, or surrounding text like \`\`\`json ... \`\`\`. Only the JSON array itself.
-5.  If a field is optional (e.g. `unit`, `min`, `max`, `enumSet`) and cannot be reasonably inferred, omit it from the object.
-6.  Ensure `id` is unique for each generated datapoint. If names are very similar, add a numeric suffix to the id.
-7.  For `icon`, provide only the name of the Lucide icon, e.g., "Thermometer", not the full import or component.
+5.  If a field is optional (e.g. unit, min, max, enumSet) and cannot be reasonably inferred, omit it from the object.
+6.  Ensure id is unique for each generated datapoint. If names are very similar, add a numeric suffix to the id.
+7.  For icon, provide only the name of the Lucide icon, e.g., "Thermometer", not the full import or component.
 
-Example for `id` generation: "Motor Speed" becomes "motor-speed". "Sensor_1_Temp" becomes "sensor-1-temp".
-Example for `label` generation: "Motor_Speed_RPM" becomes "Motor Speed (RPM)". "TempSensorMain" becomes "Main Temperature Sensor".
+Example for id generation: "Motor Speed" becomes "motor-speed". "Sensor_1_Temp" becomes "sensor-1-temp".
+Example for label generation: "Motor_Speed_RPM" becomes "Motor Speed (RPM)". "TempSensorMain" becomes "Main Temperature Sensor".
 
 Process all discovered datapoints provided in the input array.
 The final output must be a single JSON array.
 `;
 }
 
+async function generateContentWithRetry(
+  aiInstance: GoogleGenAI,
+  modelName: string,
+  prompt: string,
+  safetySettings: SafetySetting[],
+  maxRetries = 5,
+  delayMs = 1000
+): Promise<string> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await aiInstance.models.generateContent({
+        model: modelName,
+        contents: prompt,
+      });
+
+      const response: GenerateContentResponse = result;
+      
+      // Check for explicit blocking
+      if (response.promptFeedback?.blockReason) {
+        throw new Error(`Content generation blocked due to: ${response.promptFeedback.blockReason} ${response.promptFeedback.blockReasonMessage || ''}`);
+      }
+
+      // Check if text is available
+      // The `text` property on GenerateContentResponse is optional (text?: string)
+      const textOutput = response.text;
+      if (typeof textOutput !== 'string') {
+        // This might happen if the model is expected to make a function call (not used here) or if blocked without setting blockReason (less likely)
+        // or if response format is unexpected.
+        console.warn("AI response did not contain text or text was not a string.", response);
+        throw new Error("AI response did not directly provide text content. Check for function calls or other response types if applicable.");
+      }
+      
+      return textOutput; // Access the text property
+    } catch (error: any) {
+      const isOverload = error.message?.includes("503") || error.message?.includes("overloaded");
+      // Prevent retrying for certain errors like API key issues or content blocking
+      const nonRetryableError = error.message?.includes("API key") || error.message?.includes("blockReason");
+
+      console.warn(`Attempt ${attempt} failed: ${error.message}`);
+      if (attempt === maxRetries || !isOverload || nonRetryableError) {
+          throw error;
+      }
+      await new Promise(res => setTimeout(res, delayMs * Math.pow(2, attempt -1))); // Exponential backoff with jitter could be better
+    }
+  }
+  throw new Error("All retries failed for Gemini generateContent.");
+}
+
 export async function POST(req: NextRequest) {
-  if (!GEMINI_API_KEY || !model) {
+  if (!GEMINI_API_KEY || !genAI) { // Check genAI instance directly
     return NextResponse.json({ success: false, message: "AI model is not available. GEMINI_API_KEY might be missing." }, { status: 503 });
   }
 
   console.log("POST /api/ai/generate-datapoints endpoint hit.");
-  let filePath: string;
+  let filePath: string | undefined;
 
   try {
     const body = await req.json();
@@ -150,52 +203,83 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, message: 'No discovered datapoints found in the file to process.' }, { status: 400 });
     }
 
-    const prompt = buildPrompt(discoveredDatapoints);
-    console.log("Generated prompt for Gemini AI. Length:", prompt.length);
-    // console.log("Prompt content (first 500 chars):", prompt.substring(0,500)); // For debugging
+    const batchSize = 10; // Consider API rate limits if processing many batches rapidly
+    const allGeneratedDataPoints: DataPoint[] = [];
 
-    const result = await model.generateContent(prompt);
-    const response = result.response;
-    const aiTextOutput = response.text();
-    console.log("Received response from Gemini AI.");
-    // console.log("AI Text Output (first 500 chars):", aiTextOutput.substring(0,500)); // For debugging
+    for (let i = 0; i < discoveredDatapoints.length; i += batchSize) {
+      const batch = discoveredDatapoints.slice(i, i + batchSize);
+      const prompt = buildPrompt(batch);
+      console.log(`Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(discoveredDatapoints.length / batchSize)}, prompt length: ${prompt.length}`);
 
-    // Attempt to clean the AI response (remove markdown, ensure it's valid JSON)
-    let cleanedJsonText = aiTextOutput.trim();
-    if (cleanedJsonText.startsWith("```json")) {
-      cleanedJsonText = cleanedJsonText.substring(7);
-    }
-    if (cleanedJsonText.endsWith("```")) {
-      cleanedJsonText = cleanedJsonText.substring(0, cleanedJsonText.length - 3);
-    }
-    cleanedJsonText = cleanedJsonText.trim(); // Trim again after removing markdown
+      // Pass genAI instance, model name, prompt, and safety settings
+      const aiTextOutput = await generateContentWithRetry(genAI, MODEL_NAME, prompt, SAFETY_SETTINGS);
+      
+      console.log("Received response from Gemini AI.");
+      // console.log("AI Text Output (first 500 chars):", aiTextOutput.substring(0, 500)); // For debugging, uncomment if needed
 
-    try {
-      const generatedDataPoints: DataPoint[] = JSON.parse(cleanedJsonText);
-      console.log(`Successfully parsed AI response into ${generatedDataPoints.length} DataPoint objects.`);
-      // TODO: Add validation here to ensure generatedDataPoints match the DataPoint interface more strictly.
-      return NextResponse.json({ success: true, data: generatedDataPoints, count: generatedDataPoints.length }, { status: 200 });
-    } catch (parseError: any) {
-      console.error("Failed to parse AI response as JSON:", parseError.message);
-      console.error("Problematic AI Output (raw):", aiTextOutput); // Log the raw output for debugging
-      return NextResponse.json({
-        success: false,
-        message: 'Failed to parse AI response. The output was not valid JSON.',
-        error: parseError.message,
-        rawAiOutput: aiTextOutput // Send raw output for client-side debugging if needed
-      }, { status: 500 });
+      let cleanedJsonText = aiTextOutput.trim();
+      if (cleanedJsonText.startsWith("```json")) {
+        cleanedJsonText = cleanedJsonText.substring(7);
+      }
+      if (cleanedJsonText.endsWith("```")) {
+        cleanedJsonText = cleanedJsonText.substring(0, cleanedJsonText.length - 3);
+      }
+      cleanedJsonText = cleanedJsonText.trim();
+
+      if (!cleanedJsonText.startsWith("[") || !cleanedJsonText.endsWith("]")) {
+        console.error("AI output is not a JSON array after cleaning:", cleanedJsonText);
+        // Fallback for when the model doesn't strictly adhere to "only JSON array"
+        if(cleanedJsonText.startsWith("{") && cleanedJsonText.endsWith("}")) { // If it's a single object, wrap it
+            console.warn("AI output was a single JSON object, wrapping in an array.")
+            cleanedJsonText = `[${cleanedJsonText}]`;
+        } else {
+             // If still not an array, this will likely fail parsing
+        }
+      }
+
+      try {
+        const batchDataPoints: DataPoint[] = JSON.parse(cleanedJsonText);
+        allGeneratedDataPoints.push(...batchDataPoints);
+      } catch (parseError: any) {
+        console.error("Failed to parse AI response as JSON:", parseError.message);
+        console.error("Problematic AI Output (raw):", aiTextOutput);
+        console.error("Cleaned JSON text attempted for parsing:", cleanedJsonText);
+        return NextResponse.json({
+          success: false,
+          message: 'Failed to parse AI response. The output was not valid JSON.',
+          error: parseError.message,
+          rawAiOutput: aiTextOutput,
+          cleanedJsonAttempt: cleanedJsonText,
+        }, { status: 500 });
+      }
     }
+
+    return NextResponse.json({
+      success: true,
+      data: allGeneratedDataPoints,
+      count: allGeneratedDataPoints.length
+    }, { status: 200 });
 
   } catch (error: any) {
     console.error("Error in AI datapoint generation:", error);
-    if (error.code === 'ENOENT') {
-        return NextResponse.json({ success: false, message: `File not found at path: ${filePath!}` }, { status: 400 });
+    if ((error as NodeJS.ErrnoException)?.code === 'ENOENT' && filePath) {
+        return NextResponse.json({ success: false, message: `File not found at path: ${filePath}` }, { status: 400 });
     }
-    // Check if it's a Gemini API error (e.g., related to API key, quota, safety settings)
-    if (error.message && (error.message.includes("API key") || error.message.includes("quota") || error.message.includes("safety settings") || error.message.includes("GoogleGenerativeAI"))) {
-        return NextResponse.json({ success: false, message: `AI service error: ${error.message}` }, { status: 503 });
+    // Check if it's a Gemini API error (e.g., related to API key, quota, safety settings, model not found)
+    if (error.message && (
+        error.message.includes("API key") || 
+        error.message.includes("quota") || 
+        error.message.includes("safety settings") ||
+        error.message.includes("blockReason") ||
+        error.message.includes("GoogleGenerativeAI") ||
+        error.status === 400 || // For bad requests like model not found
+        error.status === 429 || // Too many requests
+        error.status === 500 || // Internal server error from Google
+        error.status === 503    // Service unavailable from Google
+    )) {
+        return NextResponse.json({ success: false, message: `AI service error: ${error.message}`, details: error.toString() }, { status: 503 }); // Use 503 for service unavailability or persistent errors
     }
-    return NextResponse.json({ success: false, message: 'An unexpected error occurred during AI datapoint generation.', error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, message: 'An unexpected error occurred during AI datapoint generation.', error: error.message, details: error.toString() }, { status: 500 });
   }
 }
 
