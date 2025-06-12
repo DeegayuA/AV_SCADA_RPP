@@ -12,7 +12,7 @@ import { DataPointConfig, IconComponentType } from '@/config/dataPoints';
 import { useOnboarding } from './OnboardingContext';
 import {
     Sigma, Loader2, ListChecks, Database, RefreshCw, RotateCcw,
-    FileJson, Wand2, Maximize, Save, Download, UploadCloud, FileSpreadsheet, Trash2, Merge, CloudUpload, PlusCircle, XCircle, CheckCircle, AlertTriangle, Info
+    FileJson, Wand2, Maximize, Save, Download, UploadCloud, FileSpreadsheet, Trash2, Merge, CloudUpload, PlusCircle, XCircle, CheckCircle, AlertTriangle, Info, MessageSquare, Send, User, Bot, AlertCircle, CheckCircle2, InfoIcon, Loader as LoaderIcon
 } from 'lucide-react';
 import * as lucideIcons from 'lucide-react';
 import Papa from 'papaparse';
@@ -151,6 +151,121 @@ const formatLogTimestamp = () => new Date().toLocaleTimeString('en-US', { hour: 
 
 const ESTIMATED_MS_PER_NODE_AI = 200; // For AI enhancement
 
+// --- Chat Message Data Structure (Requirement 1) ---
+interface ChatMessage {
+    id: string;
+    sender: 'user' | 'ai';
+    text: string;
+    timestamp: string;
+    type?: 'info' | 'error' | 'success' | 'progress' | 'welcome';
+    details?: string;
+}
+
+// --- Utility function for timestamps (Requirement 6) ---
+const formatChatMessageTimestamp = (date: Date = new Date()) => date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+// --- ChatMessageBubble Component (Requirement 3) ---
+const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
+    const [showDetails, setShowDetails] = useState(false);
+    const isUser = message.sender === 'user';
+
+    const bubbleAlignment = isUser ? 'items-end' : 'items-start';
+    const bubbleColor = isUser
+        ? 'bg-primary text-primary-foreground'
+        : message.type === 'error'
+            ? 'bg-destructive text-destructive-foreground'
+            : message.type === 'success'
+                ? 'bg-green-600 text-white'
+                : message.type === 'welcome'
+                    ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white'
+                    : 'bg-muted text-muted-foreground';
+
+    const IconComponent = () => {
+        switch (message.type) {
+            case 'error': return <AlertCircle className="h-5 w-5 mr-2 shrink-0" />;
+            case 'success': return <CheckCircle2 className="h-5 w-5 mr-2 shrink-0" />;
+            case 'progress': return <LoaderIcon className="h-5 w-5 mr-2 shrink-0 animate-spin" />;
+            case 'info': return <InfoIcon className="h-5 w-5 mr-2 shrink-0" />;
+            case 'welcome': return <Bot className="h-5 w-5 mr-2 shrink-0" />;
+            default: return isUser ? <User className="h-5 w-5 mr-2 shrink-0" /> : <Bot className="h-5 w-5 mr-2 shrink-0" />;
+        }
+    };
+
+    return (
+        <motion.div
+            className={`flex flex-col w-full my-1.5 ${bubbleAlignment}`}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+        >
+            <div className={cn("flex items-start max-w-[85%] sm:max-w-[75%] p-3 rounded-xl shadow-md", bubbleColor, isUser ? "rounded-br-none" : "rounded-bl-none")}>
+                <IconComponent />
+                <div className="flex-grow">
+                    <p className="text-sm whitespace-pre-wrap">{message.text}</p>
+                    {message.details && (
+                        <div className="mt-2 pt-1 border-t border-white/20">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className={cn("text-xs h-auto p-1 hover:underline", isUser ? "hover:bg-primary/80" : (message.type === 'error' ? "hover:bg-destructive/80" : "hover:bg-muted/80"))}
+                                onClick={() => setShowDetails(!showDetails)}
+                            >
+                                {showDetails ? "Hide Details" : "Show Details"}
+                            </Button>
+                            {showDetails && <p className="text-xs mt-1 p-1.5 bg-black/10 dark:bg-white/5 rounded-sm break-all">{message.details}</p>}
+                        </div>
+                    )}
+                </div>
+            </div>
+            <span className={cn("text-xs text-muted-foreground mt-1", isUser ? "mr-1" : "ml-1")}>{message.timestamp}</span>
+        </motion.div>
+    );
+};
+
+// --- AIChatInterface Component (Requirement 2 & 5) ---
+const AIChatInterface: React.FC<{ messages: ChatMessage[]; isLoading?: boolean }> = ({ messages, isLoading }) => {
+    const scrollAreaRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (scrollAreaRef.current) {
+            scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+        }
+    }, [messages]);
+
+    return (
+        <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
+            <CardHeader>
+                <div className="flex items-center space-x-3">
+                    <MessageSquare className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
+                    <CardTitle className="text-lg sm:text-xl font-medium">AI Assistant Chat</CardTitle>
+                </div>
+                <CardDescription className="text-xs sm:text-sm text-muted-foreground pt-1.5">
+                    Interact with the AI to enhance your datapoint configurations. Updates and results will appear here.
+                </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ScrollArea ref={scrollAreaRef} className="h-72 w-full rounded-md border border-border p-3 bg-muted/20 dark:bg-neutral-800/40 shadow-inner">
+                    {messages.length === 0 && !isLoading && (
+                        <div className="flex flex-col items-center justify-center h-full">
+                            <Bot size={48} className="text-muted-foreground/50 mb-3" />
+                            <p className="text-muted-foreground text-center italic">No messages yet. Start AI enhancement to see updates.</p>
+                        </div>
+                    )}
+                    {messages.map(msg => <ChatMessageBubble key={msg.id} message={msg} />)}
+                    {isLoading && messages.length === 0 && ( // Show initial loading state if no messages yet
+                         <div className="flex flex-col items-center justify-center h-full">
+                            <LoaderIcon size={48} className="text-primary animate-spin mb-3" />
+                            <p className="text-primary text-center">Waiting for AI process to start...</p>
+                        </div>
+                    )}
+                </ScrollArea>
+            </CardContent>
+            {/* Input area can be added later if direct chat input is needed */}
+        </Card>
+    );
+};
+
+
 export default function DatapointDiscoveryStep() { // Renamed component
     const { configuredDataPoints, setConfiguredDataPoints, setPlantDetails, onboardingData } = useOnboarding();
     const [isLoading, setIsLoading] = useState(false); // General loading for save, etc.
@@ -178,8 +293,11 @@ export default function DatapointDiscoveryStep() { // Renamed component
 
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [aiProgress, setAiProgress] = useState(0);
-    const [aiStatusMessage, setAiStatusMessage] = useState("");
+    // const [aiStatusMessage, setAiStatusMessage] = useState(""); // Replaced by chat messages
     const [estimatedAiTime, setEstimatedAiTime] = useState(0);
+    const [currentAiTaskId, setCurrentAiTaskId] = useState<string | null>(null);
+    const [aiTaskPollIntervalId, setAiTaskPollIntervalId] = useState<NodeJS.Timeout | null>(null);
+    const [showContinueAiButton, setShowContinueAiButton] = useState<boolean>(false);
 
     const [aiEnhancedPoints, setAiEnhancedPoints] = useState<ExtendedDataPointConfig[]>([]);
 
@@ -188,20 +306,85 @@ export default function DatapointDiscoveryStep() { // Renamed component
     const discoveryStartTimeRef = useRef<number | null>(null);
     const aiStartTimeRef = useRef<number | null>(null);
 
+    // --- State for Chat UI (Requirement 7 - part) ---
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([ // Requirement 5 - Initial placeholder
+        {
+            id: 'initial-ai-welcome',
+            sender: 'ai',
+            text: "Hello! I'm here to help you enhance your data point configurations using AI. When you start the AI enhancement process, I'll update you here.",
+            timestamp: formatChatMessageTimestamp(new Date(Date.now() - 1000)), // A bit in the past
+            type: 'welcome',
+        }
+    ]);
+
     const [editingPoint, setEditingPoint] = useState<ExtendedDataPointConfig | null>(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [userProvidedGeminiKey, setUserProvidedGeminiKey] = useState<string>('');
-    const [showGeminiKeyInput, setShowGeminiKeyInput] = useState<boolean>(false); // Initial state adjusted
-    const [aiConsentGiven, setAiConsentGiven] = useState<boolean>(false); // Added state for consent
+    const [showGeminiKeyInput, setShowGeminiKeyInput] = useState<boolean>(false);
+    const [aiConsentGiven, setAiConsentGiven] = useState<boolean>(false);
 
+
+    // --- Function to add chat messages (Requirement 6 & 7 - part) ---
+    const addChatMessage = useCallback((message: Omit<ChatMessage, 'id' | 'timestamp'>) => {
+        setChatMessages(prev => {
+            const newMessages = [
+                ...prev,
+                {
+                    ...message,
+                    id: `msg-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+                    timestamp: formatChatMessageTimestamp(),
+                }
+            ];
+            // Keep only the last 50 messages to prevent performance issues
+            if (newMessages.length > 50) return newMessages.slice(-50);
+            return newMessages;
+        });
+    }, []);
 
     const addLogEntry = useCallback((type: ProcessingLogEntry['type'], message: string, details?: string) => {
         setProcessLog(prev => {
             const newLog = [...prev, { id: Date.now().toString(), timestamp: formatLogTimestamp(), type, message, details }];
-            if (newLog.length > 100) return newLog.slice(-100);
+            if (newLog.length > 100) return newLog.slice(-100); // Keep last 100 logs
             return newLog;
         });
-    }, []);
+        // Mirror some log entries to chat messages for better AI interaction visibility
+        // This logic will be reviewed; direct addChatMessage calls in handleStartAiEnhancement will be primary for AI chat.
+        if (type === 'ai' ||
+            ((type === 'info' || type === 'warning' || type === 'error') && message.toLowerCase().includes('ai'))
+           ) {
+            // Avoid duplicating messages that are now directly sent to chat from AI functions
+            if (message.startsWith("AI enhancement progress:") || message.startsWith("Starting AI enhancement process for") || message.startsWith("Great news! AI enhancement is complete")) {
+                // These are now handled by more specific chat messages or progress updates.
+                // However, we might still want to log them.
+            } else {
+                let chatType: ChatMessage['type'] = 'info';
+                if (type === 'error') chatType = 'error';
+                else if (type === 'warning') chatType = 'info';
+                else if (type === 'ai' && message.toLowerCase().includes('progress')) chatType = 'progress';
+                else if (type === 'ai' && (message.toLowerCase().includes('complete') || message.toLowerCase().includes('success'))) chatType = 'success';
+
+                // Only add if it's not a direct duplicate of what will be sent by polling logic
+                // This basic check might need refinement
+                if (!chatMessages.find(cm => cm.text === message && cm.sender === 'ai')) {
+                    addChatMessage({
+                        sender: 'ai',
+                        text: message,
+                        details: details,
+                        type: chatType
+                    });
+                }
+            }
+        } else if (type === 'system' && message.toLowerCase().includes('ai')) {
+             if (!chatMessages.find(cm => cm.text === message && cm.sender === 'ai')) {
+                addChatMessage({
+                    sender: 'ai',
+                    text: message,
+                    details: details,
+                    type: 'info'
+                });
+            }
+        }
+    }, [addChatMessage, chatMessages]); // Added chatMessages to dep array for the find check
 
     useEffect(() => {
         if (processLogRef.current) {
@@ -209,7 +392,90 @@ export default function DatapointDiscoveryStep() { // Renamed component
         }
     }, [processLog]);
 
-    // --- Progress Polling Functions ---
+    // --- AI Task Polling Function ---
+    const pollAiTaskStatus = useCallback(async (taskId: string) => {
+        if (!taskId) return;
+
+        try {
+            const response = await fetch(`/api/ai/generate-datapoints/status/${taskId}`);
+            if (!response.ok) {
+                const errorText = await response.text();
+                addChatMessage({ sender: 'ai', type: 'error', text: 'Error fetching AI task status.', details: `Status: ${response.status}. ${errorText}` });
+                addLogEntry('error', `Polling failed for task ${taskId}`, `Status: ${response.status}. ${errorText}`);
+                setIsAiProcessing(false);
+                setShowContinueAiButton(false); // Don't show continue if polling itself fails badly
+                if (aiTaskPollIntervalId) clearInterval(aiTaskPollIntervalId);
+                setAiTaskPollIntervalId(null);
+                setCurrentAiTaskId(null); // Task is considered failed or inaccessible
+                return;
+            }
+
+            const status = await response.json();
+            addLogEntry('ai', `Polled Task [${taskId}] Status: ${status.status}`, `Progress: ${status.progress?.percent}% Message: ${status.message}`);
+
+
+            if (status.message && (!chatMessages.find(cm => cm.text === status.message && cm.sender === 'ai') || status.status === 'processing') ) { // Add new messages, or always update for processing status
+                 addChatMessage({
+                    sender: 'ai',
+                    type: status.status === 'processing' ? 'progress' : status.status === 'completed' ? 'success' : status.status.startsWith('error') ? 'error' : 'info',
+                    text: status.message,
+                    details: status.progress ? `Processed: ${status.progress.current}/${status.progress.total} (${status.progress.percent}%)` : (status.errorDetails || undefined)
+                });
+            }
+            if (status.progress?.percent) {
+                setAiProgress(status.progress.percent);
+            }
+
+            if (status.status === 'completed') {
+                addChatMessage({ sender: 'ai', type: 'success', text: status.message || 'AI processing completed successfully!', details: status.data ? `Enhanced ${status.data.length} points.` : "Completed." });
+                setAiEnhancedPoints(status.data || []); // Assuming status.data is the array of ExtendedDataPointConfig
+                setIsAiProcessing(false);
+                setShowContinueAiButton(false);
+                if (aiTaskPollIntervalId) clearInterval(aiTaskPollIntervalId);
+                setAiTaskPollIntervalId(null);
+                setCurrentAiTaskId(null);
+            } else if (status.status === 'error_recoverable') {
+                addChatMessage({ sender: 'ai', type: 'warning', text: status.message || 'AI processing paused due to a temporary issue.', details: status.errorDetails });
+                setIsAiProcessing(false);
+                setShowContinueAiButton(true); // Show continue button
+                if (aiTaskPollIntervalId) clearInterval(aiTaskPollIntervalId);
+                setAiTaskPollIntervalId(null);
+                // currentAiTaskId remains set
+            } else if (status.status === 'error_fatal') {
+                addChatMessage({ sender: 'ai', type: 'error', text: status.message || 'AI processing failed with a fatal error.', details: status.errorDetails });
+                setIsAiProcessing(false);
+                setShowContinueAiButton(false);
+                if (aiTaskPollIntervalId) clearInterval(aiTaskPollIntervalId);
+                setAiTaskPollIntervalId(null);
+                setCurrentAiTaskId(null);
+            } else if (status.status === 'pending' || status.status === 'processing') {
+                // Continue polling, no specific action here as interval is already running
+                setIsAiProcessing(true); // Ensure it stays true
+                setShowContinueAiButton(false);
+            }
+
+        } catch (error: any) {
+            addChatMessage({ sender: 'ai', type: 'error', text: 'Failed to fetch or parse AI task status.', details: error.message });
+            addLogEntry('error', `Polling exception for task ${taskId}`, error.message);
+            setIsAiProcessing(false);
+            setShowContinueAiButton(false);
+            if (aiTaskPollIntervalId) clearInterval(aiTaskPollIntervalId);
+            setAiTaskPollIntervalId(null);
+            // setCurrentAiTaskId(null); // Optional: depends if we want to allow manual retry on client error
+        }
+    }, [addChatMessage, addLogEntry, aiTaskPollIntervalId, chatMessages]);
+
+
+    // Cleanup polling interval on unmount
+    useEffect(() => {
+        return () => {
+            if (aiTaskPollIntervalId) {
+                clearInterval(aiTaskPollIntervalId);
+            }
+        };
+    }, [aiTaskPollIntervalId]);
+
+    // --- Progress Polling Functions --- (Original OPC UA discovery polling)
     const fetchDiscoveryProgress = async () => {
         try {
             const response = await fetch('/api/opcua/discover/status', { cache: 'no-store' });
@@ -221,8 +487,10 @@ export default function DatapointDiscoveryStep() { // Renamed component
             const displayMessage = `${progressData.status}${progressData.details ? `: ${progressData.details}` : ''}`;
             setDiscoveryStatusMessage(displayMessage.length > 150 ? displayMessage.substring(0, 147) + "..." : displayMessage);
             setDiscoveryProgress(progressData.percentage || 0);
-            // Reduced verbosity of polling logs, only log significant changes or errors
-            // addLogEntry('info', `Discovery Update: ${progressData.status}`, progressData.details);
+            // Log progress polling updates (less verbose)
+            if (progressData.percentage % 20 === 0 || progressData.percentage === 100) { // Log every 20% or at 100%
+                addLogEntry('info', `Discovery progress: ${progressData.percentage}% - ${progressData.status}`, progressData.details);
+            }
 
             if (progressData.percentage >= 100 ||
                 progressData.status?.toLowerCase().includes("success") ||
@@ -278,32 +546,33 @@ export default function DatapointDiscoveryStep() { // Renamed component
 
     const testOpcuaConnection = async (): Promise<boolean> => {
         addLogEntry('system', "Checking OPC UA server connection...");
-        setDiscoveryStatusMessage("Verifying OPC UA connection..."); // This will be updated by polling soon
+        setDiscoveryStatusMessage("Verifying OPC UA connection...");
         try {
-            const response = await fetch('/api/opcua/status', { cache: 'no-store' }); // Ensure fresh status
+            const response = await fetch('/api/opcua/status', { cache: 'no-store' });
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: `API error ${response.status}` }));
-                addLogEntry('error', `Connection Test API failed: ${response.status}`, errorData.message);
-                setDiscoveryStatusMessage(`Connection test failed: API Error ${response.status}`);
+                const reason = `API error ${response.status}: ${errorData.message}`;
+                addLogEntry('error', "OPC UA connection test failed", reason);
+                setDiscoveryStatusMessage(`Connection test failed: ${reason}`);
                 return false;
             }
             const data = await response.json();
-            const serverStatus = data.status || data.connectionStatus; // Handle both possible keys from backend
+            const serverStatus = data.status || data.connectionStatus;
 
-            // MODIFICATION: Accept 'offline' (local connection) as a valid state for discovery
             if (serverStatus === 'connected' || serverStatus === 'online' || serverStatus === 'offline') {
                 const connectionType = serverStatus === 'offline' ? 'locally connected (offline mode)' : `connected (${serverStatus})`;
-                addLogEntry('info', `OPC UA server is ${connectionType}. Backend reports: ${serverStatus}.`);
-                // No need to set discoveryStatusMessage here as handleStartOpcuaDiscovery will proceed
+                addLogEntry('info', "OPC UA connection test successful.", `Server is ${connectionType}. Backend reports: ${serverStatus}.`);
                 return true;
             } else {
-                addLogEntry('error', "OPC UA Connection Unavailable.", `Server reported: ${serverStatus || 'unknown status'}. Please check PLC & backend configuration.`);
-                setDiscoveryStatusMessage(`OPC UA Connection Unavailable: Server reported '${serverStatus || 'unknown'}'`);
+                const reason = `Server reported: ${serverStatus || 'unknown status'}. Please check PLC & backend configuration.`;
+                addLogEntry('error', "OPC UA connection test failed", reason);
+                setDiscoveryStatusMessage(`OPC UA Connection Unavailable: ${reason}`);
                 return false;
             }
         } catch (error: any) {
-            addLogEntry('error', "Connection test failed (network/fetch error).", error.message);
-            setDiscoveryStatusMessage(`Connection test failed: ${error.message}`);
+            const reason = `Network/fetch error: ${error.message}`;
+            addLogEntry('error', "OPC UA connection test failed", reason);
+            setDiscoveryStatusMessage(`Connection test failed: ${reason}`);
             return false;
         }
     };
@@ -312,112 +581,46 @@ export default function DatapointDiscoveryStep() { // Renamed component
         setIsDiscovering(true);
         setDiscoveryProgress(5);
         setDiscoveredRawPoints([]);
-        setAiEnhancedPoints([]); // Also clear AI points as discovery is a fresh start
+        setAiEnhancedPoints([]);
         setDiscoveredDataFilePath(null);
         setDiscoveryStatusMessage("Initializing discovery...");
-        addLogEntry('system', "Initiating OPC UA datapoint discovery sequence...");
+        addLogEntry('info', "Initiating OPC UA datapoint discovery..."); // Requirement 1.1
         discoveryStartTimeRef.current = Date.now();
-        // setEstimatedDiscoveryTime(30); // Removed
 
-        const isConnected = await testOpcuaConnection();
+        const isConnected = await testOpcuaConnection(); // Logs success/failure internally
         if (!isConnected) {
-            // discoveryStatusMessage would have been set by testOpcuaConnection on failure
             toast.error("Discovery Aborted", { description: discoveryStatusMessage || "Cannot start discovery without a valid OPC UA connection." });
-            // The discoveryStatusMessage is already set by testOpcuaConnection to be more specific
-            // setDiscoveryStatusMessage("Discovery aborted: OPC UA Connection unavailable."); // This line can be removed or kept as a fallback
+            // OPC UA connection test failed log is handled by testOpcuaConnection
             setIsDiscovering(false);
             setDiscoveryProgress(0);
             return;
         }
 
-        // If connected, proceed
-        // setDiscoveryStatusMessage("Preparing to browse OPC UA server..."); // Polling will handle this
-        // setDiscoveryProgress(10); // Polling will handle this
-
-        startDiscoveryProgressPolling(); // Start polling for progress
+        startDiscoveryProgressPolling();
 
         try {
-            // setDiscoveryStatusMessage("Browsing OPC UA server nodes... This can take a while."); // Polling handles status
             const response = await fetch('/api/opcua/discover', { method: 'POST' });
-
-            // stopDiscoveryProgressPolling(); // Stop polling once main fetch is complete, backend cache should have final status.
-            // Call it in finally block to ensure it's always stopped.
-
             const backendDurationSeconds = discoveryStartTimeRef.current ? ((Date.now() - discoveryStartTimeRef.current) / 1000).toFixed(1) : 'N/A';
-            // setDiscoveryProgress(90); // Polling handles progress
-
             const result = await response.json();
             const specificSuccessMessage = "datapoints discovered and saved successfully";
 
             if (response.ok && result.success) {
-                // Ideal success path
                 const nodesToProcess: DiscoveredRawDataPoint[] = Array.isArray(result.nodes) ? result.nodes : [];
                 setDiscoveredRawPoints(nodesToProcess);
                 setDiscoveredDataFilePath(result.filePath || null);
 
-                const successMsg = result.message || `Discovery successful: Found ${nodesToProcess.length} raw datapoints.`;
-                setDiscoveryStatusMessage(successMsg);
-                addLogEntry('info', successMsg, result.filePath ? `Server log: Datapoints saved to ${result.filePath}` : "OPC UA discovery process completed.");
+                const successMsg = `OPC UA Discovery Completed: Found ${nodesToProcess.length} datapoints.`;
+                const detailsMsg = result.filePath ? `Data saved to ${result.filePath}` : (result.message || "Process completed.");
+                addLogEntry('info', successMsg, detailsMsg); // Requirement 1.4
+                if (nodesToProcess.length === 0) {
+                    addLogEntry('info', "OPC UA Discovery: No datapoints found matching criteria."); // Requirement 1.6
+                }
+                setDiscoveryStatusMessage(result.message || `${nodesToProcess.length} datapoints found.`);
                 toast.success("OPC UA Discovery Completed!", {
-                    description: successMsg
+                    description: result.message || `${nodesToProcess.length} datapoints found.`
                 });
                 setDiscoveryProgress(100);
 
-                // Map nodesToProcess to baseConfiguredPoints (ensure all data type mappings are present)
-                const baseConfiguredPoints: ExtendedDataPointConfig[] = nodesToProcess.map((rawPoint: DiscoveredRawDataPoint, index: number) => {
-                    let generatedId = rawPoint.browseName?.toLowerCase().replace(/[^a-z0-9_.]+/g, '-').replace(/^-+|-+$/g, '') || `dp-${index}-${Date.now()}`;
-                    if (!generatedId || generatedId === `dp-${index}-${Date.now()}`) generatedId = rawPoint.nodeId.replace(/[^a-z0-9]+/gi, '-') || `unknown-node-${index}-${Date.now()}`;
-
-                    let mappedDataType: ExtendedDataPointConfig['dataType'] = 'String'; // Default
-                    const rawDT = rawPoint.dataType?.toLowerCase();
-                    if (rawDT) {
-                        if (rawDT.includes('bool')) mappedDataType = 'Boolean';
-                        else if (rawDT.includes('float')) mappedDataType = 'Float';
-                        else if (rawDT.includes('double')) mappedDataType = 'Double';
-                        else if (rawDT.includes('string')) mappedDataType = 'String';
-                        else if (rawDT.includes('int16') || rawDT.includes('short')) mappedDataType = 'Int16';
-                        else if (rawDT.includes('uint16') || rawDT.includes('ushort')) mappedDataType = 'UInt16';
-                        else if (rawDT.includes('int32') || (rawDT.includes('int') && !rawDT.includes('int64'))) mappedDataType = 'Int32';
-                        else if (rawDT.includes('uint32') || (rawDT.includes('uint') && !rawDT.includes('uint64'))) mappedDataType = 'UInt32';
-                        else if (rawDT.includes('int64') || rawDT.includes('long')) mappedDataType = 'Int64';
-                        else if (rawDT.includes('uint64') || rawDT.includes('ulong')) mappedDataType = 'UInt64';
-                        else if (rawDT.includes('datetime')) mappedDataType = 'DateTime';
-                        else if (rawDT.includes('byte') && !rawDT.includes('bytestring')) mappedDataType = 'Byte';
-                        else if (rawDT.includes('sbyte')) mappedDataType = 'SByte';
-                        else if (rawDT.includes('guid')) mappedDataType = 'Guid';
-                        else if (rawDT.includes('bytestring')) mappedDataType = 'ByteString';
-                    }
-
-                    return {
-                        id: generatedId,
-                        name: rawPoint.displayName || rawPoint.browseName || `Unnamed Datapoint ${index + 1}`,
-                        nodeId: rawPoint.nodeId,
-                        label: rawPoint.displayName || rawPoint.browseName || generatedId,
-                        dataType: mappedDataType,
-                        uiType: 'display', // Default UI type
-                        icon: DEFAULT_ICON, // Ensure DEFAULT_ICON is defined (e.g., Sigma or Merge from previous steps)
-                        iconName: "Sigma", // Default icon name
-                        category: 'Discovered',
-                        phase: 'a', // Default phase
-                        source: 'discovered',
-                    };
-                });
-                setAiEnhancedPoints(baseConfiguredPoints);
-
-            } else if (response.ok && result.message && result.message.toLowerCase().includes(specificSuccessMessage.toLowerCase())) {
-                // Fallback success path based on specific message
-                addLogEntry('warning', 'Interpreting discovery as successful based on message content.', `Backend success flag was ${result.success}, but message indicates completion: "${result.message}"`);
-
-                const nodesToProcess: DiscoveredRawDataPoint[] = Array.isArray(result.nodes) ? result.nodes : [];
-                setDiscoveredRawPoints(nodesToProcess);
-                setDiscoveredDataFilePath(result.filePath || null);
-
-                setDiscoveryStatusMessage(result.message);
-                addLogEntry('info', result.message, result.filePath ? `Server log: Datapoints saved to ${result.filePath}` : "Interpreted as success via message.");
-                toast.success("OPC UA Discovery Completed!", { description: result.message });
-                setDiscoveryProgress(100);
-
-                // Map nodesToProcess to baseConfiguredPoints (ensure all data type mappings are present)
                 const baseConfiguredPoints: ExtendedDataPointConfig[] = nodesToProcess.map((rawPoint: DiscoveredRawDataPoint, index: number) => {
                     let generatedId = rawPoint.browseName?.toLowerCase().replace(/[^a-z0-9_.]+/g, '-').replace(/^-+|-+$/g, '') || `dp-${index}-${Date.now()}`;
                     if (!generatedId || generatedId === `dp-${index}-${Date.now()}`) generatedId = rawPoint.nodeId.replace(/[^a-z0-9]+/gi, '-') || `unknown-node-${index}-${Date.now()}`;
@@ -486,61 +689,116 @@ export default function DatapointDiscoveryStep() { // Renamed component
     };
 
     const handleStartAiEnhancement = async () => {
+        // Clear previous task state if any
+        if (aiTaskPollIntervalId) clearInterval(aiTaskPollIntervalId);
+        setAiTaskPollIntervalId(null);
+        setCurrentAiTaskId(null);
+        setShowContinueAiButton(false);
+        setAiProgress(0);
+
         if (!aiConsentGiven) {
-            toast.error("Consent Required for AI Enhancement", {
-                description: "Please check the consent box to proceed with AI-powered configuration."
-            });
-            addLogEntry('warning', "AI Enhancement Aborted: Consent not given.");
+            toast.error("Consent Required for AI Enhancement", { description: "Please check the consent box to proceed." });
+            addChatMessage({ sender: 'ai', text: "I need your consent to proceed with AI enhancement. Please check the consent box above.", type: 'warning' });
+            addLogEntry('warning', "AI Enhancement Aborted: User consent not provided.");
             return;
         }
+        addChatMessage({ sender: 'ai', text: "Thanks for providing consent! I'm getting ready to start.", type: 'info' });
+        addLogEntry('info', "User consent granted for AI enhancement.");
 
         const storedKey = typeof window !== "undefined" ? localStorage.getItem("geminiApiKey") : null;
-        if (!GEMINI_API_KEY_EXISTS_CLIENT && !userProvidedGeminiKey.trim() && !storedKey) {
-            addLogEntry('warning', "AI Enhancement Aborted: Gemini API Key required.");
-            toast.error("Gemini API Key Missing", { description: "Please provide your Gemini API Key below or set it in environment variables." });
-            setShowGeminiKeyInput(true); // Ensure input is shown
+        const apiKeyIsAvailable = GEMINI_API_KEY_EXISTS_CLIENT || userProvidedGeminiKey.trim() || storedKey;
+
+        if (!apiKeyIsAvailable) {
+            toast.error("Gemini API Key Missing", { description: "Please provide your Gemini API Key." });
+            addChatMessage({ sender: 'ai', text: "I need a Gemini API Key to proceed. Please enter it in the field below or ensure it's set in your environment variables.", type: 'error' });
+            addLogEntry('error', "AI Enhancement Aborted: Gemini API Key not available.");
+            setShowGeminiKeyInput(true);
+            return;
+        }
+        addLogEntry('info', `API Key available (User provided: ${!!userProvidedGeminiKey.trim()}, Stored: ${!!storedKey}, System: ${GEMINI_API_KEY_EXISTS_CLIENT})`);
+
+
+        const pointsToProcess = currentPointsToDisplay.filter(p => p.source === 'discovered' || p.source === 'imported' || p.source === 'manual');
+        if (pointsToProcess.length === 0 && !discoveredDataFilePath) { // Check if there are any points from any source if no discovery file
+            toast.error("No Data for AI", { description: "Please discover, upload, or add data points first." });
+            addChatMessage({ sender: 'ai', text: "It looks like there's no data for me to process. Please discover, upload, or add some data points first.", type: 'warning' });
+            addLogEntry('warning', "AI Enhancement Aborted: No data available for processing.");
             return;
         }
 
-        if (discoveredRawPoints.length === 0 && !discoveredDataFilePath && aiEnhancedPoints.filter(p => p.source === 'discovered').length === 0) {
-            toast.error("No Discovered Data for AI", { description: "Please run OPC UA Discovery first or ensure discovered points are present." });
-            addLogEntry('warning', "AI Enhancement Aborted: No discovered data available for AI processing.");
-            return;
-        }
-
-        // If input was shown but a key is now available (e.g. from localStorage or pasted by user),
-        // and the key input area is visible, we might not need to hide it immediately,
-        // user might be in process of changing it. The check above handles if it's missing.
-        // setShowGeminiKeyInput(false); // Potentially hide if key becomes available from other source and input is empty
+        const numPointsForAI = discoveredDataFilePath ? 'data from file' : `${pointsToProcess.length} data points`; // Use discoveredDataFilePath if available
 
         setIsAiProcessing(true);
-        setAiProgress(5);
-        const pointsForAI = aiEnhancedPoints.filter(p => p.source === 'discovered');
-        const numPointsForAI = pointsForAI.length > 0 ? pointsForAI.length : (discoveredRawPoints.length > 0 ? discoveredRawPoints.length : (discoveredDataFilePath ? 'some (from file)' : 0));
-
-        setAiStatusMessage(`Preparing ${numPointsForAI} points for AI...`);
-        addLogEntry('ai', 'Sending data for AI enhancement.', `Preparing ${numPointsForAI} ${pointsForAI.length > 0 ? 'existing discovered points' : (discoveredRawPoints.length > 0 ? 'newly discovered points' : (discoveredDataFilePath ? 'data from file ' + discoveredDataFilePath : 'points'))} for AI analysis.`);
-        aiStartTimeRef.current = Date.now();
-        const pointCountForEstimation = discoveredRawPoints.length || (discoveredDataFilePath ? 50 : 0);
-        setEstimatedAiTime(Math.max(15, Math.ceil(pointCountForEstimation * ESTIMATED_MS_PER_NODE_AI / 1000)));
-
-
-        let progressInterval: NodeJS.Timeout | null = setInterval(() => {
-            setAiProgress(prev => Math.min(prev + 2, 90));
-            setEstimatedAiTime(prev => Math.max(5, prev - 1)); // Decrement estimated time
-        }, 1000);
+        setAiProgress(0); // Reset progress
+        addChatMessage({ sender: 'ai', text: `Requesting AI enhancement for ${numPointsForAI}. Initializing...`, type: 'progress' });
+        addLogEntry('ai', `Requesting AI enhancement for ${numPointsForAI}.`);
+        aiStartTimeRef.current = Date.now(); // For estimated time, though backend drives actual progress
 
         try {
-            const currentKeyForApi = userProvidedGeminiKey.trim();
-            const keyFromStorage = typeof window !== "undefined" ? localStorage.getItem("geminiApiKey") : null;
+            const requestBody: { filePath?: string; geminiApiKey?: string } = {
+                filePath: discoveredDataFilePath || undefined, // Send file path if available
+                // We no longer send raw points from client. Backend will use filePath.
+            };
+            if (userProvidedGeminiKey.trim()) {
+                requestBody.geminiApiKey = userProvidedGeminiKey.trim();
+            } else if (storedKey) {
+                requestBody.geminiApiKey = storedKey;
+            }
+            // If only system key, don't send it, backend will use its own env var.
 
-            let apiKeyToUse = currentKeyForApi;
-            if (!apiKeyToUse && keyFromStorage) {
-                apiKeyToUse = keyFromStorage;
-                addLogEntry('info', 'Using stored Gemini API Key from browser storage for AI enhancement.');
+            const response = await fetch('/api/ai/generate-datapoints', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody),
+            });
+
+            if (!response.ok) {
+                const errorResult = await response.json().catch(() => ({ message: "Failed to start AI task. API returned an error."}));
+                throw new Error(errorResult.message || `Failed to start AI task. Status: ${response.status}`);
             }
 
-            setAiStatusMessage(`Sending ${numPointsForAI} datapoints to AI for analysis...`);
+            const result = await response.json();
+            if (result.taskId) {
+                setCurrentAiTaskId(result.taskId);
+                addChatMessage({ sender: 'ai', type: 'info', text: `AI processing task started (ID: ${result.taskId}). I will update you on the progress.` });
+                addLogEntry('ai', `AI Task started with ID: ${result.taskId}`);
+
+                // Start polling
+                pollAiTaskStatus(result.taskId); // Initial immediate poll
+                const intervalId = setInterval(() => pollAiTaskStatus(result.taskId), 5000); // Poll every 5 seconds
+                setAiTaskPollIntervalId(intervalId);
+            } else {
+                throw new Error("Backend did not return a task ID.");
+            }
+
+        } catch (error: any) {
+            console.error("AI Enhancement initiation error:", error);
+            addChatMessage({ sender: 'ai', type: 'error', text: `Failed to start AI enhancement: ${error.message}` });
+            addLogEntry('error', "AI Enhancement initiation failed", error.message);
+            setIsAiProcessing(false);
+        }
+    };
+
+    const handleContinueAiProcessing = () => {
+        if (currentAiTaskId) {
+            addChatMessage({ sender: 'ai', type: 'info', text: 'Attempting to continue AI processing...' });
+            addLogEntry('ai', `Attempting to continue AI Task ID: ${currentAiTaskId}`);
+            setIsAiProcessing(true);
+            setShowContinueAiButton(false);
+
+            // Re-initiate polling for the existing task ID
+            pollAiTaskStatus(currentAiTaskId); // Initial immediate poll after continue
+            const intervalId = setInterval(() => pollAiTaskStatus(currentAiTaskId), 5000); // Poll every 5 seconds
+            setAiTaskPollIntervalId(intervalId);
+        } else {
+            addChatMessage({ sender: 'ai', type: 'error', text: 'No active AI task ID found to continue.'});
+            addLogEntry('error', "Continue AI: No currentAiTaskId found.");
+            setShowContinueAiButton(false);
+        }
+    };
+
+
+    // --- Original OPC UA Discovery Polling ---
             const requestBody = {
                 filePath: discoveredDataFilePath,
                 geminiApiKey: apiKeyToUse || undefined
@@ -560,30 +818,35 @@ export default function DatapointDiscoveryStep() { // Renamed component
 
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({ message: "AI generation API error." }));
-                throw new Error(errorData.message || `AI Enhancement API failed: ${response.statusText} (${response.status})`);
+                const errMsg = errorData.message || `AI Enhancement API failed: ${response.statusText} (${response.status})`;
+                addLogEntry('error', "AI Enhancement Error", errMsg); // Requirement 4.8
+                throw new Error(errMsg);
             }
-            setAiProgress(95);
+            setAiProgress(95); // Near completion
             const result = await response.json();
 
             if (result.success && result.data) {
+                const enhancedPointsCount = result.data?.length || 0;
+                const totalProcessed = numPointsForAI; // Assuming all sent points were processed in some way by AI
                 const enhanced: ExtendedDataPointConfig[] = result.data.map((dp: any) => ({
                     ...dp,
                     id: dp.id || dp.nodeId?.replace(/[^a-z0-9]+/gi, '-') || `ai-dp-${Math.random().toString(36).substring(7)}`,
                     iconName: dp.icon || "Tag",
                     icon: getIconComponent(dp.icon) || DEFAULT_ICON,
-                    source: 'ai-enhanced', // Added source
+                    source: 'ai-enhanced',
                 }));
-                // Preserve manually added or imported points, only update AI-enhanced/discovered ones
                 const existingManualOrImported = aiEnhancedPoints.filter(p => p.source === 'manual' || p.source === 'imported');
                 setAiEnhancedPoints([...enhanced, ...existingManualOrImported]);
-                const successMsg = `AI Enhancement Successful: ${result.data?.length || 0} points processed.`;
+
+                const successMsg = `AI Enhancement Completed: Processed ${totalProcessed} data points. ${enhancedPointsCount} points were enhanced.`; // Requirement 4.7
                 setAiStatusMessage(successMsg);
                 addLogEntry('ai', successMsg, result.message || 'AI processing completed and data updated.');
                 toast.success("AI Enhancement Completed!");
                 setAiProgress(100);
             } else {
-                addLogEntry('error', "AI Enhancement Failed", result.message || "AI process failed or returned no data.");
-                throw new Error(result.message || "AI enhancement process failed or returned no data.");
+                const failMsg = result.message || "AI enhancement process failed or returned no data.";
+                addLogEntry('error', "AI Enhancement Error", failMsg); // Requirement 4.8
+                throw new Error(failMsg);
             }
 
         } catch (error: any) {
@@ -595,7 +858,10 @@ export default function DatapointDiscoveryStep() { // Renamed component
             setAiProgress(0);
             const errorMsg = `AI Enhancement Error: ${error.message}`;
             setAiStatusMessage(errorMsg);
-            addLogEntry('error', "AI Process Failed", error.message); // Log error
+            // Specific error already logged, this is a fallback if not caught by specific cases
+            if (!error.message.includes("API failed") && !error.message.includes("failed or returned no data")) {
+                 addLogEntry('error', "AI Enhancement Error", error.message); // Requirement 4.8 (general catch)
+            }
             toast.error("AI Enhancement Failed", { description: error.message.length > 100 ? error.message.substring(0, 97) + "..." : error.message });
         } finally {
             if (progressInterval) {
@@ -663,8 +929,10 @@ export default function DatapointDiscoveryStep() { // Renamed component
         if (fileName.endsWith('.csv') || fileName.endsWith('.json') || fileName.endsWith('.xlsx')) {
             setFile(uploadedFile);
             setFileProcessingSummary(null); // Clear previous summary
+            addLogEntry('info', `File selected: ${uploadedFile.name}`); // Requirement 2.1
             toast.success(`File "${uploadedFile.name}" ready for processing.`);
         } else {
+            addLogEntry('warning', `Invalid file type selected: ${uploadedFile.name}`, `Allowed types: CSV, JSON, XLSX.`);
             toast.error("Invalid file type.", { description: "Please upload a CSV, JSON, or Excel (XLSX) file." });
             if (fileInputRef.current) fileInputRef.current.value = "";
             setFile(null);
@@ -673,7 +941,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files && event.target.files[0]) {
-            processUploadedFile(event.target.files[0]);
+            processUploadedFile(event.target.files[0]); // Already logs file selection
         }
     };
 
@@ -694,11 +962,14 @@ export default function DatapointDiscoveryStep() { // Renamed component
         event.stopPropagation();
         setIsDraggingOver(false);
         if (event.dataTransfer.files && event.dataTransfer.files[0]) {
-            processUploadedFile(event.dataTransfer.files[0]);
+            processUploadedFile(event.dataTransfer.files[0]); // Already logs file selection
         }
     };
 
     const clearFileSelection = () => {
+        if (file) {
+            addLogEntry('info', `File selection cleared: ${file.name}`);
+        }
         setFile(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
@@ -865,7 +1136,8 @@ export default function DatapointDiscoveryStep() { // Renamed component
                         if (plantDetailKeys.length > 0) {
                             setPlantDetails(plantDetailsFromFile);
                             localProcessingSummary.plantDetailsUpdated = true;
-                            addLogEntry('info', "Plant details from JSON file applied.", `Updated fields: ${plantDetailKeys.slice(0, 3).join(', ')}${plantDetailKeys.length > 3 ? '...' : '.'}`);
+                            const updatedFieldsList = plantDetailKeys.join(', ');
+                            addLogEntry('info', `Plant details updated from ${fileToProcess.name}: ${updatedFieldsList}`); // Requirement 2.5
                             toast.success("Plant details from JSON file applied.", {
                                 description: `Updated fields: ${plantDetailKeys.slice(0, 3).join(', ')}${plantDetailKeys.length > 3 ? '...' : '.'}`
                             });
@@ -943,22 +1215,30 @@ export default function DatapointDiscoveryStep() { // Renamed component
                         }
                     });
 
-                    setFileProcessingSummary(localProcessingSummary); // Set summary for UI display
-                    if (localProcessingSummary.errors > 0 || localProcessingSummary.skipped > 0) {
+                    setFileProcessingSummary(localProcessingSummary);
+
+                    // Log completion of processing with summary (Requirement 2.3)
+                    const summaryMsg = `File processing complete for ${fileToProcess.name}: Added ${localProcessingSummary.added}, Updated ${localProcessingSummary.updated}, Skipped ${localProcessingSummary.skipped}, Errors ${localProcessingSummary.errors}.`;
+                    addLogEntry(localProcessingSummary.errors > 0 ? 'warning' : 'info', summaryMsg);
+
+                    // Log detailed errors (Requirement 2.4)
+                    localProcessingSummary.errorDetails.forEach(errDetail => {
+                        addLogEntry('error', `File processing error: ${errDetail}`);
+                    });
+
+                    if (localProcessingSummary.processed === 0 && !localProcessingSummary.plantDetailsUpdated) {
+                        addLogEntry('info', `File processed: No new data points or plant details found in ${fileToProcess.name}.`); // Requirement 2.6
+                        toast.info("No New Data Processed", { description: "The file did not contain new data points or updatable plant details." });
+                    } else if (localProcessingSummary.errors > 0 || localProcessingSummary.skipped > 0) {
                         toast.warning("File Processed with Issues", {
-                            description: `${localProcessingSummary.errors} error(s), ${localProcessingSummary.skipped} skipped. See summary.`,
+                            description: `${localProcessingSummary.errors} error(s), ${localProcessingSummary.skipped} skipped. See summary & logs.`,
                             duration: 7000,
                         });
-                    } else if (localProcessingSummary.processed === 0 && !localProcessingSummary.plantDetailsUpdated) {
-                        toast.info("No New Data Processed", { description: "The file did not contain new data points or updatable plant details." });
                     } else {
-                        let successMsg = `Processed: ${localProcessingSummary.processed}`;
-                        if (localProcessingSummary.updated > 0) successMsg += `, Updated: ${localProcessingSummary.updated}`;
-                        if (localProcessingSummary.added > 0) successMsg += `, Added: ${localProcessingSummary.added}`;
-
-                        toast.success("File Processed Successfully!", {
-                            description: successMsg + ".",
-                        });
+                        let successToastMsg = `Processed: ${localProcessingSummary.processed}`;
+                        if (localProcessingSummary.updated > 0) successToastMsg += `, Updated: ${localProcessingSummary.updated}`;
+                        if (localProcessingSummary.added > 0) successToastMsg += `, Added: ${localProcessingSummary.added}`;
+                        toast.success("File Processed Successfully!", { description: successToastMsg + "." });
                     }
                     resolve(newConfiguredPoints);
 
@@ -968,16 +1248,18 @@ export default function DatapointDiscoveryStep() { // Renamed component
                     localProcessingSummary.errors++;
                     localProcessingSummary.errorDetails.push(`Critical error: ${errorMessage}`);
                     setFileProcessingSummary(localProcessingSummary);
+                    addLogEntry('error', `Critical file processing error for ${fileToProcess.name}: ${errorMessage}`); // Requirement 2.4 (critical)
                     toast.error("File Processing Failed", { description: errorMessage, duration: 8000 });
-                    reject(basePointsForProcessing); // Reject with the base points used for processing
+                    reject(basePointsForProcessing);
                 }
             };
             reader.onerror = (e) => {
                 const readErrorMsg = "Failed to read the file. It might be corrupted or inaccessible.";
                 console.error("FileReader error:", e);
                 setFileProcessingSummary(prev => ({ ...(prev || { processed: 0, updated: 0, added: 0, skipped: 0, errors: 0, errorDetails: [] }), errors: (prev?.errors || 0) + 1, errorDetails: [...(prev?.errorDetails || []), readErrorMsg] }));
+                addLogEntry('error', `File read error for ${fileToProcess.name}: ${readErrorMsg}`); // Requirement 2.4 (read error)
                 toast.error("File Read Error", { description: readErrorMsg });
-                reject(basePointsForProcessing); // Reject with the base points
+                reject(basePointsForProcessing);
             };
 
             if (fileToProcess.name.endsWith('.xlsx')) {
@@ -987,7 +1269,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPointsToDisplay, setPlantDetails, onboardingData]); // currentPointsToDisplay is now a dependency
+    }, [currentPointsToDisplay, setPlantDetails, onboardingData, addLogEntry]);
 
 
     const handleUploadAndProcess = useCallback(async () => {
@@ -997,31 +1279,24 @@ export default function DatapointDiscoveryStep() { // Renamed component
         }
         setIsFileProcessingLoading(true);
         setFileProcessingSummary(null);
-        addLogEntry('system', `Processing uploaded file: ${file.name}`);
+        addLogEntry('info', `Processing uploaded file: ${file.name}...`); // Requirement 2.2
         try {
             const processedDataPoints = await parseAndProcessFile(file);
-            if (aiEnhancedPoints.length > 0 || configuredDataPoints.length === 0) { // If AI points exist or context is empty, update aiEnhancedPoints
+            if (aiEnhancedPoints.length > 0 || configuredDataPoints.length === 0) {
                 setAiEnhancedPoints(processedDataPoints);
-            } else { // Otherwise, update context directly
+            } else {
                 setConfiguredDataPoints(processedDataPoints);
             }
-            // The fileProcessingSummary state is set inside parseAndProcessFile, so log entries based on it can be made there or here.
-            // For this implementation, summary-based logs are already added in the .finally() block of the parseAndProcessFile promise in the previous step's changes.
-            // Let's ensure the fileProcessingSummary state is available for the .finally() block.
-            // The setFileProcessingSummary is called within parseAndProcessFile.
-        } catch (error) {
+            // Logging of summary, errors, and no new data is handled within parseAndProcessFile
+        } catch (error) { // This catch is for errors in the promise chain not handled inside parseAndProcessFile
             console.error("File processing promise rejected at top level:", error);
-            addLogEntry('error', `File processing failed for ${file.name}`, (error as Error).message);
+            addLogEntry('error', `File processing failed for ${file.name}`, (error as Error).message); // Requirement 2.4 (general)
             toast.error("Unhandled Processing Error", { description: "An unexpected critical error occurred." });
         } finally {
             setIsFileProcessingLoading(false);
-            // Log based on the summary that should have been set by parseAndProcessFile
-            // This relies on setFileProcessingSummary within parseAndProcessFile having completed
-            // A more robust way might be to return the summary from parseAndProcessFile along with points.
-            // However, given the current structure, we'll use the state.
-            // The log entries are already added in the previous step's changes to this function's finally block.
+            // Summary logs are now inside parseAndProcessFile to ensure they have the correct summary details.
         }
-    }, [file, parseAndProcessFile, addLogEntry, aiEnhancedPoints, configuredDataPoints, setConfiguredDataPoints, fileProcessingSummary]);
+    }, [file, parseAndProcessFile, addLogEntry, aiEnhancedPoints, configuredDataPoints, setConfiguredDataPoints]);
 
     // --- Handlers for manual form (from DataPointConfigStep) ---
     const handleManualInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -1100,17 +1375,15 @@ export default function DatapointDiscoveryStep() { // Renamed component
             factor: parseNumericField(manualDataPoint.factor),
             phase: manualDataPoint.phase?.trim() as DataPointConfig['phase'] || undefined,
             notes: manualDataPoint.notes?.trim() || undefined,
-            source: 'manual', // Mark as manually added
+            source: 'manual',
         };
 
-        // Add to aiEnhancedPoints, which is the list used by currentPointsToDisplay if populated
-        // Add to the appropriate list
         if (aiEnhancedPoints.length > 0 || configuredDataPoints.length === 0) {
             setAiEnhancedPoints(prev => [...prev, newPoint]);
         } else {
             setConfiguredDataPoints(prev => [...prev, newPoint]);
         }
-        addLogEntry('info', `Manually added data point: "${newPoint.name}"`, `ID: ${newPoint.id}, Node ID: ${newPoint.nodeId}, UI Type: ${newPoint.uiType}`);
+        addLogEntry('info', `Manually added data point: '${newPoint.name}' (ID: ${newPoint.id}).`); // Requirement 3.1
         toast.success(`Data point "${newPoint.name}" added successfully!`);
         setShowManualForm(false);
         setManualDataPoint(initialManualDataPointState);
@@ -1124,13 +1397,12 @@ export default function DatapointDiscoveryStep() { // Renamed component
     };
 
     const openEditModal = (pointToEdit: ExtendedDataPointConfig) => {
-        // Ensure iconName is correctly derived if not present (e.g. from older context data)
         const iconComp = pointToEdit.icon as any;
         let currentIconName = pointToEdit.iconName;
         if (!currentIconName && typeof iconComp === 'function') {
             currentIconName = Object.keys(lucideIcons).find(key => lucideIcons[key as keyof typeof lucideIcons] === iconComp);
         }
-        currentIconName = currentIconName || "Sigma"; // Fallback if still not found
+        currentIconName = currentIconName || "Sigma";
 
         setEditingPoint(JSON.parse(JSON.stringify({
             ...pointToEdit,
@@ -1149,8 +1421,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
         } else if (name === 'min' || name === 'max' || name === 'factor' || name === 'precision') {
             if (value === '') finalValue = undefined;
             else finalValue = parseFloat(value);
-            // Do not revert to previous if NaN, let validation handle it or user clear it.
-            // if (isNaN(finalValue as number)) finalValue = (editingPoint as any)[name] ?? undefined;
         }
 
         setEditingPoint(prev => prev ? ({ ...prev, [name]: finalValue }) : null);
@@ -1162,7 +1432,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
             if (!prev) return null;
             const updatedPoint = { ...prev, [fieldName]: value };
             if (fieldName === 'iconName') {
-                // Just update iconName, icon component will be derived on save or display
                 updatedPoint.iconName = value;
             }
             return updatedPoint;
@@ -1172,7 +1441,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
     const saveEditedPoint = () => {
         if (!editingPoint) return;
 
-        // Validate numeric fields before saving edited point
         if (editingPoint.min && isNaN(Number(editingPoint.min))) { toast.error("Invalid Min Value", { description: "Min must be a valid number or empty." }); return; }
         if (editingPoint.max && isNaN(Number(editingPoint.max))) { toast.error("Invalid Max Value", { description: "Max must be a valid number or empty." }); return; }
         if (editingPoint.factor && isNaN(Number(editingPoint.factor))) { toast.error("Invalid Factor", { description: "Factor must be a valid number or empty." }); return; }
@@ -1181,19 +1449,17 @@ export default function DatapointDiscoveryStep() { // Renamed component
 
         const finalEditedPoint: ExtendedDataPointConfig = {
             ...editingPoint,
-            icon: getIconComponent(editingPoint.iconName) || DEFAULT_ICON, // Ensure icon component is updated
-            // Convert min/max/factor/precision back to numbers or undefined if empty string
+            icon: getIconComponent(editingPoint.iconName) || DEFAULT_ICON,
             min: editingPoint.min === undefined || editingPoint.min === null ? undefined : Number(editingPoint.min),
             max: editingPoint.max === undefined || editingPoint.max === null ? undefined : Number(editingPoint.max),
             factor: editingPoint.factor === undefined || editingPoint.factor === null ? undefined : Number(editingPoint.factor),
             precision: editingPoint.precision === undefined ? undefined : Number(editingPoint.precision),
         };
 
-        // Update in the aiEnhancedPoints list as it's the primary source for currentPointsToDisplay now
         const updatedPoints = aiEnhancedPoints.map(p => p.id === finalEditedPoint.id ? finalEditedPoint : p);
         setAiEnhancedPoints(updatedPoints);
 
-        addLogEntry('info', `Datapoint "${finalEditedPoint.name}" (ID: ${finalEditedPoint.id}) updated locally.`);
+        addLogEntry('info', `Updated data point: '${finalEditedPoint.name}' (ID: ${finalEditedPoint.id}).`); // Requirement 3.2
         toast.success(`"${finalEditedPoint.name}" updated.`);
         setIsEditModalOpen(false);
         setEditingPoint(null);
@@ -1704,25 +1970,41 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-            {/* AI Enhancement Section - Remains largely the same, ensure conditions for display are correct */}
-            <AnimatePresence>
-                {((discoveredRawPoints.length > 0 || aiEnhancedPoints.some(p => p.source === 'discovered') || discoveredDataFilePath) && !isDiscovering && !isAiProcessing && !isFileProcessingLoading) && (
-                    <motion.div variants={itemVariants(0.3)} initial="hidden" animate="visible" exit="exit"> {/* Adjusted delay */}
-                        <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
-                            <CardHeader>
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                    <div className="flex items-center space-x-3">
-                                        <Wand2 className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
-                                        <CardTitle className="text-lg sm:text-xl font-medium">AI Enhancement (Gemini)</CardTitle>
-                                    </div>
-                                    {/* Button is now rendered after consent checkbox */}
-                                </div>
-                                <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
-                                    Use Gemini AI to analyze discovered or existing datapoints to generate richer configurations. Requires a Gemini API Key and your consent.
-                                </CardDescription>
+            {/* AI Interaction Section - Grouping Chat and Controls */}
+            <motion.div
+                variants={itemVariants(0.28)} // This group will animate as one item initially
+                className="grid grid-cols-1 md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0" // Responsive grid
+            >
+                {/* AI Chat UI Section */}
+                <div className="md:col-span-1"> {/* Chat takes one column */}
+                    <AIChatInterface messages={chatMessages} isLoading={isAiProcessing && aiProgress < 5 && chatMessages.filter(cm => cm.sender === 'ai' && cm.type !== 'welcome').length === 0} />
+                </div>
 
-                                {/* AI Consent Checkbox */}
-                                <div className="mt-4 p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-3">
+                {/* AI Enhancement Control Section */}
+                <AnimatePresence>
+                    {((discoveredRawPoints.length > 0 || aiEnhancedPoints.some(p => p.source === 'discovered' || p.source === 'imported' || p.source === 'manual') || discoveredDataFilePath) && !isDiscovering && !isFileProcessingLoading) && (
+                        <motion.div
+                            // variants={itemVariants(0)} // No individual animation delay if grouped, parent handles it
+                            initial={{ opacity: 0, y: 20 }} // Simple appear for the card itself if shown
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="md:col-span-1" // Control card takes one column
+                        >
+                            <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg h-full flex flex-col"> {/* Added h-full and flex flex-col */}
+                                <CardHeader>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                        <div className="flex items-center space-x-3">
+                                            <Wand2 className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
+                                            <CardTitle className="text-lg sm:text-xl font-medium">AI Enhancement Control</CardTitle>
+                                        </div>
+                                    </div>
+                                    <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
+                                        Use Gemini AI to analyze discovered or existing datapoints. Requires a Gemini API Key and your consent. Results will appear in the AI Assistant Chat.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="pt-4 flex-grow"> {/* Added flex-grow */}
+                                    <div className="space-y-4"> {/* Added a container for spacing */}
+                                        <div className="p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-3">
                                     <div className="flex items-start space-x-2.5">
                                         <Checkbox
                                             id="ai-consent-checkbox"
