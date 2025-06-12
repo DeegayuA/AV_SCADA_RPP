@@ -38,3 +38,8 @@ next-env.d.ts
 
 # documentation
 /docs
+
+# Capacitor
+/android/
+/ios/
+/node_modules/.cache/
