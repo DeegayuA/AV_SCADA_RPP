@@ -22,10 +22,10 @@ import { OnboardingProvider, useOnboarding, OnboardingContextType, OnboardingSte
 // Assuming WelcomeStep.tsx is as per the initial problem description for THIS thread
 import WelcomeStep from './WelcomeStep'; 
 import PlantConfigStep from './PlantConfigStep';
-import DataPointConfigStep from './DataPointConfigStep';
+// import DataPointConfigStep from './DataPointConfigStep'; // Removed import
 import OpcuaTestStep from './OpcuaTestStep';
-import DatapointDiscoveryStep from './DatapointDiscoveryStep';
-// import GeminiKeyConfigStep from './GeminiKeyConfigStep'; // Original New Step, kept commented
+import DatapointDiscoveryStep from './DatapointDiscoveryStep'; // This now includes DataPointConfigStep functionality
+// import GeminiKeyConfigStep from './GeminiKeyConfigStep'; // Fully removed as per current task
 import ReviewStep from './ReviewStep';
 import { useTheme } from 'next-themes';
 
@@ -211,12 +211,12 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
         { component: <WelcomeStep key="welcome" />, name: "Welcome" }, // Uses imported WelcomeStep
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
         // { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
-        // { component: <GeminiKeyConfigStep key="gemini_key" />, name: "Gemini API Key" }, 
-        { component: <DatapointDiscoveryStep key="datapoints_auto" />, name: "Auto Discover Points" },
-        { component: <DataPointConfigStep key="datapoints_manual" />, name: "Manual Data Points" },
+        // GeminiKeyConfigStep was here
+        { component: <DatapointDiscoveryStep key="datapoint_discovery_merged" />, name: "Datapoint Management" }, // Renamed and now merged
+        // { component: <DataPointConfigStep key="datapoints_manual" />, name: "Manual Data Points" }, // Removed step
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
-    const totalSteps = stepsConfig.length;
+    const totalSteps = stepsConfig.length; // This will now be 5 (or 4 if OPCUA/Gemini are also commented out)
 
     const stepSlideVariants = {
         hidden: (dir: number) => ({ opacity: 0, x: dir > 0 ? "30px" : "-30px", scale: 0.99, filter: "blur(2px)" }),
@@ -316,8 +316,10 @@ const OnboardingPageContentInternal: React.FC = () => {
     const [hasSyncedUrlToContext, setHasSyncedUrlToContext] = useState(false);
 
     // CRITICAL: This MUST match the actual number of steps defined in OnboardingPanelInternalContent's stepsConfig
-    // Welcome, Plant, OPCUA, AutoDiscover, ManualDataPoints, Review = 6 steps
-    const totalFunctionalSteps = 6; 
+    // Welcome, Plant, DatapointManagement, Review = 4 steps (if OPCUA and Gemini commented out)
+    // If OPCUA and Gemini were active, it would be 6.
+    // Current config: Welcome, Plant, Datapoint Management, Review. So, 4 functional steps.
+    const totalFunctionalSteps = stepsConfig.length; // Dynamically set based on active stepsConfig
 
     useEffect(() => {
         if (!storeHasHydrated) {

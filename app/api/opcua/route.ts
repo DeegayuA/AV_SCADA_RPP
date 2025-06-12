@@ -29,6 +29,15 @@ const WEBSOCKET_HEARTBEAT_INTERVAL = 30000;
 
 let opcuaClient: OPCUAClient | null = null;
 let opcuaSession: ClientSession | null = null;
+
+// Global variable for discovery progress
+export let discoveryProgressCache = {
+  status: "idle",
+  percentage: 0,
+  details: "No discovery process has been initiated yet.",
+  timestamp: Date.now()
+};
+
 const connectedClients = new Set<WebSocket>();
 let dataInterval: NodeJS.Timeout | null = null;
 const nodeDataCache: Record<string, any> = {};
@@ -108,8 +117,11 @@ interface DiscoveredDataPoint {
 }
 
 async function browseAllNodes(session: ClientSession): Promise<DiscoveredDataPoint[]> {
+  discoveryProgressCache = { status: "Starting discovery...", percentage: 5, details: "Initializing browser.", timestamp: Date.now() };
   const discoveredPoints: DiscoveredDataPoint[] = [];
   const nodesToVisit: BrowseDescription[] = [];
+  let visitedCount = 0;
+  const initialNodesToEstimate = 100; // Placeholder, ideally get a count of top-level objects if possible.
 
   // Starting point: ObjectsFolder
   const rootNodeToBrowse: BrowseDescription = new BrowseDescription({
@@ -122,6 +134,11 @@ async function browseAllNodes(session: ClientSession): Promise<DiscoveredDataPoi
   nodesToVisit.push(rootNodeToBrowse);
 
   const visitedNodeIds = new Set<string>(); // To avoid re-processing or circular loops
+  let totalInitialNodes = 0; // For better percentage calculation
+
+  // Initial scan to estimate total nodes for progress (optional, can be intensive)
+  // This is a simplified estimation. A full recursive count beforehand would be more accurate but slow.
+  // For now, we'll use a dynamic approach within the loop.
 
   while (nodesToVisit.length > 0) {
     const nodeToBrowse = nodesToVisit.shift();
@@ -132,11 +149,24 @@ async function browseAllNodes(session: ClientSession): Promise<DiscoveredDataPoi
       continue;
     }
     visitedNodeIds.add(nodeIdString);
+    visitedCount++;
 
-    console.log(`Browsing node: ${nodeIdString}`);
+    // console.log(`Browsing node: ${nodeIdString}`); // Verbose, can be removed for production
 
     try {
       const browseResult = await session.browse(nodeToBrowse);
+
+      if (visitedCount % 15 === 0 || nodesToVisit.length < 5) { // Update progress every 15 nodes or if near the end
+        let currentPercentage = Math.min(85, 5 + Math.floor((visitedCount / (visitedCount + nodesToVisit.length + 1)) * 80));
+        if (nodesToVisit.length === 0) currentPercentage = 88; // Nearing completion of browse
+
+        discoveryProgressCache = {
+          status: "Browsing OPC UA structure...",
+          percentage: currentPercentage,
+          details: `Visited ${visitedCount} nodes. Found ${discoveredPoints.length} variables. Queue: ${nodesToVisit.length}. Current: ${nodeIdString.substring(0,50)}...`,
+          timestamp: Date.now()
+        };
+      }
 
       if (browseResult.references) {
         for (const reference of browseResult.references) {
@@ -212,20 +242,24 @@ async function browseAllNodes(session: ClientSession): Promise<DiscoveredDataPoi
       // Optionally, add this error to a list of problematic nodes
     }
   }
-  console.log(`Browsing complete. Discovered ${discoveredPoints.length} variable data points.`);
+  console.log(`Node browsing complete. Discovered ${discoveredPoints.length} variable data points.`);
+  discoveryProgressCache = { status: "Node browsing complete.", percentage: 90, details: `Found ${discoveredPoints.length} variables.`, timestamp: Date.now() };
   return discoveredPoints;
 }
 
 async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ success: boolean; message: string; count: number; filePath?: string; data?: DiscoveredDataPoint[]; error?: string }> {
+  discoveryProgressCache = { status: "Initiating discovery process...", percentage: 0, details: "Awaiting connection and browser setup.", timestamp: Date.now() };
   try {
     console.log("Starting datapoint discovery process...");
-    const discoveredDataPoints = await browseAllNodes(session);
+    const discoveredDataPoints = await browseAllNodes(session); // This will update progress internally
 
     if (!discoveredDataPoints || discoveredDataPoints.length === 0) {
       console.log("No datapoints found during browse operation.");
+      discoveryProgressCache = { status: "No datapoints found during browse.", percentage: 100, details: "The OPC UA server browse operation completed but yielded no variable nodes.", timestamp: Date.now() };
       return { success: true, message: 'No datapoints found.', count: 0, data: [] };
     }
 
+    discoveryProgressCache = { status: "Saving results to file...", percentage: 95, details: `Preparing to save ${discoveredDataPoints.length} discovered data points.`, timestamp: Date.now() };
     console.log(`Discovered ${discoveredDataPoints.length} datapoints. Attempting to save to file...`);
     const filePath = path.join('/tmp', 'discovered_datapoints.json');
     const jsonData = JSON.stringify(discoveredDataPoints, null, 2);
@@ -233,6 +267,7 @@ async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ succ
     try {
       await fs.writeFile(filePath, jsonData);
       console.log(`Successfully saved discovered datapoints to ${filePath}`);
+      discoveryProgressCache = { status: "Datapoints discovered and saved successfully.", percentage: 100, details: `Data saved to ${filePath}. Found ${discoveredDataPoints.length} points.`, timestamp: Date.now() };
       return {
         success: true,
         message: 'Datapoints discovered and saved successfully.',
@@ -242,6 +277,7 @@ async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ succ
       };
     } catch (fsError: any) {
       console.error(`Failed to save discovered datapoints to file at ${filePath}:`, fsError);
+      discoveryProgressCache = { status: "Error during discovery.", percentage: 95, details: `File system error: ${fsError.message}`, timestamp: Date.now() }; // Still at 95 as browse was ok
       return {
         success: false,
         message: 'Failed to save discovered datapoints to file.',
@@ -252,6 +288,7 @@ async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ succ
     }
   } catch (browseError: any) {
     console.error("Error during datapoint discovery (browseAllNodes call):", browseError);
+    discoveryProgressCache = { status: "Error during discovery.", percentage: Math.max(5, discoveryProgressCache.percentage - 20), details: `Browse error: ${browseError.message}`, timestamp: Date.now() }; // Reduce percentage on error
     return {
       success: false,
       message: 'Error during datapoint discovery.',
