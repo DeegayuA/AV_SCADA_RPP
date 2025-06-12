@@ -277,7 +277,7 @@ const DatapointDiscoveryStep: React.FC = () => {
               <p className="text-xs sm:text-sm text-muted-foreground">
                 Attempt to discover available datapoints (nodes) from the configured OPC UA server.
               </p>
-              <motion.div {...buttonMotionProps(0, true)} className="flex flex-row items-center gap-3 sm:gap-4">
+              <motion.div {...buttonMotionProps(0, true)} className="flex flex-col items-center gap-3 sm:gap-4">
                 <Button
                   onClick={handleDiscoverDatapoints}
                   disabled={isLoading || isAiGenerating}
