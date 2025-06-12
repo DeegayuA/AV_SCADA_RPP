@@ -93,6 +93,7 @@
     "recharts": "^2.15.1",
     "rimraf": "6.x",
     "sharp": "^0.34.2",
+    "@img/sharp-darwin-arm64": "^0.34.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.1.0",
     "tailwindcss": "^4.1.0",
@@ -123,6 +124,8 @@
     "typedoc-theme-hierarchy": "^6.0.0",
     "wait-on": "^8.0.3"
   },
+  "description": "Offline Dashboard for Solar Mini Grid Management",
+  "author": "Deeghayu Adhikari",
   "build": {
     "appId": "com.example.solardashboard",
     "productName": "Solar Dashboard",
