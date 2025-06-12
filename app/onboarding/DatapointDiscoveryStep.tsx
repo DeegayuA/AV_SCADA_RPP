@@ -1845,7 +1845,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
             {/* AI Interaction Section - Grouping Chat and Controls */}
             <motion.div 
                 variants={itemVariants(0.28)} // This group will animate as one item initially
-                className="flex flex-col mb-4" 
+                className="flex flex-col mb-4 gap-4" 
             >
                 {/* AI Chat UI Section */}
                 <div className=""> 
