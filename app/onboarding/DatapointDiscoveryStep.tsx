@@ -236,7 +236,7 @@ const AIChatInterface: React.FC<{ messages: ChatMessage[]; isLoading?: boolean }
     }, [messages]);
 
     return (
-        <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
+        <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg w-full">
             <CardHeader>
                 <div className="flex items-center space-x-3">
                     <MessageSquare className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
@@ -1845,10 +1845,10 @@ export default function DatapointDiscoveryStep() { // Renamed component
             {/* AI Interaction Section - Grouping Chat and Controls */}
             <motion.div 
                 variants={itemVariants(0.28)} // This group will animate as one item initially
-                className="grid grid-cols-1 md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0" // Responsive grid
+                className="flex flex-col mb-4" 
             >
                 {/* AI Chat UI Section */}
-                <div className="md:col-span-1"> {/* Chat takes one column */}
+                <div className=""> 
                     <AIChatInterface messages={chatMessages} isLoading={isAiProcessing && aiProgress < 5 && chatMessages.filter(cm => cm.sender === 'ai' && cm.type !== 'welcome').length === 0} />
                 </div>
 
