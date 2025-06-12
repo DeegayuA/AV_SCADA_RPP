@@ -319,6 +319,12 @@ const OnboardingPageContentInternal: React.FC = () => {
     // Welcome, Plant, DatapointManagement, Review = 4 steps (if OPCUA and Gemini commented out)
     // If OPCUA and Gemini were active, it would be 6.
     // Current config: Welcome, Plant, Datapoint Management, Review. So, 4 functional steps.
+    const stepsConfig = [
+        { component: <WelcomeStep key="welcome" />, name: "Welcome" },
+        { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
+        { component: <DatapointDiscoveryStep key="datapoint_discovery_merged" />, name: "Datapoint Management" },
+        { component: <ReviewStep key="review" />, name: "Review & Finalize" },
+    ];
     const totalFunctionalSteps = stepsConfig.length; // Dynamically set based on active stepsConfig
 
     useEffect(() => {
