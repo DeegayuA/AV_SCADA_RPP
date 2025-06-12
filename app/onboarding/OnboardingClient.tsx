@@ -4,7 +4,7 @@
 import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Loader2, CheckCircle, XOctagon, Sparkles, UserCog, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Loader2, CheckCircle, XOctagon, Sparkles, UserCog, AlertTriangle, ArrowLeft, ArrowRight, Sun, Moon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { isOnboardingComplete, clearOnboardingData as clearIdbOnboardingDataOnly } from '@/lib/idb-store';
@@ -27,6 +27,7 @@ import OpcuaTestStep from './OpcuaTestStep';
 import DatapointDiscoveryStep from './DatapointDiscoveryStep';
 // import GeminiKeyConfigStep from './GeminiKeyConfigStep'; // Original New Step, kept commented
 import ReviewStep from './ReviewStep';
+import { useTheme } from 'next-themes';
 
 // CSS for animated gradient (typically in globals.css)
 // @keyframes gradient-animation {
@@ -551,7 +552,42 @@ export default function OnboardingRoutePage() {
     }>
         <OnboardingProvider>
             <OnboardingPageContentInternal />
+            <ThemeToggleButton />
         </OnboardingProvider>
     </Suspense>
   );
 }
+
+
+const ThemeToggleButton = React.memo(() => {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return <div className="absolute top-5 right-5 sm:top-6 sm:right-6 z-20 h-10 w-10 rounded-full bg-black/10 dark:bg-white/5 animate-pulse" />;
+  
+  const cycleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10, scale: 0.9 }} animate={{ opacity: 1, y: 0, scale: 1, transition: { delay: 1.0, type: 'spring', stiffness:150, damping:12 } }}
+      className="absolute top-5 right-5 sm:top-6 sm:right-6 z-20" >
+      <Button
+        variant="outline" size="icon"
+        className="rounded-full bg-black/20 dark:bg-white/10 border-white/10 dark:border-black/10 text-white dark:text-black hover:bg-black/40 dark:hover:bg-white/20 backdrop-blur-md h-10 w-10 sm:h-11 sm:w-11 shadow-lg transition-all duration-200 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent"
+        style={ theme === 'dark' ? {borderColor:'rgba(255,255,255,0.15)', color: '#f5f5f5'} : {borderColor: 'rgba(0,0,0,0.15)', color:'#0a0a0a'}}
+        onClick={cycleTheme} aria-label="Toggle theme" >
+        <AnimatePresence mode="wait" initial={false}>
+          {theme === 'dark' ?
+            <motion.div key="sun-icon" initial={{ y: -12, opacity: 0, rotate: -45 }} animate={{ y: 0, opacity: 1, rotate: 0 }} exit={{ y: 12, opacity: 0, rotate: 45 }} transition={{ duration: 0.25, ease: "circOut" }}>
+              <Sun className="h-5 w-5 sm:h-[22px] sm:w-[22px] text-yellow-300" />
+            </motion.div>
+            :
+            <motion.div key="moon-icon" initial={{ y: -12, opacity: 0, rotate: 45 }} animate={{ y: 0, opacity: 1, rotate: 0 }} exit={{ y: 12, opacity: 0, rotate: -45 }} transition={{ duration: 0.25, ease: "circOut" }}>
+              <Moon className="h-5 w-5 sm:h-[22px] sm:w-[22px] text-sky-500" />
+            </motion.div>
+          }
+        </AnimatePresence>
+      </Button>
+    </motion.div>
+  );
+});
+ThemeToggleButton.displayName = "ThemeToggleButton";

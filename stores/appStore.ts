@@ -178,7 +178,7 @@ export const useAppStore = create<AppState & SLDActions>()(
       name: 'app-user-session-storage', // More specific name
       storage: createJSONStorage(() => safeLocalStorage), // Use safe local storage
       partialize: (state: AppState & SLDActions): Partial<AppState> => ({ // Only persist these parts
-        currentUser: state.currentUser,
+        // currentUser: state.currentUser,
         isEditMode: state.isEditMode,
         // Do NOT persist opcUaNodeValues or dataPoints metadata from constants
         // selectedElementForDetails should also NOT be persisted as it's transient UI state

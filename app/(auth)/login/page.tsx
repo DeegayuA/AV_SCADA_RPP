@@ -320,111 +320,112 @@ export default function LoginPage() {
     return ( /* ... Onboarding/Admin Setup UI - no changes ... */ 
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-sky-600 via-blue-700 to-indigo-800 text-white text-center p-4 sm:p-6 z-50">
-        <motion.div 
-            initial={{ y: -20, opacity: 0, scale:0.95 }} 
-            animate={{ y: 0, opacity: 1, scale:1, transition: { type: 'spring', stiffness: 120, damping: 12, delay: 0.2 } }}
-            className="bg-white/10 dark:bg-black/20 p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl backdrop-blur-lg max-w-md lg:max-w-lg w-full">
-        <Settings2 className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 text-sky-300 opacity-90 animate-pulse" />
-        <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 tracking-tight">Initial System Setup Required</h1>
-        <p className="text-xs sm:text-sm text-sky-100/80 max-w-md mx-auto mb-5">
-           Your control panel is not yet configured. An administrator must complete the initial setup.
-        </p>
+        <ThemeToggleButton />
+        <motion.div
+          initial={{ y: -20, opacity: 0, scale: 0.95 }}
+          animate={{ y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 120, damping: 12, delay: 0.2 } }}
+          className="bg-white/10 dark:bg-black/20 p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl backdrop-blur-lg max-w-md lg:max-w-lg w-full">
+          <Settings2 className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 text-sky-300 opacity-90 animate-pulse" />
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 tracking-tight">Initial System Setup Required</h1>
+          <p className="text-xs sm:text-sm text-sky-100/80 max-w-md mx-auto mb-5">
+            Your control panel is not yet configured. An administrator must complete the initial setup.
+          </p>
 
-        {pageState === 'admin_login_for_setup' ? (
+          {pageState === 'admin_login_for_setup' ? (
             <Form {...adminSetupForm}>
-            <form onSubmit={adminSetupForm.handleSubmit(values => performLogin(values, true))} className="space-y-3 text-left">
+              <form onSubmit={adminSetupForm.handleSubmit(values => performLogin(values, true))} className="space-y-3 text-left">
                 {process.env.NODE_ENV === 'development' && (
-                    <motion.div initial={{ opacity: 0, y:10 }} animate={{ opacity: 1, y:0, transition: { delay: 0.3 } }}
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
                     className="rounded-xl border border-primary/20 dark:border-primary/30 bg-primary/5 dark:bg-primary/10 p-3.5 sm:p-4 text-xs shadow-md">
                     <p className="mb-2.5 flex items-center text-sm font-semibold text-primary/90 dark:text-primary/80">
-                        <Users className="mr-2 h-5 w-5" /> Development Logins
+                      <Users className="mr-2 h-5 w-5" /> Development Logins
                     </p>
                     <div className="space-y-2">
-                        {users.map((user, index) => (
+                      {users.map((user, index) => (
                         <motion.div
-                            key={user.email}
-                            initial={{ opacity: 0, x: -15 }} 
-                            animate={{ opacity: 1, x: 0, transition: { delay: 0.3 + (index * 0.05) } }}
-                            className="flex items-center justify-between rounded-lg border border-slate-300/70 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 px-3 py-2.5 group hover:border-primary/70 dark:hover:border-primary/60 transition-all duration-150 shadow-sm hover:shadow-md"
+                          key={user.email}
+                          initial={{ opacity: 0, x: -15 }}
+                          animate={{ opacity: 1, x: 0, transition: { delay: 0.3 + (index * 0.05) } }}
+                          className="flex items-center justify-between rounded-lg border border-slate-300/70 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 px-3 py-2.5 group hover:border-primary/70 dark:hover:border-primary/60 transition-all duration-150 shadow-sm hover:shadow-md"
                         >
-                            <div className="truncate mr-2 flex-grow">
+                          <div className="truncate mr-2 flex-grow">
                             <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 flex items-center">
-                                {user.name} 
-                                <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
+                              {user.name}
+                              <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
                                 {user.role.toUpperCase()}
-                                </span>
+                              </span>
                             </p>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
                             <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
-                                <KeyRound size={10} className="mr-1 opacity-60"/> {user.passwordHash}
+                              <KeyRound size={10} className="mr-1 opacity-60" /> {user.passwordHash}
                             </p>
-                            </div>
-                            <Button
+                          </div>
+                          <Button
                             variant="ghost"
                             size="sm"
                             className="h-auto px-2.5 py-1.5 text-xs text-primary/90 dark:text-primary/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-primary/10 rounded-md"
                             onClick={() => {
-                                adminSetupForm.setValue('email', user.email, { shouldValidate: true });
-                                adminSetupForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
-                                toast.info(`Credentials auto-filled for ${user.name}.`, {position: 'top-center'});
-                            }}
-                            >
+                              adminSetupForm.setValue('email', user.email, { shouldValidate: true });
+                              adminSetupForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
+                              toast.info(`Credentials auto-filled for ${user.name}.`, { position: 'top-center' });
+                            } }
+                          >
                             Use
-                            </Button>
-                        </motion.div >
-                        ))}
+                          </Button>
+                        </motion.div>
+                      ))}
                     </div>
-                    </motion.div>
+                  </motion.div>
                 )}
                 <FormField control={adminSetupForm.control} name="email" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Email</FormLabel>
-                        <FormControl>
-                            <Input type="email" placeholder="admin@example.com" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm" autoComplete="username"/>
-                        </FormControl>
-                        <FormMessage className="text-red-300/90 text-xs pt-0.5" />
-                    </FormItem>
+                  <FormItem>
+                    <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="admin@example.com" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm" autoComplete="username" />
+                    </FormControl>
+                    <FormMessage className="text-red-300/90 text-xs pt-0.5" />
+                  </FormItem>
                 )} />
                 <FormField control={adminSetupForm.control} name="password" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Password</FormLabel>
-                        <div className="relative">
-                        <Input type={showAdminPasswordForSetup ? "text" : "password"} placeholder="Enter admin password" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm pr-10" autoComplete="current-password"/>
-                        <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-sky-200/60 hover:text-sky-100" onClick={()=>setShowAdminPasswordForSetup(!showAdminPasswordForSetup)}>
-                            {showAdminPasswordForSetup ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5"/> : <Eye className="h-4 w-4 sm:h-5 sm:w-5"/>}
-                        </Button>
-                        </div>
-                        <FormMessage className="text-red-300/90 text-xs pt-0.5" />
-                    </FormItem>
+                  <FormItem>
+                    <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Password</FormLabel>
+                    <div className="relative">
+                      <Input type={showAdminPasswordForSetup ? "text" : "password"} placeholder="Enter admin password" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm pr-10" autoComplete="current-password" />
+                      <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-sky-200/60 hover:text-sky-100" onClick={() => setShowAdminPasswordForSetup(!showAdminPasswordForSetup)}>
+                        {showAdminPasswordForSetup ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
+                      </Button>
+                    </div>
+                    <FormMessage className="text-red-300/90 text-xs pt-0.5" />
+                  </FormItem>
                 )} />
                 <AnimatePresence>
-                {adminSetupForm.formState.errors.root?.serverError && (
-                    <motion.p initial={{opacity:0, height:0}} animate={{opacity:1, height:'auto'}} exit={{opacity:0, height:0}}
-                     className="text-xs text-red-300 bg-red-500/25 p-2 rounded-md flex items-center border border-red-400/50 mt-1!"><AlertCircle size={14} className="mr-1.5"/>{adminSetupForm.formState.errors.root.serverError.message}</motion.p>
-                )}
+                  {adminSetupForm.formState.errors.root?.serverError && (
+                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+                      className="text-xs text-red-300 bg-red-500/25 p-2 rounded-md flex items-center border border-red-400/50 mt-1!"><AlertCircle size={14} className="mr-1.5" />{adminSetupForm.formState.errors.root.serverError.message}</motion.p>
+                  )}
                 </AnimatePresence>
                 <div className="pt-2 space-y-2.5">
-                <Button type="submit" size="lg" className="w-full bg-sky-400 hover:bg-sky-300 text-sky-900 shadow-lg font-semibold group py-2.5 h-auto text-sm rounded-md transition-transform hover:scale-[1.02]">
+                  <Button type="submit" size="lg" className="w-full bg-sky-400 hover:bg-sky-300 text-sky-900 shadow-lg font-semibold group py-2.5 h-auto text-sm rounded-md transition-transform hover:scale-[1.02]">
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />} Authenticate & Setup
-                </Button>
-                <Button variant="link" size="sm" onClick={() => {setPageState('onboarding_required'); adminSetupForm.reset(); setLoginError(null);}} className="w-full text-sky-200/70 hover:text-sky-100 text-xs !mt-1.5">
+                  </Button>
+                  <Button variant="link" size="sm" onClick={() => { setPageState('onboarding_required'); adminSetupForm.reset(); setLoginError(null); } } className="w-full text-sky-200/70 hover:text-sky-100 text-xs !mt-1.5">
                     Cancel Admin Login
-                </Button>
+                  </Button>
                 </div>
-            </form>
+              </form>
             </Form>
-        ) : (
+          ) : (
             <>
-                <p className="text-xs text-sky-200/70 mb-4">If you are not an administrator, please ask one to perform the initial system configuration.</p>
-                <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { delay: 0.3, type:'spring', stiffness:150 } }}>
-                    <Button onClick={() => setPageState('admin_login_for_setup')} size="lg" className="bg-white text-blue-700 hover:bg-sky-100 shadow-xl px-6 py-3 text-sm sm:text-base font-semibold group h-auto rounded-md transition-transform hover:scale-105">
-                        Log In as Administrator <ShieldCheck className="ml-2.5 h-5 w-5 transition-transform group-hover:scale-110 text-blue-600"/>
-                    </Button>
-                </motion.div>
+              <p className="text-xs text-sky-200/70 mb-4">If you are not an administrator, please ask one to perform the initial system configuration.</p>
+              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { delay: 0.3, type: 'spring', stiffness: 150 } }}>
+                <Button onClick={() => setPageState('admin_login_for_setup')} size="lg" className="bg-white text-blue-700 hover:bg-sky-100 shadow-xl px-6 py-3 text-sm sm:text-base font-semibold group h-auto rounded-md transition-transform hover:scale-105">
+                  Log In as Administrator <ShieldCheck className="ml-2.5 h-5 w-5 transition-transform group-hover:scale-110 text-blue-600" />
+                </Button>
+              </motion.div>
             </>
-        )}
+          )}
         </motion.div>
-    </motion.div>
+      </motion.div>
     );
   }
   
