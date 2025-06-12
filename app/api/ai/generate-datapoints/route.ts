@@ -30,7 +30,7 @@ interface DataPoint {
   decimalPlaces?: number; // Alternative/synonym to precision
   enumSet?: Record<number | string, string>; // For status codes or multi-state variables
 }
-
+export const dynamic = 'force-dynamic'; // explicitly tell Next.js this is dynamic
 // Interface for the data read from discovered_datapoints.json
 interface DiscoveredDataPoint {
   name: string;
