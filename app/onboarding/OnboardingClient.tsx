@@ -15,29 +15,45 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 
 import { APP_NAME } from '@/config/constants';
 import { useAppStore } from '@/stores/appStore';
-import { User, UserRole } from '@/types/auth'; // Assuming User type is imported or define it based on your store
+import { User, UserRole } from '@/types/auth'; 
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 import { OnboardingProvider, useOnboarding, OnboardingContextType, OnboardingStep } from './OnboardingContext';
-import WelcomeStep from './WelcomeStep';
+// Assuming WelcomeStep.tsx is as per the initial problem description for THIS thread
+import WelcomeStep from './WelcomeStep'; 
 import PlantConfigStep from './PlantConfigStep';
 import DataPointConfigStep from './DataPointConfigStep';
 import OpcuaTestStep from './OpcuaTestStep';
-import DatapointDiscoveryStep from './DatapointDiscoveryStep'; // Import the new step
+import DatapointDiscoveryStep from './DatapointDiscoveryStep';
+// import GeminiKeyConfigStep from './GeminiKeyConfigStep'; // Original New Step, kept commented
 import ReviewStep from './ReviewStep';
 
-// Animation variants (ensure itemVariants is defined before SuccessRedirector if used)
-const pageTransitionVariants = { /* ... same ... */
+// CSS for animated gradient (typically in globals.css)
+// @keyframes gradient-animation {
+//   0% { background-position: 0% 50%; }
+//   50% { background-position: 100% 50%; }
+//   100% { background-position: 0% 50%; }
+// }
+// .animated-gradient {
+//   background-size: 200% 200%; /* Or 400% 400% for smoother/slower */
+//   animation: gradient-animation 18s ease infinite;
+// }
+
+// --- Animation Variants (Mostly unchanged from provided) ---
+const pageTransitionVariants = {
   initial: { opacity: 0 },
   animate: { opacity: 1, transition: { duration: 0.5, ease: "anticipate" } },
   exit: { opacity: 0, transition: { duration: 0.3, ease: "easeIn" } }
 };
-const panelVariants = { /* ... same ... */
-    initial: { opacity: 0, y: 30, scale: 0.97 },
-    animate: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 260, damping: 25, delay: 0.1 } },
-    exit: { opacity: 0, y: 20, scale: 0.98, transition: { duration: 0.3 } }
+const panelVariants = { 
+    initial: { opacity: 0, y: 50, scale: 0.95, filter: "blur(4px)" }, // Enhanced initial state
+    animate: { 
+        opacity: 1, y: 0, scale: 1, filter: "blur(0px)", 
+        transition: { type: "spring", stiffness: 200, damping: 25, delay: 0.15 } 
+    },
+    exit: { opacity: 0, y: 30, scale: 0.97, filter: "blur(2px)", transition: { duration: 0.3 } }
 };
-const itemVariantsStagger = { /* ... same ... */
+const itemVariantsStagger = { 
     initial: { opacity: 0, y: 15 },
     animate: { 
         opacity: 1, y: 0, 
@@ -48,18 +64,42 @@ const itemVariantsStagger = { /* ... same ... */
         } 
     },
 };
-const itemVariants = { /* ... same ... */
+const itemVariants = { 
     initial: { opacity: 0, y: 15 },
     animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 150, damping: 18 } },
 };
-const iconPulseVariants = { /* ... same ... */
+const iconPulseVariants = { 
     pulse: { scale: [1, 1.15, 1], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } }
 };
 
+
+// --- Decorative Orb Component (NEW for impressive UI) ---
+const Orb: React.FC<{ size: string, initialX: string, initialY: string, colorFrom: string, colorTo: string, delay?: number, className?: string }> = 
+React.memo(({ size, initialX, initialY, colorFrom, colorTo, delay = 0, className }) => (
+  <motion.div
+    className={`absolute ${size} rounded-full opacity-0 blur-2xl pointer-events-none ${className}`} // opacity starts at 0, controlled by animate
+    style={{ background: `radial-gradient(circle, ${colorFrom} 0%, ${colorTo} 70%)`, zIndex: 0 }} // zIndex to be behind panel
+    initial={{ x: initialX, y: initialY, scale: 0.7 }}
+    animate={{ 
+      x: [`calc(${initialX} - 15px)`, `calc(${initialX} + 15px)`, `calc(${initialX} - 15px)`], // Subtle movement
+      y: [`calc(${initialY} + 10px)`, `calc(${initialY} - 10px)`, `calc(${initialY} + 10px)`],
+      scale: [0.7, 1, 0.7],
+      opacity: [0, 0.4, 0.4, 0.3, 0], // Dark mode opacity for orbs; 0.4 for light mode, .25 for dark
+      transition: { 
+        duration: 25, // Longer duration for slower, more ambient effect
+        repeat: Infinity, 
+        ease: "easeInOut", 
+        delay: delay 
+      }
+    }}
+  />
+));
+Orb.displayName = "Orb";
+
+
 // --- OnboardingProgressBarInternal (Internalized) ---
-// ... (Existing component code remains the same)
 interface OnboardingProgressBarInternalProps {
-  currentStep: number; // 0-indexed
+  currentStep: number; 
   totalSteps: number;
   stepNames: string[];
 }
@@ -71,7 +111,7 @@ const OnboardingProgressBarInternal: React.FC<OnboardingProgressBarInternalProps
       <div className="space-y-1.5">
           <div className="flex justify-between items-center mb-1">
               <p className="text-xs font-medium text-primary">
-                  Step {currentStep + 1} of {totalSteps}: <span className="font-semibold">{currentStepName}</span>
+                  Step {Math.min(currentStep + 1, totalSteps)} of {totalSteps}: <span className="font-semibold">{currentStepName}</span>
               </p>
               <p className="text-xs text-muted-foreground">{Math.round(progress)}%</p>
           </div>
@@ -82,18 +122,18 @@ const OnboardingProgressBarInternal: React.FC<OnboardingProgressBarInternalProps
 });
 OnboardingProgressBarInternal.displayName = "OnboardingProgressBarInternal";
 
-// --- OnboardingNavigationInternal (Internalized & UPDATED) ---
-// ... (Existing component code remains the same)
+// --- OnboardingNavigationInternal (Internalized & UPDATED for consistency) ---
 interface OnboardingNavigationInternalProps {
   onNext: () => void;
   onPrev: () => void;
-  currentStep: number; // 0-indexed
+  currentStep: number; 
   totalSteps: number;
   isLoading?: boolean;
 }
 const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> = React.memo(({ onNext, onPrev, currentStep, totalSteps, isLoading }) => {
   const isFirstStep = currentStep === 0;
-  const isLastFunctionalStep = currentStep === totalSteps - 1;
+  // This definition means ReviewStep is the last functional step *before* completion
+  const isLastFunctionalStep = currentStep === totalSteps - 1; 
 
   const buttonVariants = {
     hover: { scale: 1.03, transition: { type: "spring", stiffness: 400, damping: 15 } },
@@ -101,7 +141,7 @@ const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> 
   };
 
   return (
-    <div className="flex w-full justify-between items-center gap-3 sm:gap-4"> {/* Corrected styling */}
+    <div className="flex w-full justify-between items-center gap-3 sm:gap-4">
       <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
         <Button
           variant="outline"
@@ -113,18 +153,22 @@ const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> 
           <ArrowLeft className="h-4 w-4 mr-1.5 sm:mr-2" /> Previous
         </Button>
       </motion.div>
-      <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
-        <Button
-          onClick={onNext}
-          disabled={isLoading}
-          className="px-4 py-2 text-sm sm:min-w-[120px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg"
-          aria-label={isLastFunctionalStep ? "Finish and save configuration" : "Next step"}
-        >
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-1.5 sm:mr-2" />}
-          {isLastFunctionalStep ? "Finish & Save" : "Next"}
-          {!isLoading && !isLastFunctionalStep && <ArrowRight className="h-4 w-4 ml-1.5 sm:ml-2" />}
-        </Button>
-      </motion.div>
+      {/* Conditionally render Next/Finish button. For WelcomeStep (isFirstStep), its own buttons are primary. */}
+      {/* This ensures "Next" doesn't appear for WelcomeStep which has its own CTAs like "Start New Config" */}
+      {!isFirstStep && (
+        <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
+          <Button
+            onClick={onNext}
+            disabled={isLoading}
+            className="px-4 py-2 text-sm sm:min-w-[120px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground shadow-md hover:shadow-lg"
+            aria-label={isLastFunctionalStep ? "Finish and save configuration" : "Next step"}
+          >
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin mr-1.5 sm:mr-2" />}
+            {isLastFunctionalStep ? "Finish & Save" : "Next"}
+            {!isLoading && !isLastFunctionalStep && <ArrowRight className="h-4 w-4 ml-1.5 sm:ml-2" />}
+          </Button>
+        </motion.div>
+      )}
     </div>
   );
 });
@@ -132,10 +176,9 @@ OnboardingNavigationInternal.displayName = "OnboardingNavigationInternal";
 
 // --- NEW COMPONENT: SuccessRedirector ---
 interface SuccessRedirectorProps {
-  currentUser: User | null; // Or: typeof useAppStore extends (selector: (state: any) => infer R) => R ? ReturnType<typeof useAppStore(state => state.currentUser)> : any;
+  currentUser: User | null; 
   redirectDelay?: number;
 }
-
 const SuccessRedirector: React.FC<SuccessRedirectorProps> = React.memo(({ currentUser, redirectDelay = 3500 }) => {
     const router = useRouter();
     
@@ -144,7 +187,7 @@ const SuccessRedirector: React.FC<SuccessRedirectorProps> = React.memo(({ curren
             router.replace(currentUser?.redirectPath || '/dashboard');
         }, redirectDelay);
         return () => clearTimeout(timer);
-    }, [router, currentUser, redirectDelay]); // Dependencies
+    }, [router, currentUser, redirectDelay]);
 
     return (
         <motion.div variants={itemVariants} className="mt-8">
@@ -154,9 +197,7 @@ const SuccessRedirector: React.FC<SuccessRedirectorProps> = React.memo(({ curren
 });
 SuccessRedirector.displayName = "SuccessRedirector";
 
-
 // --- OnboardingPanelInternalContent ---
-// ... (Existing component code remains the same)
 const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     const context = useOnboarding();
     if (!context) throw new Error("useOnboarding must be used within OnboardingProvider");
@@ -164,14 +205,17 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     
     const [direction, setDirection] = useState(1);
 
+    // This config drives the steps.
     const stepsConfig = [
-        { component: <WelcomeStep key="welcome" />, name: "Welcome" },
+        { component: <WelcomeStep key="welcome" />, name: "Welcome" }, // Uses imported WelcomeStep
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
+        // { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
+        // { component: <GeminiKeyConfigStep key="gemini_key" />, name: "Gemini API Key" }, 
+        { component: <DatapointDiscoveryStep key="datapoints_auto" />, name: "Auto Discover Points" },
         { component: <DataPointConfigStep key="datapoints_manual" />, name: "Manual Data Points" },
-        { component: <DatapointDiscoveryStep key="datapoints_auto" />, name: "Auto Discover Points" }, // New Step
-        { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
+    const totalSteps = stepsConfig.length;
 
     const stepSlideVariants = {
         hidden: (dir: number) => ({ opacity: 0, x: dir > 0 ? "30px" : "-30px", scale: 0.99, filter: "blur(2px)" }),
@@ -181,12 +225,12 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
 
     const handleNext = useCallback(async () => {
         setDirection(1);
-        if (currentStep === stepsConfig.length - 1) {
+        if (currentStep === totalSteps - 1) { // If on the last step (e.g., Review)
             await completeOnboarding();
         } else if (nextStep) {
             nextStep();
         }
-    }, [currentStep, completeOnboarding, nextStep, stepsConfig.length]);
+    }, [currentStep, completeOnboarding, nextStep, totalSteps]);
 
     const handlePrev = useCallback(() => {
         setDirection(-1);
@@ -199,7 +243,7 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     return (
         <>
             <VisuallyHidden><h2>Onboarding Setup Process for {APP_NAME}</h2></VisuallyHidden>
-            <CardHeader className="p-4 sm:p-5 border-b sticky top-0 z-10 bg-card/80 backdrop-blur-sm rounded-t-xl">
+            <CardHeader className="p-4 sm:p-5 border-b sticky top-0 z-10 bg-card/80 dark:bg-card/70 backdrop-blur-sm rounded-t-xl">
                 <div className="flex items-center space-x-3">
                     <motion.div variants={iconPulseVariants} animate="pulse">
                         <Sparkles className="h-7 w-7 text-primary shrink-0" />
@@ -210,15 +254,17 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
                 </div>
             </CardHeader>
 
-            {currentStep < stepsConfig.length && (
+            {/* Progress bar is shown for all steps including WelcomeStep, as it's part of the process */}
+            {currentStep < totalSteps && (
                 <CardContent className="p-0 border-b">
                    <div className="px-4 sm:px-6 py-3">
-                    <OnboardingProgressBarInternal currentStep={currentStep} totalSteps={stepsConfig.length} stepNames={stepsConfig.map(s=>s.name)} />
+                    <OnboardingProgressBarInternal currentStep={currentStep} totalSteps={totalSteps} stepNames={stepsConfig.map(s=>s.name)} />
                    </div>
                 </CardContent>
             )}
 
-            <CardContent className="flex-grow overflow-y-auto p-4 sm:p-6 relative min-h-[350px] sm:min-h-[450px]">
+            <CardContent className="flex-grow overflow-y-auto p-0 sm:p-0 relative min-h-[380px] sm:min-h-[480px]">
+                {/* p-0 for CardContent as WelcomeStep has its own padding */}
                 <AnimatePresence initial={false} custom={direction} mode="wait">
                     <motion.div
                         key={currentStep} 
@@ -227,20 +273,21 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="w-full h-full"
+                        className="w-full h-full" // WelcomeStep and other steps will use this height
                     >
                         {stepsConfig[currentStep]?.component}
                     </motion.div>
                 </AnimatePresence>
             </CardContent>
 
-            {currentStep < stepsConfig.length && (
-                 <CardFooter className="p-4 sm:p-5 border-t sticky bottom-0 z-10 bg-card/80 backdrop-blur-sm rounded-b-xl">
+            {/* Navigation is shown for all steps, but "Next" is hidden on first step (WelcomeStep) */}
+            {currentStep < totalSteps && (
+                 <CardFooter className="p-4 sm:p-5 border-t sticky bottom-0 z-10 bg-card/80 dark:bg-card/70 backdrop-blur-sm rounded-b-xl">
                     <OnboardingNavigationInternal 
                         onNext={handleNext} 
                         onPrev={handlePrev} 
                         currentStep={currentStep} 
-                        totalSteps={stepsConfig.length} 
+                        totalSteps={totalSteps}
                         isLoading={isLoading} 
                     />
                 </CardFooter>
@@ -267,7 +314,9 @@ const OnboardingPageContentInternal: React.FC = () => {
     const [pageState, setPageState] = useState<'loading' | 'auth_required' | 'admin_setup_pending' | 'onboarding_active' | 'finalizing' | 'error_state'>('loading');
     const [hasSyncedUrlToContext, setHasSyncedUrlToContext] = useState(false);
 
-    const totalFunctionalSteps = 6; // Updated total steps
+    // CRITICAL: This MUST match the actual number of steps defined in OnboardingPanelInternalContent's stepsConfig
+    // Welcome, Plant, OPCUA, AutoDiscover, ManualDataPoints, Review = 6 steps
+    const totalFunctionalSteps = 6; 
 
     useEffect(() => {
         if (!storeHasHydrated) {
@@ -298,12 +347,13 @@ const OnboardingPageContentInternal: React.FC = () => {
                     if (wantsReset) {
                         if (idbOnboardingCompleted) await clearIdbOnboardingDataOnly();
                         if (!isMounted) return;
-                        await resetOnboardingData();
+                        await resetOnboardingData(); // This should reset context.currentStep to 0
                         const newParams = new URLSearchParams(searchParams.toString());
                         newParams.delete('reset');
+                        newParams.delete('step'); // Also clear step from URL on reset
                         router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
                         setPageState('onboarding_active');
-                        setHasSyncedUrlToContext(true); 
+                        // No need to setHasSyncedUrlToContext(true) here, let the step sync logic handle it if needed for step 0 (or no step param)
                     } else if (!idbOnboardingCompleted) {
                         setPageState('onboarding_active');
                     } else {
@@ -329,6 +379,7 @@ const OnboardingPageContentInternal: React.FC = () => {
         return () => { isMounted = false; };
     }, [storeHasHydrated, currentUserFromStore, router, resetOnboardingData, searchParams, pathname]); 
 
+    // URL to Context Sync & Context to URL Sync
     useEffect(() => {
         if (pageState !== 'onboarding_active' && pageState !== 'finalizing') return;
         if (!goToStep) return; 
@@ -336,36 +387,42 @@ const OnboardingPageContentInternal: React.FC = () => {
         const stepFromUrlStr = searchParams.get('step');
         const stepFromUrl = stepFromUrlStr ? parseInt(stepFromUrlStr, 10) : null;
 
-        if (stepFromUrl && stepFromUrl >= 1 && stepFromUrl <= totalFunctionalSteps && !hasSyncedUrlToContext) {
-            const contextEquivalentStep = stepFromUrl - 1 as OnboardingStep;
+        // Sync URL to Context (once, primarily on load or if URL driven externally)
+        if (stepFromUrl !== null && stepFromUrl >= 1 && stepFromUrl <= totalFunctionalSteps && !hasSyncedUrlToContext) {
+            const contextEquivalentStep = (stepFromUrl - 1) as OnboardingStep;
             if (currentStep !== contextEquivalentStep) {
-                console.log(`[SYNC] URL (${stepFromUrl}) to Context (${contextEquivalentStep}). Current context: ${currentStep}`);
+                console.log(`[SYNC URL->CTX] URL step ${stepFromUrl} to Context step ${contextEquivalentStep}. Current context: ${currentStep}`);
                 goToStep(contextEquivalentStep);
             }
-            setHasSyncedUrlToContext(true); 
-            return; 
+            setHasSyncedUrlToContext(true); // Mark that initial URL sync attempt has occurred
+        } else if (stepFromUrl === null && currentStep !== 0 && !hasSyncedUrlToContext) {
+            // If no step in URL, and context isn't at step 0, sync context to step 0
+            // Or, more commonly, if no step in URL, the currentStep (default 0) is fine.
+            // This part might need refinement based on desired behavior for missing 'step' param.
+            // For now, let's assume if 'step' is missing, it implies step 1 (index 0).
+             setHasSyncedUrlToContext(true); // Treat as synced if no step param and currentStep is 0
         }
-        
+
+        // Sync Context to URL (continuously, as user navigates with internal buttons)
         if (hasSyncedUrlToContext && currentStep < totalFunctionalSteps) {
-            const contextStepForUrl = currentStep + 1;
-            if (contextStepForUrl !== stepFromUrl) {
-                console.log(`[SYNC] Context (${currentStep}) to URL (${contextStepForUrl}). Current URL step: ${stepFromUrl}`);
+            const contextStepForUrl = currentStep + 1; // 1-indexed for URL
+            if (contextStepForUrl !== stepFromUrl) { // Only update if different
+                console.log(`[SYNC CTX->URL] Context step ${currentStep} to URL step ${contextStepForUrl}. Current URL step: ${stepFromUrl}`);
                 const newParams = new URLSearchParams(searchParams.toString());
                 newParams.set('step', contextStepForUrl.toString());
-                const currentHref = window.location.pathname + window.location.search;
-                const newHref = `${pathname}?${newParams.toString()}`;
-                if (currentHref !== newHref) {
-                     router.replace(newHref, { scroll: false });
+                // Avoid replacing if only the hash changes or if it's identical
+                if (window.location.search !== `?${newParams.toString()}`) {
+                     router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
                 }
             }
         }
-
     }, [pageState, currentStep, searchParams, pathname, router, goToStep, totalFunctionalSteps, hasSyncedUrlToContext]);
 
     useEffect(() => {
-        if (pageState === 'onboarding_active' && currentStep >= totalFunctionalSteps) {
+        if (pageState === 'onboarding_active' && currentStep >= totalFunctionalSteps) { // e.g. 6 steps (0-5), currentStep becomes 6
             setPageState('finalizing');
         } else if (pageState === 'finalizing' && currentStep < totalFunctionalSteps) {
+            // If user goes back from finalizing state (e.g. error, review)
             setPageState('onboarding_active');
         }
     }, [currentStep, pageState, totalFunctionalSteps]);
@@ -394,7 +451,7 @@ const OnboardingPageContentInternal: React.FC = () => {
             )}
             {pageState === 'finalizing' && (
                  <motion.div key="finalizing" {...pageTransitionVariants} className="fixed inset-0 flex flex-col items-center justify-center text-center p-6 bg-background z-[100]"
-                    variants={itemVariantsStagger} initial="initial" animate="animate"> {/* This variants is for the overall div, which is fine */}
+                    variants={itemVariantsStagger} initial="initial" animate="animate">
                     <motion.div variants={itemVariants} className="mb-8">
                         {saveStatus === 'saving' && isLoading && <Loader2 className="h-20 w-20 animate-spin text-primary" />}
                         {saveStatus === 'success' && !isLoading && <motion.div initial={{ scale: 0.3, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 180, damping: 12, delay:0.1 }}><CheckCircle className="h-20 w-20 text-green-500" /></motion.div>}
@@ -410,7 +467,6 @@ const OnboardingPageContentInternal: React.FC = () => {
                         {saveStatus === 'success' && !isLoading && `${APP_NAME} is now ready. You'll be redirected shortly.`}
                         {saveStatus === 'error' && !isLoading && "Something went wrong while saving. Please review your settings or contact support."}
                     </motion.p>
-                    {/* MODIFIED SECTION: Use the new SuccessRedirector component */}
                     {saveStatus === 'success' && !isLoading && (
                         <SuccessRedirector currentUser={currentUserFromStore} />
                     )}
@@ -423,18 +479,35 @@ const OnboardingPageContentInternal: React.FC = () => {
                 </motion.div>
             )}
             {pageState === 'onboarding_active' && ( 
-                <motion.div key="onboarding_active" className="fixed inset-0 bg-gradient-to-br from-slate-100 via-gray-100 to-slate-200 dark:from-neutral-950 dark:via-zinc-900 dark:to-gray-950 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto z-40">
+                <motion.div 
+                    key="onboarding_active" 
+                    className="fixed inset-0 bg-gradient-to-br from-slate-100 via-gray-50 to-sky-100 dark:from-neutral-950 dark:via-zinc-900 dark:to-sky-950 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden z-40 animated-gradient" // Added animated-gradient & overflow-hidden
+                    initial="initial" animate="animate" exit="exit" // Use pageTransitionVariants or define new ones if needed for this full screen container
+                >
+                    {/* Decorative Orbs - ensure your primary and accent colors are defined via CSS vars if using hsla(var(--primary)) */}
+                    <Orb size="w-60 h-60 md:w-[450px] md:h-[450px]" initialX="-25%" initialY="-15%" colorFrom="hsla(var(--primary)/0.3)" colorTo="hsla(var(--primary)/0.03)" delay={0} className="opacity-60 dark:opacity-30" />
+                    <Orb size="w-56 h-56 md:w-[400px] md:h-[400px]" initialX="65%" initialY="55%" colorFrom="hsla(210, 80%, 70%, 0.35)" colorTo="hsla(210, 80%, 50%, 0.03)" delay={1.5} className="opacity-60 dark:opacity-30"/>
+                    
                     <motion.div
-                        variants={panelVariants} initial="initial" animate="animate" exit="exit"
-                        className="relative bg-card/95 dark:bg-neutral-800/95 backdrop-blur-lg rounded-xl shadow-2xl w-full max-w-2xl md:max-w-3xl max-h-[95vh] flex flex-col overflow-hidden border border-border/60 dark:border-neutral-700/60"
-                    >
+                        variants={panelVariants} initial="initial" animate="animate" exit="exit" // Panel animation
+                        className="relative z-10 bg-card/80 dark:bg-neutral-800/85 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-2xl md:max-w-3xl max-h-[95vh] flex flex-col overflow-hidden border border-border/50 dark:border-neutral-700/50"
+                    > {/* Increased blur, adjusted opacity */}
                         <OnboardingPanelInternalContent />
                          <TooltipProvider delayDuration={100}>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <Button
                                         variant="ghost" size="icon"
-                                        onClick={async () => { if (window.confirm("Are you sure you want to reset and start over? Current progress will be lost.")) { await resetOnboardingData(); } }}
+                                        onClick={async () => { 
+                                            if (window.confirm("Are you sure you want to reset and start over? Current progress will be lost.")) { 
+                                                // Before resetting, clear the step URL param to ensure fresh start at step 1
+                                                const newParams = new URLSearchParams(window.location.search);
+                                                newParams.delete('step');
+                                                router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
+                                                // Then reset onboarding data, which should set context.currentStep to 0
+                                                await resetOnboardingData(); 
+                                            } 
+                                        }}
                                         className="absolute top-2.5 right-2.5 sm:top-3.5 sm:right-3.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full z-20 p-1 sm:p-1.5"
                                         aria-label="Restart Onboarding"
                                     > <XOctagon className="h-5 w-5" /> </Button>
@@ -465,10 +538,20 @@ OnboardingPageContentInternal.displayName = 'OnboardingPageContentInternal';
 // Main export for the page route (app/onboarding/page.tsx)
 export default function OnboardingRoutePage() {
   return (
-    <OnboardingProvider>
-        <Suspense fallback={<div>Loading Onboarding Experience...</div>}> {/* Added Suspense as a good practice if any part of Onboarding relies on it, check if searchParams or other hooks need it higher up though. If not used here, you can omit */}
+    // Wrap with Suspense at a higher level if useSearchParams directly triggers it.
+    // However, Suspense is usually for components that `React.lazy` load or data fetching hooks that suspend.
+    // `useSearchParams` in Next.js 13+ App Router doesn't typically require Suspense at this direct level 
+    // unless a parent component up the tree is already expecting it.
+    // For now, retaining the Suspense wrapper around the content.
+    <Suspense fallback={
+        <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-neutral-900 text-slate-200 z-[200]">
+            <Loader2 className="h-16 w-16 text-primary animate-spin mb-6" />
+            <p className="text-xl font-medium text-slate-300">Loading Onboarding...</p>
+        </div>
+    }>
+        <OnboardingProvider>
             <OnboardingPageContentInternal />
-        </Suspense>
-    </OnboardingProvider>
+        </OnboardingProvider>
+    </Suspense>
   );
 }

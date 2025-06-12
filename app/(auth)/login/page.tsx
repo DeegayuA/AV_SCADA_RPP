@@ -327,7 +327,7 @@ export default function LoginPage() {
         <Settings2 className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 text-sky-300 opacity-90 animate-pulse" />
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 tracking-tight">Initial System Setup Required</h1>
         <p className="text-xs sm:text-sm text-sky-100/80 max-w-md mx-auto mb-5">
-            {APP_NAME} is not yet configured. An administrator must complete the initial setup.
+           Your control panel is not yet configured. An administrator must complete the initial setup.
         </p>
 
         {pageState === 'admin_login_for_setup' ? (
