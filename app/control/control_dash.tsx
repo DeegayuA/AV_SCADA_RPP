@@ -475,7 +475,24 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [isConnected,connectWebSocket,allPossibleDataPoints,playNotificationSound,currentUserRole,authCheckComplete]);
 
   useEffect(() => { /* ... localStorage for sldLayoutId ... */ if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
-  const getHardcodedDefaultDataPointIds = useCallback(() => { /* ... unchanged ... */ const cIds=['grid-total-active-power-side-to-side','inverter-output-total-power','load-total-power','battery-capacity','battery-output-power','input-power-pv1'].filter(id=>allPossibleDataPoints.some(dp=>dp.id===id));if(cIds.length>0)return cIds;return allPossibleDataPoints.slice(0,DEFAULT_DISPLAY_COUNT).map(dp=>dp.id);},[allPossibleDataPoints]);
+  const getHardcodedDefaultDataPointIds = useCallback(() => {
+        const cIds=[
+            'grid-total-active-power-side-to-side',
+            'inverter-output-total-power',
+            'load-total-power',
+            'battery-capacity',
+            'battery-output-power',
+            'input-power-pv1',
+            'active-power-adjust', // Added
+            'pf-reactive-power-adjust', // Added
+            'export-power-percentage' // Added
+        ].filter(id => allPossibleDataPoints.some(dp => dp.id === id)); // Ensure they exist in allPossibleDataPoints
+
+        if(cIds.length > 0) return cIds;
+
+        // Fallback if none of the preferred IDs are found (less likely now)
+        return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
+    },[allPossibleDataPoints]);
   const getSmartDefaults = useDynamicDefaultDataPointIds(allPossibleDataPoints);
   const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
   useEffect(() => { /* ... localStorage for displayedDataPointIds ... */ if(typeof window!=='undefined'&&allPossibleDataPoints.length>0&&authCheckComplete){const s=localStorage.getItem(USER_DASHBOARD_CONFIG_KEY);if(s){try{const p=JSON.parse(s)as string[];const v=p.filter(id=>allPossibleDataPoints.some(dp=>dp.id===id));if(v.length>0){setDisplayedDataPointIds(v);return;}else if(p.length>0)localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);}catch(e){console.error("Parse err",e);localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);}}const sm=getSmartDefaults();setDisplayedDataPointIds(sm.length>0?sm:getHardcodedDefaultDataPointIds());}},[allPossibleDataPoints,getSmartDefaults,getHardcodedDefaultDataPointIds,authCheckComplete]);
@@ -498,7 +515,7 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [connectWebSocket, authCheckComplete]);
 
   const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
-  const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch'), [individualPoints]);
+  const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch' || p.uiType === 'input'), [individualPoints]);
   const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
   const gaugeItems = useMemo(() => individualPoints.filter(p => p.uiType === 'gauge'), [individualPoints]);
   const otherDisplayItems = useMemo(() => individualPoints.filter(p => p.uiType === 'display' && p.category !== 'status'), [individualPoints]);
