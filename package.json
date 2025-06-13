@@ -1,6 +1,6 @@
 {
   "name": "solar-minigrid-dashboard",
-  "version": "0.1.0",
+  "version": "1.6.0",
   "private": true,
   "main": "electron-main.js",
   "scripts": {
@@ -94,7 +94,6 @@
     "recharts": "^2.15.1",
     "rimraf": "6.x",
     "sharp": "^0.34.2",
-    "@img/sharp-darwin-arm64": "^0.34.2",
     "sonner": "^2.0.3",
     "tailwind-merge": "^3.1.0",
     "tailwindcss": "^4.1.0",
