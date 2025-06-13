@@ -495,8 +495,8 @@ export default function DataPointConfigStep() {
 
   const handleManualSelectChange = (fieldName: keyof ManualDataPointState, value: string) => {
       setManualDataPoint(prev => ({ ...prev, [fieldName]: value as any })); // Type assertion for safety if needed
-       if (manualFormErrors[fieldName]) {
-          setManualFormErrors(prev => ({ ...prev, [fieldName]: '' }));
+       if (manualFormErrors[fieldName as string]) {
+          setManualFormErrors(prev => ({ ...prev, [fieldName as string]: '' }));
       }
   };
   
