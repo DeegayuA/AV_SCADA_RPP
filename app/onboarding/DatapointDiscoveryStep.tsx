@@ -157,7 +157,7 @@ interface ChatMessage {
     sender: 'user' | 'ai';
     text: string;
     timestamp: string;
-    type?: 'info' | 'error' | 'success' | 'progress' | 'welcome';
+    type?: 'info' | 'error' | 'success' | 'progress' | 'welcome' | 'warning';
     details?: string;
 }
 
@@ -178,8 +178,10 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
                 ? 'bg-green-600 text-white'
                 : message.type === 'welcome'
                     ? 'bg-gradient-to-r from-purple-500 to-indigo-600 text-white'
-                    : 'bg-muted text-muted-foreground';
-
+                    : message.type === 'warning'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-secondary text-secondary-foreground';
+    
     const IconComponent = () => {
         switch (message.type) {
             case 'error': return <AlertCircle className="h-5 w-5 mr-2 shrink-0" />;
@@ -187,6 +189,7 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
             case 'progress': return <LoaderIcon className="h-5 w-5 mr-2 shrink-0 animate-spin" />;
             case 'info': return <InfoIcon className="h-5 w-5 mr-2 shrink-0" />;
             case 'welcome': return <Bot className="h-5 w-5 mr-2 shrink-0" />;
+            case 'warning': return <AlertTriangle className="h-5 w-5 mr-2 shrink-0" />;
             default: return isUser ? <User className="h-5 w-5 mr-2 shrink-0" /> : <Bot className="h-5 w-5 mr-2 shrink-0" />;
         }
     };
@@ -798,80 +801,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
     };
 
 
-    // --- Original OPC UA Discovery Polling ---
-            const requestBody = {
-                filePath: discoveredDataFilePath,
-                geminiApiKey: apiKeyToUse || undefined
-            };
-
-            const response = await fetch('/api/ai/generate-datapoints', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody),
-            });
-
-            const backendAiDuration = aiStartTimeRef.current ? ((Date.now() - aiStartTimeRef.current) / 1000).toFixed(1) : 'N/A';
-            if (progressInterval) {
-                clearInterval(progressInterval);
-                progressInterval = null;
-            }
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({ message: "AI generation API error." }));
-                const errMsg = errorData.message || `AI Enhancement API failed: ${response.statusText} (${response.status})`;
-                addLogEntry('error', "AI Enhancement Error", errMsg); // Requirement 4.8
-                throw new Error(errMsg);
-            }
-            setAiProgress(95); // Near completion
-            const result = await response.json();
-
-            if (result.success && result.data) {
-                const enhancedPointsCount = result.data?.length || 0;
-                const totalProcessed = numPointsForAI; // Assuming all sent points were processed in some way by AI
-                const enhanced: ExtendedDataPointConfig[] = result.data.map((dp: any) => ({
-                    ...dp,
-                    id: dp.id || dp.nodeId?.replace(/[^a-z0-9]+/gi, '-') || `ai-dp-${Math.random().toString(36).substring(7)}`,
-                    iconName: dp.icon || "Tag",
-                    icon: getIconComponent(dp.icon) || DEFAULT_ICON,
-                    source: 'ai-enhanced',
-                }));
-                const existingManualOrImported = aiEnhancedPoints.filter(p => p.source === 'manual' || p.source === 'imported');
-                setAiEnhancedPoints([...enhanced, ...existingManualOrImported]);
-
-                const successMsg = `AI Enhancement Completed: Processed ${totalProcessed} data points. ${enhancedPointsCount} points were enhanced.`; // Requirement 4.7
-                setAiStatusMessage(successMsg);
-                addLogEntry('ai', successMsg, result.message || 'AI processing completed and data updated.');
-                toast.success("AI Enhancement Completed!");
-                setAiProgress(100);
-            } else {
-                const failMsg = result.message || "AI enhancement process failed or returned no data.";
-                addLogEntry('error', "AI Enhancement Error", failMsg); // Requirement 4.8
-                throw new Error(failMsg);
-            }
-
-        } catch (error: any) {
-            console.error("AI Enhancement error:", error);
-            if (progressInterval) {
-                clearInterval(progressInterval);
-                progressInterval = null;
-            }
-            setAiProgress(0);
-            const errorMsg = `AI Enhancement Error: ${error.message}`;
-            setAiStatusMessage(errorMsg);
-            // Specific error already logged, this is a fallback if not caught by specific cases
-            if (!error.message.includes("API failed") && !error.message.includes("failed or returned no data")) {
-                 addLogEntry('error', "AI Enhancement Error", error.message); // Requirement 4.8 (general catch)
-            }
-            toast.error("AI Enhancement Failed", { description: error.message.length > 100 ? error.message.substring(0, 97) + "..." : error.message });
-        } finally {
-            if (progressInterval) {
-                clearInterval(progressInterval);
-            }
-            setIsAiProcessing(false);
-            aiStartTimeRef.current = null;
-            setEstimatedAiTime(0);
-        }
-    };
 
     const handleSaveConfiguration = () => { // This function now saves ALL points (discovered, AI, manual, imported)
         const pointsToSave = currentPointsToDisplay; // Use currentPointsToDisplay as it holds the merged list
@@ -917,7 +846,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
         // Keep system logs but clear operational ones or filter more selectively if needed.
         setProcessLog(prev => prev.filter(p => p.type === 'system' && p.message.includes("Configuration reset initiated") || p.message.includes("User provided Gemini API key")));
         setDiscoveryStatusMessage("");
-        setAiStatusMessage("");
         setDiscoveryProgress(0);
         setAiProgress(0);
         toast.info("Configuration Reset", { description: "All discovered, AI-enhanced, imported, and manually added data points have been cleared from this step." });
@@ -1579,6 +1507,203 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
+                {/* AI Enhancement Control Section */}
+            <AnimatePresence>
+                {((discoveredRawPoints.length > 0 || aiEnhancedPoints.some(p => p.source === 'discovered' || p.source === 'imported' || p.source === 'manual') || discoveredDataFilePath) && !isDiscovering && !isFileProcessingLoading) && (
+                    <React.Fragment>
+                        <motion.div
+                            variants={itemVariants(0.28)}
+                            initial="hidden"
+                            animate="visible"
+                            exit="exit"
+                        >
+                        <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg mb-4">
+                            <CardHeader>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <div className="flex items-center space-x-3">
+                                        <Wand2 className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
+                                        <CardTitle className="text-lg sm:text-xl font-medium">AI Enhancement Control</CardTitle>
+                                    </div>
+                                </div>
+                                <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
+                                    Use Gemini AI to analyze discovered or existing datapoints. Requires a Gemini API Key and your consent. Results will appear in the AI Assistant Chat.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="pt-4 flex-grow"> {/* Added flex-grow */}
+                                <div className="space-y-4"> {/* Added a container for spacing */}
+                                    <div className="p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-3">
+                                        <div className="flex items-start space-x-2.5">
+                                            <Checkbox
+                                                id="ai-consent-checkbox"
+                                                checked={aiConsentGiven}
+                                                onCheckedChange={(checkedState) => setAiConsentGiven(checkedState as boolean)}
+                                                className="mt-0.5" />
+                                            <Label htmlFor="ai-consent-checkbox" className="text-xs sm:text-sm font-normal text-muted-foreground leading-relaxed">
+                                                I understand and consent to send my discovered data point information (such as NodeIDs and names) to a third-party AI service (Google Gemini) for configuration enhancement. This data will be used solely for the purpose of generating improved configurations. See our <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Privacy Policy</a> for details.
+                                            </Label>
+                                        </div>
+                                    </div>
+
+                                    {/* Gemini API Key Input - shown if no env key and no stored/session key */}
+                                    {(showGeminiKeyInput || (!GEMINI_API_KEY_EXISTS_CLIENT && !userProvidedGeminiKey && (typeof window !== "undefined" && !localStorage.getItem("geminiApiKey")))) && (
+                                        <div className="mt-4 p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-2">
+                                            <Label htmlFor="gemini-key-input" className="text-sm font-medium">Enter Your Gemini API Key (Optional if already set):</Label>
+                                            <div className="flex items-center space-x-2">
+                                                <Input id="gemini-key-input" type="password" value={userProvidedGeminiKey} onChange={(e) => setUserProvidedGeminiKey(e.target.value)} placeholder="Your Gemini API Key" className="flex-grow" />
+                                                <Button size="sm" variant="secondary" onClick={() => {
+                                                    if (userProvidedGeminiKey.trim()) {
+                                                        toast.success("Gemini API Key set for this session.");
+                                                        // setShowGeminiKeyInput(false); // Keep input visible for changes, or hide:
+                                                        addLogEntry('system', 'User provided Gemini API key for session.');
+                                                    } else {
+                                                        toast.error("Please enter a valid API Key.");
+                                                    }
+                                                } }>Set Session Key</Button>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">This key will be used for this session only. It is not stored permanently by default.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                            <CardFooter className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <motion.div {...buttonMotionProps(0, false)} className="w-full sm:w-auto">
+                                    <Button
+                                        onClick={handleStartAiEnhancement}
+                                        disabled={!aiConsentGiven || isDiscovering || isAiProcessing || isFileProcessingLoading || (discoveredRawPoints.length === 0 && !discoveredDataFilePath && !aiEnhancedPoints.some(p => p.source === 'discovered'))}
+                                        className="group w-full"
+                                        variant={aiEnhancedPoints.some(p => p.source === 'ai-enhanced') && !isAiProcessing ? "outline" : "default"}
+                                    >
+                                        {isAiProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sigma className="h-4 w-4 mr-2 group-hover:animate-pulse" />}
+                                        {isAiProcessing ? "AI Processing..." : (aiEnhancedPoints.some(p => p.source === 'ai-enhanced') ? "Re-Run AI Enhancement" : "Start AI Enhancement")}
+                                    </Button>
+                                </motion.div>
+                                <AnimatePresence>
+                                    {showContinueAiButton && (
+                                        <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="mt-4">
+                                                <Button
+                                                    onClick={handleContinueAiProcessing}
+                                                    variant="secondary"
+                                                />
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </CardFooter>
+                            <AnimatePresence>
+                                {showContinueAiButton && (
+                                    <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="p-4">
+                                        <Button
+                                            onClick={handleContinueAiProcessing}
+                                            variant="secondary"
+                                            className="w-full"
+                                        >
+                                            <RefreshCw className="h-4 w-4 mr-2" />
+                                            Continue AI Processing
+                                        </Button>
+                                    </motion.div>
+                                )}
+                                {(isAiProcessing || aiProgress > 0) && (
+                                    <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="p-4">
+                                        {isAiProcessing && (
+                                            <div className="space-y-2 mt-2">
+                                                <Progress value={aiProgress} className="w-full h-2.5 bg-purple-200 dark:bg-purple-800/50 [&>div]:bg-purple-500 dark:[&>div]:bg-purple-400" />
+                                                <p className="text-xs text-muted-foreground text-center animate-pulse">
+                                                    AI processing in progress... ({aiProgress}%)
+                                                </p>
+                                            </div>
+                                        )}
+                                    </motion.div>
+                                )}
+                                </AnimatePresence>
+                            </Card>
+                            <AIChatInterface messages={chatMessages} isLoading={isAiProcessing && aiProgress < 5 && chatMessages.filter(cm => cm.sender === 'ai' && cm.type !== 'welcome').length === 0} />
+                        </motion.div>
+                        <motion.div variants={itemVariants(0.3)}>
+                            <Card className="border-border bg-card/95 dark:bg-neutral-800/85 backdrop-blur-md shadow-xl">
+                            <CardHeader>
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                    <div className="flex items-center space-x-3">
+                                        <Database className="h-6 w-6 text-green-500 dark:text-green-400 shrink-0" />
+                                        <CardTitle className="text-lg sm:text-xl font-medium">Aggregated Datapoints ({currentPointsToDisplay.length})</CardTitle>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <motion.div {...buttonMotionProps(0.02)}>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="outline" className="group flex-grow sm:flex-grow-0 border-amber-500/50 hover:border-amber-500 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:border-amber-600/50 dark:hover:border-amber-500 dark:hover:bg-amber-500/20">
+                                                        <RotateCcw className="h-4 w-4 mr-2 group-hover:rotate-[-45deg] transition-transform" /> Reset All
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader><AlertDialogTitle>Confirm Full Reset</AlertDialogTitle><AlertDialogDescription>Are you sure you want to reset ALL datapoint configurations (discovered, AI-enhanced, imported, and manual)? This action cannot be undone for the current session.</AlertDialogDescription></AlertDialogHeader>
+                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleResetConfiguration} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Confirm Full Reset</AlertDialogAction></AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
+                                        </motion.div>
+                                        <motion.div {...buttonMotionProps(0, true)} className="flex-grow sm:flex-grow-0">
+                                            <Button onClick={handleSaveConfiguration} disabled={isLoading || isDiscovering || isAiProcessing || isFileProcessingLoading} className="group w-full">
+                                                {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2 group-hover:scale-110" />}
+                                                {isLoading ? "Saving..." : "Save to Onboarding"}
+                                            </Button>
+                                        </motion.div>
+                                    </div>
+                                </div>
+                                <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
+                                    Review, edit, and manage all datapoints. Click "Save to Onboarding" to apply these to the overall onboarding configuration.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="px-0 sm:px-2 md:px-4">
+                                <ScrollArea className="max-h-[500px] sm:max-h-[600px] md:max-h-[700px] w-full rounded-md border border-border shadow-inner bg-card dark:bg-neutral-800/20">
+                                    <Table className="min-w-full text-xs">
+                                        <TableHeader className="sticky top-0 bg-muted/90 dark:bg-neutral-700/60 backdrop-blur-sm z-10"><TableRow className="border-b-border dark:border-b-neutral-600">
+                                            <TableHead className="w-[140px] sm:w-[180px] px-2 py-2.5">Name / Label</TableHead>
+                                            <TableHead className="w-[160px] sm:w-[200px] px-2 py-2.5">NodeId (Address)</TableHead>
+                                            <TableHead className="w-[70px] sm:w-[90px] px-2 py-2.5">Data Type</TableHead>
+                                            <TableHead className="w-[70px] sm:w-[90px] px-2 py-2.5">UI Type</TableHead>
+                                            <TableHead className="w-[100px] sm:w-[130px] px-2 py-2.5">Category</TableHead>
+                                            <TableHead className="w-[70px] sm:w-[90px] px-2 py-2.5 text-center">Source</TableHead> {/* Added Source Column */}
+                                            <TableHead className="w-[40px] sm:w-[60px] px-2 py-2.5 text-center">Icon</TableHead>
+                                            <TableHead className="w-[50px] sm:w-[70px] px-2 py-2.5">Unit</TableHead>
+                                            <TableHead className="w-[40px] px-2 py-2.5 text-center">Edit</TableHead>
+                                        </TableRow></TableHeader>
+                                        <TableBody>
+                                            {currentPointsToDisplay.map((dp, index) => {
+                                                const DisplayIcon = dp.icon && typeof dp.icon === 'function' ? dp.icon : (getIconComponent(dp.iconName) || DEFAULT_ICON);
+                                                const sourceDisplay = {
+                                                    'discovered': <span className="text-blue-600 dark:text-blue-400">Discovery</span>,
+                                                    'ai-enhanced': <span className="text-purple-600 dark:text-purple-400">AI</span>,
+                                                    'manual': <span className="text-teal-600 dark:text-teal-400">Manual</span>,
+                                                    'imported': <span className="text-indigo-600 dark:text-indigo-400">Imported</span>
+                                                };
+                                                return (
+                                                    <TableRow key={dp.id || `dp-${index}-${dp.nodeId}`} className="hover:bg-muted/50 dark:hover:bg-neutral-700/40 border-b-border dark:border-b-neutral-700/60 last:border-b-0">
+                                                        <TableCell className="font-medium px-2 py-1.5 align-top"><span className="font-semibold block">{dp.label || dp.name}</span><span className="text-muted-foreground text-[0.7rem] block">{dp.name !== (dp.label || dp.name) ? `(${dp.name})` : ''}</span></TableCell>
+                                                        <TableCell className="text-muted-foreground px-2 py-1.5 align-top break-all">{dp.nodeId}</TableCell>
+                                                        <TableCell className="px-2 py-1.5 align-top">{dp.dataType}</TableCell>
+                                                        <TableCell className="px-2 py-1.5 align-top">{dp.uiType}</TableCell>
+                                                        <TableCell className="px-2 py-1.5 align-top">{dp.category}</TableCell>
+                                                        <TableCell className="px-2 py-1.5 align-top text-center text-[0.75rem] font-medium">{dp.source ? sourceDisplay[dp.source] : 'N/A'}</TableCell>
+                                                        <TableCell className="px-2 py-1.5 align-top text-center">{DisplayIcon && typeof DisplayIcon === 'function' && <DisplayIcon className="h-4 w-4 inline-block text-muted-foreground" />}</TableCell>
+                                                        <TableCell className="px-2 py-1.5 align-top">{dp.unit || 'N/A'}</TableCell>
+                                                        <TableCell className="px-2 py-1.5 align-top text-center"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditModal(dp)}><Maximize className="h-3.5 w-3.5 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300" /></Button></TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </ScrollArea>
+                                {currentPointsToDisplay.length === 0 && (
+                                    <p className="text-center text-muted-foreground py-8 text-sm italic">
+                                        No datapoints configured yet. Use Discovery, Upload, or Manual Add to get started.
+                                    </p>
+                                )}
+                            </CardContent>
+                        </Card>
+                        </motion.div>
+                    </React.Fragment>
+                )}
+            </AnimatePresence>
+
+
             {/* --- Download Templates Section (from DataPointConfigStep) --- */}
             <motion.div variants={itemVariants(0.1)}>
                 <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
@@ -1970,204 +2095,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-            {/* AI Interaction Section - Grouping Chat and Controls */}
-            <motion.div
-                variants={itemVariants(0.28)} // This group will animate as one item initially
-                className="grid grid-cols-1 md:grid-cols-2 md:gap-6 space-y-6 md:space-y-0" // Responsive grid
-            >
-                {/* AI Chat UI Section */}
-                <div className="md:col-span-1"> {/* Chat takes one column */}
-                    <AIChatInterface messages={chatMessages} isLoading={isAiProcessing && aiProgress < 5 && chatMessages.filter(cm => cm.sender === 'ai' && cm.type !== 'welcome').length === 0} />
-                </div>
-
-                {/* AI Enhancement Control Section */}
-                <AnimatePresence>
-                    {((discoveredRawPoints.length > 0 || aiEnhancedPoints.some(p => p.source === 'discovered' || p.source === 'imported' || p.source === 'manual') || discoveredDataFilePath) && !isDiscovering && !isFileProcessingLoading) && (
-                        <motion.div
-                            // variants={itemVariants(0)} // No individual animation delay if grouped, parent handles it
-                            initial={{ opacity: 0, y: 20 }} // Simple appear for the card itself if shown
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="md:col-span-1" // Control card takes one column
-                        >
-                            <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg h-full flex flex-col"> {/* Added h-full and flex flex-col */}
-                                <CardHeader>
-                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                        <div className="flex items-center space-x-3">
-                                            <Wand2 className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
-                                            <CardTitle className="text-lg sm:text-xl font-medium">AI Enhancement Control</CardTitle>
-                                        </div>
-                                    </div>
-                                    <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
-                                        Use Gemini AI to analyze discovered or existing datapoints. Requires a Gemini API Key and your consent. Results will appear in the AI Assistant Chat.
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="pt-4 flex-grow"> {/* Added flex-grow */}
-                                    <div className="space-y-4"> {/* Added a container for spacing */}
-                                        <div className="p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-3">
-                                    <div className="flex items-start space-x-2.5">
-                                        <Checkbox
-                                            id="ai-consent-checkbox"
-                                            checked={aiConsentGiven}
-                                            onCheckedChange={(checkedState) => setAiConsentGiven(checkedState as boolean)}
-                                            className="mt-0.5"
-                                        />
-                                        <Label htmlFor="ai-consent-checkbox" className="text-xs sm:text-sm font-normal text-muted-foreground leading-relaxed">
-                                            I understand and consent to send my discovered data point information (such as NodeIDs and names) to a third-party AI service (Google Gemini) for configuration enhancement. This data will be used solely for the purpose of generating improved configurations. See our <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Privacy Policy</a> for details.
-                                        </Label>
-                                    </div>
-                                </div>
-
-                                {/* Gemini API Key Input - shown if no env key and no stored/session key */}
-                                {(showGeminiKeyInput || (!GEMINI_API_KEY_EXISTS_CLIENT && !userProvidedGeminiKey && (typeof window !== "undefined" && !localStorage.getItem("geminiApiKey")))) && (
-                                    <div className="mt-4 p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-2">
-                                        <Label htmlFor="gemini-key-input" className="text-sm font-medium">Enter Your Gemini API Key (Optional if already set):</Label>
-                                        <div className="flex items-center space-x-2">
-                                            <Input id="gemini-key-input" type="password" value={userProvidedGeminiKey} onChange={(e) => setUserProvidedGeminiKey(e.target.value)} placeholder="Your Gemini API Key" className="flex-grow" />
-                                            <Button size="sm" variant="secondary" onClick={() => {
-                                                if (userProvidedGeminiKey.trim()) {
-                                                    toast.success("Gemini API Key set for this session.");
-                                                    // setShowGeminiKeyInput(false); // Keep input visible for changes, or hide:
-                                                    addLogEntry('system', 'User provided Gemini API key for session.');
-                                                } else {
-                                                    toast.error("Please enter a valid API Key.");
-                                                }
-                                            }}>Set Session Key</Button>
-                                        </div>
-                                        <p className="text-xs text-muted-foreground">This key will be used for this session only. It is not stored permanently by default.</p>
-                                    </div>
-                                )}
-                            </CardHeader>
-                            <CardContent className="pt-4"> {/* Added pt-4 to CardContent for spacing button */}
-                                <motion.div {...buttonMotionProps(0, false)} className="w-full sm:w-auto">
-                                    <Button
-                                        onClick={handleStartAiEnhancement}
-                                        disabled={!aiConsentGiven || isDiscovering || isAiProcessing || isFileProcessingLoading || (discoveredRawPoints.length === 0 && !discoveredDataFilePath && !aiEnhancedPoints.some(p => p.source === 'discovered'))}
-                                        className="group w-full"
-                                        variant={aiEnhancedPoints.some(p => p.source === 'ai-enhanced') && aiStatusMessage.toLowerCase().includes("success") && !isAiProcessing ? "outline" : "default"}
-                                    >
-                                        {isAiProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sigma className="h-4 w-4 mr-2 group-hover:animate-pulse" />}
-                                        {isAiProcessing ? "AI Processing..." : (aiEnhancedPoints.some(p => p.source === 'ai-enhanced') && aiStatusMessage.toLowerCase().includes("success") ? "Re-Run AI Enhancement" : "Start AI Enhancement")}
-                                    </Button>
-                                </motion.div>
-                                <AnimatePresence>
-                                    {(isAiProcessing || (aiStatusMessage && !isAiProcessing && !aiStatusMessage.toLowerCase().includes("preparing data for ai..."))) && ( // Avoid showing stale status if just preparing
-                                        <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="mt-4">
-                                            {isAiProcessing && (
-                                                <div className="space-y-2 mt-2">
-                                                    <Progress value={aiProgress} className="w-full h-2.5 bg-purple-200 dark:bg-purple-800/50 [&>div]:bg-purple-500 dark:[&>div]:bg-purple-400" />
-                                                    <p className="text-xs text-muted-foreground text-center animate-pulse">
-                                                        {aiStatusMessage} (Estimated: <span className="font-medium">{Math.max(0, estimatedAiTime).toFixed(0)}s</span>)
-                                                    </p>
-                                                </div>
-                                            )}
-                                            {!isAiProcessing && aiStatusMessage && (
-                                                <p className={cn(
-                                                    "text-sm p-3 rounded-md border text-center",
-                                                    aiStatusMessage.toLowerCase().includes("error") || aiStatusMessage.toLowerCase().includes("fail") ?
-                                                        "bg-destructive/10 border-destructive/30 text-destructive dark:bg-red-900/30 dark:border-red-700/50 dark:text-red-300" :
-                                                        "bg-purple-500/10 border-purple-500/30 text-purple-700 dark:bg-purple-900/30 dark:border-purple-700/50 dark:text-purple-300"
-                                                )}>
-                                                    {aiStatusMessage}
-                                                </p>
-                                            )}
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Datapoints Table and Save actions - Updated to show 'source' and use currentPointsToDisplay */}
-            <AnimatePresence>
-                {(currentPointsToDisplay.length > 0) && (
-                    <motion.div variants={itemVariants(0.35)} initial="hidden" animate="visible" exit="exit" key="datapoints-display-card-merged"> {/* Adjusted delay and key */}
-                        <Card className="border-border bg-card/95 dark:bg-neutral-800/85 backdrop-blur-md shadow-xl">
-                            <CardHeader>
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                    <div className="flex items-center space-x-3">
-                                        <Database className="h-6 w-6 text-green-500 dark:text-green-400 shrink-0" />
-                                        <CardTitle className="text-lg sm:text-xl font-medium">Aggregated Datapoints ({currentPointsToDisplay.length})</CardTitle>
-                                    </div>
-                                    <div className="flex items-center gap-2 w-full sm:w-auto">
-                                        <motion.div {...buttonMotionProps(0.02)}>
-                                            <AlertDialog>
-                                                <AlertDialogTrigger asChild>
-                                                    <Button variant="outline" className="group flex-grow sm:flex-grow-0 border-amber-500/50 hover:border-amber-500 hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 dark:border-amber-600/50 dark:hover:border-amber-500 dark:hover:bg-amber-500/20">
-                                                        <RotateCcw className="h-4 w-4 mr-2 group-hover:rotate-[-45deg] transition-transform" /> Reset All
-                                                    </Button>
-                                                </AlertDialogTrigger>
-                                                <AlertDialogContent>
-                                                    <AlertDialogHeader><AlertDialogTitle>Confirm Full Reset</AlertDialogTitle><AlertDialogDescription>Are you sure you want to reset ALL datapoint configurations (discovered, AI-enhanced, imported, and manual)? This action cannot be undone for the current session.</AlertDialogDescription></AlertDialogHeader>
-                                                    <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleResetConfiguration} className="bg-destructive hover:bg-destructive/90 text-destructive-foreground">Confirm Full Reset</AlertDialogAction></AlertDialogFooter>
-                                                </AlertDialogContent>
-                                            </AlertDialog>
-                                        </motion.div>
-                                        <motion.div {...buttonMotionProps(0, true)} className="flex-grow sm:flex-grow-0">
-                                            <Button onClick={handleSaveConfiguration} disabled={isLoading || isDiscovering || isAiProcessing || isFileProcessingLoading} className="group w-full">
-                                                {isLoading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2 group-hover:scale-110" />}
-                                                {isLoading ? "Saving..." : "Save to Onboarding"}
-                                            </Button>
-                                        </motion.div>
-                                    </div>
-                                </div>
-                                <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
-                                    Review, edit, and manage all datapoints. Click "Save to Onboarding" to apply these to the overall onboarding configuration.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="px-0 sm:px-2 md:px-4">
-                                <ScrollArea className="max-h-[500px] sm:max-h-[600px] md:max-h-[700px] w-full rounded-md border border-border shadow-inner bg-card dark:bg-neutral-800/20">
-                                    <Table className="min-w-full text-xs">
-                                        <TableHeader className="sticky top-0 bg-muted/90 dark:bg-neutral-700/60 backdrop-blur-sm z-10"><TableRow className="border-b-border dark:border-b-neutral-600">
-                                            <TableHead className="w-[140px] sm:w-[180px] px-2 py-2.5">Name / Label</TableHead>
-                                            <TableHead className="w-[160px] sm:w-[200px] px-2 py-2.5">NodeId (Address)</TableHead>
-                                            <TableHead className="w-[70px] sm:w-[90px] px-2 py-2.5">Data Type</TableHead>
-                                            <TableHead className="w-[70px] sm:w-[90px] px-2 py-2.5">UI Type</TableHead>
-                                            <TableHead className="w-[100px] sm:w-[130px] px-2 py-2.5">Category</TableHead>
-                                            <TableHead className="w-[70px] sm:w-[90px] px-2 py-2.5 text-center">Source</TableHead> {/* Added Source Column */}
-                                            <TableHead className="w-[40px] sm:w-[60px] px-2 py-2.5 text-center">Icon</TableHead>
-                                            <TableHead className="w-[50px] sm:w-[70px] px-2 py-2.5">Unit</TableHead>
-                                            <TableHead className="w-[40px] px-2 py-2.5 text-center">Edit</TableHead>
-                                        </TableRow></TableHeader>
-                                        <TableBody>
-                                            {currentPointsToDisplay.map((dp, index) => {
-                                                const DisplayIcon = dp.icon && typeof dp.icon === 'function' ? dp.icon : (getIconComponent(dp.iconName) || DEFAULT_ICON);
-                                                const sourceDisplay = {
-                                                    'discovered': <span className="text-blue-600 dark:text-blue-400">Discovery</span>,
-                                                    'ai-enhanced': <span className="text-purple-600 dark:text-purple-400">AI</span>,
-                                                    'manual': <span className="text-teal-600 dark:text-teal-400">Manual</span>,
-                                                    'imported': <span className="text-indigo-600 dark:text-indigo-400">Imported</span>
-                                                };
-                                                return (
-                                                    <TableRow key={dp.id || `dp-${index}-${dp.nodeId}`} className="hover:bg-muted/50 dark:hover:bg-neutral-700/40 border-b-border dark:border-b-neutral-700/60 last:border-b-0">
-                                                        <TableCell className="font-medium px-2 py-1.5 align-top"><span className="font-semibold block">{dp.label || dp.name}</span><span className="text-muted-foreground text-[0.7rem] block">{dp.name !== (dp.label || dp.name) ? `(${dp.name})` : ''}</span></TableCell>
-                                                        <TableCell className="text-muted-foreground px-2 py-1.5 align-top break-all">{dp.nodeId}</TableCell>
-                                                        <TableCell className="px-2 py-1.5 align-top">{dp.dataType}</TableCell>
-                                                        <TableCell className="px-2 py-1.5 align-top">{dp.uiType}</TableCell>
-                                                        <TableCell className="px-2 py-1.5 align-top">{dp.category}</TableCell>
-                                                        <TableCell className="px-2 py-1.5 align-top text-center text-[0.75rem] font-medium">{dp.source ? sourceDisplay[dp.source] : 'N/A'}</TableCell>
-                                                        <TableCell className="px-2 py-1.5 align-top text-center">{DisplayIcon && typeof DisplayIcon === 'function' && <DisplayIcon className="h-4 w-4 inline-block text-muted-foreground" />}</TableCell>
-                                                        <TableCell className="px-2 py-1.5 align-top">{dp.unit || 'N/A'}</TableCell>
-                                                        <TableCell className="px-2 py-1.5 align-top text-center"><Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditModal(dp)}><Maximize className="h-3.5 w-3.5 text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300" /></Button></TableCell>
-                                                    </TableRow>
-                                                )
-                                            })}
-                                        </TableBody>
-                                    </Table>
-                                </ScrollArea>
-                                {currentPointsToDisplay.length === 0 && (
-                                    <p className="text-center text-muted-foreground py-8 text-sm italic">
-                                        No datapoints configured yet. Use Discovery, Upload, or Manual Add to get started.
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
+        
             {/* Edit Modal - Remains largely the same, ensure options are using extended lists */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                 <DialogContent className="sm:max-w-[600px] md:max-w-[750px] lg:max-w-[900px] max-h-[90vh] flex flex-col">

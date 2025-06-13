@@ -8,9 +8,10 @@ if (!global.aiTasks) {
 
 export async function GET(
   request: Request,
-  { params }: { params: { task_id: string } }
+  { params }: { params: Promise<{ task_id: string }> }
 ) {
-  const taskId = params.task_id;
+  const resolvedParams = await params;
+  const taskId = resolvedParams.task_id;
 
   if (!global.aiTasks) {
     // This should ideally not happen if initialized correctly above, but as a safeguard.
