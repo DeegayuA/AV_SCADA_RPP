@@ -14,6 +14,8 @@ import {
 } from '@/config/appConfig';
 import { APP_AUTHOR, APP_NAME } from '@/config/constants';
 import { useWebSocket } from '@/hooks/useWebSocketListener'; // Import the hook
+import NotificationSystemProvider from '@/components/NotificationSystemProvider'; // Import the new provider
+import ActiveAlarmsDisplay from '@/components/ActiveAlarmsDisplay'; // Import the new display component
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -82,8 +84,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={inter.className}>
         {isLoading && <LoadingScreen onDone={() => setIsLoading(false)} />}
         <ThemeProvider attribute="class"> {/* Removed !isLoading condition here to always render ThemeProvider */}
+          <NotificationSystemProvider />
            {/* Conditionally render children OR nothing if still loading & no pre-content wanted */}
           {!isLoading && children}
+          <ActiveAlarmsDisplay /> {/* Add the alarms display here */}
         </ThemeProvider>
         <Toaster richColors theme="system" position="bottom-right" closeButton />
       </body>

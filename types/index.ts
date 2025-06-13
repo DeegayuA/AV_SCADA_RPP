@@ -30,3 +30,5 @@ export interface AppOnboardingData {
   onboardingCompleted: boolean;
   version: string;
 }
+
+export * from './notifications';
