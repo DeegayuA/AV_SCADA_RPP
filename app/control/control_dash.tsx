@@ -40,7 +40,9 @@ import {
 import { dataPoints as allPossibleDataPointsConfig, DataPoint } from '@/config/dataPoints';
 import { WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants';
 import { containerVariants, itemVariants } from '@/config/animationVariants';
-import { playSound } from '@/lib/utils';
+// playSound (the base one) is still used by playNotificationSound in lib/utils, but control_dash won't call it directly for notifications.
+// Specific sound functions like playSuccessSound might be used if needed, or the new playNotificationSound.
+import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound, playNotificationSound } from '@/lib/utils';
 import { NodeData, ThreePhaseGroupInfo } from '@/app/DashboardData/dashboardInterfaces'; // ADJUST PATH
 import { groupDataPoints } from '@/app/DashboardData/groupDataPoints'; // ADJUST PATH
 import DashboardItemConfigurator, { ConfiguratorThreePhaseGroup } from '@/components/DashboardItemConfigurator'; // ADJUST PATH
@@ -94,7 +96,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
             <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
             <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
-            <motion.div variants={itemVariants}><SoundToggle soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} /></motion.div>
+            <motion.div variants={itemVariants}><SoundToggle /></motion.div>
             <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
 
             {isAdmin && isEditMode && (
@@ -336,7 +338,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 10; 
   const lastToastTimestamps = useRef<Record<string, number>>({});
-  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => typeof window !== 'undefined' ? localStorage.getItem('dashboardSoundEnabled') === 'true' : false);
+  // const [soundEnabled, setSoundEnabled] = useState<boolean>(() => typeof window !== 'undefined' ? localStorage.getItem('dashboardSoundEnabled') === 'true' : false); // Removed, uses Zustand now
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
   const [isSldModalOpen, setIsSldModalOpen] = useState(false); 
   const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
@@ -348,7 +350,7 @@ const UnifiedDashboardPage: React.FC = () => {
   });
   const allPossibleDataPoints = useMemo(() => allPossibleDataPointsConfig, []);
 
-  const playNotificationSound = useCallback((type: 'success'|'error'|'warning'|'info')=>{/* ... unchanged ... */ if(!soundEnabled)return;const sM={success:'/sounds/success.mp3',error:'/sounds/error.mp3',warning:'/sounds/warning.mp3',info:'/sounds/info.mp3'};const vM={success:0.99,error:0.6,warning:0.5,info:0.3};if(typeof playSound==='function')playSound(sM[type],vM[type]);},[soundEnabled]);
+  // const playNotificationSound = useCallback((type: 'success'|'error'|'warning'|'info')=>{/* ... unchanged ... */ if(!soundEnabled)return;const sM={success:'/sounds/success.mp3',error:'/sounds/error.mp3',warning:'/sounds/warning.mp3',info:'/sounds/info.mp3'};const vM={success:0.99,error:0.6,warning:0.5,info:0.3};if(typeof playSound==='function')playSound(sM[type],vM[type]);},[soundEnabled]); // Removed
   const processControlActionQueue = useCallback(async () => { /* ... unchanged ... */
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) { return; }
     const qA = await getControlQueue(); if(qA.length===0) return;
@@ -395,7 +397,7 @@ const UnifiedDashboardPage: React.FC = () => {
         reconnectAttempts.current = 0;
         if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
         toast.success('WS Connected', { id: 'ws-conn', description: 'Backend connected.', duration: 3000 });
-        playNotificationSound('success');
+        playSuccessSound(); // Use global sound
         if (typeof window !== 'undefined') { [f1, f2, f3].forEach(f => sessionStorage.removeItem(f)); }
         processControlActionQueue();
       };
@@ -409,7 +411,7 @@ const UnifiedDashboardPage: React.FC = () => {
           } else console.warn("WS:non-obj", d);
         } catch (err) {
           console.error("WS parse err", err, e.data);
-          playNotificationSound('error');
+          playErrorSound(); // Use global sound
         }
       };
 
@@ -457,22 +459,22 @@ const UnifiedDashboardPage: React.FC = () => {
           connectWebSocket(); 
         } else {
           toast.error('WS Fail', { description: 'Max reconnects.' });
-          playNotificationSound('error');
+          playErrorSound(); // Use global sound
         }
       };
     }, delayMs);
-  }, [authCheckComplete, playNotificationSound, processControlActionQueue, WS_URL, maxReconnectAttempts]);
+  }, [authCheckComplete, processControlActionQueue, WS_URL, maxReconnectAttempts]); // Removed playNotificationSound
 
 
   const sendDataToWebSocket = useCallback(async (nodeId:string,value:boolean|number|string)=>{ /* ... unchanged ... */
-    if(currentUserRole===UserRole.VIEWER){toast.warning("Restricted",{description:"Viewers cannot send cmds."});playNotificationSound('warning');return;}const pC=allPossibleDataPoints.find(p=>p.nodeId===nodeId);let v:any=value,cQV:any=undefined;
+    if(currentUserRole===UserRole.VIEWER){toast.warning("Restricted",{description:"Viewers cannot send cmds."});playWarningSound();return;}const pC=allPossibleDataPoints.find(p=>p.nodeId===nodeId);let v:any=value,cQV:any=undefined;
     if(pC?.dataType.includes('Int')){let pN:number;if(typeof value==='boolean')pN=value?1:0;else if(typeof value==='string')pN=parseInt(value,10);else pN=value as number;if(isNaN(pN)){toast.error('Send Err',{description:'Invalid int.'});return;}v=pN;cQV=pN;}
     else if(pC?.dataType==='Boolean'){let pB:boolean;if(typeof value==='number')pB=value!==0;else if(typeof value==='string')pB=value.toLowerCase()==='true'||value==='1';else pB=value as boolean;v=pB;cQV=pB;}
     else if(pC?.dataType==='Float'||pC?.dataType==='Double'){let pF:number;if(typeof value==='string')pF=parseFloat(value);else pF=value as number;if(isNaN(pF)){toast.error('Send Err',{description:'Invalid num.'});return;}v=pF;cQV=pF;}
-    if(typeof v==='number'&&!isFinite(v)){toast.error('Send Err',{description:'Num Inf/NaN.'});playNotificationSound('error');return;}
-    if(ws.current&&ws.current.readyState===WebSocket.OPEN){try{const p=JSON.stringify({[nodeId]:v});ws.current.send(p);toast.info('Cmd Sent',{description:`${pC?.name||nodeId}=${String(v)}`});playNotificationSound('info');}catch(e){console.error("WS send err",e);toast.error('Send Err',{description:'Fail.Queuing.'});playNotificationSound('error');if(cQV!==undefined)await queueControlAction(nodeId,cQV);else toast.error('Queue Err',{description:`Cannot queue ${nodeId}.`});}}
-    else{toast.warning('Offline',{description:`Cmd ${pC?.name||nodeId} queued.`});playNotificationSound('warning');if(cQV!==undefined)await queueControlAction(nodeId,cQV);else toast.error('Queue Err',{description:`Cannot queue ${nodeId}.`});if(!isConnected&&authCheckComplete)connectWebSocket();}
-  }, [isConnected,connectWebSocket,allPossibleDataPoints,playNotificationSound,currentUserRole,authCheckComplete]);
+    if(typeof v==='number'&&!isFinite(v)){toast.error('Send Err',{description:'Num Inf/NaN.'});playErrorSound();return;}
+    if(ws.current&&ws.current.readyState===WebSocket.OPEN){try{const p=JSON.stringify({[nodeId]:v});ws.current.send(p);toast.info('Cmd Sent',{description:`${pC?.name||nodeId}=${String(v)}`});playInfoSound();}catch(e){console.error("WS send err",e);toast.error('Send Err',{description:'Fail.Queuing.'});playErrorSound();if(cQV!==undefined)await queueControlAction(nodeId,cQV);else toast.error('Queue Err',{description:`Cannot queue ${nodeId}.`});}}
+    else{toast.warning('Offline',{description:`Cmd ${pC?.name||nodeId} queued.`});playWarningSound();if(cQV!==undefined)await queueControlAction(nodeId,cQV);else toast.error('Queue Err',{description:`Cannot queue ${nodeId}.`});if(!isConnected&&authCheckComplete)connectWebSocket();}
+  }, [isConnected,connectWebSocket,allPossibleDataPoints,currentUserRole,authCheckComplete]); // Removed playNotificationSound
 
   useEffect(() => { /* ... localStorage for sldLayoutId ... */ if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
   const getHardcodedDefaultDataPointIds = useCallback(() => { /* ... unchanged ... */ const cIds=['grid-total-active-power-side-to-side','inverter-output-total-power','load-total-power','battery-capacity','battery-output-power','input-power-pv1'].filter(id=>allPossibleDataPoints.some(dp=>dp.id===id));if(cIds.length>0)return cIds;return allPossibleDataPoints.slice(0,DEFAULT_DISPLAY_COUNT).map(dp=>dp.id);},[allPossibleDataPoints]);
@@ -480,14 +482,14 @@ const UnifiedDashboardPage: React.FC = () => {
   const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
   useEffect(() => { /* ... localStorage for displayedDataPointIds ... */ if(typeof window!=='undefined'&&allPossibleDataPoints.length>0&&authCheckComplete){const s=localStorage.getItem(USER_DASHBOARD_CONFIG_KEY);if(s){try{const p=JSON.parse(s)as string[];const v=p.filter(id=>allPossibleDataPoints.some(dp=>dp.id===id));if(v.length>0){setDisplayedDataPointIds(v);return;}else if(p.length>0)localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);}catch(e){console.error("Parse err",e);localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);}}const sm=getSmartDefaults();setDisplayedDataPointIds(sm.length>0?sm:getHardcodedDefaultDataPointIds());}},[allPossibleDataPoints,getSmartDefaults,getHardcodedDefaultDataPointIds,authCheckComplete]);
   useEffect(() => { /* ... localStorage for displayedDataPointIds on change ... */ if(typeof window!=='undefined'&&authCheckComplete){if(displayedDataPointIds.length>0)localStorage.setItem(USER_DASHBOARD_CONFIG_KEY,JSON.stringify(displayedDataPointIds));else if(localStorage.getItem(USER_DASHBOARD_CONFIG_KEY))localStorage.setItem(USER_DASHBOARD_CONFIG_KEY,JSON.stringify([]));}},[displayedDataPointIds,authCheckComplete]);
-  useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('dashboardSoundEnabled', String(soundEnabled)); }, [soundEnabled]);
+  // useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('dashboardSoundEnabled', String(soundEnabled)); }, [soundEnabled]); // Removed, managed by Zustand store
   const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
   useEffect(() => {const uc=()=>setCurrentTime(new Date().toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,day:'2-digit',month:'short',year:'numeric'}));uc();const i=setInterval(uc,1000);return()=>clearInterval(i);},[]);
   useEffect(() => { /* ... lagCheckInterval ... */
     if (!authCheckComplete) return; const lagI=setInterval(()=>{const cD=Date.now()-lastUpdateTime;setDelay(cD);const fS=typeof window!=='undefined'&&['reloadingDueToDelay','redirectingDueToExtremeDelay','opcuaRedirected'].some(f=>sessionStorage.getItem(f));if(fS)return;
     if(isConnected&&cD>60000){console.error(`CRIT WS lag(${(Number(cD)/1000).toFixed(1)}s).Closing WS.`);toast.error('Critical Lag',{id:'ws-lag',description:'Re-establishing...',duration:10000});if(ws.current)ws.current.close(1011,"Crit Lag");return;}
     else if(isConnected&&cD>30000){console.warn(`High WS lag(${(Number(cD)/1000).toFixed(1)}s).`);toast.warning('Stale Warn',{id:'ws-stale',description:`Last upd >${(Number(cD)/1000).toFixed(0)}s ago.`,duration:8000});}},15000);return()=>clearInterval(lagI);
-  }, [lastUpdateTime, isConnected, playNotificationSound, authCheckComplete]);
+  }, [lastUpdateTime, isConnected, authCheckComplete]); // Removed playNotificationSound
   const checkPlcConnection = useCallback(async () => { /* ... unchanged, reduced noise ... */ if(!authCheckComplete)return;try{const r=await fetch('/api/opcua/status');if(!r.ok)throw new Error(`API Err:${r.status}`);const d=await r.json();const nS=d.connectionStatus;if(nS&&['online','offline','disconnected'].includes(nS))setPlcStatus(nS);else{if(plcStatus!=='disconnected')setPlcStatus('disconnected');}}catch(e){if(plcStatus!=='disconnected')setPlcStatus('disconnected');}},[plcStatus,authCheckComplete]);
   useEffect(() => {if (!authCheckComplete) return ()=>{}; checkPlcConnection(); const plcI=setInterval(checkPlcConnection,15000); return()=>clearInterval(plcI);},[checkPlcConnection,authCheckComplete]);
   useEffect(() => {  /* ... unchanged WebSocket setup/teardown ... */
@@ -519,7 +521,8 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
   const commonRenderingProps = {
     isEditMode: isGlobalEditMode,
     nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,
-    playNotificationSound, lastToastTimestamps, onRemoveItem: handleRemoveItem,
+    playNotificationSound: playNotificationSound, // Add back the required prop
+    lastToastTimestamps, onRemoveItem: handleRemoveItem,
     allPossibleDataPoints, containerVariants, currentUserRole,
   };
   
@@ -576,13 +579,15 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
       <div className="max-w-screen-4xl mx-auto">
         <HeaderConnectivityComponent
           plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
-          soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} currentTime={currentTime} delay={delay}
+          // soundEnabled and setSoundEnabled are no longer passed as SoundToggle uses Zustand
+          currentTime={currentTime} delay={delay}
           version={VERSION}
-          isEditMode={isGlobalEditMode} 
+          isEditMode={isGlobalEditMode}
           toggleEditMode={toggleEditModeAction}
           currentUserRole={currentUserRole}
-          onOpenConfigurator={() => { if (currentUserRole === UserRole.ADMIN) setIsConfiguratorOpen(true); else toast.warning("Access Denied", { description: "Only administrators can add cards." }); }}
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} />
+          onOpenConfigurator={() => { if (currentUserRole === UserRole.ADMIN) setIsConfiguratorOpen(true); else toast.warning("Access Denied", { description: "Only administrators can add cards." }); } }
+          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} soundEnabled={false} setSoundEnabled={function (value: React.SetStateAction<boolean>): void {
+          } } />
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
 
