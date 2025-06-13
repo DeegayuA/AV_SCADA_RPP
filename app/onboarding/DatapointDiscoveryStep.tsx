@@ -1496,7 +1496,58 @@ export default function DatapointDiscoveryStep() { // Renamed component
                                                 {discoveryStatusMessage}
                                             </p>
                                             {discoveredDataFilePath && !isDiscovering && (
-                                                <p className="text-xs text-muted-foreground mt-2 text-center">Raw discovery data saved to: <code className='bg-muted p-1 rounded-sm'>{discoveredDataFilePath}</code></p>
+                                                <div className="flex flex-col items-center gap-2 mt-2">
+                                                    <p className="text-xs text-muted-foreground text-center">Raw discovery data saved to: <code className='bg-muted p-1 rounded-sm'>{discoveredDataFilePath}</code></p>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const response = await fetch(`/api/files/view?path=${encodeURIComponent(discoveredDataFilePath)}`);
+                                                                if (!response.ok) throw new Error('Failed to load file');
+                                                                const fileContent = await response.text();
+                                                                
+                                                                // Create a dialog to show the JSON content
+                                                                const dialog = document.createElement('dialog');
+                                                                dialog.className = 'p-6 rounded-lg border border-border bg-card text-foreground max-w-4xl max-h-[80vh] overflow-hidden flex flex-col';
+                                                                dialog.innerHTML = `
+                                                                    <div class="flex items-center justify-between mb-4 border-b border-border pb-3">
+                                                                        <h3 class="text-lg font-semibold">Discovery Data: ${discoveredDataFilePath.split('/').pop()}</h3>
+                                                                        <button class="text-muted-foreground hover:text-foreground p-1" onclick="this.closest('dialog').close()">
+                                                                            <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                                            </svg>
+                                                                        </button>
+                                                                    </div>
+                                                                    <div class="flex-1 overflow-auto">
+                                                                        <pre class="text-xs bg-muted/20 p-4 rounded-md overflow-auto whitespace-pre-wrap font-mono">${JSON.stringify(JSON.parse(fileContent), null, 2)}</pre>
+                                                                    </div>
+                                                                    <div class="flex justify-end gap-2 pt-4 border-t border-border mt-4">
+                                                                        <button class="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90" onclick="navigator.clipboard.writeText(\`${fileContent.replace(/`/g, '\\`')}\`).then(() => alert('Copied to clipboard!')).catch(() => alert('Copy failed'))">
+                                                                            Copy JSON
+                                                                        </button>
+                                                                        <button class="px-4 py-2 text-sm border border-border rounded-md hover:bg-muted" onclick="this.closest('dialog').close()">
+                                                                            Close
+                                                                        </button>
+                                                                    </div>
+                                                                `;
+                                                                document.body.appendChild(dialog);
+                                                                dialog.showModal();
+                                                                
+                                                                // Clean up when dialog is closed
+                                                                dialog.addEventListener('close', () => {
+                                                                    document.body.removeChild(dialog);
+                                                                });
+                                                            } catch (error) {
+                                                                toast.error("Failed to load discovery file", { description: (error as Error).message });
+                                                            }
+                                                        }}
+                                                        className="group text-xs"
+                                                    >
+                                                        <FileJson className="h-3.5 w-3.5 mr-1.5 group-hover:scale-110 transition-transform" />
+                                                        View Raw Data
+                                                    </Button>
+                                                </div>
                                             )}
                                         </>
                                     )}
@@ -1507,7 +1558,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-                {/* AI Enhancement Control Section */}
+            {/* AI Enhancement Control Section */}
             <AnimatePresence>
                 {((discoveredRawPoints.length > 0 || aiEnhancedPoints.some(p => p.source === 'discovered' || p.source === 'imported' || p.source === 'manual') || discoveredDataFilePath) && !isDiscovering && !isFileProcessingLoading) && (
                     <React.Fragment>
@@ -1517,102 +1568,104 @@ export default function DatapointDiscoveryStep() { // Renamed component
                             animate="visible"
                             exit="exit"
                         >
-                        <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg mb-4">
-                            <CardHeader>
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                                    <div className="flex items-center space-x-3">
-                                        <Wand2 className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
-                                        <CardTitle className="text-lg sm:text-xl font-medium">AI Enhancement Control</CardTitle>
-                                    </div>
-                                </div>
-                                <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
-                                    Use Gemini AI to analyze discovered or existing datapoints. Requires a Gemini API Key and your consent. Results will appear in the AI Assistant Chat.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-4 flex-grow"> {/* Added flex-grow */}
-                                <div className="space-y-4"> {/* Added a container for spacing */}
-                                    <div className="p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-3">
-                                        <div className="flex items-start space-x-2.5">
-                                            <Checkbox
-                                                id="ai-consent-checkbox"
-                                                checked={aiConsentGiven}
-                                                onCheckedChange={(checkedState) => setAiConsentGiven(checkedState as boolean)}
-                                                className="mt-0.5" />
-                                            <Label htmlFor="ai-consent-checkbox" className="text-xs sm:text-sm font-normal text-muted-foreground leading-relaxed">
-                                                I understand and consent to send my discovered data point information (such as NodeIDs and names) to a third-party AI service (Google Gemini) for configuration enhancement. This data will be used solely for the purpose of generating improved configurations. See our <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Privacy Policy</a> for details.
-                                            </Label>
+                            <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg mb-4">
+                                <CardHeader>
+                                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                                        <div className="flex items-center space-x-3">
+                                            <Wand2 className="h-6 w-6 text-purple-500 dark:text-purple-400 shrink-0" />
+                                            <CardTitle className="text-lg sm:text-xl font-medium">AI Enhancement Control</CardTitle>
                                         </div>
                                     </div>
-
-                                    {/* Gemini API Key Input - shown if no env key and no stored/session key */}
-                                    {(showGeminiKeyInput || (!GEMINI_API_KEY_EXISTS_CLIENT && !userProvidedGeminiKey && (typeof window !== "undefined" && !localStorage.getItem("geminiApiKey")))) && (
-                                        <div className="mt-4 p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-2">
-                                            <Label htmlFor="gemini-key-input" className="text-sm font-medium">Enter Your Gemini API Key (Optional if already set):</Label>
-                                            <div className="flex items-center space-x-2">
-                                                <Input id="gemini-key-input" type="password" value={userProvidedGeminiKey} onChange={(e) => setUserProvidedGeminiKey(e.target.value)} placeholder="Your Gemini API Key" className="flex-grow" />
-                                                <Button size="sm" variant="secondary" onClick={() => {
-                                                    if (userProvidedGeminiKey.trim()) {
-                                                        toast.success("Gemini API Key set for this session.");
-                                                        // setShowGeminiKeyInput(false); // Keep input visible for changes, or hide:
-                                                        addLogEntry('system', 'User provided Gemini API key for session.');
-                                                    } else {
-                                                        toast.error("Please enter a valid API Key.");
-                                                    }
-                                                } }>Set Session Key</Button>
+                                    <CardDescription className="pt-2 text-xs sm:text-sm text-muted-foreground">
+                                        Use Gemini AI to analyze discovered or existing datapoints. Requires a Gemini API Key and your consent. Results will appear in the AI Assistant Chat.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="pt-4 flex-grow">
+                                    <div className="space-y-4">
+                                        <div className="p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-3">
+                                            <div className="flex items-start space-x-2.5">
+                                                <Checkbox
+                                                    id="ai-consent-checkbox"
+                                                    checked={aiConsentGiven}
+                                                    onCheckedChange={(checkedState) => setAiConsentGiven(checkedState as boolean)}
+                                                    className="mt-0.5" />
+                                                <Label htmlFor="ai-consent-checkbox" className="text-xs sm:text-sm font-normal text-muted-foreground leading-relaxed">
+                                                    I understand and consent to send my discovered data point information (such as NodeIDs and names) to a third-party AI service (Google Gemini) for configuration enhancement. This data will be used solely for the purpose of generating improved configurations. See our <a href="/privacy-policy" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Privacy Policy</a> for details.
+                                                </Label>
                                             </div>
-                                            <p className="text-xs text-muted-foreground">This key will be used for this session only. It is not stored permanently by default.</p>
                                         </div>
-                                    )}
-                                </div>
-                            </CardContent>
-                            <CardFooter className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                                <motion.div {...buttonMotionProps(0, false)} className="w-full sm:w-auto">
-                                    <Button
-                                        onClick={handleStartAiEnhancement}
-                                        disabled={!aiConsentGiven || isDiscovering || isAiProcessing || isFileProcessingLoading || (discoveredRawPoints.length === 0 && !discoveredDataFilePath && !aiEnhancedPoints.some(p => p.source === 'discovered'))}
-                                        className="group w-full"
-                                        variant={aiEnhancedPoints.some(p => p.source === 'ai-enhanced') && !isAiProcessing ? "outline" : "default"}
-                                    >
-                                        {isAiProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sigma className="h-4 w-4 mr-2 group-hover:animate-pulse" />}
-                                        {isAiProcessing ? "AI Processing..." : (aiEnhancedPoints.some(p => p.source === 'ai-enhanced') ? "Re-Run AI Enhancement" : "Start AI Enhancement")}
-                                    </Button>
-                                </motion.div>
-                                <AnimatePresence>
-                                    {showContinueAiButton && (
-                                        <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="mt-4">
+
+                                        {/* Gemini API Key Input - shown if no env key and no stored/session key */}
+                                        {(showGeminiKeyInput || (!GEMINI_API_KEY_EXISTS_CLIENT && !userProvidedGeminiKey && (typeof window !== "undefined" && !localStorage.getItem("geminiApiKey")))) && (
+                                            <div className="mt-4 p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-2">
+                                                <Label htmlFor="gemini-key-input" className="text-sm font-medium">Enter Your Gemini API Key (Optional if already set):</Label>
+                                                <div className="flex items-center space-x-2">
+                                                    <Input id="gemini-key-input" type="password" value={userProvidedGeminiKey} onChange={(e) => setUserProvidedGeminiKey(e.target.value)} placeholder="Your Gemini API Key" className="flex-grow" />
+                                                    <Button size="sm" variant="secondary" onClick={() => {
+                                                        if (userProvidedGeminiKey.trim()) {
+                                                            toast.success("Gemini API Key set for this session.");
+                                                            // setShowGeminiKeyInput(false); // Keep input visible for changes, or hide:
+                                                            addLogEntry('system', 'User provided Gemini API key for session.');
+                                                        } else {
+                                                            toast.error("Please enter a valid API Key.");
+                                                        }
+                                                    } }>Set Session Key</Button>
+                                                </div>
+                                                <p className="text-xs text-muted-foreground">This key will be used for this session only. It is not stored permanently by default.</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                                <CardFooter className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                    <motion.div {...buttonMotionProps(0, false)} className="w-full sm:w-auto">
+                                        <Button
+                                            onClick={handleStartAiEnhancement}
+                                            disabled={!aiConsentGiven || isDiscovering || isAiProcessing || isFileProcessingLoading || (discoveredRawPoints.length === 0 && !discoveredDataFilePath && !aiEnhancedPoints.some(p => p.source === 'discovered'))}
+                                            className="group w-full"
+                                            variant={aiEnhancedPoints.some(p => p.source === 'ai-enhanced') && !isAiProcessing ? "outline" : "default"}
+                                        >
+                                            {isAiProcessing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Sigma className="h-4 w-4 mr-2 group-hover:animate-pulse" />}
+                                            {isAiProcessing ? "AI Processing..." : (aiEnhancedPoints.some(p => p.source === 'ai-enhanced') ? "Re-Run AI Enhancement" : "Start AI Enhancement")}
+                                        </Button>
+                                    </motion.div>
+                                    <AnimatePresence>
+                                        {showContinueAiButton && (
+                                            <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="mt-4">
                                                 <Button
                                                     onClick={handleContinueAiProcessing}
                                                     variant="secondary"
-                                                />
+                                                >
+                                                    Continue
+                                                </Button>
                                             </motion.div>
                                         )}
                                     </AnimatePresence>
                                 </CardFooter>
-                            <AnimatePresence>
-                                {showContinueAiButton && (
-                                    <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="p-4">
-                                        <Button
-                                            onClick={handleContinueAiProcessing}
-                                            variant="secondary"
-                                            className="w-full"
-                                        >
-                                            <RefreshCw className="h-4 w-4 mr-2" />
-                                            Continue AI Processing
-                                        </Button>
-                                    </motion.div>
-                                )}
-                                {(isAiProcessing || aiProgress > 0) && (
-                                    <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="p-4">
-                                        {isAiProcessing && (
-                                            <div className="space-y-2 mt-2">
-                                                <Progress value={aiProgress} className="w-full h-2.5 bg-purple-200 dark:bg-purple-800/50 [&>div]:bg-purple-500 dark:[&>div]:bg-purple-400" />
-                                                <p className="text-xs text-muted-foreground text-center animate-pulse">
-                                                    AI processing in progress... ({aiProgress}%)
-                                                </p>
-                                            </div>
-                                        )}
-                                    </motion.div>
-                                )}
+                                <AnimatePresence>
+                                    {showContinueAiButton && (
+                                        <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="p-4">
+                                            <Button
+                                                onClick={handleContinueAiProcessing}
+                                                variant="secondary"
+                                                className="w-full"
+                                            >
+                                                <RefreshCw className="h-4 w-4 mr-2" />
+                                                Continue AI Processing
+                                            </Button>
+                                        </motion.div>
+                                    )}
+                                    {(isAiProcessing || aiProgress > 0) && (
+                                        <motion.div variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="p-4">
+                                            {isAiProcessing && (
+                                                <div className="space-y-2 mt-2">
+                                                    <Progress value={aiProgress} className="w-full h-2.5 bg-purple-200 dark:bg-purple-800/50 [&>div]:bg-purple-500 dark:[&>div]:bg-purple-400" />
+                                                    <p className="text-xs text-muted-foreground text-center animate-pulse">
+                                                        AI processing in progress... ({aiProgress}%)
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </motion.div>
+                                    )}
                                 </AnimatePresence>
                             </Card>
                             <AIChatInterface messages={chatMessages} isLoading={isAiProcessing && aiProgress < 5 && chatMessages.filter(cm => cm.sender === 'ai' && cm.type !== 'welcome').length === 0} />
@@ -2109,7 +2162,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
                                 <div className="space-y-1.5"><Label htmlFor="edit-label">Label (UI Display)</Label><Input id="edit-label" name="label" value={editingPoint.label ?? ''} onChange={handleEditFormChange} /></div>
                                 <div className="space-y-1.5"><Label htmlFor="edit-dataType">Data Type</Label><Select name="dataType" value={editingPoint.dataType} onValueChange={(value) => handleEditSelectChange('dataType', value)}><SelectTrigger id="edit-dataType"><SelectValue /></SelectTrigger><SelectContent>{DATA_TYPE_OPTIONS_EXTENDED.map(dt => <SelectItem key={dt} value={dt}>{dt}</SelectItem>)}</SelectContent></Select></div>
                                 <div className="space-y-1.5"><Label htmlFor="edit-uiType">UI Type</Label><Select name="uiType" value={editingPoint.uiType} onValueChange={(value) => handleEditSelectChange('uiType', value)}><SelectTrigger id="edit-uiType"><SelectValue /></SelectTrigger><SelectContent>{UI_TYPE_OPTIONS_EXTENDED.map(uit => <SelectItem key={String(uit)} value={String(uit)}>{String(uit)}</SelectItem>)}</SelectContent></Select></div>
-                                <div className="space-y-1.5"><Label htmlFor="edit-iconName">Icon Name (Lucide)</Label><Input id="edit-iconName" name="iconName" value={editingPoint.iconName ?? ''} onChange={(e) => handleEditSelectChange('iconName', e.target.value)} /><p className="text-xs text-muted-foreground pt-1">E.g., "Zap", "Settings". Current: {getIconComponent(editingPoint.iconName) ? <span className="inline-flex items-center"><>{React.createElement(getIconComponent(editingPoint.iconName)!, { className: "h-3 w-3 mr-1" })} Valid</></span> : <span className="text-orange-500 dark:text-orange-400">Not found or invalid</span>}</p></div>
+                                <div className="space-y-1.5"><Label htmlFor="edit-iconName">Icon Name (Lucide)</Label><Input id="edit-iconName" name="iconName" value={editingPoint.iconName ?? ''} onChange={(e) => handleEditSelectChange('iconName', e.target.value)} /><p className="text-xs text-muted-foreground pt-1">E.g., "Zap", "Settings". Current: {getIconComponent(editingPoint.iconName) ? <span className="inline-flex items-center">{React.createElement(getIconComponent(editingPoint.iconName)!, { className: "h-3 w-3 mr-1" })} Valid</span> : <span className="text-orange-500 dark:text-orange-400">Not found or invalid</span>}</p></div>
                                 <div className="space-y-1.5"><Label htmlFor="edit-unit">Unit</Label><Input id="edit-unit" name="unit" value={editingPoint.unit ?? ''} onChange={handleEditFormChange} /></div>
                                 <div className="space-y-1.5"><Label htmlFor="edit-category">Category</Label><Input id="edit-category" name="category" value={editingPoint.category ?? ''} onChange={handleEditFormChange} /></div>
                                 <div className="space-y-1.5"><Label htmlFor="edit-min">Min Value</Label><Input id="edit-min" name="min" type="text" value={editingPoint.min ?? ''} onChange={handleEditFormChange} placeholder="e.g., 0 or -10.5" /></div>
