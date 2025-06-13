@@ -189,7 +189,6 @@ export default function LoginPage() {
     }
     setIsSubmitting(true); setLoginError(null);
 
-    // Simulate a brief API call
     await new Promise(resolve => setTimeout(resolve, 500)); 
 
     const user = users.find((u) => u.email.toLowerCase() === values.email.toLowerCase() && u.passwordHash === values.password);

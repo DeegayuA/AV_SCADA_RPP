@@ -96,7 +96,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
             <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
             <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
-            <motion.div variants={itemVariants}><SoundToggle soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} /></motion.div>
+            <motion.div variants={itemVariants}><SoundToggle /></motion.div>
             <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
 
             {isAdmin && isEditMode && (
@@ -521,7 +521,7 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
   const commonRenderingProps = {
     isEditMode: isGlobalEditMode,
     nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,
-    // playNotificationSound, // This prop is removed from DashboardSection if it's not used or uses global sounds
+    playNotificationSound: playNotificationSound, // Add back the required prop
     lastToastTimestamps, onRemoveItem: handleRemoveItem,
     allPossibleDataPoints, containerVariants, currentUserRole,
   };
@@ -582,11 +582,12 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
           // soundEnabled and setSoundEnabled are no longer passed as SoundToggle uses Zustand
           currentTime={currentTime} delay={delay}
           version={VERSION}
-          isEditMode={isGlobalEditMode} 
+          isEditMode={isGlobalEditMode}
           toggleEditMode={toggleEditModeAction}
           currentUserRole={currentUserRole}
-          onOpenConfigurator={() => { if (currentUserRole === UserRole.ADMIN) setIsConfiguratorOpen(true); else toast.warning("Access Denied", { description: "Only administrators can add cards." }); }}
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} />
+          onOpenConfigurator={() => { if (currentUserRole === UserRole.ADMIN) setIsConfiguratorOpen(true); else toast.warning("Access Denied", { description: "Only administrators can add cards." }); } }
+          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} soundEnabled={false} setSoundEnabled={function (value: React.SetStateAction<boolean>): void {
+          } } />
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
 

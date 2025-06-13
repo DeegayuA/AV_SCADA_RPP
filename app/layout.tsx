@@ -35,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     if (hasLoadedBefore) {
       setIsLoading(false);
     } else {
-      // Simulate loading only on first visit per session
       // The LoadingScreen's onDone will set isLoading to false
       sessionStorage.setItem('hasLoadedBefore', 'true');
       // setIsLoading(true); // Already true by default

@@ -503,8 +503,8 @@ export async function addActiveAlarm(alarm: Omit<ActiveAlarm, 'id' | 'triggeredA
   const newAlarm: ActiveAlarm = {
     ...alarm,
     id: alarm.id || uuidv4(),
-    triggeredAt: alarm.triggeredAt || now,
-    lastNotifiedAt: alarm.lastNotifiedAt || now,
+    triggeredAt: now,
+    lastNotifiedAt: now,
   };
   try {
     await db.add('activeAlarms', newAlarm);

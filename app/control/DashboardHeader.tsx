@@ -170,7 +170,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderProps> = React.memo(
                             </TooltipProvider>
                         </motion.div>
 
-                        <motion.div variants={itemVariants}><SoundToggle soundEnabled={soundEnabled} setSoundEnabled={setSoundEnabled} /></motion.div>
+                        <motion.div variants={itemVariants}><SoundToggle /></motion.div>
                         <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
                     </div>
                 </motion.div>

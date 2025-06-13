@@ -19,8 +19,8 @@ const ActiveAlarmsDisplay: React.FC = () => {
   const unacknowledgedAlarms = activeAlarms.filter(
     (alarm) =>
       !alarm.acknowledged &&
-      (alarm.originalRuleDetails.priority === 'HIGH' ||
-        alarm.originalRuleDetails.priority === 'MEDIUM')
+      (alarm.originalRuleDetails?.severity === 'critical' ||
+        alarm.originalRuleDetails?.severity === 'warning')
   );
 
   const handleAcknowledge = async (alarm: ActiveAlarm) => {
@@ -33,7 +33,7 @@ const ActiveAlarmsDisplay: React.FC = () => {
         acknowledgedBy: ackUser,
       });
       toast.dismiss(`alarm-${alarm.id}`); // Dismiss the persistent toast
-      toast.success(`Alarm "${alarm.originalRuleDetails.name}" acknowledged by ${ackUser}.`);
+      toast.success(`Alarm "${alarm.originalRuleDetails?.name || 'Unknown'}" acknowledged by ${ackUser}.`);
       // The useNotificationSystem hook will eventually sync its local state from DB
       // or if it directly listens to DB changes (which it doesn't currently),
       // and then update the Zustand store.
@@ -56,7 +56,7 @@ const ActiveAlarmsDisplay: React.FC = () => {
         <Card
           key={alarm.id}
           className={`border-2 ${
-            alarm.originalRuleDetails.priority === 'HIGH'
+            alarm.originalRuleDetails?.severity === 'critical'
               ? 'border-red-500/80 bg-red-500/10 dark:bg-red-900/30'
               : 'border-yellow-500/80 bg-yellow-500/10 dark:bg-yellow-900/30'
           } shadow-xl animate-pulse-once-fast`} // Custom animation for new alarms
@@ -66,22 +66,22 @@ const ActiveAlarmsDisplay: React.FC = () => {
               <CardTitle className="text-base font-semibold flex items-center">
                 <BellRing
                   className={`mr-2 h-5 w-5 ${
-                    alarm.originalRuleDetails.priority === 'HIGH' ? 'text-red-500' : 'text-yellow-500'
+                    alarm.originalRuleDetails?.severity === 'critical' ? 'text-red-500' : 'text-yellow-500'
                   }`}
                 />
-                {alarm.originalRuleDetails.name || 'Unnamed Alarm'}
+                {alarm.originalRuleDetails?.name || 'Unnamed Alarm'}
               </CardTitle>
               <Badge
                 variant={
-                  alarm.originalRuleDetails.priority === 'HIGH' ? 'destructive' : 'secondary'
+                  alarm.originalRuleDetails?.severity === 'critical' ? 'destructive' : 'secondary'
                 }
                 className={
-                    alarm.originalRuleDetails.priority === 'HIGH'
+                    alarm.originalRuleDetails?.severity === 'critical'
                     ? 'bg-red-600 text-white'
                     : 'bg-yellow-500 text-black'
                 }
               >
-                {alarm.originalRuleDetails.priority}
+                {alarm.originalRuleDetails?.severity?.toUpperCase() || 'UNKNOWN'}
               </Badge>
             </div>
           </CardHeader>
@@ -91,10 +91,10 @@ const ActiveAlarmsDisplay: React.FC = () => {
             </p>
             <p className="font-mono my-1">
               Condition: {String(alarm.currentValue)}{' '}
-              <span className="font-bold">{alarm.originalRuleDetails.condition}</span>{' '}
-              {String(alarm.originalRuleDetails.thresholdValue)}
+              <span className="font-bold">{alarm.originalRuleDetails?.condition}</span>{' '}
+              {String(alarm.originalRuleDetails?.thresholdValue)}
             </p>
-            <p className="text-muted-foreground text-[11px]">Rule Node ID: {alarm.originalRuleDetails.nodeId}</p>
+            <p className="text-muted-foreground text-[11px]">Rule Node ID: {alarm.originalRuleDetails?.nodeId}</p>
             <Button
               size="sm"
               variant="outline"

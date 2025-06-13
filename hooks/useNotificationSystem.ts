@@ -16,8 +16,6 @@ import { toast } from 'sonner'; // Import toast
 import type { NotificationRule, ActiveAlarm } from '@/types/notifications';
 import type { DataPoint } from '@/config/dataPoints'; // Not directly used in this version but good for context
 
-import { setActiveAlarms as updateGlobalActiveAlarms } from '@/stores/appStore'; // Import the action directly if it's exported, or useAppStore().setActiveAlarms
-
 // Helper function to check condition
 const checkCondition = (
   actualValue: any,
@@ -125,7 +123,7 @@ export const useNotificationSystem = () => {
     }
 
     const processNodeValueChange = async (nodeId: string, currentValue: any) => {
-      const relevantRules = rules.filter((rule) => rule.nodeId === nodeId && rule.isEnabled);
+      const relevantRules = rules.filter((rule) => rule.nodeId === nodeId && rule.enabled);
 
       for (const rule of relevantRules) {
         const conditionMet = checkCondition(currentValue, rule.condition, rule.thresholdValue);
@@ -147,7 +145,7 @@ export const useNotificationSystem = () => {
               currentValue: currentValue,
               originalRuleDetails: {
                 name: rule.name,
-                priority: rule.priority,
+                severity: rule.severity,
                 condition: rule.condition,
                 thresholdValue: rule.thresholdValue,
                 nodeId: rule.nodeId,
@@ -160,23 +158,23 @@ export const useNotificationSystem = () => {
               const toastId = newAlarm.id; // Use alarm.id directly as toastId
               const description = `Value ${currentValue} ${rule.condition} ${rule.thresholdValue}. Node: ${rule.nodeId}.`;
 
-              switch (rule.priority) {
-                case 'LOW':
+                switch (rule.severity) {
+                case 'info':
                   playNotificationSound('info');
                   toast.info(rule.name, { id: toastId, description, duration: 5000 });
-                  console.log(`[NotificationSystem] LOW ALARM: "${rule.name}" (Value: ${currentValue})`);
+                  console.log(`[NotificationSystem] INFO ALARM: "${rule.name}" (Value: ${currentValue})`);
                   break;
-                case 'MEDIUM':
+                case 'warning':
                   playNotificationSound('warning');
                   toast.warning(rule.name, { id: toastId, description: `${description} Requires acknowledgement.`, duration: Infinity });
-                  console.log(`[NotificationSystem] MEDIUM ALARM: "${rule.name}" (Value: ${currentValue})`);
+                  console.log(`[NotificationSystem] WARNING ALARM: "${rule.name}" (Value: ${currentValue})`);
                   break;
-                case 'HIGH':
+                case 'critical':
                   playNotificationSound('error');
                   toast.error(rule.name, { id: toastId, description: `CRITICAL: ${description} Requires immediate acknowledgement.`, duration: Infinity });
-                  console.log(`[NotificationSystem] HIGH ALARM: "${rule.name}" (Value: ${currentValue})`);
+                  console.log(`[NotificationSystem] CRITICAL ALARM: "${rule.name}" (Value: ${currentValue})`);
                   break;
-              }
+                }
             } catch (error) {
               console.error('[NotificationSystem] Error adding active alarm:', error);
             }
@@ -194,7 +192,7 @@ export const useNotificationSystem = () => {
           }
         } else { // Condition NOT met
           if (existingAlarm) {
-            if (rule.priority === 'LOW') {
+            if (rule.severity === 'info') {
               try {
                 await deleteActiveAlarm(existingAlarm.id);
                 setLocalActiveAlarms((prev) => prev.filter((alarm) => alarm.id !== existingAlarm.id)); // Update local state
@@ -202,16 +200,16 @@ export const useNotificationSystem = () => {
                   description: `Value ${currentValue} no longer meets condition ${rule.condition} ${rule.thresholdValue}.`,
                   duration: 3000,
                 });
-                console.log(`[NotificationSystem] LOW ALARM RESOLVED: "${rule.name}" (Value: ${currentValue})`);
+                console.log(`[NotificationSystem] INFO ALARM RESOLVED: "${rule.name}" (Value: ${currentValue})`);
               } catch (error) {
                 console.error('[NotificationSystem] Error deleting auto-resolving LOW priority alarm:', error);
               }
             } else {
-              // For MEDIUM/HIGH, they persist until manually acknowledged.
+              // For WARNING/CRITICAL, they persist until manually acknowledged.
               // We could update its currentValue to reflect it's no longer in alarm state,
               // but it remains for acknowledgement. This depends on specific requirements.
               // For now, do nothing, it waits for manual acknowledgement.
-              // console.log(`[NotificationSystem] Condition for ${rule.priority} rule "${rule.name}" no longer met, but alarm ID ${existingAlarm.id} persists until acknowledged.`);
+              // console.log(`[NotificationSystem] Condition for ${rule.severity} rule "${rule.name}" no longer met, but alarm ID ${existingAlarm.id} persists until acknowledged.`);
             }
           }
         }
@@ -225,7 +223,7 @@ export const useNotificationSystem = () => {
       processNodeValueChange(nodeId, value);
     });
 
-  }, [opcUaNodeValues, rules, activeAlarms]); // Rerun when values, rules, or local activeAlarms change
+  }, [opcUaNodeValues, rules, localActiveAlarms]); // Rerun when values, rules, or local activeAlarms change
 
   // Functions to be exposed by the hook, if any (e.g., manual ack, etc.)
   // For now, this hook primarily works in the background.
@@ -243,27 +241,27 @@ export const useNotificationSystem = () => {
 
       let soundPlayed = false; // To prevent multiple sounds in one interval check if many alarms qualify
 
-      for (const alarm of activeAlarms) {
+      for (const alarm of localActiveAlarms) {
         if (!alarm.acknowledged) {
           const now = new Date().getTime();
-          const lastNotified = new Date(alarm.lastNotifiedAt).getTime();
+          const lastNotified = alarm.lastNotifiedAt ? new Date(alarm.lastNotifiedAt).getTime() : 0;
           let needsUpdate = false;
 
-          if (alarm.originalRuleDetails.priority === 'HIGH') {
+          if (alarm.originalRuleDetails.severity === 'critical') {
             if (now - lastNotified > HIGH_PRIORITY_INTERVAL && !soundPlayed) {
               playNotificationSound('error');
               alarm.lastNotifiedAt = new Date();
               needsUpdate = true;
               soundPlayed = true; // Play only one high priority sound per interval check
-               console.log(`[NotificationSystem] Periodic HIGH ALARM sound for rule "${alarm.originalRuleDetails.name}"`);
+               console.log(`[NotificationSystem] Periodic CRITICAL ALARM sound for rule "${alarm.originalRuleDetails.name}"`);
             }
-          } else if (alarm.originalRuleDetails.priority === 'MEDIUM') {
+          } else if (alarm.originalRuleDetails.severity === 'warning') {
             if (now - lastNotified > MEDIUM_PRIORITY_INTERVAL && !soundPlayed) {
               playNotificationSound('warning');
               alarm.lastNotifiedAt = new Date();
               needsUpdate = true;
               soundPlayed = true; // Play only one medium priority sound per interval check (if no high prio played)
-              console.log(`[NotificationSystem] Periodic MEDIUM ALARM sound for rule "${alarm.originalRuleDetails.name}"`);
+              console.log(`[NotificationSystem] Periodic WARNING ALARM sound for rule "${alarm.originalRuleDetails.name}"`);
             }
           }
 
@@ -271,23 +269,23 @@ export const useNotificationSystem = () => {
             try {
               await updateActiveAlarm(alarm);
               // Update local state to reflect change in lastNotifiedAt
-              setActiveAlarms(prevAlarms =>
+              setLocalActiveAlarms(prevAlarms =>
                 prevAlarms.map(a => a.id === alarm.id ? { ...a, lastNotifiedAt: alarm.lastNotifiedAt } : a)
               );
             } catch (error) {
               console.error('[NotificationSystem] Error updating alarm lastNotifiedAt:', error);
             }
           }
-          if (soundPlayed && alarm.originalRuleDetails.priority === 'HIGH') break; // Prioritize re-sounding HIGH alarms
+          if (soundPlayed && alarm.originalRuleDetails.severity === 'critical') break; // Prioritize re-sounding CRITICAL alarms
         }
       }
     }, Math.min(HIGH_PRIORITY_INTERVAL, MEDIUM_PRIORITY_INTERVAL) / 2); // Run interval more frequently to catch windows
 
     return () => clearInterval(intervalId);
-  }, [activeAlarms]); // Rerun if activeAlarms list changes
+  }, [localActiveAlarms]); // Rerun if activeAlarms list changes
 
   return {
-    activeAlarms, // Exposing active alarms for potential UI display
+    activeAlarms: localActiveAlarms, // Exposing active alarms for potential UI display
     rules, // Exposing rules for potential debugging or display
   };
 };

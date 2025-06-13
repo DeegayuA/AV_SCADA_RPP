@@ -66,7 +66,7 @@ const SAFETY_SETTINGS: SafetySetting[] = [
     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-const SIMULATED_PROCESSING_DELAY_PER_BATCH_MS = 1500; 
+const SIMULATED_PROCESSING_DELAY_PER_BATCH_MS = 500; 
 
 function buildPrompt(discoveredDatapoints: DiscoveredDataPoint[]): string {
   const formattedDataPoints = discoveredDatapoints.map(dp => ({
