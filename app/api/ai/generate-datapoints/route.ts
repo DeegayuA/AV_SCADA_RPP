@@ -47,7 +47,8 @@ interface GenerateDatapointsRequestBody {
     filePath?: string;
     geminiApiKey?: string;
 }
-
+export const dynamic = 'force-dynamic'; // explicitly tell Next.js this is dynamic
+// Interface for the data read from discovered_datapoints.json
 interface DiscoveredDataPoint {
   name: string;
   address: string; 
