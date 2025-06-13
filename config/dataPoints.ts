@@ -262,39 +262,45 @@ export const dataPoints: ExtendedDataPoint[] = [
 //     label: '',
 //     isWritable: true,
 //   },
-//   // --- Index 9 ---
-//   {
-//     id: 'active-power-adjust',
-//     name: 'Active Power Adjust',
-//     nodeId: 'ns=4;i=14',
-//     dataType: 'Int16',
-//     uiType: 'display', 
-//     icon: Settings,
-//     unit: '%',
-//     description: 'Active power output adjustment setting.',
-//     category: 'control',
-//     factor: 0.1,
-//     phase: 'x',
-//     label: '',
-//     isWritable: true,
-//   },
-//   // --- Index 10 ---
-//   {
-//     id: 'pf-reactive-power-adjust',
-//     name: 'PF Reactive Power Adjust',
-//     nodeId: 'ns=4;i=15',
-//     dataType: 'Int16',
-//     uiType: 'display', 
-//     icon: Settings,
-//     unit: '', 
-//     description: 'Power Factor or Reactive Power adjustment setting (PF mode). Value scaled by 1000.',
-//     category: 'control',
-//     factor: 0.001,
-//     phase: 'x',
-//     notes: 'Factor 0.001 for PF (e.g., 995 -> 0.995).',
-//     label: '',
-//     isWritable: true,
-//   },
+  // --- Index 9 ---
+  {
+    id: 'active-power-adjust',
+    name: 'Active Power Adjust',
+    nodeId: 'ns=4;i=14',
+    dataType: 'Int16',
+    uiType: 'input', // Changed to 'input'
+    icon: Settings,
+    unit: '%',
+    description: 'Active power output adjustment setting. Target range 0-100%.', // Updated description
+    category: 'control',
+    factor: 0.1, // Raw value 1000 means 100.0%
+    min: 0,      // Raw min for 0%
+    max: 1000,   // Raw max for 100%
+    precision: 1, // For display formatting
+    phase: 'x',
+    label: '',
+    isWritable: true,
+  },
+  // --- Index 10 ---
+  {
+    id: 'pf-reactive-power-adjust',
+    name: 'PF Reactive Power Adjust',
+    nodeId: 'ns=4;i=15',
+    dataType: 'Int16',
+    uiType: 'input', // Changed to 'input'
+    icon: Settings,
+    unit: '', // PF is unitless
+    description: 'Power Factor adjustment setting. Target range -1.000 to 1.000.', // Updated description
+    category: 'control',
+    factor: 0.001, // Raw value 1000 means PF 1.000
+    min: -1000,    // Raw min for PF -1.000
+    max: 1000,     // Raw max for PF 1.000
+    precision: 3,  // For display formatting
+    phase: 'x',
+    notes: 'Factor 0.001 for PF (e.g., raw 995 -> PF 0.995).',
+    label: '',
+    isWritable: true,
+  },
 //   // --- Index 11 ---
 //   {
 //     id: 'reactive-power-adjust',
@@ -342,22 +348,25 @@ export const dataPoints: ExtendedDataPoint[] = [
 //     label: '',
 //     isWritable: true,
 //   },
-//   // --- Index 14 ---
-//   {
-//     id: 'export-power-percentage',
-//     name: 'Export Power Percentage',
-//     nodeId: 'ns=4;i=20',
-//     dataType: 'Int16',
-//     uiType: 'display', 
-//     icon: Percent,
-//     unit: '%',
-//     description: 'Set the export power limit as a percentage of rated power.',
-//     category: 'control',
-//     factor: 0.1,
-//     phase: 'x',
-//     label: '',
-//     isWritable: true,
-//   },
+  // --- Index 14 ---
+  {
+    id: 'export-power-percentage',
+    name: 'Export Power Percentage',
+    nodeId: 'ns=4;i=20',
+    dataType: 'Int16',
+    uiType: 'input', // Changed to 'input'
+    icon: Percent,
+    unit: '%',
+    description: 'Set the export power limit as a percentage of rated power. Target range 0-100%.', // Updated description
+    category: 'control',
+    factor: 0.1,  // Raw value 1000 means 100.0%
+    min: 0,       // Raw min for 0%
+    max: 1000,    // Raw max for 100%
+    precision: 1, // For display formatting
+    phase: 'x',
+    label: '',
+    isWritable: true,
+  },
 //   // --- Index 15 ---
 //   {
 //     id: 'export-power-percentage-1',

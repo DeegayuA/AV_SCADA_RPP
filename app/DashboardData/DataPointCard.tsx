@@ -6,6 +6,7 @@ import DataPointDisplayCard from './DataPointDisplayCard';
 import DataPointGaugeCard from './DataPointGaugeCard';
 import DataPointButton from './DataPointButton';
 import DataPointSwitch from './DataPointSwitch';
+import DataPointInputCard from './DataPointInputCard';
 import { motion } from 'framer-motion';
 import { itemVariants } from '@/config/animationVariants';
 import { Card } from '@/components/ui/card';
@@ -80,6 +81,16 @@ const DataPointCard: React.FC<DataPointCardProps> = React.memo(
                     isDisabled={isDisabled}
                     sendData={sendDataToWebSocket}
                     // DataPointSwitch might need playNotificationSound if it toasts on action
+                />
+            );
+        } else if (point.uiType === 'input') { // New condition
+            content = (
+                <DataPointInputCard
+                    point={point}
+                    nodeValue={nodeValue}
+                    isDisabled={isDisabled}
+                    sendData={sendDataToWebSocket}
+                    // Pass playNotificationSound if DataPointInputCard is designed to use it
                 />
             );
         } else {
