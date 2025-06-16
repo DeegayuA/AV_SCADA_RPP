@@ -70,6 +70,7 @@ const DataPointCard: React.FC<DataPointCardProps> = React.memo(
                     point={point}
                     isDisabled={isDisabled}
                     sendData={sendDataToWebSocket}
+                    
                     // DataPointButton might need playNotificationSound if it toasts on action
                 />
             );
@@ -89,8 +90,9 @@ const DataPointCard: React.FC<DataPointCardProps> = React.memo(
                     point={point}
                     nodeValue={nodeValue}
                     isDisabled={isDisabled}
-                    sendData={sendDataToWebSocket}
-                    // Pass playNotificationSound if DataPointInputCard is designed to use it
+                    sendData={sendDataToWebSocket}  
+                    isEditMode={isEditMode}
+                                   
                 />
             );
         } else {
