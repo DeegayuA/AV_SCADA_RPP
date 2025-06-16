@@ -422,12 +422,6 @@ export const dataPoints: ExtendedDataPoint[] = [
     min: 0,      // Raw min for 0%
     max: 1000,   // Raw max for 100%
     precision: 1, // For display formatting
-    uiType: 'display', 
-    icon: Settings,
-    unit: '%',
-    description: 'Active power output adjustment setting.',
-    category: 'control',
-    factor: 0.1,
     phase: 'x',
     label: '',
     isWritable: true,
