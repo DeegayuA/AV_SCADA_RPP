@@ -26,7 +26,14 @@ const ValueDisplayContent: React.FC<ValueDisplayContentProps> = ({
     isEditMode,
 }) => {
     const rawValue = nodeValues[item.nodeId];
-    const displayValue = formatValue(rawValue, item.unit, item.factor, item.precision, item.dataType, item.enumSet);
+    const numericValue = typeof rawValue === 'number' ? rawValue : 
+                        (typeof rawValue === 'string' ? parseFloat(rawValue) : null);
+    const displayValue = formatValue(
+        numericValue === null || numericValue === undefined || isNaN(numericValue) 
+            ? null 
+            : numericValue, 
+        item
+    );
 
     const [inputValue, setInputValue] = useState<string>(
         rawValue !== undefined && rawValue !== null ? String(rawValue) : ''
