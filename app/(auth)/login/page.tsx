@@ -21,6 +21,7 @@ import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
 import { User, UserRole } from '@/types/auth';
 import { useAppStore } from '@/stores/appStore';
+import { logActivity } from '@/lib/activityLog'; // Added import
 import React from 'react';
 
 // Background images
@@ -194,6 +195,13 @@ export default function LoginPage() {
     const user = users.find((u) => u.email.toLowerCase() === values.email.toLowerCase() && u.passwordHash === values.password);
 
     if (user) {
+      // Log successful login
+      logActivity(
+        'LOGIN_SUCCESS',
+        { email: user.email, role: user.role },
+        '/login'
+      );
+
       setCurrentUserInStore(user); // Store user immediately
       toast.success(
         isAdminSetupLogin ? `Admin Verified: ${user.name}!` : `Welcome back, ${user.name}!`, 

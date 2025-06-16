@@ -56,7 +56,8 @@ import SLDWidget from "@/app/circuit/sld/SLDWidget"; // ADJUST PATH
 import { useDynamicDefaultDataPointIds } from '@/app/utils/defaultDataPoints'; // ADJUST PATH
 import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph'; 
 import PowerTimelineGraphConfigurator from './PowerTimelineGraphConfigurator';
-import { useAppStore, useCurrentUser, useIsEditMode } from '@/stores/appStore'; 
+import { useAppStore, useCurrentUser, useIsEditMode } from '@/stores/appStore';
+import { logActivity } from '@/lib/activityLog';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected"; isConnected: boolean; connectWebSocket: () => void;
@@ -466,15 +467,100 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [authCheckComplete, processControlActionQueue, WS_URL, maxReconnectAttempts]); // Removed playNotificationSound
 
 
-  const sendDataToWebSocket = useCallback(async (nodeId:string,value:boolean|number|string)=>{ /* ... unchanged ... */
-    if(currentUserRole===UserRole.VIEWER){toast.warning("Restricted",{description:"Viewers cannot send cmds."});playWarningSound();return;}const pC=allPossibleDataPoints.find(p=>p.nodeId===nodeId);let v:any=value,cQV:any=undefined;
-    if(pC?.dataType.includes('Int')){let pN:number;if(typeof value==='boolean')pN=value?1:0;else if(typeof value==='string')pN=parseInt(value,10);else pN=value as number;if(isNaN(pN)){toast.error('Send Err',{description:'Invalid int.'});return;}v=pN;cQV=pN;}
-    else if(pC?.dataType==='Boolean'){let pB:boolean;if(typeof value==='number')pB=value!==0;else if(typeof value==='string')pB=value.toLowerCase()==='true'||value==='1';else pB=value as boolean;v=pB;cQV=pB;}
-    else if(pC?.dataType==='Float'||pC?.dataType==='Double'){let pF:number;if(typeof value==='string')pF=parseFloat(value);else pF=value as number;if(isNaN(pF)){toast.error('Send Err',{description:'Invalid num.'});return;}v=pF;cQV=pF;}
-    if(typeof v==='number'&&!isFinite(v)){toast.error('Send Err',{description:'Num Inf/NaN.'});playErrorSound();return;}
-    if(ws.current&&ws.current.readyState===WebSocket.OPEN){try{const p=JSON.stringify({[nodeId]:v});ws.current.send(p);toast.info('Cmd Sent',{description:`${pC?.name||nodeId}=${String(v)}`});playInfoSound();}catch(e){console.error("WS send err",e);toast.error('Send Err',{description:'Fail.Queuing.'});playErrorSound();if(cQV!==undefined)await queueControlAction(nodeId,cQV);else toast.error('Queue Err',{description:`Cannot queue ${nodeId}.`});}}
-    else{toast.warning('Offline',{description:`Cmd ${pC?.name||nodeId} queued.`});playWarningSound();if(cQV!==undefined)await queueControlAction(nodeId,cQV);else toast.error('Queue Err',{description:`Cannot queue ${nodeId}.`});if(!isConnected&&authCheckComplete)connectWebSocket();}
-  }, [isConnected,connectWebSocket,allPossibleDataPoints,currentUserRole,authCheckComplete]); // Removed playNotificationSound
+  const sendDataToWebSocket = useCallback(async (nodeId: string, value: boolean | number | string) => {
+    if (currentUserRole === UserRole.VIEWER) {
+      toast.warning("Restricted Action", { description: "Viewers cannot send commands." });
+      playWarningSound();
+      return;
+    }
+
+    const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId);
+    let processedValue: any = value;
+    let queueValue: any = undefined; // Value to be stored in queue, should be OPC UA compatible
+
+    if (pointConfig?.dataType.includes('Int')) {
+      let parsedNum: number;
+      if (typeof value === 'boolean') parsedNum = value ? 1 : 0;
+      else if (typeof value === 'string') parsedNum = parseInt(value, 10);
+      else parsedNum = value as number;
+      if (isNaN(parsedNum)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; }
+      processedValue = parsedNum;
+      queueValue = parsedNum;
+    } else if (pointConfig?.dataType === 'Boolean') {
+      let parsedBool: boolean;
+      if (typeof value === 'number') parsedBool = value !== 0;
+      else if (typeof value === 'string') parsedBool = value.toLowerCase() === 'true' || value === '1';
+      else parsedBool = value as boolean;
+      processedValue = parsedBool;
+      queueValue = parsedBool;
+    } else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') {
+      let parsedFloat: number;
+      if (typeof value === 'string') parsedFloat = parseFloat(value);
+      else parsedFloat = value as number;
+      if (isNaN(parsedFloat)) { toast.error('Send Error', { description: 'Invalid numeric value.' }); return; }
+      processedValue = parsedFloat;
+      queueValue = parsedFloat;
+    }
+
+    if (typeof processedValue === 'number' && !isFinite(processedValue)) {
+      toast.error('Send Error', { description: 'Numeric value is not finite (Infinity or NaN).' });
+      playErrorSound();
+      return;
+    }
+
+    // New Logging Call
+    logActivity(
+      'DATA_POINT_CHANGE',
+      {
+        nodeId: nodeId,
+        newValue: processedValue,
+        dataPointName: pointConfig?.name || 'Unknown DataPoint',
+        dataType: pointConfig?.dataType || 'Unknown Type'
+      },
+      currentPath
+    );
+
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      try {
+        const payload = JSON.stringify({ [nodeId]: processedValue });
+        ws.current.send(payload);
+        toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` });
+        playInfoSound();
+      } catch (error) {
+        console.error("WebSocket send error:", error);
+        toast.error('Send Error', { description: 'Failed to send command. Queuing.' });
+        playErrorSound();
+        if (queueValue !== undefined) {
+          await queueControlAction(nodeId, queueValue);
+        } else {
+          toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
+        }
+      }
+    } else {
+      toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` });
+      playWarningSound();
+      if (queueValue !== undefined) {
+        await queueControlAction(nodeId, queueValue);
+      } else {
+        toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
+      }
+      if (!isConnected && authCheckComplete) {
+        connectWebSocket();
+      }
+    }
+  }, [
+    currentUserRole,
+    allPossibleDataPoints,
+    ws,
+    isConnected,
+    authCheckComplete,
+    connectWebSocket,
+    currentPath,
+    playInfoSound,
+    playErrorSound,
+    playWarningSound,
+    queueControlAction
+  ]);
 
   useEffect(() => { /* ... localStorage for sldLayoutId ... */ if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
   const getHardcodedDefaultDataPointIds = useCallback(() => {
@@ -525,10 +611,104 @@ const UnifiedDashboardPage: React.FC = () => {
   const gaugesOverviewSectionDefinition = useMemo<SectionToRender | null>(() => { /* ... unchanged ... */ if(gaugeItems.length>0)return{title:"Gauges & Overview",items:gaugeItems,gridCols:'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'};return null;},[gaugeItems]);
   const bottomReadingsSections = useMemo<SectionToRender[]>(() => { /* ... unchanged ... */ if(otherDisplayItems.length===0)return[];const cGC='grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6';const s:SectionToRender[]=[];const dBC=otherDisplayItems.reduce((acc,p)=>{const k=p.category||'miscellaneous';if(!acc[k])acc[k]=[];acc[k].push(p);return acc;},{}as Record<string,DataPoint[]>);const gORP:DataPoint[]=[];Object.entries(dBC).sort(([a],[b])=>a.localeCompare(b)).forEach(([cat,pts])=>{if(pts.length>OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD)s.push({title:`${cat.charAt(0).toUpperCase()+cat.slice(1)} Readings`,items:pts,gridCols:cGC});else gORP.push(...pts);});if(gORP.length>0){const oRS:SectionToRender={title:"Other Readings",items:gORP,gridCols:cGC};if(s.some(sec=>sec.title!=="Other Readings"))s.push(oRS);else s.unshift(oRS);}return s.filter(sec=>sec.items.length>0);},[otherDisplayItems]);
   const cardHoverEffect = useMemo(() => (resolvedTheme === 'dark' ? { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } } : { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } }), [resolvedTheme]);
-  const handleResetToDefault = useCallback(() => { /* ... unchanged ... */ if(currentUserRole!==UserRole.ADMIN)return;const sD=getSmartDefaults();setDisplayedDataPointIds(sD.length>0?sD:getHardcodedDefaultDataPointIds());toast.info("Layout reset.");},[getSmartDefaults,getHardcodedDefaultDataPointIds,currentUserRole]);
-  const handleRemoveAllItems = useCallback(() => { /* ... unchanged ... */ if(currentUserRole!==UserRole.ADMIN)return;setDisplayedDataPointIds([]);toast.info("All cards removed.");},[currentUserRole]);
-  const handleAddMultipleDataPoints = useCallback((sIds:string[]) => { /* ... unchanged ... */ if(currentUserRole!==UserRole.ADMIN)return;const cDS=new Set(displayedDataPointIds);const tNI=sIds.filter(id=>!cDS.has(id));if(tNI.length===0&&sIds.length>0){toast.warning("Items already shown or none selected.");return;}if(tNI.length>0){setDisplayedDataPointIds(pIds=>Array.from(new Set([...pIds,...tNI])));toast.success(`${tNI.length} new DP${tNI.length>1?'s':''} added.`);}setIsConfiguratorOpen(false);},[displayedDataPointIds,currentUserRole]);
-  const handleRemoveItem = useCallback((dpIdToRemove:string)=>{ /* ... unchanged ... */ if(currentUserRole!==UserRole.ADMIN)return;const pTR=allPossibleDataPoints.find(dp=>dp.id===dpIdToRemove);if(pTR?.threePhaseGroup){const gIds=allPossibleDataPoints.filter(dp=>dp.threePhaseGroup===pTR.threePhaseGroup).map(dp=>dp.id);setDisplayedDataPointIds(pIs=>pIs.filter(id=>!gIds.includes(id)));toast.info(`${pTR.threePhaseGroup} group removed.`);}else{setDisplayedDataPointIds(pIs=>pIs.filter(id=>id!==dpIdToRemove));toast.info("DP removed.");}},[allPossibleDataPoints,currentUserRole]);
+  const handleResetToDefault = useCallback(() => {
+    if (currentUserRole !== UserRole.ADMIN) return;
+    const smartDefaults = getSmartDefaults();
+    const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds();
+    setDisplayedDataPointIds(defaultIds);
+    toast.info("Layout reset to default.");
+    logActivity(
+      'ADMIN_DASHBOARD_RESET_LAYOUT',
+      {
+        resetToIds: defaultIds
+      },
+      currentPath
+    );
+  }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
+
+  const handleRemoveAllItems = useCallback(() => {
+    if (currentUserRole !== UserRole.ADMIN) return;
+    const oldIds = displayedDataPointIds; // Capture before clearing
+    setDisplayedDataPointIds([]);
+    toast.info("All cards removed.");
+    logActivity(
+      'ADMIN_DASHBOARD_REMOVE_ALL_CARDS',
+      {
+        removedAll: true,
+        previousIds: oldIds // Log what was removed
+      },
+      currentPath
+    );
+  }, [currentUserRole, displayedDataPointIds, currentPath]);
+
+  const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
+    if (currentUserRole !== UserRole.ADMIN) return;
+    const currentDisplayedSet = new Set(displayedDataPointIds);
+    const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
+
+    if (newIdsToAdd.length === 0 && selectedIds.length > 0) {
+      toast.warning("Items already shown or none selected to add.");
+      setIsConfiguratorOpen(false); // Still close configurator
+      return;
+    }
+    if (newIdsToAdd.length > 0) {
+      const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd]));
+      setDisplayedDataPointIds(newFullList);
+      toast.success(`${newIdsToAdd.length} new DP${newIdsToAdd.length > 1 ? 's' : ''} added.`);
+      logActivity(
+        'ADMIN_DASHBOARD_ADD_CARDS',
+        {
+          addedIds: newIdsToAdd,
+          addedCount: newIdsToAdd.length,
+          currentDashboardIds: newFullList // State after change
+        },
+        currentPath
+      );
+    }
+    setIsConfiguratorOpen(false);
+  }, [displayedDataPointIds, currentUserRole, currentPath]);
+
+  const handleRemoveItem = useCallback((dpIdToRemove: string) => {
+    if (currentUserRole !== UserRole.ADMIN) return;
+    const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove);
+    let isGroupRemoval = false;
+    let removedItemsList: string[] = [];
+    let newDisplayedIds: string[] = [];
+
+    if (pointToRemove?.threePhaseGroup) {
+      isGroupRemoval = true;
+      removedItemsList = allPossibleDataPoints
+        .filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup)
+        .map(dp => dp.id);
+      newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id));
+      setDisplayedDataPointIds(newDisplayedIds);
+      toast.info(`${pointToRemove.threePhaseGroup} group removed.`);
+      logActivity(
+        'ADMIN_DASHBOARD_REMOVE_CARD',
+        {
+          removedGroupId: pointToRemove.threePhaseGroup,
+          removedItemIds: removedItemsList,
+          isGroup: true,
+          currentDashboardIds: newDisplayedIds
+        },
+        currentPath
+      );
+    } else {
+      removedItemsList = [dpIdToRemove];
+      newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove);
+      setDisplayedDataPointIds(newDisplayedIds);
+      toast.info("Data point removed.");
+      logActivity(
+        'ADMIN_DASHBOARD_REMOVE_CARD',
+        {
+          removedId: dpIdToRemove,
+          isGroup: false,
+          currentDashboardIds: newDisplayedIds
+        },
+        currentPath
+      );
+    }
+  }, [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]);
   const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => { /* ... unchanged ... */ const g:Record<string,ConfiguratorThreePhaseGroup>={},i:DataPoint[]=[];const cS=new Set(displayedDataPointIds);allPossibleDataPoints.forEach(dp=>{if(dp.threePhaseGroup&&dp.phase&&['a','b','c','x','total'].includes(dp.phase)){if(!g[dp.threePhaseGroup]){let rN=dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig,'').trim().replace(/ \([ABCX]\)$/i,'').trim();g[dp.threePhaseGroup]={name:dp.threePhaseGroup,representativeName:rN||dp.threePhaseGroup,ids:[],category:dp.category || 'miscellaneous'};}g[dp.threePhaseGroup].ids.push(dp.id);}else if(!dp.threePhaseGroup){i.push(dp);}});const aGA=Array.from(new Set(Object.values(g).flatMap(grp=>grp.ids)));const tIP=i.filter(ind=>!aGA.includes(ind.id));const cDA=Array.from(cS);return{threePhaseGroupsForConfig:Object.values(g).filter(grp=>grp.ids.some(id=>!cDA.includes(id))).sort((a,b)=>a.representativeName.localeCompare(b.representativeName)),individualPointsForConfig:tIP.filter(dp=>!cDA.includes(dp.id)).sort((a,b)=>a.name.localeCompare(b.name))};}, [allPossibleDataPoints, displayedDataPointIds]);
   
   const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
@@ -589,7 +769,19 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
     return(<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary"/><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
   }
 
-  const handleSldLayoutSelect = (newLayoutId: string) => { setSldLayoutId(newLayoutId); setIsSldConfigOpen(false); };
+  const handleSldLayoutSelect = useCallback((newLayoutId: string) => {
+    const oldLayout = sldLayoutId; // Capture old layout
+    setSldLayoutId(newLayoutId);
+    // Close any dialog that might have triggered this
+    if (isSldConfigOpen) setIsSldConfigOpen(false);
+    if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false);
+
+    logActivity(
+      'ADMIN_SLD_LAYOUT_CHANGE',
+      { oldLayoutId: oldLayout, newLayoutId: newLayoutId },
+      currentPath
+    );
+  }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]); // Added dependencies
 
   return (
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
@@ -693,13 +885,24 @@ const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
           currentUsageDpIds={powerGraphUsageDpIds}
           currentExportDpIds={powerGraphExportDpIds}
           initialExportMode={powerGraphExportMode}
-          onSaveConfiguration={(config)=>{
+          onSaveConfiguration={(config) => {
             setPowerGraphGenerationDpIds(config.generationDpIds);
             setPowerGraphUsageDpIds(config.usageDpIds);
             setPowerGraphExportDpIds(config.exportDpIds);
             setPowerGraphExportMode(config.exportMode);
-            setIsGraphConfiguratorOpen(false);toast.success('Graph config updated.');
-          }}/>
+            setIsGraphConfiguratorOpen(false);
+            toast.success('Graph configuration updated.');
+            logActivity(
+              'ADMIN_GRAPH_CONFIG_CHANGE',
+              {
+                generationDpIds: config.generationDpIds,
+                usageDpIds: config.usageDpIds,
+                exportDpIds: config.exportDpIds,
+                exportMode: config.exportMode
+              },
+              currentPath
+            );
+          }} />
       )}
 
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>

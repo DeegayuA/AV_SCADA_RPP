@@ -7,6 +7,7 @@ import { Inter } from 'next/font/google';
 import React, { useEffect, useState } from 'react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { Toaster } from "@/components/ui/sonner";
+import PageViewLogger from '@/components/PageViewLogger'; // Import PageViewLogger
 import { 
     APP_DEFAULT_TITLE, APP_DESCRIPTION, APP_FAVICON, APP_KEYWORDS, 
     APP_LOGO_PNG_HEIGHT, APP_LOGO_PNG_WIDTH, APP_OG_IMAGE_URL, 
@@ -87,6 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
            {/* Conditionally render children OR nothing if still loading & no pre-content wanted */}
           {!isLoading && children}
           <ActiveAlarmsDisplay /> {/* Add the alarms display here */}
+          <PageViewLogger /> {/* Add the PageViewLogger here */}
         </ThemeProvider>
         <Toaster richColors theme="system" position="bottom-right" closeButton />
       </body>
