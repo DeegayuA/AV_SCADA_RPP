@@ -25,22 +25,38 @@ const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => { // Reverted to No
 
   const { StatusIcon, statusText, styleClasses } = useMemo(() => {
     let icon = CpuIcon;
-    let text = data.status || 'Idle';
+    let text = data?.status ? String(data?.status).toLowerCase() : 'error';
     let classes = 'border-neutral-400 dark:border-neutral-600 bg-muted/30 text-muted-foreground';
 
-    switch (data.status) {
-      case 'fault': case 'alarm':
-        icon = AlertTriangleIcon; text = 'FAULT';
-        classes = 'border-destructive bg-destructive/10 text-destructive'; break;
-      case 'running': case 'online': case 'ok':
-        icon = CheckSquareIcon; text = 'RUNNING';
-        classes = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400'; break;
-      case 'stopped': case 'offline':
-        icon = CpuIcon; text = 'STOPPED';
-        classes = 'border-neutral-500 bg-neutral-500/10 text-neutral-500 opacity-70'; break;
+    switch (text) {
+      case 'fault':
+      case 'alarm':
+        icon = AlertTriangleIcon;
+        text = 'FAULT';
+        classes = 'border-destructive bg-destructive/10 text-destructive';
+        break;
+      case 'running':
+      case 'ok':
+      case 'online':
+        icon = CheckSquareIcon;
+        text = 'RUNNING';
+        classes = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400';
+        break;
+      case 'stopped':
+      case 'offline':
+        icon = CpuIcon;
+        text = 'STOPPED';
+        classes = 'border-neutral-500 bg-neutral-500/10 text-neutral-500 opacity-70';
+        break;
+      default:
+        icon = InfoIcon;
+        text = `ERROR: ${data?.status ?? 'Unknown'}`;
+
+        classes = 'border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400';
+        break;
     }
     return { StatusIcon: icon, statusText: text, styleClasses: classes };
-  }, [data.status]);
+  }, [data?.status]);
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
   const prevStatusRef = useRef(data.status);
@@ -66,8 +82,8 @@ const PLCNode: React.FC<NodeProps<PLCNodeData>> = (props) => { // Reverted to No
         ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
         /* hover:shadow-lg removed */
       `}
-      // variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
-      // whileHover="hover" // Prefer CSS hover
+      variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
+      whileHover="hover" // Prefer CSS hover
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >
