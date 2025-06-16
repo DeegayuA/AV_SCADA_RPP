@@ -1,137 +1,187 @@
-'use client';
-import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { AlertCircle, Info } from 'lucide-react';
-import { toast } from 'sonner';
-import { DataPoint } from '@/config/dataPoints'; // Updated import
-import { useTheme } from 'next-themes';
-import { formatValue } from './formatValue';
+// app/DashboardData/ValueDisplayContent.tsx
+import React, { useState, useCallback, useEffect } from 'react';
+import { DataPoint } from '@/config/dataPoints';
 import { NodeData } from './dashboardInterfaces';
+import { formatValue } from './formatValue';
+import { Input } from '@/components/ui/input';
+import { toast } from 'sonner';
 
 interface ValueDisplayContentProps {
-    item: DataPoint; // FIX 1: Corrected item type
+    item: DataPoint;
     nodeValues: NodeData;
-    isDisabled: boolean;
+    isDisabled: boolean; // This is the effectiveIsDisabled from DataPointDisplayCard
     sendDataToWebSocket: (nodeId: string, value: any) => void;
     playNotificationSound: (type: 'success' | 'error' | 'warning' | 'info') => void;
     lastToastTimestamps: React.MutableRefObject<Record<string, number>>;
     isEditMode: boolean;
 }
 
-const ValueDisplayContent: React.FC<ValueDisplayContentProps> = React.memo(
-    ({ item: config, nodeValues, isDisabled, sendDataToWebSocket, playNotificationSound, lastToastTimestamps, isEditMode }) => {
-        // Safely derive nodeId. It defaults to '' if config.nodeId is not present or falsy.
-        const nodeId = ('nodeId' in config && config.nodeId) ? config.nodeId : '';
-        const value = nodeId ? nodeValues[nodeId] : undefined;
-        const { resolvedTheme } = useTheme();
-        const key = `${nodeId}-${String(value)}-${resolvedTheme}`; // Key for AnimatePresence
-        let content: React.ReactNode;
-        let valueClass = "text-foreground font-medium";
-        let iconPrefix: React.ReactNode = null;
-        const unit = config.unit;
+const ValueDisplayContent: React.FC<ValueDisplayContentProps> = ({
+    item,
+    nodeValues,
+    isDisabled, // Represents effectiveIsDisabled
+    sendDataToWebSocket,
+    playNotificationSound,
+    lastToastTimestamps,
+    isEditMode,
+}) => {
+    const rawValue = nodeValues[item.nodeId];
+    const numericValue = typeof rawValue === 'number' ? rawValue : 
+                        (typeof rawValue === 'string' ? parseFloat(rawValue) : null);
+    const displayValue = formatValue(
+        numericValue === null || numericValue === undefined || isNaN(numericValue) 
+            ? null 
+            : numericValue, 
+        item
+    );
 
-        if (value === undefined || value === null) {
-            content = <span className="text-gray-400 dark:text-gray-500 italic">--</span>;
-        } else if (value === 'Error') {
-            content = <span className="font-semibold">Error</span>;
-            valueClass = "text-red-600 dark:text-red-400";
-            iconPrefix = <AlertCircle size={14} className="mr-1 inline-block" />;
-        } else if (typeof value === 'boolean') {
-            content = value ? 'ON' : 'OFF';
-            valueClass = `font-semibold ${value ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`;
-        } else if (typeof value === 'number') {
-            const factor = config.factor ?? 1;
-            const min = config.min;
-            const max = config.max;
-            let adjustedValue = value * factor;
-            let displayValue = formatValue(adjustedValue, config);
+    const [inputValue, setInputValue] = useState<string>(
+        rawValue !== undefined && rawValue !== null ? String(rawValue) : ''
+    );
+    const [isInputFocused, setIsInputFocused] = useState(false);
 
-            const isOnOff = displayValue === 'ON' || displayValue === 'OFF';
-            const isOutOfRange = !isOnOff && (
-                 (min !== undefined && adjustedValue < min) ||
-                 (max !== undefined && adjustedValue > max)
-            );
+    useEffect(() => {
+        if (!isInputFocused) {
+            setInputValue(rawValue !== undefined && rawValue !== null ? String(rawValue) : '');
+        }
+    }, [rawValue, isInputFocused]);
 
-            if (isOnOff) {
-                valueClass = `font-semibold ${displayValue === 'ON' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`;
-            } else if (isOutOfRange) {
-                 valueClass = "text-yellow-600 dark:text-yellow-400 font-semibold";
-                 iconPrefix = <AlertCircle size={14} className="mr-1 inline-block" />;
+    const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        setInputValue(event.target.value);
+    };
 
-                 const now = Date.now();
-                 // Only proceed with toast logic if nodeId is valid
-                 if (nodeId) {
-                    const lastToastTime = lastToastTimestamps.current[nodeId];
-                    const cooldown = 60 * 1000; // 60 seconds
-
-                    if (!lastToastTime || now - lastToastTime > cooldown) {
-                        const direction = (min !== undefined && adjustedValue < min) ? 'below minimum' : 'above maximum';
-                        const rangeText = `(Range: ${formatValue(min ?? null, config)} to ${formatValue(max ?? null, config)})`;
-                        toast.warning('Value Alert', {
-                            description: `${config.name}: ${displayValue}${unit || ''} is ${direction} ${rangeText}.`,
-                            duration: 8000,
-                            id: `value-alert-${nodeId}`
-                        });
-                        playNotificationSound('warning');
-                        lastToastTimestamps.current[nodeId] = now; // FIX 2: Use derived nodeId
-                    }
-                 }
-             } else {
-                 // If value was out of range but is now back, clear the cooldown
-                 // Only proceed if nodeId is valid
-                 if (nodeId && lastToastTimestamps.current[nodeId]) {
-                     delete lastToastTimestamps.current[nodeId];
-                     // Optional: Clear the toast if it's still visible and if nodeId is valid
-                     toast.dismiss(`value-alert-${nodeId}`); // FIX 3: Use derived nodeId
-                 }
-             }
-            content = isOnOff ? displayValue : <>{displayValue}<span className="text-[10px] sm:text-xs text-muted-foreground ml-0.5">{unit || ''}</span></>;
-
-        } else if (typeof value === 'string') {
-            if (config.dataType === 'DateTime') {
-                try {
-                    const date = new Date(value);
-                    if (!isNaN(date.getTime())) { // Check if date is valid
-                        content = date.toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'medium' });
-                    } else {
-                        content = value; // Fallback for invalid date string
-                    }
-                } catch {
-                    content = value; // Fallback to raw string if parsing fails
-                }
-            } else if (config.dataType === 'Guid') {
-                 content = value.length > 8 ? `${value.substring(0, 8)}...` : value;
-            } else if (config.dataType === 'ByteString') {
-                 content = `[${value.length} bytes]`;
-            }
-            else {
-                 content = value.length > 25 ? `${value.substring(0, 22)}...` : value;
-            }
-            valueClass = "text-sm text-muted-foreground font-normal";
-        } else {
-            content = <span className="text-yellow-500">?</span>;
-            valueClass = "text-yellow-500";
-            iconPrefix = <Info size={14} className="mr-1 inline-block" />;
+    const validateAndSendData = useCallback(() => {
+        // Component is disabled (e.g. disconnected) or item itself is not writable.
+        if (isDisabled || !item.isWritable) {
+            toast.warning('Cannot send data', { description: 'Input is disabled or data point is not writable.' });
+            setInputValue(String(rawValue)); // Revert to original value
+            return;
         }
 
+        let processedValue: number | boolean | string;
+        const trimmedValue = inputValue.trim();
+
+        if (trimmedValue === String(rawValue)) { // No change
+            setIsInputFocused(false);
+            return;
+        }
+
+        if (trimmedValue === '') {
+            toast.error('Invalid input', { description: 'Input value cannot be empty.' });
+            setInputValue(String(rawValue)); // Revert
+            return;
+        }
+
+        // Attempt to parse based on dataType
+        switch (item.dataType) {
+            case 'Int16':
+            case 'Int32':
+            case 'UInt16':
+            case 'UInt32':
+            case 'Byte':
+            case 'SByte':
+            case 'Int64':
+            case 'UInt64':
+                processedValue = parseInt(trimmedValue, 10);
+                if (isNaN(processedValue) || !Number.isInteger(processedValue)) {
+                    toast.error('Invalid input', { description: `Value must be an integer for ${item.dataType}.` });
+                    setInputValue(String(rawValue)); // Revert
+                    return;
+                }
+                break;
+            case 'Float':
+            case 'Double':
+                processedValue = parseFloat(trimmedValue);
+                if (isNaN(processedValue)) {
+                    toast.error('Invalid input', { description: `Value must be a number for ${item.dataType}.` });
+                    setInputValue(String(rawValue)); // Revert
+                    return;
+                }
+                break;
+            case 'Boolean':
+                if (trimmedValue.toLowerCase() === 'true' || trimmedValue === '1') {
+                    processedValue = true;
+                } else if (trimmedValue.toLowerCase() === 'false' || trimmedValue === '0') {
+                    processedValue = false;
+                } else {
+                    toast.error('Invalid input', { description: 'Value must be true/false or 1/0 for Boolean.' });
+                    setInputValue(String(rawValue)); // Revert
+                    return;
+                }
+                break;
+            case 'String':
+            default: // Includes types like DateTime, Guid etc. Send as string if writable.
+                processedValue = trimmedValue;
+                break;
+        }
+
+        // Check min/max if defined and value is numeric
+        if (typeof processedValue === 'number') {
+            if (item.min !== undefined && processedValue < item.min) {
+                toast.error('Validation Error', { description: `Value for ${item.name} must be >= ${item.min}.` });
+                setInputValue(String(rawValue)); // Revert
+                return;
+            }
+            if (item.max !== undefined && processedValue > item.max) {
+                toast.error('Validation Error', { description: `Value for ${item.name} must be <= ${item.max}.` });
+                setInputValue(String(rawValue)); // Revert
+                return;
+            }
+        }
+
+        sendDataToWebSocket(item.nodeId, processedValue);
+        toast.success('Data sent', { description: `${item.name} will be updated to ${processedValue}.` });
+        // playNotificationSound?.('info'); // Or success, depending on desired feedback
+        setIsInputFocused(false); // Remove focus after successful send
+    }, [inputValue, item, isDisabled, sendDataToWebSocket, rawValue, playNotificationSound]);
+
+    const handleKeyPress = (event: React.KeyboardEvent<HTMLInputElement>) => {
+        if (event.key === 'Enter') {
+            validateAndSendData();
+            (event.target as HTMLInputElement).blur();
+        } else if (event.key === 'Escape') {
+            setInputValue(String(rawValue)); // Revert to original value
+            setIsInputFocused(false);
+            (event.target as HTMLInputElement).blur();
+        }
+    };
+
+    const handleFocus = () => {
+        if (isEditMode && item.isWritable && item.uiType === 'display' && !isDisabled) {
+            setIsInputFocused(true);
+        }
+    };
+
+    const handleBlur = () => {
+        // Send data on blur only if focused and value has changed
+        if (isInputFocused && inputValue !== String(rawValue)) {
+             validateAndSendData();
+        }
+        setIsInputFocused(false);
+    };
+
+    if (isEditMode && item.isWritable && item.uiType === 'display' && !isDisabled) {
         return (
-            <AnimatePresence mode="wait" initial={false}>
-                <motion.span
-                    key={key}
-                    className={`inline-flex items-center ${valueClass}`}
-                    initial={{ opacity: 0.6 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0.6 }}
-                    transition={{ duration: 0.15, ease: "linear" }}
-                >
-                    {iconPrefix}
-                    {content}
-                </motion.span>
-            </AnimatePresence>
+            <Input
+                type="text"
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyPress} // Changed from onKeyPress to onKeyDown for Escape
+                onFocus={handleFocus}
+                onBlur={handleBlur}
+                disabled={isDisabled} // This is the effectiveIsDisabled for the card
+                aria-label={`${item.name} inline input`}
+                className={`h-7 text-sm text-right w-full min-w-[60px] max-w-[120px] px-1 py-0 border-dashed ${isInputFocused ? 'border-primary ring-1 ring-primary': 'border-transparent hover:border-muted-foreground/50'}`}
+                placeholder="Edit..."
+            />
         );
     }
-);
 
-ValueDisplayContent.displayName = 'ValueDisplayContent';
+    return (
+        <span className={rawValue === 'Error' || rawValue === undefined ? 'text-red-500' : ''} title={`Node ID: ${item.nodeId}`}>
+            {displayValue}
+        </span>
+    );
+};
 
 export default ValueDisplayContent;
