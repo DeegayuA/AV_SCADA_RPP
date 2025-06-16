@@ -1,0 +1,3947 @@
+[
+  {
+    "name": "Auditing",
+    "address": "ns=0;i=2994",
+    "initialValue": true,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "NamespaceArray",
+    "address": "ns=0;i=2255",
+    "initialValue": [
+      "http://opcfoundation.org/UA/",
+      "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+      "http://opcfoundation.org/UA/DI/",
+      "http://www.siemens.com/simatic-s7-opcua",
+      "http://OPC_UA"
+    ],
+    "dataType": "String"
+  },
+  {
+    "name": "ServerArray",
+    "address": "ns=0;i=2254",
+    "initialValue": [
+      "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1"
+    ],
+    "dataType": "String"
+  },
+  {
+    "name": "ServerStatus",
+    "address": "ns=0;i=2256",
+    "initialValue": {
+      "startTime": "2025-06-09T11:00:36.920Z",
+      "currentTime": "2025-06-16T09:18:40.305Z",
+      "state": "Running",
+      "buildInfo": {
+        "productUri": "https://www.siemens.com/s7-1200",
+        "manufacturerName": "SIEMENS AG",
+        "productName": "SIMATIC S7-1200 OPC UA",
+        "softwareVersion": "FW: V.4.6.0",
+        "buildNumber": "00",
+        "buildDate": "1970-01-01T00:00:00.000Z"
+      },
+      "secondsTillShutdown": 0,
+      "shutdownReason": {}
+    },
+    "dataType": "Unknown (862)"
+  },
+  {
+    "name": "ServiceLevel",
+    "address": "ns=0;i=2267",
+    "initialValue": 255,
+    "dataType": "Byte"
+  },
+  {
+    "name": "ns=2:DeviceManual",
+    "address": "ns=3;s=DeviceManual",
+    "initialValue": "https://support.industry.siemens.com/cs/ww/en/view/109743003",
+    "dataType": "String"
+  },
+  {
+    "name": "ns=2:DeviceRevision",
+    "address": "ns=3;s=DeviceRevision",
+    "initialValue": "6ES7 214-1BG40-0XB0  V04.06.00",
+    "dataType": "String"
+  },
+  {
+    "name": "ns=3:EngineeringRevision",
+    "address": "ns=3;s=EngineeringRevision",
+    "initialValue": "V19.0",
+    "dataType": "String"
+  },
+  {
+    "name": "ns=2:HardwareRevision",
+    "address": "ns=3;s=HardwareRevision",
+    "initialValue": "13",
+    "dataType": "String"
+  },
+  {
+    "name": "ns=2:Manufacturer",
+    "address": "ns=3;s=Manufacturer",
+    "initialValue": {
+      "locale": "en-US",
+      "text": "Siemens AG"
+    },
+    "dataType": "LocalizedText"
+  },
+  {
+    "name": "ns=2:Model",
+    "address": "ns=3;s=Model",
+    "initialValue": {
+      "locale": "en-US",
+      "text": "CPU 1214C AC/DC/Rly"
+    },
+    "dataType": "LocalizedText"
+  },
+  {
+    "name": "ns=3:OperatingMode",
+    "address": "ns=3;s=OperatingMode",
+    "initialValue": 8,
+    "dataType": "SimaticOperatingState"
+  },
+  {
+    "name": "ns=3:OrderNumber",
+    "address": "ns=3;s=OrderNumber",
+    "initialValue": "6ES7 214-1BG40-0XB0 ",
+    "dataType": "String"
+  },
+  {
+    "name": "ns=2:RevisionCounter",
+    "address": "ns=3;s=RevisionCounter",
+    "initialValue": -1,
+    "dataType": "Int32"
+  },
+  {
+    "name": "ns=2:SerialNumber",
+    "address": "ns=3;s=SerialNumber",
+    "initialValue": "S V-PNC44234    ",
+    "dataType": "String"
+  },
+  {
+    "name": "ns=2:SoftwareRevision",
+    "address": "ns=3;s=SoftwareRevision",
+    "initialValue": "V04.06.00",
+    "dataType": "String"
+  },
+  {
+    "name": "LocaleIdArray",
+    "address": "ns=0;i=2271",
+    "initialValue": [
+      "en-US"
+    ],
+    "dataType": "Unknown (295)"
+  },
+  {
+    "name": "MaxArrayLength",
+    "address": "ns=0;i=11702",
+    "initialValue": 131072,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxBrowseContinuationPoints",
+    "address": "ns=0;i=2735",
+    "initialValue": 5,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "MaxByteStringLength",
+    "address": "ns=0;i=12911",
+    "initialValue": 131072,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxHistoryContinuationPoints",
+    "address": "ns=0;i=2737",
+    "initialValue": 5,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "MaxQueryContinuationPoints",
+    "address": "ns=0;i=2736",
+    "initialValue": 5,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "MaxStringLength",
+    "address": "ns=0;i=11703",
+    "initialValue": 16382,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MinSupportedSampleRate",
+    "address": "ns=0;i=2272",
+    "initialValue": 1000,
+    "dataType": "Unknown (290)"
+  },
+  {
+    "name": "ServerProfileArray",
+    "address": "ns=0;i=2269",
+    "initialValue": [
+      "http://opcfoundation.org/UA-Profile/Server/StandardUA",
+      "http://opcfoundation.org/UA-Profile/Server/Methods",
+      "http://opcfoundation.org/UA-Profile/Server/StandardEventSubscription",
+      "http://opcfoundation.org/UA-Profile/Server/DataAccess"
+    ],
+    "dataType": "String"
+  },
+  {
+    "name": "SoftwareCertificates",
+    "address": "ns=0;i=3704",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (344)"
+  },
+  {
+    "name": "ns=2:MaxInactiveLockTime",
+    "address": "ns=2;i=6387",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (290)"
+  },
+  {
+    "name": "EnabledFlag",
+    "address": "ns=0;i=2294",
+    "initialValue": true,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ServerDiagnosticsSummary",
+    "address": "ns=0;i=2275",
+    "initialValue": {
+      "serverViewCount": 0,
+      "currentSessionCount": 4,
+      "cumulatedSessionCount": 356,
+      "securityRejectedSessionCount": 0,
+      "rejectedSessionCount": 89,
+      "sessionTimeoutCount": 235,
+      "sessionAbortCount": 0,
+      "currentSubscriptionCount": 4,
+      "cumulatedSubscriptionCount": 211,
+      "publishingIntervalCount": 0,
+      "securityRejectedRequestsCount": 0,
+      "rejectedRequestsCount": 0
+    },
+    "dataType": "Unknown (859)"
+  },
+  {
+    "name": "SubscriptionDiagnosticsArray",
+    "address": "ns=0;i=2290",
+    "initialValue": [
+      {
+        "sessionId": "ns=1;i=3190210086",
+        "subscriptionId": 3113788418,
+        "priority": 10,
+        "publishingInterval": 1000,
+        "maxKeepAliveCount": 10,
+        "maxLifetimeCount": 300,
+        "maxNotificationsPerPublish": 100,
+        "publishingEnabled": true,
+        "modifyCount": 0,
+        "enableCount": 0,
+        "disableCount": 0,
+        "republishRequestCount": 0,
+        "republishMessageRequestCount": 0,
+        "republishMessageCount": 0,
+        "transferRequestCount": 0,
+        "transferredToAltClientCount": 0,
+        "transferredToSameClientCount": 0,
+        "publishRequestCount": 858,
+        "dataChangeNotificationsCount": 0,
+        "eventNotificationsCount": 0,
+        "notificationsCount": 0,
+        "latePublishRequestCount": 0,
+        "currentKeepAliveCount": 4,
+        "currentLifetimeCount": 4,
+        "unacknowledgedMessageCount": 0,
+        "discardedMessageCount": 0,
+        "monitoredItemCount": 0,
+        "disabledMonitoredItemCount": 0,
+        "monitoringQueueOverflowCount": 0,
+        "nextSequenceNumber": 0,
+        "eventQueueOverflowCount": 0
+      },
+      {
+        "sessionId": "ns=1;i=335972813",
+        "subscriptionId": 3113788419,
+        "priority": 10,
+        "publishingInterval": 1000,
+        "maxKeepAliveCount": 10,
+        "maxLifetimeCount": 100,
+        "maxNotificationsPerPublish": 50,
+        "publishingEnabled": true,
+        "modifyCount": 0,
+        "enableCount": 0,
+        "disableCount": 0,
+        "republishRequestCount": 3,
+        "republishMessageRequestCount": 3,
+        "republishMessageCount": 1,
+        "transferRequestCount": 0,
+        "transferredToAltClientCount": 0,
+        "transferredToSameClientCount": 0,
+        "publishRequestCount": 7461,
+        "dataChangeNotificationsCount": 276585,
+        "eventNotificationsCount": 0,
+        "notificationsCount": 7051,
+        "latePublishRequestCount": 2,
+        "currentKeepAliveCount": 1,
+        "currentLifetimeCount": 1,
+        "unacknowledgedMessageCount": 1,
+        "discardedMessageCount": 0,
+        "monitoredItemCount": 329,
+        "disabledMonitoredItemCount": 0,
+        "monitoringQueueOverflowCount": 0,
+        "nextSequenceNumber": 7051,
+        "eventQueueOverflowCount": 0
+      },
+      {
+        "sessionId": "ns=1;i=972933471",
+        "subscriptionId": 3113788428,
+        "priority": 10,
+        "publishingInterval": 1000,
+        "maxKeepAliveCount": 10,
+        "maxLifetimeCount": 300,
+        "maxNotificationsPerPublish": 100,
+        "publishingEnabled": true,
+        "modifyCount": 0,
+        "enableCount": 0,
+        "disableCount": 0,
+        "republishRequestCount": 0,
+        "republishMessageRequestCount": 0,
+        "republishMessageCount": 0,
+        "transferRequestCount": 0,
+        "transferredToAltClientCount": 0,
+        "transferredToSameClientCount": 0,
+        "publishRequestCount": 4,
+        "dataChangeNotificationsCount": 0,
+        "eventNotificationsCount": 0,
+        "notificationsCount": 0,
+        "latePublishRequestCount": 0,
+        "currentKeepAliveCount": 2,
+        "currentLifetimeCount": 2,
+        "unacknowledgedMessageCount": 0,
+        "discardedMessageCount": 0,
+        "monitoredItemCount": 0,
+        "disabledMonitoredItemCount": 0,
+        "monitoringQueueOverflowCount": 0,
+        "nextSequenceNumber": 0,
+        "eventQueueOverflowCount": 0
+      }
+    ],
+    "dataType": "Unknown (874)"
+  },
+  {
+    "name": "RedundancySupport",
+    "address": "ns=0;i=3709",
+    "initialValue": 0,
+    "dataType": "Unknown (851)"
+  },
+  {
+    "name": "ns=4:Backup_Supply_Contactor_Switch_Out_M",
+    "address": "ns=4;i=391",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Deye_Grid_Supply_switch_Out_M",
+    "address": "ns=4;i=392",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Gen_Supply_M",
+    "address": "ns=4;i=393",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Grid_Supply_M",
+    "address": "ns=4;i=394",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Main_Grid_Supply_Switch_Out_M",
+    "address": "ns=4;i=395",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "IsNamespaceSubset",
+    "address": "ns=0;i=15961",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Boolean"
+  },
+  {
+    "name": "NamespacePublicationDate",
+    "address": "ns=0;i=15960",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "DateTime"
+  },
+  {
+    "name": "NamespaceUri",
+    "address": "ns=0;i=15958",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "String"
+  },
+  {
+    "name": "NamespaceVersion",
+    "address": "ns=0;i=15959",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "String"
+  },
+  {
+    "name": "StaticNodeIdTypes",
+    "address": "ns=0;i=15962",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (256)"
+  },
+  {
+    "name": "StaticNumericNodeIdRange",
+    "address": "ns=0;i=15963",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (291)"
+  },
+  {
+    "name": "StaticStringNodeIdPattern",
+    "address": "ns=0;i=15964",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "String"
+  },
+  {
+    "name": "MaxMonitoredItemsPerCall",
+    "address": "ns=0;i=11714",
+    "initialValue": 1000,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxNodesPerBrowse",
+    "address": "ns=0;i=11710",
+    "initialValue": 2000,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxNodesPerWrite",
+    "address": "ns=0;i=11707",
+    "initialValue": 2000,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxNodesPerTranslateBrowsePathsToNodeIds",
+    "address": "ns=0;i=11712",
+    "initialValue": 2000,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxNodesPerRegisterNodes",
+    "address": "ns=0;i=11711",
+    "initialValue": 2000,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxNodesPerMethodCall",
+    "address": "ns=0;i=11709",
+    "initialValue": 1,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxNodesPerRead",
+    "address": "ns=0;i=11705",
+    "initialValue": 2000,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "SessionDiagnosticsArray",
+    "address": "ns=0;i=3707",
+    "initialValue": [
+      {
+        "sessionId": "ns=1;i=3190210086",
+        "sessionName": "ClientSession1",
+        "clientDescription": {
+          "applicationUri": "urn:DESKTOP-PUFAUHT:NodeOPCUA-Client",
+          "productUri": "NodeOPCUA-Client",
+          "applicationName": {
+            "text": "MainAppClient-MyApp"
+          },
+          "applicationType": "Client",
+          "gatewayServerUri": "",
+          "discoveryProfileUri": "",
+          "discoveryUrls": []
+        },
+        "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+        "endpointUrl": "opc.tcp://192.168.1.2:4840",
+        "localeIds": [],
+        "actualSessionTimeout": 30000,
+        "maxResponseMessageSize": 800000,
+        "clientConnectionTime": "2025-06-16T06:52:49.784Z",
+        "clientLastContactTime": "2025-06-16T09:18:40.754Z",
+        "currentSubscriptionsCount": 1,
+        "currentMonitoredItemsCount": 0,
+        "currentPublishRequestsInQueue": 5,
+        "totalRequestCount": {
+          "totalCount": 864,
+          "errorCount": 0
+        },
+        "unauthorizedRequestCount": 0,
+        "readCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "historyReadCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "writeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "historyUpdateCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "callCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "modifyMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setMonitoringModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setTriggeringCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createSubscriptionCount": {
+          "totalCount": 1,
+          "errorCount": 0
+        },
+        "modifySubscriptionCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setPublishingModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "publishCount": {
+          "totalCount": 863,
+          "errorCount": 0
+        },
+        "republishCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "transferSubscriptionsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteSubscriptionsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "browseCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "browseNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "translateBrowsePathsToNodeIdsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryFirstCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "registerNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "unregisterNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        }
+      },
+      {
+        "sessionId": "ns=1;i=335972813",
+        "sessionName": "ClientSession1",
+        "clientDescription": {
+          "applicationUri": "urn:DESKTOP-PUFAUHT:NodeOPCUA-Client",
+          "productUri": "NodeOPCUA-Client",
+          "applicationName": {
+            "text": "NodeOPCUA-Client"
+          },
+          "applicationType": "Client",
+          "gatewayServerUri": "",
+          "discoveryProfileUri": "",
+          "discoveryUrls": []
+        },
+        "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+        "endpointUrl": "opc.tcp://192.168.1.2:4840",
+        "localeIds": [],
+        "actualSessionTimeout": 30000,
+        "maxResponseMessageSize": 800000,
+        "clientConnectionTime": "2025-06-16T06:54:16.982Z",
+        "clientLastContactTime": "2025-06-16T09:18:49.991Z",
+        "currentSubscriptionsCount": 1,
+        "currentMonitoredItemsCount": 329,
+        "currentPublishRequestsInQueue": 5,
+        "totalRequestCount": {
+          "totalCount": 7480,
+          "errorCount": 3
+        },
+        "unauthorizedRequestCount": 0,
+        "readCount": {
+          "totalCount": 1,
+          "errorCount": 0
+        },
+        "historyReadCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "writeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "historyUpdateCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "callCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createMonitoredItemsCount": {
+          "totalCount": 1,
+          "errorCount": 0
+        },
+        "modifyMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setMonitoringModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setTriggeringCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createSubscriptionCount": {
+          "totalCount": 1,
+          "errorCount": 0
+        },
+        "modifySubscriptionCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setPublishingModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "publishCount": {
+          "totalCount": 7473,
+          "errorCount": 0
+        },
+        "republishCount": {
+          "totalCount": 3,
+          "errorCount": 2
+        },
+        "transferSubscriptionsCount": {
+          "totalCount": 1,
+          "errorCount": 1
+        },
+        "deleteSubscriptionsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "browseCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "browseNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "translateBrowsePathsToNodeIdsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryFirstCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "registerNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "unregisterNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        }
+      },
+      {
+        "sessionId": "ns=1;i=648760849",
+        "sessionName": "AVR&D_Solar_Power_Plant_Dashboard-PID630721",
+        "clientDescription": {
+          "applicationUri": "urn:MacBook-Air.local:NodeOPCUA-Client",
+          "productUri": "NodeOPCUA-Client",
+          "applicationName": {
+            "text": "NodeOPCUA-Client"
+          },
+          "applicationType": "Client",
+          "gatewayServerUri": "",
+          "discoveryProfileUri": "",
+          "discoveryUrls": []
+        },
+        "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+        "endpointUrl": "opc.tcp://192.168.1.2:4840",
+        "localeIds": [],
+        "actualSessionTimeout": 30000,
+        "maxResponseMessageSize": 800000,
+        "clientConnectionTime": "2025-06-16T09:18:06.052Z",
+        "clientLastContactTime": "2025-06-16T09:18:50.671Z",
+        "currentSubscriptionsCount": 0,
+        "currentMonitoredItemsCount": 0,
+        "currentPublishRequestsInQueue": 0,
+        "totalRequestCount": {
+          "totalCount": 132,
+          "errorCount": 0
+        },
+        "unauthorizedRequestCount": 0,
+        "readCount": {
+          "totalCount": 116,
+          "errorCount": 0
+        },
+        "historyReadCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "writeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "historyUpdateCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "callCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "modifyMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setMonitoringModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setTriggeringCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createSubscriptionCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "modifySubscriptionCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setPublishingModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "publishCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "republishCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "transferSubscriptionsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteSubscriptionsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "browseCount": {
+          "totalCount": 16,
+          "errorCount": 0
+        },
+        "browseNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "translateBrowsePathsToNodeIdsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryFirstCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "registerNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "unregisterNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        }
+      },
+      {
+        "sessionId": "ns=1;i=972933471",
+        "sessionName": "ClientSession1",
+        "clientDescription": {
+          "applicationUri": "urn:MacBook-Air.local:NodeOPCUA-Client",
+          "productUri": "NodeOPCUA-Client",
+          "applicationName": {
+            "text": "MainAppClient-MyApp"
+          },
+          "applicationType": "Client",
+          "gatewayServerUri": "",
+          "discoveryProfileUri": "",
+          "discoveryUrls": []
+        },
+        "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+        "endpointUrl": "opc.tcp://192.168.1.2:4840",
+        "localeIds": [],
+        "actualSessionTimeout": 30000,
+        "maxResponseMessageSize": 800000,
+        "clientConnectionTime": "2025-06-16T09:18:10.453Z",
+        "clientLastContactTime": "2025-06-16T09:18:42.814Z",
+        "currentSubscriptionsCount": 1,
+        "currentMonitoredItemsCount": 0,
+        "currentPublishRequestsInQueue": 5,
+        "totalRequestCount": {
+          "totalCount": 10,
+          "errorCount": 0
+        },
+        "unauthorizedRequestCount": 0,
+        "readCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "historyReadCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "writeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "historyUpdateCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "callCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "modifyMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setMonitoringModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setTriggeringCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteMonitoredItemsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "createSubscriptionCount": {
+          "totalCount": 1,
+          "errorCount": 0
+        },
+        "modifySubscriptionCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "setPublishingModeCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "publishCount": {
+          "totalCount": 9,
+          "errorCount": 0
+        },
+        "republishCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "transferSubscriptionsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteSubscriptionsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "addReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "deleteReferencesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "browseCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "browseNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "translateBrowsePathsToNodeIdsCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryFirstCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "queryNextCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "registerNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        },
+        "unregisterNodesCount": {
+          "totalCount": 0,
+          "errorCount": 0
+        }
+      }
+    ],
+    "dataType": "Unknown (865)"
+  },
+  {
+    "name": "ns=4:Power On Voltage",
+    "address": "ns=4;i=3",
+    "initialValue": 100,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Reconnecting Time",
+    "address": "ns=4;i=4",
+    "initialValue": 30,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Lower Limit of Grid Voltage",
+    "address": "ns=4;i=5",
+    "initialValue": 1909,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Upper Limit of Grid Voltage_1",
+    "address": "ns=4;i=6",
+    "initialValue": 2870,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Lower Limit of Grid Frequency",
+    "address": "ns=4;i=7",
+    "initialValue": 4750,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Upper Limit of Grid Frequency_1",
+    "address": "ns=4;i=8",
+    "initialValue": 5250,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Device RTC Time Year/Month",
+    "address": "ns=4;i=10",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Device RTC Time Day/Hour",
+    "address": "ns=4;i=11",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Device RTC Time Minute/Second",
+    "address": "ns=4;i=12",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Active power adjust",
+    "address": "ns=4;i=14",
+    "initialValue": 100,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:PF Reactive power adjust",
+    "address": "ns=4;i=15",
+    "initialValue": 100,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Reactive Power adjust",
+    "address": "ns=4;i=16",
+    "initialValue": 0,
+    "dataType": "Int32"
+  },
+  {
+    "name": "ns=4:Max value of reactive power",
+    "address": "ns=4;i=17",
+    "initialValue": 0,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "ns=4:On Grid Export Power Limit Switch",
+    "address": "ns=4;i=19",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Set the Export power percentage (Need to turn on the limit switch)",
+    "address": "ns=4;i=20",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Set the Export power percentage (Need to turn on the limit switch)_1",
+    "address": "ns=4;i=21",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Error Message",
+    "address": "ns=4;i=22",
+    "initialValue": 0,
+    "dataType": "UInt32"
+  },
+  {
+    "name": "ns=4:High Byte of Total Feed Total Power Generation",
+    "address": "ns=4;i=24",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Low Byte of Total Feed Total Power Generation",
+    "address": "ns=4;i=25",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:High byte of total hourly power generaton",
+    "address": "ns=4;i=26",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Low byte of total hourly power generaton",
+    "address": "ns=4;i=27",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Vpv1 /PV1 input voltage",
+    "address": "ns=4;i=28",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Vpv2/PV2 input voltage",
+    "address": "ns=4;i=29",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Ipv1/PV1 input current",
+    "address": "ns=4;i=30",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Ipv2/PV2 input current",
+    "address": "ns=4;i=31",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Vac1/L1 phase Voltage",
+    "address": "ns=4;i=32",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Vac2/L2 phase Voltage",
+    "address": "ns=4;i=33",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Vac3/L3 phase Voltage",
+    "address": "ns=4;i=34",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Iac1/L1 Phase current",
+    "address": "ns=4;i=35",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Iac2/L2 Phase current",
+    "address": "ns=4;i=36",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Iac3/L3 Phase current",
+    "address": "ns=4;i=37",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Fac1/L1 Phase Frequency",
+    "address": "ns=4;i=38",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Fac2/L2 Phase Frequency",
+    "address": "ns=4;i=39",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Fac3/L3 Phase Frequency",
+    "address": "ns=4;i=40",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Pac L/ inverter current",
+    "address": "ns=4;i=41",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Work Mode",
+    "address": "ns=4;i=42",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Inverter internal",
+    "address": "ns=4;i=43",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:E-day/daily power generation",
+    "address": "ns=4;i=44",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Grid1_I",
+    "address": "ns=4;i=46",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid2_I",
+    "address": "ns=4;i=47",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid3_I",
+    "address": "ns=4;i=48",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid_V_L1",
+    "address": "ns=4;i=49",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid_V_L2",
+    "address": "ns=4;i=50",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid_V_L3",
+    "address": "ns=4;i=51",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Limit1_I",
+    "address": "ns=4;i=52",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Limit2_I",
+    "address": "ns=4;i=53",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Limit3_I",
+    "address": "ns=4;i=54",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:PV1_V",
+    "address": "ns=4;i=55",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:PV1_I",
+    "address": "ns=4;i=56",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:PV2_V",
+    "address": "ns=4;i=57",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:PV2_I",
+    "address": "ns=4;i=58",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:INV_A_I",
+    "address": "ns=4;i=59",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:INV_B_I",
+    "address": "ns=4;i=60",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:INV_C_I",
+    "address": "ns=4;i=61",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:INV_A_V",
+    "address": "ns=4;i=62",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:INV_B_V",
+    "address": "ns=4;i=63",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:INV_C_V",
+    "address": "ns=4;i=64",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:BAT_I",
+    "address": "ns=4;i=65",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:BAT_V",
+    "address": "ns=4;i=66",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Max Solar Sell Power",
+    "address": "ns=4;i=68",
+    "initialValue": 12000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Run State",
+    "address": "ns=4;i=70",
+    "initialValue": 2,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active power generation of today",
+    "address": "ns=4;i=71",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Reactive power generation of today",
+    "address": "ns=4;i=72",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid connection time of today",
+    "address": "ns=4;i=73",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Active power generation of total low byte",
+    "address": "ns=4;i=74",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active power generation of total high byte",
+    "address": "ns=4;i=75",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active power generation of total low byte_1",
+    "address": "ns=4;i=76",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active power generation of total high byte_1",
+    "address": "ns=4;i=77",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total charge of the battery",
+    "address": "ns=4;i=79",
+    "initialValue": 4,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total charge of the battery low byte",
+    "address": "ns=4;i=80",
+    "initialValue": 2,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:total charge of the battery high byte",
+    "address": "ns=4;i=81",
+    "initialValue": 7533,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total discharge of the battery low byte",
+    "address": "ns=4;i=82",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total discharge of the battery high byte",
+    "address": "ns=4;i=83",
+    "initialValue": 6335,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Day_Grid Buy_Power Wh",
+    "address": "ns=4;i=84",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DAy_GridSell_Power Wh",
+    "address": "ns=4;i=85",
+    "initialValue": 118,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total_GridBuy_Power Wh_low word",
+    "address": "ns=4;i=86",
+    "initialValue": 43,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total_GridBuy_Power Wh_high word",
+    "address": "ns=4;i=87",
+    "initialValue": 6744,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total_GridSell_Power Wh_low word",
+    "address": "ns=4;i=88",
+    "initialValue": 2,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total_GridSell_Power Wh_high word",
+    "address": "ns=4;i=89",
+    "initialValue": 6826,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DAy_Load_Power Wh",
+    "address": "ns=4;i=90",
+    "initialValue": 1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total_Load_Power Wh_low word",
+    "address": "ns=4;i=91",
+    "initialValue": 296,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total_Load_Power Wh_high word",
+    "address": "ns=4;i=92",
+    "initialValue": -10632,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Day_PV_Power Wh",
+    "address": "ns=4;i=93",
+    "initialValue": 3,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Day_PV-1_Power Wh",
+    "address": "ns=4;i=94",
+    "initialValue": 233,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Day_PV-2_Power Wh",
+    "address": "ns=4;i=95",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Day_PV-3_Power Wh",
+    "address": "ns=4;i=96",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Day_PV-4_Power Wh",
+    "address": "ns=4;i=97",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total PV_power Wh_low word",
+    "address": "ns=4;i=98",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total PV_power Wh_high word",
+    "address": "ns=4;i=99",
+    "initialValue": 4662,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC Transformer Temperature",
+    "address": "ns=4;i=101",
+    "initialValue": 1250,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Heat sink temperature",
+    "address": "ns=4;i=102",
+    "initialValue": 1498,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Turn on/off status",
+    "address": "ns=4;i=104",
+    "initialValue": 1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:AC relay status",
+    "address": "ns=4;i=105",
+    "initialValue": 13,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Warning message Word_1",
+    "address": "ns=4;i=106",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Warning message Word_2",
+    "address": "ns=4;i=107",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Fault information word_1",
+    "address": "ns=4;i=108",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Fault information word_2",
+    "address": "ns=4;i=109",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Fault information word_3",
+    "address": "ns=4;i=110",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Fault information word_4",
+    "address": "ns=4;i=111",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Battery temperature",
+    "address": "ns=4;i=113",
+    "initialValue": 1282,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery voltage",
+    "address": "ns=4;i=114",
+    "initialValue": 5151,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery capacity",
+    "address": "ns=4;i=115",
+    "initialValue": 100,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:N/A",
+    "address": "ns=4;i=116",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery output power",
+    "address": "ns=4;i=117",
+    "initialValue": -6,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery output current",
+    "address": "ns=4;i=118",
+    "initialValue": -12,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:corrected AH",
+    "address": "ns=4;i=119",
+    "initialValue": 712,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid phase voltage A",
+    "address": "ns=4;i=121",
+    "initialValue": 2421,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid phase voltage B",
+    "address": "ns=4;i=122",
+    "initialValue": 2463,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid phase voltage C",
+    "address": "ns=4;i=123",
+    "initialValue": 2426,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid line voltage AB",
+    "address": "ns=4;i=124",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid line voltage BC",
+    "address": "ns=4;i=125",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid line voltage CA",
+    "address": "ns=4;i=126",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:A phase power in the inner side of the grid",
+    "address": "ns=4;i=127",
+    "initialValue": 1401,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:B phase power in the inner side of the grid",
+    "address": "ns=4;i=128",
+    "initialValue": -717,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:C phase power in the inner side of the grid",
+    "address": "ns=4;i=129",
+    "initialValue": 2261,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Total active power from side to side of the grid",
+    "address": "ns=4;i=130",
+    "initialValue": 2945,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid side - inside total apparent power",
+    "address": "ns=4;i=131",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid side frequency",
+    "address": "ns=4;i=132",
+    "initialValue": 5004,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:grid side inner current A",
+    "address": "ns=4;i=133",
+    "initialValue": 522,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:grid side inner current B",
+    "address": "ns=4;i=134",
+    "initialValue": 295,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:grid side inner current C",
+    "address": "ns=4;i=135",
+    "initialValue": 882,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Current A",
+    "address": "ns=4;i=136",
+    "initialValue": 516,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Current B",
+    "address": "ns=4;i=137",
+    "initialValue": 300,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Current C",
+    "address": "ns=4;i=138",
+    "initialValue": 887,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Power A",
+    "address": "ns=4;i=139",
+    "initialValue": -1375,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Power B",
+    "address": "ns=4;i=140",
+    "initialValue": 723,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Power C",
+    "address": "ns=4;i=141",
+    "initialValue": -2273,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Total Power",
+    "address": "ns=4;i=142",
+    "initialValue": -2925,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Out-of -grid - Total apparent Power",
+    "address": "ns=4;i=143",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid connected power factor",
+    "address": "ns=4;i=144",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Side A phase power",
+    "address": "ns=4;i=145",
+    "initialValue": 1401,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Side B phase power",
+    "address": "ns=4;i=146",
+    "initialValue": -717,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Side C phase power",
+    "address": "ns=4;i=147",
+    "initialValue": 2261,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Drid side total power",
+    "address": "ns=4;i=148",
+    "initialValue": 2945,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:N/A",
+    "address": "ns=4;i=149",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Voltage A",
+    "address": "ns=4;i=150",
+    "initialValue": 2424,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Voltage B",
+    "address": "ns=4;i=151",
+    "initialValue": 2462,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Voltage C",
+    "address": "ns=4;i=152",
+    "initialValue": 2424,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Current A",
+    "address": "ns=4;i=153",
+    "initialValue": 460,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Current B",
+    "address": "ns=4;i=154",
+    "initialValue": 280,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Current C",
+    "address": "ns=4;i=155",
+    "initialValue": 480,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Power A",
+    "address": "ns=4;i=156",
+    "initialValue": 1128,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Power  B",
+    "address": "ns=4;i=157",
+    "initialValue": 750,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output phase Power C",
+    "address": "ns=4;i=158",
+    "initialValue": 1165,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output total power",
+    "address": "ns=4;i=159",
+    "initialValue": 3043,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter output total apparent power",
+    "address": "ns=4;i=160",
+    "initialValue": 3043,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Inverter Frequency",
+    "address": "ns=4;i=161",
+    "initialValue": 5004,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:N/A_1",
+    "address": "ns=4;i=162",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:UPS load-side phase power A",
+    "address": "ns=4;i=163",
+    "initialValue": 2531,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:UPS load-side phase power B",
+    "address": "ns=4;i=164",
+    "initialValue": 33,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:UPS load-side phase power C",
+    "address": "ns=4;i=165",
+    "initialValue": 3441,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:UPS load-side total power",
+    "address": "ns=4;i=166",
+    "initialValue": 6005,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase voltage A",
+    "address": "ns=4;i=167",
+    "initialValue": 2424,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase voltage B",
+    "address": "ns=4;i=168",
+    "initialValue": 2476,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase voltage C",
+    "address": "ns=4;i=169",
+    "initialValue": 2417,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase current A no use",
+    "address": "ns=4;i=170",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase current B no use",
+    "address": "ns=4;i=171",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase current C no use",
+    "address": "ns=4;i=172",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase power A",
+    "address": "ns=4;i=173",
+    "initialValue": 2531,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase power B",
+    "address": "ns=4;i=174",
+    "initialValue": 33,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase power C",
+    "address": "ns=4;i=175",
+    "initialValue": 3441,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load total power",
+    "address": "ns=4;i=176",
+    "initialValue": 6005,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load phase apparent power undefine",
+    "address": "ns=4;i=177",
+    "initialValue": 6005,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Load Frequency",
+    "address": "ns=4;i=178",
+    "initialValue": 5000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Input power PV1",
+    "address": "ns=4;i=180",
+    "initialValue": 3166,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Input power PV2",
+    "address": "ns=4;i=181",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Input power PV3",
+    "address": "ns=4;i=182",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Input power PV4",
+    "address": "ns=4;i=183",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC voltage 1",
+    "address": "ns=4;i=184",
+    "initialValue": 4122,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC current 1",
+    "address": "ns=4;i=185",
+    "initialValue": 74,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC voltage 2",
+    "address": "ns=4;i=186",
+    "initialValue": 254,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC current 2",
+    "address": "ns=4;i=187",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC voltage 3",
+    "address": "ns=4;i=188",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC current 3",
+    "address": "ns=4;i=189",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC voltage 4",
+    "address": "ns=4;i=190",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:DC current 4",
+    "address": "ns=4;i=191",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Control Mode",
+    "address": "ns=4;i=193",
+    "initialValue": 1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Equilazation V",
+    "address": "ns=4;i=194",
+    "initialValue": 5720,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Absorption V",
+    "address": "ns=4;i=195",
+    "initialValue": 5720,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Float V",
+    "address": "ns=4;i=196",
+    "initialValue": 5525,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Batt Capacity",
+    "address": "ns=4;i=197",
+    "initialValue": 1000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Empty V",
+    "address": "ns=4;i=198",
+    "initialValue": 4500,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Zero Export Power",
+    "address": "ns=4;i=199",
+    "initialValue": 20,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Equalization day cycle",
+    "address": "ns=4;i=200",
+    "initialValue": 90,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Equalization Time",
+    "address": "ns=4;i=201",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:TEMPCO",
+    "address": "ns=4;i=202",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Max A Charge Battery",
+    "address": "ns=4;i=203",
+    "initialValue": 200,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Max A Discharge Battery",
+    "address": "ns=4;i=204",
+    "initialValue": 195,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Lithium Battery Wake up sign bit",
+    "address": "ns=4;i=206",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery Resistance Value",
+    "address": "ns=4;i=207",
+    "initialValue": 25,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery charging Efficiency",
+    "address": "ns=4;i=208",
+    "initialValue": 990,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery Capacity ShutDown",
+    "address": "ns=4;i=209",
+    "initialValue": 20,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery Capacity Restart",
+    "address": "ns=4;i=210",
+    "initialValue": 50,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery Capacity Low battery",
+    "address": "ns=4;i=211",
+    "initialValue": 20,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery Voltage ShutDown",
+    "address": "ns=4;i=212",
+    "initialValue": 4600,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery Voltage Restart",
+    "address": "ns=4;i=213",
+    "initialValue": 5200,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Battery Voltage Low battery",
+    "address": "ns=4;i=214",
+    "initialValue": 4750,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid charging start voltage point",
+    "address": "ns=4;i=216",
+    "initialValue": 4900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid charging start capacity point",
+    "address": "ns=4;i=217",
+    "initialValue": 40,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid charge battery current",
+    "address": "ns=4;i=218",
+    "initialValue": 40,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid is charged to enable",
+    "address": "ns=4;i=220",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:AC couple",
+    "address": "ns=4;i=221",
+    "initialValue": 5500,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Energy Management model",
+    "address": "ns=4;i=223",
+    "initialValue": 1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Limit Control function",
+    "address": "ns=4;i=224",
+    "initialValue": 1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Limit the maximum power output of the grid connection",
+    "address": "ns=4;i=225",
+    "initialValue": 12100,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:External Current Sensor Clamp Phase",
+    "address": "ns=4;i=226",
+    "initialValue": 11,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Solar sell",
+    "address": "ns=4;i=227",
+    "initialValue": 1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Time of use selling enabled",
+    "address": "ns=4;i=228",
+    "initialValue": 254,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Phase",
+    "address": "ns=4;i=229",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Sell mode time point 1",
+    "address": "ns=4;i=230",
+    "initialValue": 100,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Sell mode time point 2",
+    "address": "ns=4;i=231",
+    "initialValue": 500,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Sell mode time point 3",
+    "address": "ns=4;i=232",
+    "initialValue": 900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Sell mode time point 4",
+    "address": "ns=4;i=233",
+    "initialValue": 1300,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Sell mode time point 5",
+    "address": "ns=4;i=234",
+    "initialValue": 1700,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Sell mode time point 6",
+    "address": "ns=4;i=235",
+    "initialValue": 2100,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Power (Sell mode time point 1)",
+    "address": "ns=4;i=236",
+    "initialValue": 11000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Power (Sell mode time point 2)",
+    "address": "ns=4;i=237",
+    "initialValue": 11000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Power (Sell mode time point 3)",
+    "address": "ns=4;i=238",
+    "initialValue": 11000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Power (Sell mode time point 4)",
+    "address": "ns=4;i=239",
+    "initialValue": 11000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Power (Sell mode time point 5)",
+    "address": "ns=4;i=240",
+    "initialValue": 11000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Power (Sell mode time point 6)",
+    "address": "ns=4;i=241",
+    "initialValue": 10992,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Voltage (Sell mode time point 1)",
+    "address": "ns=4;i=242",
+    "initialValue": 4900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Voltage (Sell mode time point 2)",
+    "address": "ns=4;i=243",
+    "initialValue": 4900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Voltage (Sell mode time point 3)",
+    "address": "ns=4;i=244",
+    "initialValue": 4900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Voltage (Sell mode time point 4)",
+    "address": "ns=4;i=245",
+    "initialValue": 4900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Voltage (Sell mode time point 5)",
+    "address": "ns=4;i=246",
+    "initialValue": 4900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Voltage (Sell mode time point 6)",
+    "address": "ns=4;i=247",
+    "initialValue": 4900,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Capacity 1",
+    "address": "ns=4;i=248",
+    "initialValue": 70,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Capacity 2",
+    "address": "ns=4;i=249",
+    "initialValue": 70,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Capacity 3",
+    "address": "ns=4;i=250",
+    "initialValue": 70,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Capacity 4",
+    "address": "ns=4;i=251",
+    "initialValue": 70,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Capacity 5",
+    "address": "ns=4;i=252",
+    "initialValue": 70,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Capacity 6",
+    "address": "ns=4;i=253",
+    "initialValue": 70,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Time point 1 charge enable",
+    "address": "ns=4;i=254",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Time point 2 charge enable",
+    "address": "ns=4;i=255",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Time point 3 charge enable",
+    "address": "ns=4;i=256",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Time point 4 charge enable",
+    "address": "ns=4;i=257",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Time point 5 charge enable",
+    "address": "ns=4;i=258",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Time point 6 charge enable",
+    "address": "ns=4;i=259",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Mode",
+    "address": "ns=4;i=261",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Frequency",
+    "address": "ns=4;i=262",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Type",
+    "address": "ns=4;i=263",
+    "initialValue": 1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Voltage High",
+    "address": "ns=4;i=264",
+    "initialValue": 2650,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Voltage Low",
+    "address": "ns=4;i=265",
+    "initialValue": 1850,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Hz High",
+    "address": "ns=4;i=266",
+    "initialValue": 5136,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid Hz Low",
+    "address": "ns=4;i=267",
+    "initialValue": 4684,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:XXXXXX Gen. connected to thr grid input",
+    "address": "ns=4;i=268",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:XXXXXX GEN peak shaving power",
+    "address": "ns=4;i=269",
+    "initialValue": 8000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Grid peak shaving Power",
+    "address": "ns=4;i=270",
+    "initialValue": 8000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:UPS_Delay time",
+    "address": "ns=4;i=272",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Charging Voltage",
+    "address": "ns=4;i=273",
+    "initialValue": 5250,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Discharging Voltage",
+    "address": "ns=4;i=274",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Charging current limiting",
+    "address": "ns=4;i=275",
+    "initialValue": 475,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Discharge current limiting",
+    "address": "ns=4;i=276",
+    "initialValue": 570,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Real time capacity",
+    "address": "ns=4;i=277",
+    "initialValue": 100,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Real time voltage",
+    "address": "ns=4;i=278",
+    "initialValue": 5011,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Real time current",
+    "address": "ns=4;i=279",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Real Time temp",
+    "address": "ns=4;i=280",
+    "initialValue": 1282,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Maximum charge current limiting",
+    "address": "ns=4;i=281",
+    "initialValue": 495,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Maximum discharge current limiting",
+    "address": "ns=4;i=282",
+    "initialValue": 590,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Lithium battery type",
+    "address": "ns=4;i=284",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Lithium Battery SOH",
+    "address": "ns=4;i=285",
+    "initialValue": -1,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Power On (Allow On Grid Self Test)",
+    "address": "ns=4;i=287",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Power Off (Not Allow On Grid Self Test)_1",
+    "address": "ns=4;i=288",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Restart",
+    "address": "ns=4;i=289",
+    "initialValue": 0,
+    "dataType": "UInt16"
+  },
+  {
+    "name": "ns=4:Current A",
+    "address": "ns=4;i=291",
+    "initialValue": 6.418680191040039,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current B",
+    "address": "ns=4;i=292",
+    "initialValue": 6.30055046081543,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current C",
+    "address": "ns=4;i=293",
+    "initialValue": 6.495015621185303,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current N",
+    "address": "ns=4;i=294",
+    "initialValue": 11.100868225097656,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current G",
+    "address": "ns=4;i=295",
+    "initialValue": null,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current Avg",
+    "address": "ns=4;i=296",
+    "initialValue": 6.404748916625977,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current Unbalance A",
+    "address": "ns=4;i=297",
+    "initialValue": 0.217514768242836,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current Unbalance B",
+    "address": "ns=4;i=298",
+    "initialValue": 1.6268936395645142,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current Unbalance C",
+    "address": "ns=4;i=299",
+    "initialValue": 1.4093714952468872,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Current Unbalance Worst",
+    "address": "ns=4;i=300",
+    "initialValue": 1.6268936395645142,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage A-B",
+    "address": "ns=4;i=301",
+    "initialValue": 420.99664306640625,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage B-C",
+    "address": "ns=4;i=302",
+    "initialValue": 418.9123840332031,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage C-A",
+    "address": "ns=4;i=303",
+    "initialValue": 418.8035888671875,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage L-L Avg",
+    "address": "ns=4;i=304",
+    "initialValue": 419.5708923339844,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage A-N",
+    "address": "ns=4;i=305",
+    "initialValue": 240.639404296875,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage B-N",
+    "address": "ns=4;i=306",
+    "initialValue": 245.5148162841797,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage C-N",
+    "address": "ns=4;i=307",
+    "initialValue": 240.63389587402344,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use",
+    "address": "ns=4;i=308",
+    "initialValue": -4.591774807899561e-41,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage L-N Avg",
+    "address": "ns=4;i=309",
+    "initialValue": 242.26271057128906,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance A-B",
+    "address": "ns=4;i=310",
+    "initialValue": 0.33981165289878845,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance B-C",
+    "address": "ns=4;i=311",
+    "initialValue": 0.1569480448961258,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance C-A",
+    "address": "ns=4;i=312",
+    "initialValue": 0.18287815153598785,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance L-L Worst",
+    "address": "ns=4;i=313",
+    "initialValue": 0.33981165289878845,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance A-N",
+    "address": "ns=4;i=314",
+    "initialValue": 0.6700603365898132,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance B-N",
+    "address": "ns=4;i=315",
+    "initialValue": 1.3423880338668823,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance C-N",
+    "address": "ns=4;i=316",
+    "initialValue": 0.6723340749740601,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Voltage Unbalance L-N Worst",
+    "address": "ns=4;i=317",
+    "initialValue": 1.3423880338668823,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Active Power A",
+    "address": "ns=4;i=318",
+    "initialValue": -1.34507417678833,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Active Power B",
+    "address": "ns=4;i=319",
+    "initialValue": -1.5381120443344116,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Active Power C",
+    "address": "ns=4;i=320",
+    "initialValue": 1.4093923568725586,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Active Power Total",
+    "address": "ns=4;i=321",
+    "initialValue": -1.4737939834594727,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Power A",
+    "address": "ns=4;i=322",
+    "initialValue": 0.7874541282653809,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Power B",
+    "address": "ns=4;i=323",
+    "initialValue": 0.16098137199878693,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Power C",
+    "address": "ns=4;i=324",
+    "initialValue": 0.6435755491256714,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Power Total",
+    "address": "ns=4;i=325",
+    "initialValue": 1.5920109748840332,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Power A",
+    "address": "ns=4;i=326",
+    "initialValue": 1.056736946105957,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Power B",
+    "address": "ns=4;i=327",
+    "initialValue": 1.4809273481369019,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Power C",
+    "address": "ns=4;i=328",
+    "initialValue": 1.6003365516662598,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Power Total",
+    "address": "ns=4;i=329",
+    "initialValue": 4.138000965118408,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_1",
+    "address": "ns=4;i=330",
+    "initialValue": -0.6668688654899597,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_2",
+    "address": "ns=4;i=331",
+    "initialValue": -0.9940742254257202,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_3",
+    "address": "ns=4;i=332",
+    "initialValue": 0.9155737161636353,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_4",
+    "address": "ns=4;i=333",
+    "initialValue": -1.828025460243225,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_5",
+    "address": "ns=4;i=334",
+    "initialValue": 0.9999174475669861,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_6",
+    "address": "ns=4;i=335",
+    "initialValue": 0.9999210834503174,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_7",
+    "address": "ns=4;i=336",
+    "initialValue": 0.9998977780342102,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Not use_8",
+    "address": "ns=4;i=337",
+    "initialValue": -2.9999120235443115,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Power Factor A",
+    "address": "ns=4;i=338",
+    "initialValue": 2147516416,
+    "dataType": "DWORD"
+  },
+  {
+    "name": "ns=4:Power Factor B",
+    "address": "ns=4;i=339",
+    "initialValue": 2147516416,
+    "dataType": "DWORD"
+  },
+  {
+    "name": "ns=4:Power Factor C",
+    "address": "ns=4;i=340",
+    "initialValue": 2147516416,
+    "dataType": "DWORD"
+  },
+  {
+    "name": "ns=4:Power Factor Total",
+    "address": "ns=4;i=341",
+    "initialValue": 2147516416,
+    "dataType": "DWORD"
+  },
+  {
+    "name": "ns=4:Displacement Power Factor A",
+    "address": "ns=4;i=342",
+    "initialValue": -4.591774807899561e-41,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Displacement Power Factor B",
+    "address": "ns=4;i=343",
+    "initialValue": -4.591774807899561e-41,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Displacement Power Factor C",
+    "address": "ns=4;i=344",
+    "initialValue": -4.591774807899561e-41,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Displacement Power Factor Total",
+    "address": "ns=4;i=345",
+    "initialValue": -4.591774807899561e-41,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Frequency",
+    "address": "ns=4;i=346",
+    "initialValue": 49.980648040771484,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Year",
+    "address": "ns=4;i=348",
+    "initialValue": 0,
+    "dataType": "SByte"
+  },
+  {
+    "name": "ns=4:Month",
+    "address": "ns=4;i=349",
+    "initialValue": 0,
+    "dataType": "SByte"
+  },
+  {
+    "name": "ns=4:Day",
+    "address": "ns=4;i=350",
+    "initialValue": 0,
+    "dataType": "SByte"
+  },
+  {
+    "name": "ns=4:Hour",
+    "address": "ns=4;i=351",
+    "initialValue": 0,
+    "dataType": "SByte"
+  },
+  {
+    "name": "ns=4:Minute",
+    "address": "ns=4;i=352",
+    "initialValue": 0,
+    "dataType": "SByte"
+  },
+  {
+    "name": "ns=4:Second",
+    "address": "ns=4;i=353",
+    "initialValue": 0,
+    "dataType": "SByte"
+  },
+  {
+    "name": "ns=4:Millisecond",
+    "address": "ns=4;i=354",
+    "initialValue": 0,
+    "dataType": "SByte"
+  },
+  {
+    "name": "ns=4:Active Load Timer",
+    "address": "ns=4;i=356",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Meter Operation Timer_1",
+    "address": "ns=4;i=357",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Cycle Count",
+    "address": "ns=4;i=358",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Active Energy Delivered (Into Load)",
+    "address": "ns=4;i=360",
+    "initialValue": 17829,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active Energy Received (Out of Load)",
+    "address": "ns=4;i=361",
+    "initialValue": 7.380937753185278e-34,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Active Energy Delivered + Received",
+    "address": "ns=4;i=362",
+    "initialValue": 36567,
+    "dataType": "WORD"
+  },
+  {
+    "name": "ns=4:Active Energy Delivered- Received",
+    "address": "ns=4;i=363",
+    "initialValue": 14724.7666015625,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Energy Delivered",
+    "address": "ns=4;i=364",
+    "initialValue": -4162.65283203125,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Energy Received",
+    "address": "ns=4;i=365",
+    "initialValue": 7022.73388671875,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Energy Delivered + Received",
+    "address": "ns=4;i=366",
+    "initialValue": 1814.1700439453125,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Reactive Energy Delivered - Received",
+    "address": "ns=4;i=367",
+    "initialValue": 0,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Energy Delivered",
+    "address": "ns=4;i=368",
+    "initialValue": 0,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Energy Received",
+    "address": "ns=4;i=369",
+    "initialValue": 0,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Energy Delivered + Received",
+    "address": "ns=4;i=370",
+    "initialValue": 0,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Apparent Energy Delivered - Received",
+    "address": "ns=4;i=371",
+    "initialValue": 0,
+    "dataType": "Float"
+  },
+  {
+    "name": "ns=4:Accumulated Energy Reset Date/Time",
+    "address": "ns=4;i=373",
+    "initialValue": 24,
+    "dataType": "DATE"
+  },
+  {
+    "name": "ns=4:Active Energy Delivered (Into Load)",
+    "address": "ns=4;i=374",
+    "initialValue": 1283,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active Energy Received (Out of Load)",
+    "address": "ns=4;i=375",
+    "initialValue": 5159,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active Energy Delivered + Received",
+    "address": "ns=4;i=376",
+    "initialValue": 18000,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Active Energy Delivered + Received_1",
+    "address": "ns=4;i=377",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Reactive Energy Delivered",
+    "address": "ns=4;i=378",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Reactive Energy Received",
+    "address": "ns=4;i=379",
+    "initialValue": 80,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Reactive Energy Delivered + Received",
+    "address": "ns=4;i=380",
+    "initialValue": -27359,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Reactive Energy Delivered - Received",
+    "address": "ns=4;i=381",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Apparent Energy Delivered",
+    "address": "ns=4;i=382",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Apparent Energy Received",
+    "address": "ns=4;i=383",
+    "initialValue": 144,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Apparent Energy Delivered + Received",
+    "address": "ns=4;i=384",
+    "initialValue": 6530,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Apparent Energy Delivered - Received",
+    "address": "ns=4;i=385",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Last Demand",
+    "address": "ns=4;i=387",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Present Demand",
+    "address": "ns=4;i=388",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Predicted Demand",
+    "address": "ns=4;i=389",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Peak Demand",
+    "address": "ns=4;i=390",
+    "initialValue": false,
+    "dataType": "Boolean"
+  },
+  {
+    "name": "ns=4:Deye_Inverter_Modbus_Mode",
+    "address": "ns=4;i=397",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "ns=4:Goodwe_Inverter_Modbus_Mode",
+    "address": "ns=4;i=398",
+    "initialValue": 0,
+    "dataType": "Int16"
+  },
+  {
+    "name": "NamingRule",
+    "address": "ns=0;i=114",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (120)"
+  },
+  {
+    "name": "NamingRule",
+    "address": "ns=0;i=112",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (120)"
+  },
+  {
+    "name": "NamingRule",
+    "address": "ns=0;i=116",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (120)"
+  },
+  {
+    "name": "NamingRule",
+    "address": "ns=0;i=113",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (120)"
+  },
+  {
+    "name": "NamingRule",
+    "address": "ns=0;i=11509",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (120)"
+  },
+  {
+    "name": "NamingRule",
+    "address": "ns=0;i=11511",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (120)"
+  },
+  {
+    "name": "SessionDiagnostics",
+    "address": "ns=1;s=Session_3190210086.SessionDiagnostics",
+    "initialValue": {
+      "sessionId": "ns=1;i=3190210086",
+      "sessionName": "ClientSession1",
+      "clientDescription": {
+        "applicationUri": "urn:DESKTOP-PUFAUHT:NodeOPCUA-Client",
+        "productUri": "NodeOPCUA-Client",
+        "applicationName": {
+          "text": "MainAppClient-MyApp"
+        },
+        "applicationType": "Client",
+        "gatewayServerUri": "",
+        "discoveryProfileUri": "",
+        "discoveryUrls": []
+      },
+      "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+      "endpointUrl": "opc.tcp://192.168.1.2:4840",
+      "localeIds": [],
+      "actualSessionTimeout": 30000,
+      "maxResponseMessageSize": 800000,
+      "clientConnectionTime": "2025-06-16T06:52:49.784Z",
+      "clientLastContactTime": "2025-06-16T09:21:24.216Z",
+      "currentSubscriptionsCount": 1,
+      "currentMonitoredItemsCount": 0,
+      "currentPublishRequestsInQueue": 5,
+      "totalRequestCount": {
+        "totalCount": 880,
+        "errorCount": 0
+      },
+      "unauthorizedRequestCount": 0,
+      "readCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "historyReadCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "writeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "historyUpdateCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "callCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "modifyMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setMonitoringModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setTriggeringCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createSubscriptionCount": {
+        "totalCount": 1,
+        "errorCount": 0
+      },
+      "modifySubscriptionCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setPublishingModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "publishCount": {
+        "totalCount": 879,
+        "errorCount": 0
+      },
+      "republishCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "transferSubscriptionsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteSubscriptionsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "browseCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "browseNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "translateBrowsePathsToNodeIdsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryFirstCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "registerNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "unregisterNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      }
+    },
+    "dataType": "Unknown (865)"
+  },
+  {
+    "name": "SubscriptionDiagnosticsArray",
+    "address": "ns=1;s=Session_3190210086.SubscriptionDiagnosticsArray",
+    "initialValue": [
+      {
+        "sessionId": "ns=1;i=3190210086",
+        "subscriptionId": 3113788418,
+        "priority": 10,
+        "publishingInterval": 1000,
+        "maxKeepAliveCount": 10,
+        "maxLifetimeCount": 300,
+        "maxNotificationsPerPublish": 100,
+        "publishingEnabled": true,
+        "modifyCount": 0,
+        "enableCount": 0,
+        "disableCount": 0,
+        "republishRequestCount": 0,
+        "republishMessageRequestCount": 0,
+        "republishMessageCount": 0,
+        "transferRequestCount": 0,
+        "transferredToAltClientCount": 0,
+        "transferredToSameClientCount": 0,
+        "publishRequestCount": 874,
+        "dataChangeNotificationsCount": 0,
+        "eventNotificationsCount": 0,
+        "notificationsCount": 0,
+        "latePublishRequestCount": 0,
+        "currentKeepAliveCount": 6,
+        "currentLifetimeCount": 6,
+        "unacknowledgedMessageCount": 0,
+        "discardedMessageCount": 0,
+        "monitoredItemCount": 0,
+        "disabledMonitoredItemCount": 0,
+        "monitoringQueueOverflowCount": 0,
+        "nextSequenceNumber": 0,
+        "eventQueueOverflowCount": 0
+      }
+    ],
+    "dataType": "Unknown (874)"
+  },
+  {
+    "name": "SessionDiagnostics",
+    "address": "ns=1;s=Session_335972813.SessionDiagnostics",
+    "initialValue": {
+      "sessionId": "ns=1;i=335972813",
+      "sessionName": "ClientSession1",
+      "clientDescription": {
+        "applicationUri": "urn:DESKTOP-PUFAUHT:NodeOPCUA-Client",
+        "productUri": "NodeOPCUA-Client",
+        "applicationName": {
+          "text": "NodeOPCUA-Client"
+        },
+        "applicationType": "Client",
+        "gatewayServerUri": "",
+        "discoveryProfileUri": "",
+        "discoveryUrls": []
+      },
+      "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+      "endpointUrl": "opc.tcp://192.168.1.2:4840",
+      "localeIds": [],
+      "actualSessionTimeout": 30000,
+      "maxResponseMessageSize": 800000,
+      "clientConnectionTime": "2025-06-16T06:54:16.982Z",
+      "clientLastContactTime": "2025-06-16T09:21:24.239Z",
+      "currentSubscriptionsCount": 1,
+      "currentMonitoredItemsCount": 329,
+      "currentPublishRequestsInQueue": 5,
+      "totalRequestCount": {
+        "totalCount": 7527,
+        "errorCount": 3
+      },
+      "unauthorizedRequestCount": 0,
+      "readCount": {
+        "totalCount": 1,
+        "errorCount": 0
+      },
+      "historyReadCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "writeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "historyUpdateCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "callCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createMonitoredItemsCount": {
+        "totalCount": 1,
+        "errorCount": 0
+      },
+      "modifyMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setMonitoringModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setTriggeringCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createSubscriptionCount": {
+        "totalCount": 1,
+        "errorCount": 0
+      },
+      "modifySubscriptionCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setPublishingModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "publishCount": {
+        "totalCount": 7520,
+        "errorCount": 0
+      },
+      "republishCount": {
+        "totalCount": 3,
+        "errorCount": 2
+      },
+      "transferSubscriptionsCount": {
+        "totalCount": 1,
+        "errorCount": 1
+      },
+      "deleteSubscriptionsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "browseCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "browseNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "translateBrowsePathsToNodeIdsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryFirstCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "registerNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "unregisterNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      }
+    },
+    "dataType": "Unknown (865)"
+  },
+  {
+    "name": "SubscriptionDiagnosticsArray",
+    "address": "ns=1;s=Session_335972813.SubscriptionDiagnosticsArray",
+    "initialValue": [
+      {
+        "sessionId": "ns=1;i=335972813",
+        "subscriptionId": 3113788419,
+        "priority": 10,
+        "publishingInterval": 1000,
+        "maxKeepAliveCount": 10,
+        "maxLifetimeCount": 100,
+        "maxNotificationsPerPublish": 50,
+        "publishingEnabled": true,
+        "modifyCount": 0,
+        "enableCount": 0,
+        "disableCount": 0,
+        "republishRequestCount": 3,
+        "republishMessageRequestCount": 3,
+        "republishMessageCount": 1,
+        "transferRequestCount": 0,
+        "transferredToAltClientCount": 0,
+        "transferredToSameClientCount": 0,
+        "publishRequestCount": 7511,
+        "dataChangeNotificationsCount": 277655,
+        "eventNotificationsCount": 0,
+        "notificationsCount": 7092,
+        "latePublishRequestCount": 2,
+        "currentKeepAliveCount": 6,
+        "currentLifetimeCount": 6,
+        "unacknowledgedMessageCount": 2,
+        "discardedMessageCount": 0,
+        "monitoredItemCount": 329,
+        "disabledMonitoredItemCount": 0,
+        "monitoringQueueOverflowCount": 0,
+        "nextSequenceNumber": 7092,
+        "eventQueueOverflowCount": 0
+      }
+    ],
+    "dataType": "Unknown (874)"
+  },
+  {
+    "name": "SessionDiagnostics",
+    "address": "ns=1;s=Session_972933471.SessionDiagnostics",
+    "initialValue": {
+      "sessionId": "ns=1;i=972933471",
+      "sessionName": "ClientSession1",
+      "clientDescription": {
+        "applicationUri": "urn:MacBook-Air.local:NodeOPCUA-Client",
+        "productUri": "NodeOPCUA-Client",
+        "applicationName": {
+          "text": "MainAppClient-MyApp"
+        },
+        "applicationType": "Client",
+        "gatewayServerUri": "",
+        "discoveryProfileUri": "",
+        "discoveryUrls": []
+      },
+      "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+      "endpointUrl": "opc.tcp://192.168.1.2:4840",
+      "localeIds": [],
+      "actualSessionTimeout": 30000,
+      "maxResponseMessageSize": 800000,
+      "clientConnectionTime": "2025-06-16T09:18:10.453Z",
+      "clientLastContactTime": "2025-06-16T09:21:26.311Z",
+      "currentSubscriptionsCount": 1,
+      "currentMonitoredItemsCount": 0,
+      "currentPublishRequestsInQueue": 5,
+      "totalRequestCount": {
+        "totalCount": 26,
+        "errorCount": 0
+      },
+      "unauthorizedRequestCount": 0,
+      "readCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "historyReadCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "writeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "historyUpdateCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "callCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "modifyMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setMonitoringModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setTriggeringCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createSubscriptionCount": {
+        "totalCount": 1,
+        "errorCount": 0
+      },
+      "modifySubscriptionCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setPublishingModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "publishCount": {
+        "totalCount": 25,
+        "errorCount": 0
+      },
+      "republishCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "transferSubscriptionsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteSubscriptionsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "browseCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "browseNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "translateBrowsePathsToNodeIdsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryFirstCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "registerNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "unregisterNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      }
+    },
+    "dataType": "Unknown (865)"
+  },
+  {
+    "name": "SubscriptionDiagnosticsArray",
+    "address": "ns=1;s=Session_972933471.SubscriptionDiagnosticsArray",
+    "initialValue": [
+      {
+        "sessionId": "ns=1;i=972933471",
+        "subscriptionId": 3113788428,
+        "priority": 10,
+        "publishingInterval": 1000,
+        "maxKeepAliveCount": 10,
+        "maxLifetimeCount": 300,
+        "maxNotificationsPerPublish": 100,
+        "publishingEnabled": true,
+        "modifyCount": 0,
+        "enableCount": 0,
+        "disableCount": 0,
+        "republishRequestCount": 0,
+        "republishMessageRequestCount": 0,
+        "republishMessageCount": 0,
+        "transferRequestCount": 0,
+        "transferredToAltClientCount": 0,
+        "transferredToSameClientCount": 0,
+        "publishRequestCount": 20,
+        "dataChangeNotificationsCount": 0,
+        "eventNotificationsCount": 0,
+        "notificationsCount": 0,
+        "latePublishRequestCount": 0,
+        "currentKeepAliveCount": 4,
+        "currentLifetimeCount": 4,
+        "unacknowledgedMessageCount": 0,
+        "discardedMessageCount": 0,
+        "monitoredItemCount": 0,
+        "disabledMonitoredItemCount": 0,
+        "monitoringQueueOverflowCount": 0,
+        "nextSequenceNumber": 0,
+        "eventQueueOverflowCount": 0
+      }
+    ],
+    "dataType": "Unknown (874)"
+  },
+  {
+    "name": "SessionDiagnostics",
+    "address": "ns=1;s=Session_648760849.SessionDiagnostics",
+    "initialValue": {
+      "sessionId": "ns=1;i=648760849",
+      "sessionName": "AVR&D_Solar_Power_Plant_Dashboard-PID630721",
+      "clientDescription": {
+        "applicationUri": "urn:MacBook-Air.local:NodeOPCUA-Client",
+        "productUri": "NodeOPCUA-Client",
+        "applicationName": {
+          "text": "NodeOPCUA-Client"
+        },
+        "applicationType": "Client",
+        "gatewayServerUri": "",
+        "discoveryProfileUri": "",
+        "discoveryUrls": []
+      },
+      "serverUri": "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
+      "endpointUrl": "opc.tcp://192.168.1.2:4840",
+      "localeIds": [],
+      "actualSessionTimeout": 30000,
+      "maxResponseMessageSize": 800000,
+      "clientConnectionTime": "2025-06-16T09:18:06.052Z",
+      "clientLastContactTime": "2025-06-16T09:21:31.409Z",
+      "currentSubscriptionsCount": 0,
+      "currentMonitoredItemsCount": 0,
+      "currentPublishRequestsInQueue": 0,
+      "totalRequestCount": {
+        "totalCount": 982,
+        "errorCount": 0
+      },
+      "unauthorizedRequestCount": 0,
+      "readCount": {
+        "totalCount": 926,
+        "errorCount": 0
+      },
+      "historyReadCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "writeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "historyUpdateCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "callCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "modifyMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setMonitoringModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setTriggeringCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteMonitoredItemsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "createSubscriptionCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "modifySubscriptionCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "setPublishingModeCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "publishCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "republishCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "transferSubscriptionsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteSubscriptionsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "addReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "deleteReferencesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "browseCount": {
+        "totalCount": 56,
+        "errorCount": 0
+      },
+      "browseNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "translateBrowsePathsToNodeIdsCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryFirstCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "queryNextCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "registerNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      },
+      "unregisterNodesCount": {
+        "totalCount": 0,
+        "errorCount": 0
+      }
+    },
+    "dataType": "Unknown (865)"
+  },
+  {
+    "name": "SubscriptionDiagnosticsArray",
+    "address": "ns=1;s=Session_648760849.SubscriptionDiagnosticsArray",
+    "initialValue": [],
+    "dataType": "Unknown (874)"
+  }
+]

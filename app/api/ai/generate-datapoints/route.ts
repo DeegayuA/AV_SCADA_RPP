@@ -8,8 +8,9 @@ import {
   HarmCategory,
   HarmBlockThreshold,
   SafetySetting,
-  GenerateContentResponse, // This type is for result.response
 } from '@google/genai';
+
+// ... (all your existing interface definitions, global.aiTasks, constants, buildPrompt, etc. remain UNCHANGED from the previous good version) ...
 
 // Extend global interface to include aiTasks
 declare global {
@@ -48,7 +49,7 @@ interface GenerateDatapointsRequestBody {
     geminiApiKey?: string;
 }
 export const dynamic = 'force-dynamic'; // explicitly tell Next.js this is dynamic
-// Interface for the data read from discovered_datapoints.json
+
 interface DiscoveredDataPoint {
   name: string;
   address: string; 
@@ -57,8 +58,9 @@ interface DiscoveredDataPoint {
 }
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-// Updated MODEL_NAME to reflect Gemini 2.0 Flash as per user request and new SDK docs.
-const MODEL_NAME = "gemini-2.0-flash-001"; 
+
+const MODEL_NAME = "gemini-2.5-flash-preview-05-20"; // Or your preferred model for testing, "gemini-pro" is also good for text
+
 const SAFETY_SETTINGS: SafetySetting[] = [
     { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
     { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
@@ -66,14 +68,15 @@ const SAFETY_SETTINGS: SafetySetting[] = [
     { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
 
-const SIMULATED_PROCESSING_DELAY_PER_BATCH_MS = 500; 
+const SIMULATED_PROCESSING_DELAY_PER_BATCH_MS = 500; // Not used in GET test
+
 
 function buildPrompt(discoveredDatapoints: DiscoveredDataPoint[]): string {
   const formattedDataPoints = discoveredDatapoints.map(dp => ({
     name: dp.name,
-    address: dp.address, // nodeId in DataPoint
+    address: dp.address,
     dataType: dp.dataType,
-    initialValue: dp.initialValue // Optional: provide for context if helpful
+    initialValue: dp.initialValue
   }));
 
   const dataTypeMappingGuidance = `
@@ -81,20 +84,20 @@ function buildPrompt(discoveredDatapoints: DiscoveredDataPoint[]): string {
   Allowed types: 'Boolean', 'Float', 'Double', 'Int16', 'Int32', 'UInt16', 'UInt32', 'String', 'DateTime', 'ByteString', 'Guid', 'Byte', 'SByte', 'Int64', 'UInt64', 'StatusCode', 'LocalizedText', 'Unknown'.
   Common OPC UA data types and their typical mappings:
   - "Boolean" -> "Boolean"
-  - "Float" (typically OPC UA data type i=10) -> "Float"
-  - "Double" (typically OPC UA data type i=11) -> "Double"
-  - "SByte" (i=2) -> "SByte"
-  - "Byte" (i=3) -> "Byte"
-  - "Int16" (i=4) -> "Int16"
-  - "UInt16" (i=5) -> "UInt16"
-  - "Int32" (i=6) -> "Int32"
-  - "UInt32" (i=7) -> "UInt32"
-  - "Int64" (i=8) -> "Int64"
-  - "UInt64" (i=9) -> "UInt64"
-  - "String" (i=12) -> "String"
-  - "DateTime" (i=13) -> "DateTime"
-  - "Guid" (i=14) -> "Guid"
-  - "ByteString" (i=15) -> "ByteString"
+  - "Float" -> "Float"
+  - "Double" -> "Double"
+  - "SByte" -> "SByte"
+  - "Byte" -> "Byte"
+  - "Int16" -> "Int16"
+  - "UInt16" -> "UInt16"
+  - "Int32" -> "Int32"
+  - "UInt32" -> "UInt32"
+  - "Int64" -> "Int64"
+  - "UInt64" -> "UInt64"
+  - "String" -> "String"
+  - "DateTime" -> "DateTime"
+  - "Guid" -> "Guid"
+  - "ByteString" -> "ByteString"
   If the OPC UA type is a number like "10", map it to "Float". Use "Unknown" if unsure.
   `;
 
@@ -111,23 +114,23 @@ ${JSON.stringify(formattedDataPoints, null, 2)}
 
 Target TypeScript interface for each datapoint object in the output array:
 interface DataPoint {
-  label: string; // Human-friendly display name (e.g., "Pump Speed")
-  id: string; // kebab-case identifier derived from name (e.g., "pump-speed")
-  name: string; // Original name from OPC UA (e.g., "PLC1.Pumps.P101.Speed")
-  nodeId: string; // Original address (nodeId) from OPC UA (e.g., "ns=2;s=PLC1.Pumps.P101.Speed")
+  label: string; 
+  id: string; 
+  name: string; 
+  nodeId: string; 
   dataType: 'Boolean' | 'Float' | 'Double' | 'Int16' | 'Int32' | 'UInt16' | 'UInt32' | 'String' | 'DateTime' | 'ByteString' | 'Guid' | 'Byte' | 'SByte' | 'Int64' | 'UInt64' | 'StatusCode' | 'LocalizedText' | 'Unknown';
-  uiType?: 'display' | 'button' | 'switch' | 'gauge' | 'input' | 'slider' | 'indicator'; // Optional: suggest HMI element
-  icon?: string; // Optional: Lucide icon name (e.g., 'Zap', 'Thermometer')
-  unit?: string; // Optional: (e.g., "°C", "RPM", "kW")
-  min?: number; // Optional: Min value for inputs/gauges
-  max?: number; // Optional: Max value for inputs/gauges
-  description?: string; // Optional: Brief description of the datapoint
-  category?: string; // Optional: (e.g., "Sensors", "Actuators", "Status", "Alarms", "Configuration")
-  factor?: number; // Optional: Scaling factor
-  precision?: number; // Optional: Number of decimal places for display
-  isWritable?: boolean; // Optional: Inferred if the datapoint is likely writable
-  decimalPlaces?: number; // Optional: Synonym for precision
-  enumSet?: Record<number | string, string>; // Optional: For integer types representing states
+  uiType?: 'display' | 'button' | 'switch' | 'gauge' | 'input' | 'slider' | 'indicator'; 
+  icon?: string; 
+  unit?: string; 
+  min?: number; 
+  max?: number; 
+  description?: string; 
+  category?: string; 
+  factor?: number; 
+  precision?: number; 
+  isWritable?: boolean; 
+  decimalPlaces?: number; 
+  enumSet?: Record<number | string, string>; 
 }
 
 ${dataTypeMappingGuidance}
@@ -138,7 +141,7 @@ Example of how to choose uiType, icon, and unit based on name and dataType:
 - Name contains "Status", dataType is Int (any variant): uiType: 'display' or 'indicator', icon: 'Activity'. If known states, provide enumSet.
 - Name contains "Enable" or "Switch" or "Command", dataType is Boolean: uiType: 'switch', icon: 'ToggleRight' or 'Power', isWritable: true
 - Name contains "Count", dataType is Int (any variant): uiType: 'display', icon: 'Sigma'
-- Name contains "Pressure", dataType is Float/Double: uiType: 'gauge', icon: 'Pocket', unit: 'bar' or 'psi' // Using Pocket as another example gauge-like icon
+- Name contains "Pressure", dataType is Float/Double: uiType: 'gauge', icon: 'Pocket', unit: 'bar' or 'psi'
 - Name for a general numeric value input/output: uiType: 'input' for writable, 'display' for read-only. icon: 'Hash'
 - For a boolean that indicates a state (e.g. "PumpRunning"): uiType: 'indicator', icon: 'CircleDot'
 
@@ -159,61 +162,123 @@ The final output must be a single JSON array.
 
 
 async function generateContentWithRetry(
-  aiInstance: GoogleGenAI,
+  apiKey: string,
   modelName: string,
   prompt: string,
-  safetySettings: SafetySetting[],
+  passedSafetySettings: SafetySetting[], 
   maxRetries = 3,
   delayMs = 500
 ): Promise<string> {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      const result = await aiInstance.models.generateContent({
-          model: modelName,
-          contents: prompt, // SDK wraps this string as { role: "user", parts: [{ text: prompt }] }
-      });
+      const genAI = new GoogleGenAI({ apiKey }); 
 
-      const genResponse = result; // This is the GenerateContentResponse
+      const request = {
+        model: modelName,
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        safetySettings: passedSafetySettings, 
+      };
+      const result = await genAI.models.generateContent(request);
 
-      if (genResponse.promptFeedback?.blockReason) {
-        throw new Error(`Content generation blocked due to: ${genResponse.promptFeedback.blockReason} ${genResponse.promptFeedback.blockReasonMessage || ''}`);
+      let blocked = false;
+      let blockMessage = "";
+
+      if (result.promptFeedback?.blockReason) {
+        blocked = true;
+        blockMessage = `Content generation blocked by promptFeedback: ${result.promptFeedback.blockReason}`;
+        if (result.promptFeedback.blockReasonMessage) {
+          blockMessage += ` - ${result.promptFeedback.blockReasonMessage}`;
+        }
+      } else {
+        const candidate = result.candidates?.[0];
+        if (candidate?.finishReason === 'SAFETY') {
+          blocked = true;
+          blockMessage = `Content generation stopped due to candidate safety (finishReason: SAFETY).`;
+          if (candidate.safetyRatings && candidate.safetyRatings.length > 0) {
+              blockMessage += ` Details: ${candidate.safetyRatings.map(r => `${r.category}: ${r.probability}`).join(', ')}`;
+          }
+        }
+      }
+
+      if (blocked) {
+        console.error(`[AI Content Gen] Blocked: ${blockMessage}. Full response feedback:`, JSON.stringify(result.promptFeedback || {}, null, 2));
+        if(result.candidates && result.candidates.length > 0) {
+            console.error(`[AI Content Gen] Candidate details:`, JSON.stringify(result.candidates[0], null, 2));
+        }
+        throw new Error(blockMessage);
       }
       
-      const textOutput = result.text; // Convenience getter from EnhancedGenerateContentResponse
+      const textOutput = result.text; 
 
       if (typeof textOutput !== 'string') {
-        console.warn("AI response's .text accessor did not return a string. Full response object:", genResponse);
-        if (!genResponse.candidates || genResponse.candidates.length === 0 ||
-            !genResponse.candidates[0].content ||
-            !genResponse.candidates[0].content.parts ||
-            genResponse.candidates[0].content.parts.length === 0 ||
-            typeof genResponse.candidates[0].content.parts[0].text !== 'string' ) {
-          throw new Error("AI response did not provide usable text content in the expected structure.");
+        console.warn("AI response's .text property did not return a string. Full response object:", JSON.stringify(result, null, 2));
+        const firstCandidateText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (typeof firstCandidateText === 'string') {
+            console.warn("Found text in first candidate, using that as fallback.");
+            return firstCandidateText;
         }
-        throw new Error("AI response did not directly provide text content via .text accessor.");
+        throw new Error("AI response did not provide usable text content via `result.text` or candidate content.");
       }
       return textOutput;
     } catch (error: any) {
-      const isOverload = error.message?.includes("503") || error.message?.includes("overloaded") || error.message?.includes("rate limit");
-      const nonRetryableError = error.message?.includes("API key") || 
-                                error.message?.includes("blockReason") ||
-                                error.message?.includes("access") || 
-                                error.message?.includes("permission") ||
-                                error.message?.includes("invalid argument"); // e.g. bad model name or invalid request structure
+      let errorMessage = error.message;
+      let errorStatus = error.status; 
 
-      console.warn(`[AI Content Gen] Attempt ${attempt} failed: ${error.message}`);
-      if (attempt === maxRetries || nonRetryableError || !isOverload) {
+      if (error.name === 'GoogleGenerativeAIError' || error.constructor?.name === 'GoogleGenerativeAIError') {
+      }
+      if (error.cause instanceof Error) { 
+        errorMessage = `${errorMessage} (Caused by: ${error.cause.message})`;
+        if (!errorStatus && (error.cause as any).status) { 
+            errorStatus = (error.cause as any).status;
+        }
+      }
+
+      const isOverload = errorMessage?.includes("503") || 
+                        errorMessage?.includes("overloaded") || 
+                        errorMessage?.includes("rate limit") ||
+                        errorMessage?.includes("fetch failed") || 
+                        errorMessage?.includes("ECONNREFUSED") || 
+                        errorMessage?.includes("ENOTFOUND") ||   
+                        errorStatus === 429 || 
+                        errorStatus === 500 || 
+                        errorStatus === 503;   
+      
+      const nonRetryableError = errorMessage?.includes("API key") || 
+                                errorMessage?.includes("access") || 
+                                errorMessage?.includes("permission") ||
+                                (errorStatus === 400 && errorMessage?.includes("model")) || 
+                                (errorStatus === 400 && !isOverload) || 
+                                errorStatus === 401 || 
+                                errorStatus === 403;   
+
+      console.warn(`[AI Content Gen] Attempt ${attempt} failed: Status: ${errorStatus || 'N/A'}, Message: ${errorMessage}`);
+      
+      if (nonRetryableError && !( (errorMessage?.includes("fetch failed") || errorMessage?.includes("ECONNREFUSED") || errorMessage?.includes("ENOTFOUND")) && attempt < maxRetries) ) {
+          console.error(`[AI Content Gen] Non-retryable error or max retries reached for such. Error: ${errorMessage}`);
           throw error;
       }
-      await new Promise(res => setTimeout(res, delayMs * Math.pow(2, attempt -1)));
+      
+      if (attempt === maxRetries) {
+          console.error(`[AI Content Gen] Max retries (${maxRetries}) reached. Error: ${errorMessage}`);
+          throw error;
+      }
+
+      if (isOverload || errorMessage?.includes("fetch failed") || errorMessage?.includes("ECONNREFUSED") || errorMessage?.includes("ENOTFOUND")) {
+        const retryDelay = delayMs * Math.pow(2, attempt - 1);
+        console.log(`[AI Content Gen] Overload or transient network issue. Retrying in ${retryDelay}ms...`);
+        await new Promise(res => setTimeout(res, retryDelay));
+      } else {
+        console.error(`[AI Content Gen] Unexpected error type during retry logic, but will retry. Error: ${errorMessage}`);
+        const retryDelay = delayMs * Math.pow(2, attempt - 1);
+        await new Promise(res => setTimeout(res, retryDelay));
+      }
     }
   }
-  throw new Error("All retries failed for Gemini generateContent.");
+  throw new Error(`All retries failed for Gemini generateContent after ${maxRetries} attempts.`);
 }
 
 async function processAiTaskInBackground(taskId: string, filePath: string, userApiKey?: string) {
     console.log(`[Task ${taskId}] Starting background AI processing for filePath: ${filePath}`);
-    let genAIInstance: GoogleGenAI;
     const effectiveApiKey = userApiKey || GEMINI_API_KEY;
 
     if (!effectiveApiKey) {
@@ -225,118 +290,116 @@ async function processAiTaskInBackground(taskId: string, filePath: string, userA
     }
 
     try {
-        genAIInstance = new GoogleGenAI({apiKey: effectiveApiKey}); // Corrected initialization
-    } catch (e: any) {
-        console.error(`[Task ${taskId}] Failed to initialize GoogleGenAI: ${e.message}`);
-         global.aiTasks.set(taskId, {
-            ...global.aiTasks.get(taskId), status: 'error_fatal', message: 'Failed to initialize AI Client.', errorDetails: e.message,
-        });
-        return;
-    }
-
-    let discoveredDatapoints: DiscoveredDataPoint[];
-    try {
-        const fullPath = path.join(process.cwd(), filePath);
-        console.log(`[Task ${taskId}] Reading file from: ${fullPath}`);
-        const fileContent = await fs.readFile(fullPath, 'utf-8');
-        const jsonData = JSON.parse(fileContent);
-        
-        if (Array.isArray(jsonData)) {
-            discoveredDatapoints = jsonData;
-        } else if (jsonData && Array.isArray(jsonData.datapoints)) { // Handle if JSON is { "datapoints": [...] }
-            discoveredDatapoints = jsonData.datapoints;
-        } else {
-            throw new Error("Invalid data format in JSON file. Expected an array of datapoints or an object with a 'datapoints' array property.");
-        }
-
-        if (discoveredDatapoints.length === 0) {
-             throw new Error("No datapoints found in the file.");
-        }
-        console.log(`[Task ${taskId}] Successfully read ${discoveredDatapoints.length} datapoints.`);
-        global.aiTasks.set(taskId, {
-            ...global.aiTasks.get(taskId), status: 'processing', progress: { current: 0, total: discoveredDatapoints.length, percent: 0 }, message: 'Successfully loaded data points. Starting AI analysis.',
-        });
-    } catch (e: any) {
-        console.error(`[Task ${taskId}] Error reading or parsing data file:`, e.message);
-        global.aiTasks.set(taskId, {
-            ...global.aiTasks.get(taskId), status: 'error_fatal', message: `Failed to read or parse data file: ${e.message}`, errorDetails: e.toString(),
-        });
-        return;
-    }
-
-    const batchSize = 10;
-    const allGeneratedDataPoints: DataPoint[] = [];
-    const totalItems = discoveredDatapoints.length;
-
-    for (let i = 0; i < totalItems; i += batchSize) {
-        const batch = discoveredDatapoints.slice(i, i + batchSize);
-        // Progress message before starting the batch processing
-        const itemsStarted = i;
-        const percentBeforeBatch = Math.round((itemsStarted / totalItems) * 100);
-        global.aiTasks.set(taskId, {
-            ...global.aiTasks.get(taskId),
-            status: 'processing',
-            progress: { current: itemsStarted, total: totalItems, percent: percentBeforeBatch },
-            message: `Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(totalItems / batchSize)}. (${itemsStarted}/${totalItems})`,
-        });
-
+        let discoveredDatapoints: DiscoveredDataPoint[];
         try {
-            const prompt = buildPrompt(batch);
-            await new Promise(resolve => setTimeout(resolve, SIMULATED_PROCESSING_DELAY_PER_BATCH_MS));
-
-            const aiTextOutput = await generateContentWithRetry(genAIInstance, MODEL_NAME, prompt, SAFETY_SETTINGS);
-
-            let cleanedJsonText = aiTextOutput.trim();
-            if (cleanedJsonText.startsWith("```json")) cleanedJsonText = cleanedJsonText.substring(7);
-            if (cleanedJsonText.endsWith("```")) cleanedJsonText = cleanedJsonText.substring(0, cleanedJsonText.length - 3);
-            cleanedJsonText = cleanedJsonText.trim();
+            const fullPath = path.resolve(filePath);
+            console.log(`[Task ${taskId}] Reading file from: ${fullPath}`);
+            const fileContent = await fs.readFile(fullPath, 'utf-8');
+            const jsonData = JSON.parse(fileContent);
             
-            if (!cleanedJsonText.startsWith("[") || !cleanedJsonText.endsWith("]")) {
-                if(cleanedJsonText.startsWith("{") && cleanedJsonText.endsWith("}")) {
-                    console.warn(`[Task ${taskId}] AI returned a single JSON object for batch; wrapping in an array.`);
-                    cleanedJsonText = `[${cleanedJsonText}]`;
-                } else {
-                    console.error(`[Task ${taskId}] AI returned non-JSON array format for batch: ${cleanedJsonText.substring(0,200)}...`);
-                    throw new Error("AI returned content that could not be parsed into a JSON array, even after attempting to wrap a single object.");
-                }
+            if (Array.isArray(jsonData)) {
+                discoveredDatapoints = jsonData;
+            } else if (jsonData && Array.isArray(jsonData.datapoints)) {
+                discoveredDatapoints = jsonData.datapoints;
+            } else {
+                throw new Error("Invalid data format in JSON file. Expected an array of datapoints or an object with a 'datapoints' array property.");
             }
 
-            const batchDataPoints: DataPoint[] = JSON.parse(cleanedJsonText);
-            allGeneratedDataPoints.push(...batchDataPoints);
-
-            // Update progress after successful batch processing
-            const itemsCompletedAfterBatch = Math.min(itemsStarted + batch.length, totalItems);
-            const percentAfterBatch = Math.round((itemsCompletedAfterBatch / totalItems) * 100);
+            if (discoveredDatapoints.length === 0) {
+                throw new Error("No datapoints found in the file.");
+            }
+            console.log(`[Task ${taskId}] Successfully read ${discoveredDatapoints.length} datapoints.`);
             global.aiTasks.set(taskId, {
-                ...global.aiTasks.get(taskId),
-                progress: { current: itemsCompletedAfterBatch, total: totalItems, percent: percentAfterBatch },
-                message: `Processed batch ${Math.floor(i / batchSize) + 1}. (${itemsCompletedAfterBatch}/${totalItems})`
+                ...global.aiTasks.get(taskId), status: 'processing', progress: { current: 0, total: discoveredDatapoints.length, percent: 0 }, message: 'Successfully loaded data points. Starting AI analysis.',
             });
-
-        } catch (error: any) {
-            console.error(`[Task ${taskId}] Error processing batch ${Math.floor(i / batchSize) + 1}:`, error.message, error.stack);
+        } catch (e: any) {
+            console.error(`[Task ${taskId}] Error reading or parsing data file:`, e.message);
             global.aiTasks.set(taskId, {
-                ...global.aiTasks.get(taskId),
-                status: 'error_fatal',
-                message: `Error processing batch ${Math.floor(i/batchSize) + 1}. ${error.message}`,
-                errorDetails: error.toString(),
-                data: allGeneratedDataPoints.length > 0 ? allGeneratedDataPoints : null,
+                ...global.aiTasks.get(taskId), status: 'error_fatal', message: `Failed to read or parse data file: ${e.message}`, errorDetails: e.toString(),
             });
             return;
         }
+
+        const batchSize = 10;
+        const allGeneratedDataPoints: DataPoint[] = [];
+        const totalItems = discoveredDatapoints.length;
+
+        for (let i = 0; i < totalItems; i += batchSize) {
+            const batch = discoveredDatapoints.slice(i, i + batchSize);
+            const itemsStarted = i;
+            const percentBeforeBatch = Math.round((itemsStarted / totalItems) * 100);
+            global.aiTasks.set(taskId, {
+                ...global.aiTasks.get(taskId),
+                status: 'processing',
+                progress: { current: itemsStarted, total: totalItems, percent: percentBeforeBatch },
+                message: `Processing batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(totalItems / batchSize)}. (${itemsStarted}/${totalItems})`,
+            });
+
+            try {
+                const prompt = buildPrompt(batch);
+                await new Promise(resolve => setTimeout(resolve, SIMULATED_PROCESSING_DELAY_PER_BATCH_MS));
+
+                const aiTextOutput = await generateContentWithRetry(effectiveApiKey, MODEL_NAME, prompt, SAFETY_SETTINGS);
+
+                let cleanedJsonText = aiTextOutput.trim();
+                if (cleanedJsonText.startsWith("```json")) cleanedJsonText = cleanedJsonText.substring(7);
+                if (cleanedJsonText.endsWith("```")) cleanedJsonText = cleanedJsonText.substring(0, cleanedJsonText.length - 3);
+                cleanedJsonText = cleanedJsonText.trim();
+                
+                if (!cleanedJsonText.startsWith("[") || !cleanedJsonText.endsWith("]")) {
+                    if(cleanedJsonText.startsWith("{") && cleanedJsonText.endsWith("}")) {
+                        console.warn(`[Task ${taskId}] AI returned a single JSON object, wrapping in an array.`);
+                        cleanedJsonText = `[${cleanedJsonText}]`;
+                    } else {
+                        console.error(`[Task ${taskId}] AI returned non-JSON array format for batch: ${cleanedJsonText.substring(0,200)}...`);
+                        throw new Error("AI returned content that could not be parsed into a JSON array, even after attempting to wrap a single object.");
+                    }
+                }
+
+                const batchDataPoints: DataPoint[] = JSON.parse(cleanedJsonText);
+                allGeneratedDataPoints.push(...batchDataPoints);
+
+                const itemsCompletedAfterBatch = Math.min(itemsStarted + batch.length, totalItems);
+                const percentAfterBatch = Math.round((itemsCompletedAfterBatch / totalItems) * 100);
+                global.aiTasks.set(taskId, {
+                    ...global.aiTasks.get(taskId),
+                    progress: { current: itemsCompletedAfterBatch, total: totalItems, percent: percentAfterBatch },
+                    message: `Processed batch ${Math.floor(i / batchSize) + 1}. (${itemsCompletedAfterBatch}/${totalItems})`
+                });
+
+            } catch (error: any) {
+                console.error(`[Task ${taskId}] Error processing batch ${Math.floor(i / batchSize) + 1}:`, error.message, error.stack);
+                global.aiTasks.set(taskId, {
+                    ...global.aiTasks.get(taskId),
+                    status: 'error_fatal',
+                    message: `Error processing batch ${Math.floor(i/batchSize) + 1}. ${error.message}`,
+                    errorDetails: error.toString(),
+                    data: allGeneratedDataPoints.length > 0 ? allGeneratedDataPoints : null,
+                });
+                return; 
+            }
+        }
+
+        console.log(`[Task ${taskId}] AI processing completed successfully. Total generated datapoints: ${allGeneratedDataPoints.length}`);
+        global.aiTasks.set(taskId, {
+            ...global.aiTasks.get(taskId),
+            status: 'completed',
+            progress: { current: totalItems, total: totalItems, percent: 100 },
+            message: 'AI enhancement completed successfully.',
+            data: allGeneratedDataPoints,
+            errorDetails: null,
+        });
+
+    } catch (error: any) {
+        console.error(`[Task ${taskId}] Unexpected error in processAiTaskInBackground:`, error);
+        global.aiTasks.set(taskId, {
+            ...global.aiTasks.get(taskId),
+            status: 'error_fatal',
+            message: `An unexpected error occurred: ${error.message}`,
+            errorDetails: error.toString(),
+        });
     }
-
-    console.log(`[Task ${taskId}] AI processing completed successfully. Total generated datapoints: ${allGeneratedDataPoints.length}`);
-    global.aiTasks.set(taskId, {
-        ...global.aiTasks.get(taskId),
-        status: 'completed',
-        progress: { current: totalItems, total: totalItems, percent: 100 },
-        message: 'AI enhancement completed successfully.',
-        data: allGeneratedDataPoints,
-        errorDetails: null,
-    });
 }
-
 
 export async function POST(req: NextRequest) {
   console.log("POST /api/ai/generate-datapoints endpoint hit (async).");
@@ -347,13 +410,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json() as GenerateDatapointsRequestBody;
     filePath = body.filePath;
-    userApiKey = body.geminiApiKey;
+    userApiKey = body.geminiApiKey; 
 
     if (!GEMINI_API_KEY && !userApiKey) {
-      console.warn("Gemini API Key is not configured.");
-      return NextResponse.json({ success: false, message: "AI model is not available. Gemini API Key is not configured." }, { status: 503 });
+      console.warn("Gemini API Key is not configured on the server and no user key provided.");
+      return NextResponse.json({ success: false, message: "AI model is not available. Gemini API Key is not configured and no user-provided key was found." }, { status: 503 });
     }
     if (!filePath) {
+      // For POST, filePath is required. We'll leave this check here.
+      // The GET test does not require a filePath.
       return NextResponse.json({ success: false, message: 'File path to discovered_datapoints.json is required.' }, { status: 400 });
     }
 
@@ -370,34 +435,117 @@ export async function POST(req: NextRequest) {
     if (!global.aiTasks) global.aiTasks = new Map();
     global.aiTasks.set(taskId, initialTaskState);
 
-    // Initiate background processing without awaiting it
     setTimeout(() => {
         processAiTaskInBackground(taskId, filePath!, userApiKey).catch(err => {
-            console.error(`[Task ${taskId}] Critical unhandled error in processAiTaskInBackground: `, err);
-            const existingState = global.aiTasks.get(taskId) || initialTaskState; // Ensure we have a base state
+            console.error(`[Task ${taskId}] Critical unhandled error escaped processAiTaskInBackground: `, err);
+            const existingState = global.aiTasks.get(taskId) || initialTaskState;
             global.aiTasks.set(taskId, {
                 ...existingState,
                 status: 'error_fatal',
                 message: 'A critical unhandled error occurred during background processing.',
-                errorDetails: err.message || 'Unknown critical error',
+                errorDetails: err.message || 'Unknown critical error during background processing.',
             });
         });
-    }, 0); // Execute immediately after current event loop cycle
+    }, 0); 
 
     return NextResponse.json({ taskId: taskId }, { status: 202 });
 
   } catch (error: any) {
-    console.error("Error in POST /api/ai/generate-datapoints (sync part):", error);
+    console.error("Error in POST /api/ai/generate-datapoints (synchronous part):", error);
+    if (error instanceof SyntaxError && error.message.includes("JSON")) {
+        return NextResponse.json({ success: false, message: 'Invalid JSON in request body.', error: error.message }, { status: 400 });
+    }
     return NextResponse.json({ success: false, message: 'Failed to initiate AI task.', error: error.message }, { status: 500 });
   }
 }
 
+// MODIFIED GET Handler for simple API Test
 export async function GET(req: NextRequest) {
-  console.log("GET /api/ai/generate-datapoints endpoint hit. Method not allowed.");
-  return NextResponse.json({
-      message: 'Method Not Allowed. Use POST to generate datapoints with AI.'
-  }, {
-      status: 405,
-      headers: { 'Allow': 'POST' }
-  });
+  console.log("GET /api/ai/generate-datapoints endpoint hit - performing API test.");
+
+  const apiKey = GEMINI_API_KEY || req.nextUrl.searchParams.get("geminiApiKey"); // Allow passing API key via query for quick tests
+
+  if (!apiKey) {
+    console.warn("API Key for test is missing (checked ENV and query param 'geminiApiKey').");
+    return NextResponse.json(
+      { success: false, message: "API Key is not configured (checked GEMINI_API_KEY env var and 'geminiApiKey' query parameter)." },
+      { status: 503 }
+    );
+  }
+
+  try {
+    console.log(`Attempting to connect to Gemini with model: ${MODEL_NAME}`);
+    const genAI = new GoogleGenAI({ apiKey });
+
+    // Simple prompt for testing
+    const testPrompt = "Hi, how are you today?";
+    const request = {
+      model: MODEL_NAME, // Using the same model as your main functionality
+      contents: [{ role: "user", parts: [{ text: testPrompt }] }],
+      // Using the same safety settings for consistency, though for "Hi" it's less critical
+      safetySettings: SAFETY_SETTINGS, 
+      generationConfig: {
+        maxOutputTokens: 50, // Keep response short for a test
+      }
+    };
+    
+    const result = await genAI.models.generateContent(request);
+    
+    // Check for blocked content (same logic as in generateContentWithRetry)
+    let blocked = false;
+    let blockMessage = "";
+    if (result.promptFeedback?.blockReason) {
+      blocked = true;
+      blockMessage = `Content generation blocked by promptFeedback: ${result.promptFeedback.blockReason}`;
+      if (result.promptFeedback.blockReasonMessage) {
+        blockMessage += ` - ${result.promptFeedback.blockReasonMessage}`;
+      }
+    } else {
+      const candidate = result.candidates?.[0];
+      if (candidate?.finishReason === 'SAFETY') {
+        blocked = true;
+        blockMessage = `Content generation stopped due to candidate safety (finishReason: SAFETY).`;
+        if (candidate.safetyRatings && candidate.safetyRatings.length > 0) {
+            blockMessage += ` Details: ${candidate.safetyRatings.map(r => `${r.category}: ${r.probability}`).join(', ')}`;
+        }
+      }
+    }
+
+    if (blocked) {
+      console.error(`[API Test] Blocked: ${blockMessage}`);
+      return NextResponse.json({ success: false, message: "AI content generation was blocked.", details: blockMessage, promptFeedback: result.promptFeedback, candidates: result.candidates }, { status: 400 });
+    }
+
+    const aiResponseText = result.text;
+
+    if (typeof aiResponseText !== 'string') {
+        console.warn("[API Test] AI response's .text property did not return a string. Full response:", JSON.stringify(result, null, 2));
+        const firstCandidateText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+         if (typeof firstCandidateText === 'string') {
+            console.warn("[API Test] Found text in first candidate, using that as fallback for test response.");
+            return NextResponse.json({ success: true, prompt: testPrompt, response: firstCandidateText, fullResponse: result });
+        }
+        return NextResponse.json({ success: false, message: "AI response did not provide usable text.", fullResponse: result }, { status: 500 });
+    }
+
+    console.log(`[API Test] Success! Prompt: "${testPrompt}", AI Response: "${aiResponseText.substring(0, 100)}..."`);
+    return NextResponse.json({ success: true, prompt: testPrompt, response: aiResponseText, fullResponse: result });
+
+  } catch (error: any) {
+    let errorMessage = error.message;
+    if (error.cause instanceof Error) {
+        errorMessage = `${errorMessage} (Caused by: ${error.cause.message})`;
+    }
+    console.error("[API Test] Error during API test:", errorMessage, error.stack);
+    console.error("[API Test] Full error object:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+
+    // Try to determine a more specific status code based on common error patterns
+    let status = 500;
+    if (errorMessage.includes("API key not valid")) status = 401;
+    else if (errorMessage.includes("Permission denied") || errorMessage.includes("access")) status = 403;
+    else if (errorMessage.includes("model") && (errorMessage.includes("not found") || errorMessage.includes("format"))) status = 400;
+
+
+    return NextResponse.json({ success: false, message: 'API test failed.', error: errorMessage, errorDetails: error }, { status });
+  }
 }

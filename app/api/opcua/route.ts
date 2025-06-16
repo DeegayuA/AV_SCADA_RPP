@@ -261,7 +261,7 @@ async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ succ
 
     discoveryProgressCache = { status: "Saving results to file...", percentage: 95, details: `Preparing to save ${discoveredDataPoints.length} discovered data points.`, timestamp: Date.now() };
     console.log(`Discovered ${discoveredDataPoints.length} datapoints. Attempting to save to file...`);
-    const filePath = path.join('/tmp', 'discovered_datapoints.json');
+    const filePath = path.join(process.cwd(), 'discovered_datapoints.json');
     const jsonData = JSON.stringify(discoveredDataPoints, null, 2);
 
     try {
@@ -698,7 +698,7 @@ async function connectOPCUA() {
         securityMode: MessageSecurityMode.None,
         securityPolicy: SecurityPolicy.None,
         requestedSessionTimeout: SESSION_TIMEOUT,
-        clientName: `MyNextJsApp-PID${process.pid}`
+        clientName: `AVR&D_Solar_Power_Plant_Dashboard-PID${process.pid}`
       });
 
       opcuaClient.on("backoff", (retry, delay) => console.log(`OPC UA internal backoff: retry ${retry} in ${delay}ms (Note: custom retry logic is primary)`));

@@ -440,7 +440,7 @@ export async function getEnabledNotificationRules(): Promise<NotificationRule[]>
     return [];
   }
   try {
-    return await db.getAllFromIndex('notificationRules', 'isEnabled', IDBKeyRange.only(true as any)); // Type cast for boolean index
+    return await db.getAllFromIndex('notificationRules', 'isEnabled', IDBKeyRange.only(1)); // Convert boolean true to number 1
   } catch (error) {
     console.error("Error getting enabled notification rules:", error);
     toast.error("Failed to Fetch Enabled Rules", { description: error instanceof Error ? error.message : String(error) });
@@ -554,7 +554,7 @@ export async function getUnacknowledgedActiveAlarms(): Promise<ActiveAlarm[]> {
     return [];
   }
   try {
-    return await db.getAllFromIndex('activeAlarms', 'acknowledged', IDBKeyRange.only(false as any)); // Type cast for boolean index
+    return await db.getAllFromIndex('activeAlarms', 'acknowledged', IDBKeyRange.only(0)); // Convert boolean false to number 0
   } catch (error) {
     console.error("Error getting unacknowledged active alarms:", error);
     toast.error("Failed to Fetch Unacknowledged Alarms", { description: error instanceof Error ? error.message : String(error) });

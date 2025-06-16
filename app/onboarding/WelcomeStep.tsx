@@ -136,9 +136,36 @@ export default function WelcomeStep() {
         </motion.p>
         <motion.p
           variants={itemVariants(0.3, 20, 3)}
-          className="text-sm sm:text-base text-red-600 border border-red-300 border-md rounded-md bg-red-50 dark:bg-red-950/30 p-3 max-w-md sm:max-w-lg mb-8 sm:mb-10 leading-relaxed"
+          className="flex items-start gap-2 text-sm sm:text-base text-amber-900 dark:text-amber-200 max-w-md sm:max-w-lg mb-8 sm:mb-10 leading-relaxed p-4 rounded-md border border-amber-500/30 bg-amber-50 dark:bg-amber-900/20 shadow-md"
         >
-          This is a beta version. Changes made here are not saved permanently as there's no database connected.
+          {/* Warning icon for context */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#f59e0b"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="flex-shrink-0 w-6 h-6 mr-2"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="16" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12" y2="8" />
+          </svg>
+
+          <span>
+            <strong>This is a beta version.</strong> Changes made here are not permanent as there’s no database connected.
+            <br />
+            Please <strong>do not edit anything</strong> you’d like to keep.
+            {/* Optional learn more link */}
+            <br />
+            <a
+              href="#learn-more"
+              className="ml-1 text-amber-600 dark:text-amber-400 underline font-semibold">
+              Learn more →
+            </a>
+          </span>
         </motion.p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-5 w-full max-w-sm sm:max-w-md">
