@@ -7,6 +7,7 @@ import {
     CustomFlowEdge,
 } from '@/types/sld';
 import { User, UserRole } from '@/types/auth'; // Assuming auth types are correct
+import { logActivity } from '@/lib/activityLog'; // Import logActivity
 
 import React from 'react'; // forwardRef and createElement are part of React
 import { toast } from 'sonner';
@@ -150,18 +151,38 @@ export const useAppStore = create<AppState & SLDActions>()(
       },
 
       setCurrentUser: (user: User | null) => {
+        const previousUser = get().currentUser; // Get current user before update
         const currentEditMode = get().isEditMode;
+
         set({ 
             currentUser: user, 
-            // Disable edit mode if user is not admin/editor or if logging out (user is null)
             isEditMode: user && (user.role === UserRole.ADMIN) ? currentEditMode : false 
         });
-        if (user) {
-            // toast.info(`Logged in as ${user.name}`);
+
+        if (previousUser && user === null) {
+          // User is being logged out
+          logActivity(
+            'LOGOUT',
+            { email: previousUser.email, role: previousUser.role },
+            typeof window !== 'undefined' ? window.location.pathname : undefined
+          );
+        } else if (!previousUser && user) {
+          // User is logging in - this is already handled by the login page.
+          // No action needed here to avoid double logging for login.
         }
+        // Removed toast.info for login from here as it's better handled on the login page
       },
 
       logout: () => {
+        // Also log when explicit logout action is called
+        const previousUser = get().currentUser;
+        if (previousUser && previousUser.email !== defaultUser.email) { // Avoid logging if already guest
+          logActivity(
+            'LOGOUT',
+            { email: previousUser.email, role: previousUser.role },
+            typeof window !== 'undefined' ? window.location.pathname : undefined
+          );
+        }
         set({ currentUser: defaultUser, isEditMode: false, selectedElementForDetails: null }); // Revert to default user on logout, clear selected element
         toast.success("Logged Out", { description: "You have been successfully signed out." });
       },

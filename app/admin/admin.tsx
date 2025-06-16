@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { NotificationConfigModal } from '@/components/admin/NotificationConfigModal'; // Verify path
@@ -118,6 +119,7 @@ const AdminActionCard: React.FC<AdminCardProps> = ({ title, description, icon: I
 
 
 const AdminPage: React.FC = () => {
+    const router = useRouter();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const currentUser = useAppStore((state) => state.currentUser);
 
@@ -174,10 +176,11 @@ const AdminPage: React.FC = () => {
       {
         title: "System Logs",
         description: "Access and review detailed system operational logs and event histories.",
-        icon: ScrollText,
+        icon: ScrollText, // Or your chosen icon
         buttonText: "View Logs",
-        disabled: true,
-        colorClass: "emerald",
+        onClick: () => router.push('/admin/system-logs'), // Navigate to the new page
+        disabled: false, // Enable the card
+        colorClass: "emerald", // Or your chosen color
       },
       {
         title: "Feature Flags",
