@@ -18,7 +18,7 @@ import {
 
 import { useParams, usePathname } from "next/navigation"
 import { PLANT_LOCATION } from "@/config/constants";
-import AdminPage from "./admin";
+import SettingsPage from "./settings";
 
 export default function Page() {
   const pathname = usePathname();
@@ -50,7 +50,7 @@ export default function Page() {
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 px-4 pt-0 ">
-          <AdminPage/>
+          <SettingsPage/>
         </div>
       </SidebarInset>
     </SidebarProvider>

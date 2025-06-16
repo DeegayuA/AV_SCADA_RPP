@@ -2,49 +2,49 @@
 "use client"
 
 import * as React from "react"
-import { useRouter, usePathname } from "next/navigation";
-import { motion } from "framer-motion"; // AnimatePresence removed as it's not directly used at this level
+import { usePathname } from "next/navigation"; // useRouter removed as it was not directly used for navigation here
+import { motion } from "framer-motion";
 import {
   BookOpen,
   Bot,
-  Frame,
+  // Frame, // Commented out as NavProjectItemProps might not be defined for it
   LifeBuoy,
   Map,
-  PieChart,
+  // PieChart, // Commented out
   Send,
   Settings2,
   SquareTerminal,
-  // Home, // Already provided by NavUser or NavMain
   ShieldQuestion,
   LucideIcon,
-  // ChevronsRight, // Not used directly, might be in child components
-  // Dot, // Not used directly, might be in child components
+  ShieldCheck, // Changed User to ShieldCheck for Admin for better visual distinction
+  // Home, 
+  // User, // Replaced by ShieldCheck for admin or can be other role-specific icon
+  // ChevronsRight, 
+  // Dot, 
 } from "lucide-react";
 
 import { NavMain, NavMainItemProps } from "@/components/nav-main";
-import { NavProjects } from "@/components/nav-projects";
+import { NavProjects } from "@/components/nav-projects"; // Keep if projects are used, else can be removed if navData.projects is empty
 import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarHeader, // SidebarHeader seemed unused, but kept for potential structure
+  // SidebarHeader, // Kept for potential structure
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { AppLogo2 } from "@/app/onboarding/AppLogo"; // Assuming AppLogo is AppLogo2 or vice versa
+import { AppLogo2 } from "@/app/onboarding/AppLogo";
 import { APP_NAME } from "@/config/constants";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 // Import Zustand store and user types
-import { useAppStore } from '@/stores/appStore'; // Correct path to your store
-
-// StoredUser interface is no longer needed here, as NavUser handles user data directly from the store.
-// interface StoredUser { ... }
+import { useAppStore } from '@/stores/appStore';
+import { UserRole, User } from '@/types/auth'; // Import User and UserRole
 
 export interface ActiveAccents {
   [key: string]: string;
@@ -59,20 +59,20 @@ const activeAccents: ActiveAccents = {
   help: "text-teal-600 dark:text-teal-400 border-teal-500 indicator-bg-teal-500",
   report: "text-amber-600 dark:text-amber-400 border-amber-500 indicator-bg-amber-500",
   projects: "text-orange-600 dark:text-orange-400 border-orange-500 indicator-bg-orange-500",
+  admin: "text-red-600 dark:text-red-400 border-red-500 indicator-bg-red-500", // Added admin color
   default: "text-primary border-primary indicator-bg-primary dark:text-primary-dark dark:border-primary-dark dark:indicator-bg-primary-dark"
 };
 
-
-// Assuming NavChildItem is a shared type or defined elsewhere, 
-// or NavMainItemProps, NavProjectItemProps, NavSecondaryItemProps cover these.
 interface NavChildItemForSectionLogic {
-  title?: string; 
+  title?: string;
   name?: string;
   url: string;
   sectionId: string;
+  // icon?: LucideIcon; // icon could be useful here too
+  // colorKey?: string;
 }
 
-// Define NavProjectItemProps interface since it's not exported from nav-projects
+// Define NavProjectItemProps interface - assuming it's used elsewhere or keep projects minimal
 interface NavProjectItemProps {
   name: string;
   url: string;
@@ -81,7 +81,7 @@ interface NavProjectItemProps {
   colorKey: string;
 }
 
-// Define NavSecondaryItemProps interface since it's not exported from nav-secondary
+// Define NavSecondaryItemProps interface
 interface NavSecondaryItemProps {
   title: string;
   url: string;
@@ -90,23 +90,22 @@ interface NavSecondaryItemProps {
   colorKey: string;
 }
 
-const navData = {
-  navMain: [
+// Original navigation data configuration
+const navDataConfig = {
+  navMainBase: [
     { title: "Control Panel", url: "/control", icon: SquareTerminal, sectionId: "Control Panel", colorKey: "control" },
     { title: "Dashboard", url: "/dashboard", icon: Bot, sectionId: "Dashboard", colorKey: "dashboard" },
     { title: "Circuit Layouts", url: "/circuit", icon: BookOpen, sectionId: "Circuit Layouts", colorKey: "circuit" },
-    { title: "System Settings", url: "/settings", icon: Settings2, sectionId: "Settings", colorKey: "settings" },
   ] as NavMainItemProps[],
+adminNavItem: { title: "Administration", url: "/admin", icon: ShieldCheck, sectionId: "Administration", colorKey: "admin" } as NavMainItemProps,
+adminSettingsNavItem: { title: "Mobile Config", url: "/mobile-config", icon: Settings2, sectionId: "Settings", colorKey: "settings" } as NavMainItemProps,
   navSecondary: [
     { title: "Help Center", url: "/help", icon: ShieldQuestion, sectionId: "Help Center", colorKey: "help" },
     { title: "Privacy Policy", url: "/privacy-policy", icon: LifeBuoy, sectionId: "Privacy Policy", colorKey: "settings" },
     { title: "Terms of Service", url: "/terms-of-service", icon: Map, sectionId: "Terms of Service", colorKey: "dashboard" },
     { title: "Report Issue", url: "/report-issue", icon: Send, sectionId: "Report Issue", colorKey: "report" },
   ] as NavSecondaryItemProps[],
-  projects: [
-    // { name: "Main Plant Status", url: "/projects/main-plant", icon: Frame, sectionId: "Main Plant Status", colorKey: "projects" },
-    // { name: "Substation Alpha Metrics", url: "/projects/substation-alpha", icon: PieChart, sectionId: "Substation Alpha Metrics", colorKey: "projects" },
-  ] as NavProjectItemProps[],
+  projects: [] as NavProjectItemProps[], // Keep empty or define projects if any
 };
 
 const headerVariants = {
@@ -123,37 +122,38 @@ const appNameVariants = {
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  // No longer need local currentUser state or setIsMounted based on localStorage
-  // const [currentUser, setCurrentUser] = React.useState<StoredUser | null>(null);
-  // const [isMounted, setIsMounted] = React.useState(false);
-  
-  const router = useRouter(); // Kept for activeSection logic, potentially not needed if activeSection solely relies on pathname
   const pathname = usePathname();
   const { state: sidebarState, isMobile } = useSidebar();
   const isCollapsed = !isMobile && sidebarState === "collapsed";
 
-  // Get Zustand store hydration status
-  // Zustand persist hydration status
   const storeHasHydrated = useAppStore.persist.hasHydrated();
+  const currentUser = useAppStore((state) => state.currentUser);
+
+  // Dynamically construct navMainItems based on user role
+  const navMainItems = React.useMemo(() => {
+    let items = [...navDataConfig.navMainBase];
+    if (currentUser && currentUser.role === UserRole.ADMIN) {
+      items.push(navDataConfig.adminNavItem);
+      items.push(navDataConfig.adminSettingsNavItem);
+    }
+    return items;
+  }, [currentUser]);
 
   const activeSection = React.useMemo(() => {
     if (pathname === "/") return "Dashboard"; // Default to Dashboard for home
 
     const allNavItems: NavChildItemForSectionLogic[] = [
-      ...navData.navMain,
-      ...navData.projects,
-      ...navData.navSecondary,
+      ...navMainItems, // Use dynamically generated navMainItems
+      ...navDataConfig.projects,
+      ...navDataConfig.navSecondary,
     ];
 
     const findActive = (items: NavChildItemForSectionLogic[]) => {
       let bestMatch: NavChildItemForSectionLogic | undefined = undefined;
       let bestMatchLength = 0;
 
-
-
       for (const item of items) {
-        if (pathname === item.url) return item.sectionId; // Exact match is best
-        // Check if pathname starts with item.url AND is followed by a '/' or is an exact match without trailing '/' for base path
+        if (pathname === item.url) return item.sectionId; 
         if (pathname.startsWith(item.url) && (pathname.length === item.url.length || pathname[item.url.length] === '/')) {
             if (item.url.length > bestMatchLength) {
                 bestMatch = item;
@@ -174,20 +174,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           item => item.url.substring(1).toLowerCase() === firstSegment
         );
         if (mappedSection) return mappedSection.sectionId;
+        // Fallback to capitalizing the first segment if no direct mapping
         return firstSegment.charAt(0).toUpperCase() + firstSegment.slice(1);
       }
     }
     return currentSection || "Dashboard"; // Ultimate fallback
-  }, [pathname]);
+  }, [pathname, navMainItems]); // Add navMainItems to dependency array
 
-
-  // Removed the useEffect that managed local currentUser and router.replace.
-  // Auth guarding should be handled by individual page components (like UnifiedDashboardPage)
-  // or a higher-order component / middleware if using Next.js Pages Router patterns.
-
-  // Render skeleton if Zustand store is not yet hydrated.
-  // NavUser component will handle its own skeleton/loading state based on storeHasHydrated.
   if (!storeHasHydrated) {
+    // Skeleton rendering remains the same
     return (
       <Sidebar variant="inset" {...props} className="animate-pulse !bg-transparent dark:!bg-transparent pointer-events-none">
         <motion.div
@@ -212,7 +207,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     );
   }
   
-  // Main Sidebar Render once store is hydrated
   return (
     <Sidebar variant="inset" {...props}
       className={cn("transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]",
@@ -252,19 +246,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </motion.div>
       <SidebarContent className="py-2.5 transition-opacity duration-150" style={{ opacity: isCollapsed ? 0.3 : 1 }}>
         <NavMain
-          items={navData.navMain}
+          items={navMainItems} // Pass the dynamically generated items
           activeSection={activeSection}
           activeAccents={activeAccents}
         />
-        {navData.projects.length > 0 &&
+        {navDataConfig.projects.length > 0 && ( // Use navDataConfig here
           <NavProjects
-            projects={navData.projects}
+            projects={navDataConfig.projects} // Use navDataConfig here
             activeSection={activeSection}
             activeAccents={activeAccents}
           />
-        }
+        )}
         <NavSecondary
-          items={navData.navSecondary}
+          items={navDataConfig.navSecondary} // Use navDataConfig here
           activeSection={activeSection}
           activeAccents={activeAccents}
           className="mt-auto pt-2.5 border-t border-border/20 dark:border-slate-700/50"
@@ -274,8 +268,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         "border-t border-border/20 dark:border-slate-700/50 p-2.5 hover:bg-slate-100/40 dark:hover:bg-slate-800/40 transition-all duration-200",
         isCollapsed && "!py-2"
       )}>
-        {/* NavUser component now gets user data directly from Zustand store */}
-        {/* It will also handle its own skeleton/loading state based on store hydration */}
         <NavUser />
       </SidebarFooter>
     </Sidebar>

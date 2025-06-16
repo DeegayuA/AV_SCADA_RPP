@@ -2,6 +2,8 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { DataPoint } from '@/config/dataPoints'; // Assuming this is used elsewhere or for future plans
 import { toast } from 'sonner'; // Import toast for notifications
+import { v4 as uuidv4 } from 'uuid';
+import { NotificationRule, ActiveAlarm } from '../types';
 
 // Import constants to be saved
 import {
@@ -56,10 +58,20 @@ interface SolarDB extends DBSchema {
     key: string; // We'll use a single key like 'mainConfiguration'
     value: AppConfigValue;
   };
+  notificationRules: {
+    key: string;
+    value: NotificationRule;
+    indexes: { isEnabled: 'boolean' };
+  };
+  activeAlarms: {
+    key: string;
+    value: ActiveAlarm;
+    indexes: { ruleId: 'string'; acknowledged: 'boolean' };
+  };
 }
 
 const DB_NAME = 'solar-minigrid';
-const DB_VERSION = 2; // Incremented version due to new object store
+const DB_VERSION = 3; // Incremented version due to new object stores
 const APP_CONFIG_KEY = 'mainConfiguration'; // Key for the single config object
 
 let dbPromise: Promise<IDBPDatabase<SolarDB> | null> | null = null;
@@ -99,6 +111,20 @@ export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
             if (!dbInstance.objectStoreNames.contains('appConfig')) {
               dbInstance.createObjectStore('appConfig');
               console.log("Created 'appConfig' object store.");
+            }
+          }
+          // Create notificationRules and activeAlarms stores if they don't exist (from version < 3)
+          if (oldVersion < 3) {
+            if (!dbInstance.objectStoreNames.contains('notificationRules')) {
+              const notificationRulesStore = dbInstance.createObjectStore('notificationRules', { keyPath: 'id' });
+              notificationRulesStore.createIndex('isEnabled', 'isEnabled', { unique: false });
+              console.log("Created 'notificationRules' object store and 'isEnabled' index.");
+            }
+            if (!dbInstance.objectStoreNames.contains('activeAlarms')) {
+              const activeAlarmsStore = dbInstance.createObjectStore('activeAlarms', { keyPath: 'id' });
+              activeAlarmsStore.createIndex('ruleId', 'ruleId', { unique: false });
+              activeAlarmsStore.createIndex('acknowledged', 'acknowledged', { unique: false });
+              console.log("Created 'activeAlarms' object store and 'ruleId', 'acknowledged' indexes.");
             }
           }
         },
@@ -347,5 +373,260 @@ export async function ensureAppConfigIsSaved() {
     await saveAppConfig();
   } else {
     console.log("Local app configuration is up-to-date.");
+  }
+}
+
+// --- NotificationRule CRUD Functions ---
+
+export async function addNotificationRule(rule: Omit<NotificationRule, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<string> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot add notification rule." });
+    throw new Error("Database not initialized");
+  }
+  const now = new Date();
+  const newRule: NotificationRule = {
+    ...rule,
+    id: rule.id || uuidv4(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  try {
+    await db.add('notificationRules', newRule);
+    toast.success("Notification Rule Added", { description: `Rule "${newRule.name}" saved.` });
+    return newRule.id;
+  } catch (error) {
+    console.error("Error adding notification rule:", error);
+    toast.error("Notification Rule Add Failed", { description: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+export async function getNotificationRule(id: string): Promise<NotificationRule | undefined> {
+  const db = await initDB();
+  if (!db) {
+    // No toast, might be called frequently or internally
+    console.error("Database not ready, cannot get notification rule.");
+    return undefined;
+  }
+  try {
+    return await db.get('notificationRules', id);
+  } catch (error) {
+    console.error(`Error getting notification rule ${id}:`, error);
+    toast.error("Notification Rule Fetch Failed", { description: error instanceof Error ? error.message : String(error) });
+    return undefined;
+  }
+}
+
+export async function getAllNotificationRules(): Promise<NotificationRule[]> {
+  const db = await initDB();
+  if (!db) {
+    console.error("Database not ready, cannot get all notification rules.");
+    return [];
+  }
+  try {
+    return await db.getAll('notificationRules');
+  } catch (error) {
+    console.error("Error getting all notification rules:", error);
+    toast.error("Failed to Fetch Notification Rules", { description: error instanceof Error ? error.message : String(error) });
+    return [];
+  }
+}
+
+export async function getEnabledNotificationRules(): Promise<NotificationRule[]> {
+  const db = await initDB();
+  if (!db) {
+    console.error("Database not ready, cannot get enabled notification rules.");
+    return [];
+  }
+  try {
+    return await db.getAllFromIndex('notificationRules', 'isEnabled', IDBKeyRange.only(true as any)); // Type cast for boolean index
+  } catch (error) {
+    console.error("Error getting enabled notification rules:", error);
+    toast.error("Failed to Fetch Enabled Rules", { description: error instanceof Error ? error.message : String(error) });
+    return [];
+  }
+}
+
+export async function updateNotificationRule(ruleUpdate: Partial<NotificationRule> & { id: string }): Promise<void> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot update notification rule." });
+    throw new Error("Database not initialized");
+  }
+  try {
+    const existingRule = await db.get('notificationRules', ruleUpdate.id);
+    if (!existingRule) {
+      throw new Error(`Notification rule with id ${ruleUpdate.id} not found.`);
+    }
+    const updatedRule = {
+      ...existingRule,
+      ...ruleUpdate,
+      updatedAt: new Date(),
+    };
+    await db.put('notificationRules', updatedRule);
+    toast.success("Notification Rule Updated", { description: `Rule "${updatedRule.name}" updated.` });
+  } catch (error) {
+    console.error("Error updating notification rule:", error);
+    toast.error("Notification Rule Update Failed", { description: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+export async function deleteNotificationRule(id: string): Promise<void> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot delete notification rule." });
+    throw new Error("Database not initialized");
+  }
+  try {
+    await db.delete('notificationRules', id);
+    // Also delete associated active alarms
+    await deleteActiveAlarmsByRuleId(id);
+    toast.success("Notification Rule Deleted", { description: `Rule ${id} and associated alarms deleted.` });
+  } catch (error) {
+    console.error(`Error deleting notification rule ${id}:`, error);
+    toast.error("Notification Rule Delete Failed", { description: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+// --- ActiveAlarm CRUD Functions ---
+
+export async function addActiveAlarm(alarm: Omit<ActiveAlarm, 'id' | 'triggeredAt' | 'lastNotifiedAt'> & { id?: string }): Promise<string> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot add active alarm." });
+    throw new Error("Database not initialized");
+  }
+  const now = new Date();
+  const newAlarm: ActiveAlarm = {
+    ...alarm,
+    id: alarm.id || uuidv4(),
+    triggeredAt: now,
+    lastNotifiedAt: now,
+  };
+  try {
+    await db.add('activeAlarms', newAlarm);
+    toast.info("New Active Alarm", { description: `Alarm for rule ${newAlarm.ruleId} triggered.` });
+    return newAlarm.id;
+  } catch (error) {
+    console.error("Error adding active alarm:", error);
+    toast.error("Active Alarm Add Failed", { description: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+export async function getActiveAlarm(id: string): Promise<ActiveAlarm | undefined> {
+  const db = await initDB();
+  if (!db) {
+    console.error("Database not ready, cannot get active alarm.");
+    return undefined;
+  }
+  try {
+    return await db.get('activeAlarms', id);
+  } catch (error) {
+    console.error(`Error getting active alarm ${id}:`, error);
+    toast.error("Active Alarm Fetch Failed", { description: error instanceof Error ? error.message : String(error) });
+    return undefined;
+  }
+}
+
+export async function getAllActiveAlarms(): Promise<ActiveAlarm[]> {
+  const db = await initDB();
+  if (!db) {
+    console.error("Database not ready, cannot get all active alarms.");
+    return [];
+  }
+  try {
+    return await db.getAll('activeAlarms');
+  } catch (error) {
+    console.error("Error getting all active alarms:", error);
+    toast.error("Failed to Fetch Active Alarms", { description: error instanceof Error ? error.message : String(error) });
+    return [];
+  }
+}
+
+export async function getUnacknowledgedActiveAlarms(): Promise<ActiveAlarm[]> {
+  const db = await initDB();
+  if (!db) {
+    console.error("Database not ready, cannot get unacknowledged active alarms.");
+    return [];
+  }
+  try {
+    return await db.getAllFromIndex('activeAlarms', 'acknowledged', IDBKeyRange.only(false as any)); // Type cast for boolean index
+  } catch (error) {
+    console.error("Error getting unacknowledged active alarms:", error);
+    toast.error("Failed to Fetch Unacknowledged Alarms", { description: error instanceof Error ? error.message : String(error) });
+    return [];
+  }
+}
+
+export async function updateActiveAlarm(alarmUpdate: Partial<ActiveAlarm> & { id: string }): Promise<void> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot update active alarm." });
+    throw new Error("Database not initialized");
+  }
+  try {
+    const existingAlarm = await db.get('activeAlarms', alarmUpdate.id);
+    if (!existingAlarm) {
+      throw new Error(`Active alarm with id ${alarmUpdate.id} not found.`);
+    }
+    const updatedAlarm = {
+      ...existingAlarm,
+      ...alarmUpdate,
+      // lastNotifiedAt could be updated here if the update is for a re-notification
+    };
+    await db.put('activeAlarms', updatedAlarm);
+    toast.success("Active Alarm Updated", { description: `Alarm ${updatedAlarm.id} updated.` });
+  } catch (error) {
+    console.error("Error updating active alarm:", error);
+    toast.error("Active Alarm Update Failed", { description: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+export async function deleteActiveAlarm(id: string): Promise<void> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot delete active alarm." });
+    throw new Error("Database not initialized");
+  }
+  try {
+    await db.delete('activeAlarms', id);
+    toast.success("Active Alarm Deleted", { description: `Alarm ${id} removed.` });
+  } catch (error) {
+    console.error(`Error deleting active alarm ${id}:`, error);
+    toast.error("Active Alarm Delete Failed", { description: error instanceof Error ? error.message : String(error) });
+    throw error;
+  }
+}
+
+export async function deleteActiveAlarmsByRuleId(ruleId: string): Promise<void> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot delete active alarms by rule ID." });
+    throw new Error("Database not initialized");
+  }
+  try {
+    const tx = db.transaction('activeAlarms', 'readwrite');
+    const index = tx.store.index('ruleId');
+    let cursor = await index.openCursor(IDBKeyRange.only(ruleId));
+    let deleteCount = 0;
+    while (cursor) {
+      await cursor.delete();
+      deleteCount++;
+      cursor = await cursor.continue();
+    }
+    await tx.done;
+    if (deleteCount > 0) {
+      toast.info("Associated Alarms Cleared", { description: `${deleteCount} active alarms for rule ${ruleId} deleted.` });
+    }
+    console.log(`Deleted ${deleteCount} active alarms for ruleId ${ruleId}`);
+  } catch (error) {
+    console.error(`Error deleting active alarms for ruleId ${ruleId}:`, error);
+    toast.error("Failed to Delete Associated Alarms", { description: error instanceof Error ? error.message : String(error) });
+    throw error;
   }
 }

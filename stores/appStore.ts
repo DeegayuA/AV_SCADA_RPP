@@ -44,6 +44,8 @@ interface AppState {
   isEditMode: boolean;
   currentUser: User | null;
   selectedElementForDetails: CustomNodeType | CustomFlowEdge | null; // Added for detail sheet
+  soundEnabled: boolean;
+  activeAlarms: ActiveAlarm[]; // Added for system-wide alarm display
 }
 
 const initialState: AppState = {
@@ -55,6 +57,8 @@ const initialState: AppState = {
   isEditMode: false, // Default to false, admin can toggle
   currentUser: defaultUser, // Default to guest or null if prefer explicit login
   selectedElementForDetails: null, // Initialize as null
+  soundEnabled: typeof window !== 'undefined' ? localStorage.getItem('dashboardSoundEnabled') === 'true' : true,
+  activeAlarms: [], // Initialize as empty
 };
 
 interface SLDActions {
@@ -65,6 +69,8 @@ interface SLDActions {
   logout: () => void;
   setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) => void; // Added action
   updateNodeConfig: (nodeId: string, config: any, data?: any) => void;
+  setSoundEnabled: (enabled: boolean) => void;
+  setActiveAlarms: (alarms: ActiveAlarm[]) => void; // Added action
 }
 
 const onRehydrateStorageCallback = (
@@ -173,13 +179,22 @@ export const useAppStore = create<AppState & SLDActions>()(
           return state;
         });
       },
+      setSoundEnabled: (enabled: boolean) => {
+        set({ soundEnabled: enabled });
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('dashboardSoundEnabled', String(enabled));
+        }
+      },
+      setActiveAlarms: (alarms: ActiveAlarm[]) => set({ activeAlarms: alarms }),
     }),
     {
       name: 'app-user-session-storage', // More specific name
       storage: createJSONStorage(() => safeLocalStorage), // Use safe local storage
       partialize: (state: AppState & SLDActions): Partial<AppState> => ({ // Only persist these parts
-        // currentUser: state.currentUser,
+        // currentUser: state.currentUser, // Example: persist currentUser
         isEditMode: state.isEditMode,
+        soundEnabled: state.soundEnabled, // Persist soundEnabled
+        // activeAlarms: state.activeAlarms, // Persisting active alarms might be too much, they should be re-read from DB
         // Do NOT persist opcUaNodeValues or dataPoints metadata from constants
         // selectedElementForDetails should also NOT be persisted as it's transient UI state
       }),
@@ -193,6 +208,8 @@ export const useIsEditMode = () => useAppStore((state) => state.isEditMode);
 export const useCurrentUser = () => useAppStore((state) => state.currentUser);
 export const useCurrentUserRole = () => useAppStore((state) => state.currentUser?.role);
 export const useSelectedElementForDetails = () => useAppStore((state) => state.selectedElementForDetails); // New hook
+export const useSoundEnabled = () => useAppStore((state) => state.soundEnabled);
+export const useActiveAlarms = () => useAppStore((state) => state.activeAlarms); // New hook
 
 // Get a single OPC UA node value, subscribing only to changes for that ID
 export const useOpcUaNodeValue = (nodeId: string | undefined): string | number | boolean | undefined => 
@@ -200,3 +217,4 @@ export const useOpcUaNodeValue = (nodeId: string | undefined): string | number |
 
 // useCallback imported from React for useOpcUaNodeValue hook
 import { useCallback } from 'react';
+import { ActiveAlarm } from '@/types';
