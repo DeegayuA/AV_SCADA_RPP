@@ -408,7 +408,7 @@ const SwitchNode: React.FC<NodeProps<SwitchNodeData>> = (props) => {
         {id: 'common_in', type: 'target', position: Position.Top, style: {background: commonColor }, title: 'Common Input'}
     ];
     if(switchType === 'two-way'){
-        handles.push({id: 'out_on', type:'source', position: Position.Bottom, style: {background: pos1Color }, title: 'Output (ON/OFF)'})
+        handles.push({id: 'out_on', type:'source' | 'target', position: Position.Bottom, style: {background: pos1Color }, title: 'Output (ON/OFF)'})
     } else { // three-way
         handles.push({id: 'out_pos1', type:'source', position: Position.Left, style: {background: pos1Color }, title: 'Output Position 1'})
         handles.push({id: 'out_pos2', type:'source', position: Position.Right, style: {background: pos2Color }, title: 'Output Position 2'})
