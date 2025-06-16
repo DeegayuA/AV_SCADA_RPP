@@ -304,61 +304,104 @@ const CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD = 4;
 const OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD = 4;
 
 const UnifiedDashboardPage: React.FC = () => {
+  // --- Start of React Hooks Declarations ---
+
+  // Hooks from next/navigation and next-themes
   const router = useRouter();
   const currentPath = usePathname();
+  const { resolvedTheme } = useTheme();
+
+  // Hooks from Zustand store (useAppStore)
   const currentUser = useCurrentUser();
-  const storeHasHydrated = useAppStore.persist.hasHydrated();
-  const [authCheckComplete, setAuthCheckComplete] = useState(false);
-  
   const { isEditMode: isGlobalEditMode, toggleEditMode: toggleEditModeAction } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     toggleEditMode: state.toggleEditMode,
   }));
+  const currentUserRole = currentUser?.role; // Derived from currentUser, can be defined after currentUser hook
 
-  useEffect(() => { /* ... initDB ... */ 
-    initDB().catch(console.error); ensureAppConfigIsSaved();
-  }, []); 
-
-  useEffect(() => { /* ... auth check ... */
-    if (!storeHasHydrated) return;
-    if (!currentUser?.email || currentUser.email === 'guest@example.com') {
-      toast.error("Auth Required", { description: "Please log in." });
-      router.replace('/login');
-    } else { setAuthCheckComplete(true); }
-  }, [currentUser, router, storeHasHydrated, currentPath]);
-
-  const { resolvedTheme } = useTheme();
+  // useState hooks
+  const [authCheckComplete, setAuthCheckComplete] = useState(false);
   const [nodeValues, setNodeValues] = useState<NodeData>({});
   const [isConnected, setIsConnected] = useState(false);
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
   const [currentTime, setCurrentTime] = useState<string>('');
-  const ws = useRef<WebSocket | null>(null);
-  const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 10; 
-  const lastToastTimestamps = useRef<Record<string, number>>({});
-  // const [soundEnabled, setSoundEnabled] = useState<boolean>(() => typeof window !== 'undefined' ? localStorage.getItem('dashboardSoundEnabled') === 'true' : false); // Removed, uses Zustand now
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
-  const [isSldModalOpen, setIsSldModalOpen] = useState(false); 
+  const [isSldModalOpen, setIsSldModalOpen] = useState(false);
   const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
   const [isSldConfigOpen, setIsSldConfigOpen] = useState(false);
-
-  const currentUserRole = currentUser?.role;
-  const [sldLayoutId, setSldLayoutId] = useState<string>(() => { /* ... unchanged ... */
-      if (typeof window !== 'undefined') { const s=localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY); if(s&&AVAILABLE_SLD_LAYOUT_IDS.includes(s))return s;} return AVAILABLE_SLD_LAYOUT_IDS[0]||'main_plant';
+  const [sldLayoutId, setSldLayoutId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const s = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY);
+      if (s && AVAILABLE_SLD_LAYOUT_IDS.includes(s)) return s;
+    }
+    return AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant';
   });
-  const allPossibleDataPoints = useMemo(() => allPossibleDataPointsConfig, []);
+  const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
+  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>(() => {
+    if (typeof window !== 'undefined') {
+      const sT = localStorage.getItem(GRAPH_TIMESCALESETTING_KEY);
+      if (sT && ['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'].includes(sT)) return sT as TimeScale;
+    }
+    return '1m';
+  });
+  const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
+  const [powerGraphGenerationDpIds, setPowerGraphGenerationDpIds] = useState<string[]>([]);
+  const [powerGraphUsageDpIds, setPowerGraphUsageDpIds] = useState<string[]>([]);
+  const [powerGraphExportDpIds, setPowerGraphExportDpIds] = useState<string[]>([]);
+  const [powerGraphExportMode, setPowerGraphExportMode] = useState<'auto' | 'manual'>('auto');
+  const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false); // Note: UI for this was commented out
 
-  // const playNotificationSound = useCallback((type: 'success'|'error'|'warning'|'info')=>{/* ... unchanged ... */ if(!soundEnabled)return;const sM={success:'/sounds/success.mp3',error:'/sounds/error.mp3',warning:'/sounds/warning.mp3',info:'/sounds/info.mp3'};const vM={success:0.99,error:0.6,warning:0.5,info:0.3};if(typeof playSound==='function')playSound(sM[type],vM[type]);},[soundEnabled]); // Removed
-  const processControlActionQueue = useCallback(async () => { /* ... unchanged ... */
+  // useRef hooks
+  const ws = useRef<WebSocket | null>(null);
+  const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttempts = useRef(0);
+  const maxReconnectAttempts = 10; // This is a constant, but related to reconnectAttempts ref
+  const lastToastTimestamps = useRef<Record<string, number>>({});
+
+  // useMemo hooks
+  const allPossibleDataPoints = useMemo(() => allPossibleDataPointsConfig, []);
+  const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
+  const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
+  const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch' || p.uiType === 'input'), [individualPoints]);
+  const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
+  const gaugeItems = useMemo(() => individualPoints.filter(p => p.uiType === 'gauge'), [individualPoints]);
+  const otherDisplayItems = useMemo(() => individualPoints.filter(p => p.uiType === 'display' && p.category !== 'status'), [individualPoints]);
+  const topSections = useMemo<SectionToRender[]>(() => {
+    const s: SectionToRender[] = []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const bC = controlItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; const bS = statusDisplayItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; if (bC || bS) { if (statusDisplayItems.length > 0) s.push({ title: "Status Readings", items: statusDisplayItems, gridCols: cGC }); if (controlItems.length > 0) s.push({ title: "Controls", items: controlItems, gridCols: cGC }); } else { const cI = [...statusDisplayItems, ...controlItems]; if (cI.length > 0) s.push({ title: "Controls & Status", items: cI, gridCols: cGC }); } return s;
+  }, [controlItems, statusDisplayItems]);
+  const gaugesOverviewSectionDefinition = useMemo<SectionToRender | null>(() => {
+    if (gaugeItems.length > 0) return { title: "Gauges & Overview", items: gaugeItems, gridCols: 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8' }; return null;
+  }, [gaugeItems]);
+  const bottomReadingsSections = useMemo<SectionToRender[]>(() => {
+    if (otherDisplayItems.length === 0) return []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const s: SectionToRender[] = []; const dBC = otherDisplayItems.reduce((acc, p) => { const k = p.category || 'miscellaneous'; if (!acc[k]) acc[k] = []; acc[k].push(p); return acc; }, {} as Record<string, DataPoint[]>); const gORP: DataPoint[] = []; Object.entries(dBC).sort(([a], [b]) => a.localeCompare(b)).forEach(([cat, pts]) => { if (pts.length > OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD) s.push({ title: `${cat.charAt(0).toUpperCase() + cat.slice(1)} Readings`, items: pts, gridCols: cGC }); else gORP.push(...pts); }); if (gORP.length > 0) { const oRS: SectionToRender = { title: "Other Readings", items: gORP, gridCols: cGC }; if (s.some(sec => sec.title !== "Other Readings")) s.push(oRS); else s.unshift(oRS); } return s.filter(sec => sec.items.length > 0);
+  }, [otherDisplayItems]);
+  const cardHoverEffect = useMemo(() => (resolvedTheme === 'dark' ? { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } } : { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } }), [resolvedTheme]);
+  const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => {
+    const g: Record<string, ConfiguratorThreePhaseGroup> = {}, i: DataPoint[] = []; const cS = new Set(displayedDataPointIds); allPossibleDataPoints.forEach(dp => { if (dp.threePhaseGroup && dp.phase && ['a', 'b', 'c', 'x', 'total'].includes(dp.phase)) { if (!g[dp.threePhaseGroup]) { let rN = dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig, '').trim().replace(/ \([ABCX]\)$/i, '').trim(); g[dp.threePhaseGroup] = { name: dp.threePhaseGroup, representativeName: rN || dp.threePhaseGroup, ids: [], category: dp.category || 'miscellaneous' }; } g[dp.threePhaseGroup].ids.push(dp.id); } else if (!dp.threePhaseGroup) { i.push(dp); } }); const aGA = Array.from(new Set(Object.values(g).flatMap(grp => grp.ids))); const tIP = i.filter(ind => !aGA.includes(ind.id)); const cDA = Array.from(cS); return { threePhaseGroupsForConfig: Object.values(g).filter(grp => grp.ids.some(id => !cDA.includes(id))).sort((a, b) => a.representativeName.localeCompare(b.representativeName)), individualPointsForConfig: tIP.filter(dp => !cDA.includes(dp.id)).sort((a, b) => a.name.localeCompare(b.name)) };
+  }, [allPossibleDataPoints, displayedDataPointIds]);
+
+  // useCallback hooks
+  const getHardcodedDefaultDataPointIds = useCallback(() => {
+    const cIds = [
+      'grid-total-active-power-side-to-side', 'inverter-output-total-power', 'load-total-power',
+      'battery-capacity', 'battery-output-power', 'input-power-pv1',
+      'active-power-adjust', 'pf-reactive-power-adjust', 'export-power-percentage'
+    ].filter(id => allPossibleDataPoints.some(dp => dp.id === id));
+    if (cIds.length > 0) return cIds;
+    return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
+  }, [allPossibleDataPoints]);
+
+  const getSmartDefaults = useDynamicDefaultDataPointIds(allPossibleDataPoints);
+
+  const processControlActionQueue = useCallback(async () => {
     if (!ws.current || ws.current.readyState !== WebSocket.OPEN) { return; }
-    const qA = await getControlQueue(); if(qA.length===0) return;
-    console.log(`Processing ${qA.length} actions...`); toast.info("Processing Queued Actions", { description: `Found ${qA.length} pending command(s).`});
-    let allOk=true; for(const a of qA){try{ws.current.send(JSON.stringify({[a.nodeId]:a.value}));}catch(e){allOk=false;console.error(`Fail queue ${a.nodeId}:`,e);toast.error("Queue Fail",{description:`Cmd ${a.nodeId||'??'} fail.`});}}
-    await clearControlQueue(); if(allOk)toast.success("Queue OK",{description:"All sent."});else toast.warning("Queue Incomplete");
-  }, []);
+    const qA = await getControlQueue(); if (qA.length === 0) return;
+    console.log(`Processing ${qA.length} actions...`); toast.info("Processing Queued Actions", { description: `Found ${qA.length} pending command(s).` });
+    let allOk = true; for (const a of qA) { try { ws.current.send(JSON.stringify({ [a.nodeId]: a.value })); } catch (e) { allOk = false; console.error(`Fail queue ${a.nodeId}:`, e); toast.error("Queue Fail", { description: `Cmd ${a.nodeId || '??'} fail.` }); } }
+    await clearControlQueue(); if (allOk) toast.success("Queue OK", { description: "All sent." }); else toast.warning("Queue Incomplete");
+  }, []); // ws is a ref, so not typically in dep array unless its .current assignment changes its identity
 
   const connectWebSocket = useCallback(async () => {
     if (!authCheckComplete) return;
@@ -372,416 +415,119 @@ const UnifiedDashboardPage: React.FC = () => {
 
     reconnectInterval.current = setTimeout(async () => {
       if (typeof window === 'undefined') return;
-
       try {
-        console.log("Attempting to contact /api/opcua endpoint before WebSocket connection...");
         const response = await fetch('/api/opcua');
-        if (response.ok) {
-          console.log("/api/opcua endpoint reached successfully.");
-          // Potentially, response could provide a dynamic WS_URL, but for now, assume it's a status check/trigger.
-        } else {
-          console.warn(`/api/opcua endpoint returned an error: ${response.status}. Proceeding with WebSocket connection attempt anyway.`);
-          toast.warning("OPC UA API Check", { description: `Endpoint /api/opcua status: ${response.status}. Will still attempt WS connection.` });
-        }
-      } catch (error) {
-        console.error("Error fetching /api/opcua:", error, "Proceeding with WebSocket connection attempt anyway.");
-        toast.error("OPC UA API Error", { description: "Could not reach /api/opcua. Will still attempt WS connection." });
-      }
+        if (!response.ok) console.warn(`/api/opcua endpoint returned an error: ${response.status}. Proceeding with WebSocket connection attempt anyway.`);
+      } catch (error) { console.error("Error fetching /api/opcua:", error, "Proceeding with WebSocket connection attempt anyway."); }
       
-      console.log("Attempting WebSocket connection to:", WS_URL);
       ws.current = new WebSocket(WS_URL);
-
       ws.current.onopen = () => {
-        console.log("WS Open:", WS_URL);
-        setIsConnected(true);
-        setLastUpdateTime(Date.now());
-        reconnectAttempts.current = 0;
+        setIsConnected(true); setLastUpdateTime(Date.now()); reconnectAttempts.current = 0;
         if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
         toast.success('WS Connected', { id: 'ws-conn', description: 'Backend connected.', duration: 3000 });
-        playSuccessSound(); // Use global sound
+        playSuccessSound();
         if (typeof window !== 'undefined') { [f1, f2, f3].forEach(f => sessionStorage.removeItem(f)); }
         processControlActionQueue();
       };
-
       ws.current.onmessage = (e) => {
-        try {
-          const d = JSON.parse(e.data as string);
-          if (typeof d === 'object' && d !== null) {
-            setNodeValues(p => ({ ...p, ...d }));
-            setLastUpdateTime(Date.now());
-          } else console.warn("WS:non-obj", d);
-        } catch (err) {
-          console.error("WS parse err", err, e.data);
-          playErrorSound(); // Use global sound
-        }
+        try { const d = JSON.parse(e.data as string); if (typeof d === 'object' && d !== null) { setNodeValues(p => ({ ...p, ...d })); setLastUpdateTime(Date.now()); } else console.warn("WS:non-obj", d); }
+        catch (err) { console.error("WS parse err", err, e.data); playErrorSound(); }
       };
-
       ws.current.onerror = (ev) => {
-        console.error("WS Err on", (ev.target as WebSocket)?.url, ev);
-        setIsConnected(false);
-        const t = ev.target as WebSocket;
-
-        if (!t?.url?.includes(WS_URL)) {
-          console.warn("WS error from unexpected URL:", t?.url);
-          return;
-        }
-
-        // As per "websocket on error go to /api/opcua"
-        console.log("WebSocket error occurred. Pinging /api/opcua as part of error handling.");
-        fetch('/api/opcua')
-          .then(res => {
-            if (!res.ok) { 
-              console.warn('Error pinging /api/opcua after WS error:', res.status); 
-            } else { 
-              console.log('Successfully pinged /api/opcua after WS error.'); 
-            }
-          })
-          .catch(err => console.error('Failed to ping /api/opcua after WS error:', err));
-
-        if (reconnectAttempts.current >= maxReconnectAttempts - 1) {
-          toast.error('WS Critical', {
-            description: 'Connection failed after retries.'
-          });
-          // The fetch('/api/opcua') above already happened. If a specific fetch was needed
-          // *only* for max_retries, it would be here, but the instruction implies general on-error.
-        }
+        console.error("WS Err on", (ev.target as WebSocket)?.url, ev); setIsConnected(false);
+        fetch('/api/opcua').catch(err => console.error('Failed to ping /api/opcua after WS error:', err));
+        if (reconnectAttempts.current >= maxReconnectAttempts - 1) toast.error('WS Critical', { description: 'Connection failed after retries.' });
       };
-
       ws.current.onclose = (ev) => {
-        console.log(`WS Close: ${(ev.target as WebSocket)?.url} Code:${ev.code} Rsn:'${ev.reason || '-'}' Clean:${ev.wasClean}`);
         setIsConnected(false);
         if (ev.code === 1000 || ev.code === 1001 || ev.code === 1005 || ev.code === 1006 || (typeof window !== 'undefined' && (sessionStorage.getItem(f1) || sessionStorage.getItem(f2) || sessionStorage.getItem(f3)))) {
-          reconnectAttempts.current = maxReconnectAttempts + 1; // Stop retrying for these specific close codes
-          return;
+          reconnectAttempts.current = maxReconnectAttempts + 1; return;
         }
-        if (reconnectAttempts.current < maxReconnectAttempts) {
-          reconnectAttempts.current++;
-          console.log(`Scheduling reconnect attempt ${reconnectAttempts.current} / ${maxReconnectAttempts} via onclose.`);
-          connectWebSocket(); 
-        } else {
-          toast.error('WS Fail', { description: 'Max reconnects.' });
-          playErrorSound(); // Use global sound
-        }
+        if (reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); }
+        else { toast.error('WS Fail', { description: 'Max reconnects.' }); playErrorSound(); }
       };
     }, delayMs);
-  }, [authCheckComplete, processControlActionQueue, WS_URL, maxReconnectAttempts]); // Removed playNotificationSound
-
+  }, [authCheckComplete, processControlActionQueue, WS_URL, maxReconnectAttempts]);
 
   const sendDataToWebSocket = useCallback(async (nodeId: string, value: boolean | number | string) => {
-    if (currentUserRole === UserRole.VIEWER) {
-      toast.warning("Restricted Action", { description: "Viewers cannot send commands." });
-      playWarningSound();
-      return;
-    }
-
+    if (currentUserRole === UserRole.VIEWER) { toast.warning("Restricted Action", { description: "Viewers cannot send commands." }); playWarningSound(); return; }
     const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId);
-    let processedValue: any = value;
-    let queueValue: any = undefined; // Value to be stored in queue, should be OPC UA compatible
-
-    if (pointConfig?.dataType.includes('Int')) {
-      let parsedNum: number;
-      if (typeof value === 'boolean') parsedNum = value ? 1 : 0;
-      else if (typeof value === 'string') parsedNum = parseInt(value, 10);
-      else parsedNum = value as number;
-      if (isNaN(parsedNum)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; }
-      processedValue = parsedNum;
-      queueValue = parsedNum;
-    } else if (pointConfig?.dataType === 'Boolean') {
-      let parsedBool: boolean;
-      if (typeof value === 'number') parsedBool = value !== 0;
-      else if (typeof value === 'string') parsedBool = value.toLowerCase() === 'true' || value === '1';
-      else parsedBool = value as boolean;
-      processedValue = parsedBool;
-      queueValue = parsedBool;
-    } else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') {
-      let parsedFloat: number;
-      if (typeof value === 'string') parsedFloat = parseFloat(value);
-      else parsedFloat = value as number;
-      if (isNaN(parsedFloat)) { toast.error('Send Error', { description: 'Invalid numeric value.' }); return; }
-      processedValue = parsedFloat;
-      queueValue = parsedFloat;
-    }
-
-    if (typeof processedValue === 'number' && !isFinite(processedValue)) {
-      toast.error('Send Error', { description: 'Numeric value is not finite (Infinity or NaN).' });
-      playErrorSound();
-      return;
-    }
-
-    // New Logging Call
-    logActivity(
-      'DATA_POINT_CHANGE',
-      {
-        nodeId: nodeId,
-        newValue: processedValue,
-        dataPointName: pointConfig?.name || 'Unknown DataPoint',
-        dataType: pointConfig?.dataType || 'Unknown Type'
-      },
-      currentPath
-    );
-
+    let processedValue: any = value; let queueValue: any = undefined;
+    if (pointConfig?.dataType.includes('Int')) { let pN: number; if (typeof value === 'boolean') pN = value ? 1 : 0; else if (typeof value === 'string') pN = parseInt(value, 10); else pN = value as number; if (isNaN(pN)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; } processedValue = pN; queueValue = pN; }
+    else if (pointConfig?.dataType === 'Boolean') { let pB: boolean; if (typeof value === 'number') pB = value !== 0; else if (typeof value === 'string') pB = value.toLowerCase() === 'true' || value === '1'; else pB = value as boolean; processedValue = pB; queueValue = pB; }
+    else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') { let pF: number; if (typeof value === 'string') pF = parseFloat(value); else pF = value as number; if (isNaN(pF)) { toast.error('Send Error', { description: 'Invalid numeric value.' }); return; } processedValue = pF; queueValue = pF; }
+    if (typeof processedValue === 'number' && !isFinite(processedValue)) { toast.error('Send Error', { description: 'Numeric value is not finite (Infinity or NaN).' }); playErrorSound(); return; }
+    logActivity('DATA_POINT_CHANGE', { nodeId: nodeId, newValue: processedValue, dataPointName: pointConfig?.name || 'Unknown DataPoint', dataType: pointConfig?.dataType || 'Unknown Type' }, currentPath);
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      try {
-        const payload = JSON.stringify({ [nodeId]: processedValue });
-        ws.current.send(payload);
-        toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` });
-        playInfoSound();
-      } catch (error) {
-        console.error("WebSocket send error:", error);
-        toast.error('Send Error', { description: 'Failed to send command. Queuing.' });
-        playErrorSound();
-        if (queueValue !== undefined) {
-          await queueControlAction(nodeId, queueValue);
-        } else {
-          toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
-        }
-      }
+      try { const payload = JSON.stringify({ [nodeId]: processedValue }); ws.current.send(payload); toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` }); playInfoSound(); }
+      catch (error) { console.error("WebSocket send error:", error); toast.error('Send Error', { description: 'Failed to send command. Queuing.' }); playErrorSound(); if (queueValue !== undefined) await queueControlAction(nodeId, queueValue); else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` }); }
     } else {
-      toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` });
-      playWarningSound();
-      if (queueValue !== undefined) {
-        await queueControlAction(nodeId, queueValue);
-      } else {
-        toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
-      }
-      if (!isConnected && authCheckComplete) {
-        connectWebSocket();
-      }
+      toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` }); playWarningSound(); if (queueValue !== undefined) await queueControlAction(nodeId, queueValue); else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
+      if (!isConnected && authCheckComplete) connectWebSocket();
     }
-  }, [
-    currentUserRole,
-    allPossibleDataPoints,
-    ws,
-    isConnected,
-    authCheckComplete,
-    connectWebSocket,
-    currentPath,
-    playInfoSound,
-    playErrorSound,
-    playWarningSound,
-    queueControlAction
-  ]);
+  }, [currentUserRole, allPossibleDataPoints, ws, isConnected, authCheckComplete, connectWebSocket, currentPath, playInfoSound, playErrorSound, playWarningSound, queueControlAction]);
 
-  useEffect(() => { /* ... localStorage for sldLayoutId ... */ if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
-  const getHardcodedDefaultDataPointIds = useCallback(() => {
-        const cIds=[
-            'grid-total-active-power-side-to-side',
-            'inverter-output-total-power',
-            'load-total-power',
-            'battery-capacity',
-            'battery-output-power',
-            'input-power-pv1',
-            'active-power-adjust', // Added
-            'pf-reactive-power-adjust', // Added
-            'export-power-percentage' // Added
-        ].filter(id => allPossibleDataPoints.some(dp => dp.id === id)); // Ensure they exist in allPossibleDataPoints
+  const checkPlcConnection = useCallback(async () => {
+    if (!authCheckComplete) return; try { const r = await fetch('/api/opcua/status'); if (!r.ok) throw new Error(`API Err:${r.status}`); const d = await r.json(); const nS = d.connectionStatus; if (nS && ['online', 'offline', 'disconnected'].includes(nS)) setPlcStatus(nS); else { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (e) { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); }
+  }, [plcStatus, authCheckComplete]);
 
-        if(cIds.length > 0) return cIds;
-
-        // Fallback if none of the preferred IDs are found (less likely now)
-        return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
-    },[allPossibleDataPoints]);
-  const getSmartDefaults = useDynamicDefaultDataPointIds(allPossibleDataPoints);
-  const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
-  useEffect(() => { /* ... localStorage for displayedDataPointIds ... */ if(typeof window!=='undefined'&&allPossibleDataPoints.length>0&&authCheckComplete){const s=localStorage.getItem(USER_DASHBOARD_CONFIG_KEY);if(s){try{const p=JSON.parse(s)as string[];const v=p.filter(id=>allPossibleDataPoints.some(dp=>dp.id===id));if(v.length>0){setDisplayedDataPointIds(v);return;}else if(p.length>0)localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);}catch(e){console.error("Parse err",e);localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);}}const sm=getSmartDefaults();setDisplayedDataPointIds(sm.length>0?sm:getHardcodedDefaultDataPointIds());}},[allPossibleDataPoints,getSmartDefaults,getHardcodedDefaultDataPointIds,authCheckComplete]);
-  useEffect(() => { /* ... localStorage for displayedDataPointIds on change ... */ if(typeof window!=='undefined'&&authCheckComplete){if(displayedDataPointIds.length>0)localStorage.setItem(USER_DASHBOARD_CONFIG_KEY,JSON.stringify(displayedDataPointIds));else if(localStorage.getItem(USER_DASHBOARD_CONFIG_KEY))localStorage.setItem(USER_DASHBOARD_CONFIG_KEY,JSON.stringify([]));}},[displayedDataPointIds,authCheckComplete]);
-  // useEffect(() => { if (typeof window !== 'undefined') localStorage.setItem('dashboardSoundEnabled', String(soundEnabled)); }, [soundEnabled]); // Removed, managed by Zustand store
-  const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
-  useEffect(() => {const uc=()=>setCurrentTime(new Date().toLocaleString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,day:'2-digit',month:'short',year:'numeric'}));uc();const i=setInterval(uc,1000);return()=>clearInterval(i);},[]);
-  useEffect(() => { /* ... lagCheckInterval ... */
-    if (!authCheckComplete) return; const lagI=setInterval(()=>{const cD=Date.now()-lastUpdateTime;setDelay(cD);const fS=typeof window!=='undefined'&&['reloadingDueToDelay','redirectingDueToExtremeDelay','opcuaRedirected'].some(f=>sessionStorage.getItem(f));if(fS)return;
-    if(isConnected&&cD>60000){console.error(`CRIT WS lag(${(Number(cD)/1000).toFixed(1)}s).Closing WS.`);toast.error('Critical Lag',{id:'ws-lag',description:'Re-establishing...',duration:10000});if(ws.current)ws.current.close(1011,"Crit Lag");return;}
-    else if(isConnected&&cD>30000){console.warn(`High WS lag(${(Number(cD)/1000).toFixed(1)}s).`);toast.warning('Stale Warn',{id:'ws-stale',description:`Last upd >${(Number(cD)/1000).toFixed(0)}s ago.`,duration:8000});}},15000);return()=>clearInterval(lagI);
-  }, [lastUpdateTime, isConnected, authCheckComplete]); // Removed playNotificationSound
-  const checkPlcConnection = useCallback(async () => { /* ... unchanged, reduced noise ... */ if(!authCheckComplete)return;try{const r=await fetch('/api/opcua/status');if(!r.ok)throw new Error(`API Err:${r.status}`);const d=await r.json();const nS=d.connectionStatus;if(nS&&['online','offline','disconnected'].includes(nS))setPlcStatus(nS);else{if(plcStatus!=='disconnected')setPlcStatus('disconnected');}}catch(e){if(plcStatus!=='disconnected')setPlcStatus('disconnected');}},[plcStatus,authCheckComplete]);
-  useEffect(() => {if (!authCheckComplete) return ()=>{}; checkPlcConnection(); const plcI=setInterval(checkPlcConnection,15000); return()=>clearInterval(plcI);},[checkPlcConnection,authCheckComplete]);
-  useEffect(() => {  /* ... unchanged WebSocket setup/teardown ... */
-    if (!authCheckComplete) return ()=>{}; if(typeof window==='undefined')return;
-    ['opcuaRedirected','reloadingDueToDelay','redirectingDueToExtremeDelay'].forEach(f=>sessionStorage.removeItem(f));
-    reconnectAttempts.current=0;connectWebSocket();
-    return()=>{if(reconnectInterval.current)clearTimeout(reconnectInterval.current);if(ws.current&&ws.current.readyState!==WebSocket.CLOSED){console.log("Unmounting, closing WS.");ws.current.onopen=null;ws.current.onmessage=null;ws.current.onerror=null;ws.current.onclose=null;ws.current.close(1000,'Unmounted');ws.current=null;}};
-  }, [connectWebSocket, authCheckComplete]);
-
-  const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
-  const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch' || p.uiType === 'input'), [individualPoints]);
-  const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
-  const gaugeItems = useMemo(() => individualPoints.filter(p => p.uiType === 'gauge'), [individualPoints]);
-  const otherDisplayItems = useMemo(() => individualPoints.filter(p => p.uiType === 'display' && p.category !== 'status'), [individualPoints]);
-  const topSections = useMemo<SectionToRender[]>(() => { /* ... unchanged ... */ const s: SectionToRender[] = []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const bC=controlItems.length>CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; const bS=statusDisplayItems.length>CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; if(bC||bS){if(statusDisplayItems.length>0)s.push({title:"Status Readings",items:statusDisplayItems,gridCols:cGC}); if(controlItems.length>0)s.push({title:"Controls",items:controlItems,gridCols:cGC});}else{const cI=[...statusDisplayItems,...controlItems];if(cI.length>0)s.push({title:"Controls & Status",items:cI,gridCols:cGC});} return s; }, [controlItems, statusDisplayItems]);
-  const gaugesOverviewSectionDefinition = useMemo<SectionToRender | null>(() => { /* ... unchanged ... */ if(gaugeItems.length>0)return{title:"Gauges & Overview",items:gaugeItems,gridCols:'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8'};return null;},[gaugeItems]);
-  const bottomReadingsSections = useMemo<SectionToRender[]>(() => { /* ... unchanged ... */ if(otherDisplayItems.length===0)return[];const cGC='grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6';const s:SectionToRender[]=[];const dBC=otherDisplayItems.reduce((acc,p)=>{const k=p.category||'miscellaneous';if(!acc[k])acc[k]=[];acc[k].push(p);return acc;},{}as Record<string,DataPoint[]>);const gORP:DataPoint[]=[];Object.entries(dBC).sort(([a],[b])=>a.localeCompare(b)).forEach(([cat,pts])=>{if(pts.length>OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD)s.push({title:`${cat.charAt(0).toUpperCase()+cat.slice(1)} Readings`,items:pts,gridCols:cGC});else gORP.push(...pts);});if(gORP.length>0){const oRS:SectionToRender={title:"Other Readings",items:gORP,gridCols:cGC};if(s.some(sec=>sec.title!=="Other Readings"))s.push(oRS);else s.unshift(oRS);}return s.filter(sec=>sec.items.length>0);},[otherDisplayItems]);
-  const cardHoverEffect = useMemo(() => (resolvedTheme === 'dark' ? { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } } : { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } }), [resolvedTheme]);
   const handleResetToDefault = useCallback(() => {
-    if (currentUserRole !== UserRole.ADMIN) return;
-    const smartDefaults = getSmartDefaults();
-    const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds();
-    setDisplayedDataPointIds(defaultIds);
-    toast.info("Layout reset to default.");
-    logActivity(
-      'ADMIN_DASHBOARD_RESET_LAYOUT',
-      {
-        resetToIds: defaultIds
-      },
-      currentPath
-    );
+    if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath);
   }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
 
   const handleRemoveAllItems = useCallback(() => {
-    if (currentUserRole !== UserRole.ADMIN) return;
-    const oldIds = displayedDataPointIds; // Capture before clearing
-    setDisplayedDataPointIds([]);
-    toast.info("All cards removed.");
-    logActivity(
-      'ADMIN_DASHBOARD_REMOVE_ALL_CARDS',
-      {
-        removedAll: true,
-        previousIds: oldIds // Log what was removed
-      },
-      currentPath
-    );
+    if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath);
   }, [currentUserRole, displayedDataPointIds, currentPath]);
 
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
-    if (currentUserRole !== UserRole.ADMIN) return;
-    const currentDisplayedSet = new Set(displayedDataPointIds);
-    const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
-
-    if (newIdsToAdd.length === 0 && selectedIds.length > 0) {
-      toast.warning("Items already shown or none selected to add.");
-      setIsConfiguratorOpen(false); // Still close configurator
-      return;
-    }
-    if (newIdsToAdd.length > 0) {
-      const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd]));
-      setDisplayedDataPointIds(newFullList);
-      toast.success(`${newIdsToAdd.length} new DP${newIdsToAdd.length > 1 ? 's' : ''} added.`);
-      logActivity(
-        'ADMIN_DASHBOARD_ADD_CARDS',
-        {
-          addedIds: newIdsToAdd,
-          addedCount: newIdsToAdd.length,
-          currentDashboardIds: newFullList // State after change
-        },
-        currentPath
-      );
-    }
+    if (currentUserRole !== UserRole.ADMIN) return; const currentDisplayedSet = new Set(displayedDataPointIds); const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
+    if (newIdsToAdd.length === 0 && selectedIds.length > 0) { toast.warning("Items already shown or none selected to add."); setIsConfiguratorOpen(false); return; }
+    if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new DP${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath); }
     setIsConfiguratorOpen(false);
   }, [displayedDataPointIds, currentUserRole, currentPath]);
 
   const handleRemoveItem = useCallback((dpIdToRemove: string) => {
-    if (currentUserRole !== UserRole.ADMIN) return;
-    const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove);
-    let isGroupRemoval = false;
-    let removedItemsList: string[] = [];
-    let newDisplayedIds: string[] = [];
-
-    if (pointToRemove?.threePhaseGroup) {
-      isGroupRemoval = true;
-      removedItemsList = allPossibleDataPoints
-        .filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup)
-        .map(dp => dp.id);
-      newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id));
-      setDisplayedDataPointIds(newDisplayedIds);
-      toast.info(`${pointToRemove.threePhaseGroup} group removed.`);
-      logActivity(
-        'ADMIN_DASHBOARD_REMOVE_CARD',
-        {
-          removedGroupId: pointToRemove.threePhaseGroup,
-          removedItemIds: removedItemsList,
-          isGroup: true,
-          currentDashboardIds: newDisplayedIds
-        },
-        currentPath
-      );
-    } else {
-      removedItemsList = [dpIdToRemove];
-      newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove);
-      setDisplayedDataPointIds(newDisplayedIds);
-      toast.info("Data point removed.");
-      logActivity(
-        'ADMIN_DASHBOARD_REMOVE_CARD',
-        {
-          removedId: dpIdToRemove,
-          isGroup: false,
-          currentDashboardIds: newDisplayedIds
-        },
-        currentPath
-      );
-    }
+    if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove); let newDisplayedIds: string[];
+    if (pointToRemove?.threePhaseGroup) { const removedItemsList = allPossibleDataPoints.filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup).map(dp => dp.id); newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id)); setDisplayedDataPointIds(newDisplayedIds); toast.info(`${pointToRemove.threePhaseGroup} group removed.`); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedGroupId: pointToRemove.threePhaseGroup, removedItemIds: removedItemsList, isGroup: true, currentDashboardIds: newDisplayedIds }, currentPath); }
+    else { newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove); setDisplayedDataPointIds(newDisplayedIds); toast.info("Data point removed."); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedId: dpIdToRemove, isGroup: false, currentDashboardIds: newDisplayedIds }, currentPath); }
   }, [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]);
-  const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => { /* ... unchanged ... */ const g:Record<string,ConfiguratorThreePhaseGroup>={},i:DataPoint[]=[];const cS=new Set(displayedDataPointIds);allPossibleDataPoints.forEach(dp=>{if(dp.threePhaseGroup&&dp.phase&&['a','b','c','x','total'].includes(dp.phase)){if(!g[dp.threePhaseGroup]){let rN=dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig,'').trim().replace(/ \([ABCX]\)$/i,'').trim();g[dp.threePhaseGroup]={name:dp.threePhaseGroup,representativeName:rN||dp.threePhaseGroup,ids:[],category:dp.category || 'miscellaneous'};}g[dp.threePhaseGroup].ids.push(dp.id);}else if(!dp.threePhaseGroup){i.push(dp);}});const aGA=Array.from(new Set(Object.values(g).flatMap(grp=>grp.ids)));const tIP=i.filter(ind=>!aGA.includes(ind.id));const cDA=Array.from(cS);return{threePhaseGroupsForConfig:Object.values(g).filter(grp=>grp.ids.some(id=>!cDA.includes(id))).sort((a,b)=>a.representativeName.localeCompare(b.representativeName)),individualPointsForConfig:tIP.filter(dp=>!cDA.includes(dp.id)).sort((a,b)=>a.name.localeCompare(b.name))};}, [allPossibleDataPoints, displayedDataPointIds]);
-  
-  const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
-  const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
-const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
 
-  const commonRenderingProps = {
-    isEditMode: isGlobalEditMode,
-    nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,
-    playNotificationSound: playNotificationSound, // Add back the required prop
-    lastToastTimestamps, onRemoveItem: handleRemoveItem,
-    allPossibleDataPoints, containerVariants, currentUserRole,
-  };
-  
-  const hasAnyDynamicCardContent = topSections.length > 0 || !!gaugesOverviewSectionDefinition || bottomReadingsSections.length > 0;
-  
-  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>(() => { 
-      if(typeof window!=='undefined'){const sT=localStorage.getItem(GRAPH_TIMESCALESETTING_KEY);if(sT&&['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'].includes(sT))return sT as TimeScale;}return '1m';
-  });
+  const handleSldLayoutSelect = useCallback((newLayoutId: string) => {
+    const oldLayout = sldLayoutId; setSldLayoutId(newLayoutId);
+    if (isSldConfigOpen) setIsSldConfigOpen(false); if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false);
+    logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath);
+  }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]);
 
-  // Initialize ALL graph related states together
-  const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
-  const [powerGraphGenerationDpIds, setPowerGraphGenerationDpIds] = useState<string[]>([]);
-  const [powerGraphUsageDpIds, setPowerGraphUsageDpIds] = useState<string[]>([]);
-  const [powerGraphExportDpIds, setPowerGraphExportDpIds] = useState<string[]>([]);
-  const [powerGraphExportMode, setPowerGraphExportMode] = useState<'auto' | 'manual'>('auto');
-  const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false);
+  // useEffect hooks
+  useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
+  useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]); // Removed storeHasHydrated from deps as it's not a state/prop
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && allPossibleDataPoints.length > 0 && authCheckComplete) { const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY); if (s) { try { const p = JSON.parse(s) as string[]; const v = p.filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (v.length > 0) { setDisplayedDataPointIds(v); return; } else if (p.length > 0) localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } catch (e) { console.error("Parse err", e); localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } } const sm = getSmartDefaults(); setDisplayedDataPointIds(sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()); } }, [allPossibleDataPoints, getSmartDefaults, getHardcodedDefaultDataPointIds, authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { if (displayedDataPointIds.length > 0) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify(displayedDataPointIds)); else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY)) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([])); } }, [displayedDataPointIds, authCheckComplete]);
+  useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
+  useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).Closing WS.`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); if (ws.current) ws.current.close(1011, "Crit Lag"); return; } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 15000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete]);
+  useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
+  useEffect(() => { if (!authCheckComplete) return () => { }; if (typeof window === 'undefined') return; ['opcuaRedirected', 'reloadingDueToDelay', 'redirectingDueToExtremeDelay'].forEach(f => sessionStorage.removeItem(f)); reconnectAttempts.current = 0; connectWebSocket(); return () => { if (reconnectInterval.current) clearTimeout(reconnectInterval.current); if (ws.current && ws.current.readyState !== WebSocket.CLOSED) { ws.current.onopen = null; ws.current.onmessage = null; ws.current.onerror = null; ws.current.onclose = null; ws.current.close(1000, 'Unmounted'); ws.current = null; } }; }, [connectWebSocket, authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
+  // --- End of React Hooks Declarations ---
 
-  // Load graph configuration from localStorage AFTER authCheckComplete
-  useEffect(() => {
-    if (typeof window !== 'undefined' && authCheckComplete) {
-        setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]'));
-        setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]'));
-        setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]'));
-        setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto'|'manual')) || 'auto');
-        setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');
-        setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m');
-    }
-  }, [authCheckComplete]); // Only run once after auth check
-
-  // Persist ALL graph config to localStorage when any of them change
-  useEffect(() => {
-    if (typeof window !== 'undefined' && authCheckComplete) { // Ensure not to run on initial SSR or before auth
-      localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds));
-      localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds));
-      localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds));
-      localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode);
-      localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph));
-      localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale);
-    }
-  }, [
-    powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, 
-    powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete
-  ]);
-
+  const storeHasHydrated = useAppStore.persist.hasHydrated(); // Not a hook, can be here
   if (!storeHasHydrated || !authCheckComplete) { /* ... unchanged loading screen ... */
     return(<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary"/><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
   }
-
-  const handleSldLayoutSelect = useCallback((newLayoutId: string) => {
-    const oldLayout = sldLayoutId; // Capture old layout
-    setSldLayoutId(newLayoutId);
-    // Close any dialog that might have triggered this
-    if (isSldConfigOpen) setIsSldConfigOpen(false);
-    if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false);
-
-    logActivity(
-      'ADMIN_SLD_LAYOUT_CHANGE',
-      { oldLayoutId: oldLayout, newLayoutId: newLayoutId },
-      currentPath
-    );
-  }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]); // Added dependencies
+  
+  // Non-hook derived constants (can be here or after hooks, but before use)
+  const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
+  const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
+  const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
+  const commonRenderingProps = {
+    isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,
+    playNotificationSound: playNotificationSound, lastToastTimestamps, onRemoveItem: handleRemoveItem,
+    allPossibleDataPoints, containerVariants, currentUserRole,
+  };
+  const hasAnyDynamicCardContent = topSections.length > 0 || !!gaugesOverviewSectionDefinition || bottomReadingsSections.length > 0;
 
   return (
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
