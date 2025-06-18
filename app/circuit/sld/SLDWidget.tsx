@@ -636,8 +636,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
       toast.success("Layout Imported Successfully", { description: `Content from '${selectedFileName || 'pasted text'}' imported into layout '${layoutId.replace(/_/g, ' ')}'.` });
       setIsImportDialogOpen(false); // This will trigger onOpenChange to clear states
-      // setImportJsonString(''); // Moved to onOpenChange
-      // setSelectedFileName(null); // Moved to onOpenChange
+      setImportJsonString(''); // Moved to onOpenChange
+      setSelectedFileName(null); // Moved to onOpenChange
 
     } catch (error: any) {
       console.error("Error importing SLD layout:", error);
@@ -676,7 +676,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     } else {
       setSelectedFileName(null);
       // Optionally, clear importJsonString if you want 'cancel' in file dialog to clear text area
-      // setImportJsonString(''); 
+      setImportJsonString(''); 
     }
     // Reset file input to allow re-uploading the same file
     if (fileInputRef.current) {
@@ -1354,7 +1354,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         transition={{ duration: 0.2, ease: "circOut" }}
     >
       {canEdit && onLayoutIdChangeProp && (
-          <div className="absolute top-3 left-64 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2"> {/* Changed left-3 to left-64 */}
+          <div className="absolute bottom-0 right-0 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2"> {/* Changed left-3 to left-64 */}
             <Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''} disabled={!layoutId && dynamicAvailableLayouts.length === 0}>
               <SelectTrigger className="h-9 text-xs min-w-[12rem]"> {/* Added min-w */}
                 <div className="flex items-center">
