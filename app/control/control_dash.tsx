@@ -581,6 +581,13 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
+  // --- Additional useCallback hooks that need to be declared before early returns ---
+  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => {
+      setSldLayoutId(newLayoutId);
+      // The localStorage update for DEFAULT_SLD_LAYOUT_ID_KEY is handled by an existing useEffect.
+      // logUserActivity(`SLDWidget changed layout to ${newLayoutId}`); // Optional: specific logging
+  }, [setSldLayoutId]); // Removed logUserActivity to simplify
+
   // --- End of React Hooks Declarations ---
 
   const storeHasHydrated = useAppStore.persist.hasHydrated(); // Not a hook, can be here
@@ -592,12 +599,6 @@ const UnifiedDashboardPage: React.FC = () => {
   const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
   const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
   const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
-
-  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => {
-      setSldLayoutId(newLayoutId);
-      // The localStorage update for DEFAULT_SLD_LAYOUT_ID_KEY is handled by an existing useEffect.
-      // logUserActivity(`SLDWidget changed layout to ${newLayoutId}`); // Optional: specific logging
-  }, [setSldLayoutId]); // Removed logUserActivity to simplify
 
   const commonRenderingProps = {
     isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,
