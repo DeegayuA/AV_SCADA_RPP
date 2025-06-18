@@ -62,7 +62,7 @@ import { logActivity } from '@/lib/activityLog';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected"; isConnected: boolean; connectWebSocket: () => void;
-  soundEnabled: boolean; setSoundEnabled: Dispatch<SetStateAction<boolean>>; currentTime: string; delay: number;
+  currentTime: string; delay: number;
   version: string; onOpenConfigurator: () => void;
   isEditMode: boolean;
   toggleEditMode: () => void;
@@ -72,7 +72,7 @@ interface DashboardHeaderControlProps {
 
 const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, soundEnabled, setSoundEnabled, currentTime, delay,
+    plcStatus, isConnected, connectWebSocket, currentTime, delay,
     version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault,
   }) => {
     const router = useRouter(); 
@@ -568,7 +568,7 @@ const UnifiedDashboardPage: React.FC = () => {
               localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId); // Persist this fallback
           }
       }
-  }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]); // sldLayoutId in deps to re-verify if it changes from another source
+  }, [availableSldLayoutsForPage, authCheckComplete]); // Removed sldLayoutId from deps to prevent infinite loop
 
 
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
@@ -612,15 +612,13 @@ const UnifiedDashboardPage: React.FC = () => {
       <div className="max-w-screen-4xl mx-auto">
         <HeaderConnectivityComponent
           plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
-          // soundEnabled and setSoundEnabled are no longer passed as SoundToggle uses Zustand
           currentTime={currentTime} delay={delay}
           version={VERSION}
           isEditMode={isGlobalEditMode}
           toggleEditMode={toggleEditModeAction}
           currentUserRole={currentUserRole}
           onOpenConfigurator={() => { if (currentUserRole === UserRole.ADMIN) setIsConfiguratorOpen(true); else toast.warning("Access Denied", { description: "Only administrators can add cards." }); } }
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} soundEnabled={false} setSoundEnabled={function (value: React.SetStateAction<boolean>): void {
-          } } />
+          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} />
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
 

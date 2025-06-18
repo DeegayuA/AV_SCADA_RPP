@@ -5,7 +5,8 @@ import { AVAILABLE_SLD_LAYOUT_IDS } from "@/config/constants";
 import {
   Copy, Save, FolderKanban, Upload, Download, Trash2, ChevronsUpDown,
   Info, DownloadCloud, FileJson, PlusCircle, Settings2, ExternalLink,
-  FileUp, FileDown, Wrench, ServerCog, RefreshCcw, AlertCircle, Link2Off, Palette, BrainCircuit, CloudFog, MessageSquareWarning
+  FileUp, FileDown, Wrench, ServerCog, RefreshCcw, AlertCircle, Link2Off, Palette, BrainCircuit, CloudFog, MessageSquareWarning,
+  ChevronLeft
 } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage"; // Keep if you have a specific hook
 import SLDWidget from "@/app/circuit/sld/SLDWidget"; // Assuming path is corrected
@@ -383,6 +384,22 @@ export default function CircuitDesignerStudio() {
           animate={{ y: 0, opacity: 1, transition: { delay: 0.2, duration: 0.5, ease: "easeOut" } }}
         >
           <div className="container flex h-16 items-center space-x-4 px-4 md:px-6">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => window.history.back()}
+                    className="shadow-sm hover:bg-muted/80 transition-colors"
+                  >
+                    <ChevronLeft className="mr-1 h-4 w-4" />
+                    Back
+                  </Button>
+                </motion.div>
+              </TooltipTrigger>
+              <TooltipContent>Go back to previous page</TooltipContent>
+            </Tooltip>
             <motion.div className="flex gap-2 items-center" whileHover={{ scale: 1.05 }} transition={{ type: "spring", stiffness: 300 }}>
               <BrainCircuit className="h-8 w-8 text-primary drop-shadow-[0_2px_4px_rgba(var(--primary-rgb),0.4)]" />
               <h1 className="text-2xl font-bold tracking-tight">
