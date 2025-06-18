@@ -39,6 +39,7 @@ import { useAppStore, useSelectedElementForDetails } from '@/stores/appStore';
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -87,6 +88,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { PlusCircle } from 'lucide-react'; // Added PlusCircle
 import RelayNode from './nodes/RelayNode';
 
 interface WebSocketMessageFromServer {
@@ -163,12 +165,15 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<CustomNodeType[]>([]);
   const [edges, setEdges] = useState<CustomFlowEdge[]>([]);
+  const [dynamicAvailableLayouts, setDynamicAvailableLayouts] = useState<{ id: string; name: string }[]>([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [selectedElement, setSelectedElement] = useState<CustomNodeType | CustomFlowEdge | null>(null);
   const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
   const [drillDownLayoutId, setDrillDownLayoutId] = useState<string | null>(null);
   const [drillDownParentLabel, setDrillDownParentLabel] = useState<string | undefined>(undefined);
   const [isInspectorDialogOpen, setIsInspectorDialogOpen] = useState(false);
+  const [isAddNewLayoutDialogOpen, setIsAddNewLayoutDialogOpen] = useState(false);
+  const [newLayoutNameInput, setNewLayoutNameInput] = useState('');
   const [isControlPopupOpen, setIsControlPopupOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isDirty, setIsDirty] = useState(false);
@@ -205,6 +210,135 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const selectedEdgesFromReactFlow = useMemo(() => edges.filter(edge => edge.selected), [edges]);
   const clipboardNodesRef = useRef<CustomNodeType[]>([]);
 
+  const handleCreateNewLayout = useCallback(() => {
+    if (!newLayoutNameInput.trim()) {
+      toast.error("Layout name cannot be empty.");
+      return;
+    }
+
+    const sanitizedLayoutId = newLayoutNameInput.trim().toLowerCase().replace(/\s+/g, '_');
+    if (!sanitizedLayoutId) {
+      toast.error("Invalid layout ID generated. Please use alphanumeric characters and spaces.");
+      return;
+    }
+
+    // Check for uniqueness
+    const isNameTaken = dynamicAvailableLayouts.some(layout => layout.id === sanitizedLayoutId);
+    if (isNameTaken) {
+      toast.error(`Layout ID "${sanitizedLayoutId}" is already taken. Please choose a different name.`);
+      return;
+    }
+
+    // Create new layout from empty_template
+    const emptyTemplate = constantSldLayouts['empty_template'];
+    if (!emptyTemplate) {
+      toast.error("Empty template layout not found. Cannot create new layout.");
+      return;
+    }
+
+    const newLayout: SLDLayout = cloneDeep(emptyTemplate);
+    newLayout.layoutId = sanitizedLayoutId;
+    if (newLayout.meta) {
+      newLayout.meta.name = newLayoutNameInput.trim(); // User-friendly name
+      newLayout.meta.description = `User created layout: ${newLayoutNameInput.trim()}`;
+    } else {
+      newLayout.meta = {
+          name: newLayoutNameInput.trim(),
+          description: `User created layout: ${newLayoutNameInput.trim()}`
+      };
+    }
+    newLayout.nodes = [createPlaceholderNode(newLayout.meta.name || sanitizedLayoutId, currentThemeHookValue)];
+    newLayout.edges = [];
+    newLayout.viewport = { x: 0, y: 0, zoom: 1 };
+
+    try {
+      localStorage.setItem(`${LOCAL_STORAGE_KEY_PREFIX}${newLayout.layoutId}`, JSON.stringify(newLayout));
+      toast.success(`Layout "${newLayout.meta.name || newLayout.layoutId}" created successfully.`);
+
+      fetchAndSetAvailableLayouts(); // Refresh the dropdown list
+
+      if (onLayoutIdChangeProp) {
+          onLayoutIdChangeProp(newLayout.layoutId);
+      } else {
+           if (layoutId !== newLayout.layoutId) {
+              setCurrentLayoutIdKey(`sld_${newLayout.layoutId}`);
+              setNodes(newLayout.nodes);
+              setEdges(newLayout.edges);
+              setActiveGlobalAnimationSettings(newLayout.meta?.globalAnimationSettings);
+              setIsDirty(false);
+              currentLayoutLoadedFromServerOrInitialized.current = true;
+              initialFitViewDone.current = false;
+           }
+      }
+
+      if (isWebSocketConnected && sendJsonMessage) {
+        sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${newLayout.layoutId}`, layout: newLayout } });
+        toast.info("Syncing new layout to server...");
+      }
+
+      setIsAddNewLayoutDialogOpen(false);
+      setNewLayoutNameInput('');
+    } catch (error) {
+      console.error("Error creating new layout:", error);
+      toast.error("Failed to create new layout.");
+    }
+  }, [newLayoutNameInput, dynamicAvailableLayouts, constantSldLayouts, currentThemeHookValue, fetchAndSetAvailableLayouts, onLayoutIdChangeProp, isWebSocketConnected, sendJsonMessage, layoutId]);
+  // Note: cloneDeep and createPlaceholderNode are assumed stable and not listed in deps here. Add if they are not.
+
+  const fetchAndSetAvailableLayouts = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const layoutsFromStorage: { id: string; name: string }[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
+          // Attempt to parse the layout to get a more descriptive name if available from meta, otherwise format the ID.
+          let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          try {
+              const layoutJson = localStorage.getItem(key);
+              if (layoutJson) {
+                  const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
+                  if (parsedLayout.meta?.name) {
+                      layoutName = parsedLayout.meta.name;
+                  } else if (parsedLayout.layoutId && parsedLayout.layoutId !== layoutIdKey) {
+                    // if meta.name is not present, but layoutId in content is different from key part
+                    layoutName = `${layoutName} (${parsedLayout.layoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})`;
+                  }
+              }
+          } catch (e) {
+              console.warn(`Could not parse layout ${layoutIdKey} from localStorage to get meta.name`, e);
+          }
+          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
+        }
+      }
+
+      const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
+      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS
+        .filter(id => !layoutIdsFromStorage.has(id)) // Add only if not already found in storage
+        .map(id => ({
+          id,
+          name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        }));
+
+      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
+      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
+
+      setDynamicAvailableLayouts(combinedLayouts);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAndSetAvailableLayouts();
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+        fetchAndSetAvailableLayouts();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [fetchAndSetAvailableLayouts]);
 
   const removePlaceholderIfNeeded = useCallback((currentNodes: CustomNodeType[]) => {
     const hasPlaceholder = currentNodes.some(n => n.id === PLACEHOLDER_NODE_ID);
@@ -1173,7 +1307,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
   if (showConnectingMessage) return (<div className="sld-loader-container text-muted-foreground"><svg className="sld-loader-svg" viewBox="0 0 50 50"><circle className="sld-loader-path" cx="25" cy="25" r="20" fill="none" strokeWidth="4"></circle></svg>Connecting...</div>);
   if (showInitialLoadingSpinner) return (<div className="sld-loader-container text-muted-foreground"><svg className="sld-loader-svg" viewBox="0 0 50 50"><circle className="sld-loader-path" cx="25" cy="25" r="20" fill="none" strokeWidth="4"></circle></svg>Loading Diagram{layoutId ? ` for ${layoutId.replace(/_/g, ' ')}...` : '...'}</div>);
-  if (showPromptToSelectLayout) return (<div className="sld-loader-container text-muted-foreground flex-col"> <LayoutList className="h-12 w-12 mb-4 opacity-50"/><p className="text-lg font-semibold mb-2">Select Layout</p><p className="text-sm mb-4">Choose layout.</p>{onLayoutIdChangeProp !== undefined && (<Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''}><SelectTrigger className="w-[280px] mb-2"><SelectValue placeholder="Select layout..." /></SelectTrigger><SelectContent>{AVAILABLE_SLD_LAYOUT_IDS.map(id => <SelectItem key={id} value={id}>{id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>)}</SelectContent></Select>)}</div>);
+  if (showPromptToSelectLayout) return (<div className="sld-loader-container text-muted-foreground flex-col"> <LayoutList className="h-12 w-12 mb-4 opacity-50"/><p className="text-lg font-semibold mb-2">Select Layout</p><p className="text-sm mb-4">Choose a layout to get started.</p>{onLayoutIdChangeProp !== undefined && (<Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''}><SelectTrigger className="w-[280px] mb-2"><SelectValue placeholder="Select layout..." /></SelectTrigger><SelectContent>{dynamicAvailableLayouts.map(layout => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select>)}</div>);
   if (showDisconnectedMessageForEdit) return (<div className="sld-loader-container text-muted-foreground flex-col"><AlertTriangle className="h-10 w-10 text-amber-500 mb-3"/><p className="my-2 font-semibold">Sync Disconnected</p><p className="text-xs mb-3">Edits local. Reconnect to sync.</p><Button onClick={() => { setIsLoading(true); connectWebSocket();}} variant="outline" size="sm">Reconnect</Button></div>);
   if (!layoutId && !canEdit) return (<div className="sld-loader-container text-muted-foreground">No diagram specified.</div>);
 
@@ -1217,12 +1351,37 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ duration: 0.2, ease: "circOut" }}
     >
-      {canEdit && onLayoutIdChangeProp && layoutId && ( 
-          <div className="absolute top-3 left-3 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border w-auto min-w-[14rem]">
-            <Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''}>
-              <SelectTrigger className="h-9 text-xs"><div className="flex items-center"><LayoutList className="h-3.5 w-3.5 mr-1.5 opacity-70"/><SelectValue placeholder="Switch Layout..." /></div></SelectTrigger>
-              <SelectContent>{AVAILABLE_SLD_LAYOUT_IDS.map(id => (<SelectItem key={id} value={id} className="text-xs">{id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</SelectItem>))}</SelectContent>
+      {canEdit && onLayoutIdChangeProp && (
+          <div className="absolute top-3 left-3 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2"> {/* Added flex and gap */}
+            <Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''} disabled={!layoutId && dynamicAvailableLayouts.length === 0}>
+              <SelectTrigger className="h-9 text-xs min-w-[12rem]"> {/* Added min-w */}
+                <div className="flex items-center">
+                  <LayoutList className="h-3.5 w-3.5 mr-1.5 opacity-70"/>
+                  <SelectValue placeholder="Switch Layout..." />
+                </div>
+              </SelectTrigger>
+              <SelectContent>{dynamicAvailableLayouts.map(layout => (<SelectItem key={layout.id} value={layout.id} className="text-xs">{layout.name}</SelectItem>))}</SelectContent>
             </Select>
+            <TooltipProvider delayDuration={100}>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-9"
+                    onClick={() => {
+                      setNewLayoutNameInput(''); // Reset input field
+                      setIsAddNewLayoutDialogOpen(true);
+                    }}
+                  >
+                    <PlusCircle className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Add New SLD Layout</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
       )}
 
@@ -1703,6 +1862,39 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     }}
   />
 )}
+
+    {/* Add New Layout Dialog */}
+    {canEdit && (
+      <AlertDialog open={isAddNewLayoutDialogOpen} onOpenChange={setIsAddNewLayoutDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Create New SLD Layout</AlertDialogTitle>
+            <AlertDialogDescription>
+              Enter a name for your new layout. It will be used to generate a unique ID.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <Input
+              placeholder="e.g., Substation Alpha Line 1"
+              value={newLayoutNameInput}
+              onChange={(e) => setNewLayoutNameInput(e.target.value)}
+              autoFocus
+            />
+            {newLayoutNameInput.trim() && (
+                <p className="text-xs text-muted-foreground mt-2">
+                    Generated ID: <span className="font-mono">{newLayoutNameInput.trim().toLowerCase().replace(/\s+/g, '_')}</span>
+                </p>
+            )}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setNewLayoutNameInput('')}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCreateNewLayout} disabled={!newLayoutNameInput.trim()}>
+              Create Layout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )}
     </motion.div>
   );
 };
