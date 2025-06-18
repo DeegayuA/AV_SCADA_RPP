@@ -23,7 +23,7 @@ export const WS_URL = (() => {
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.251.229:4840";
-export const VERSION = "- Ranna Day 1 | Release v2025.06.18 • 08:30 (GMT+5:30)";
+export const VERSION = "- Version: Ranna Day 1 | Release v2025.06.18 • 08:30 (GMT+5:30)";
 export const PLANT_NAME= "Ranna 2MW";
 export const PLANT_LOCATION = "Kahandamodara, Ranna, Sri Lanka";
 export const PLANT_TYPE = "Solar Power Plant";
@@ -79,6 +79,9 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'misc1',
   'misc2',
   'misc3',
+  'Power_Analyser1',
+  'Power_Analyser2',
+  'MiCom_Relay',
   'empty_template',
 'test_data_nodes_layout',
 ];
