@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo, Dispatch, SetStateAction } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, Variants, TargetAndTransition } from 'framer-motion';
+import { cn } from "@/lib/utils";
 import { Orbit } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
@@ -41,7 +42,7 @@ import { WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KE
 import { containerVariants, itemVariants } from '@/config/animationVariants';
 // playSound (the base one) is still used by playNotificationSound in lib/utils, but control_dash won't call it directly for notifications.
 // Specific sound functions like playSuccessSound might be used if needed, or the new playNotificationSound.
-import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound, playNotificationSound, cn } from '@/lib/utils';
+import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound, playNotificationSound } from '@/lib/utils';
 import { NodeData, ThreePhaseGroupInfo } from '@/app/DashboardData/dashboardInterfaces'; // ADJUST PATH
 import { groupDataPoints } from '@/app/DashboardData/groupDataPoints'; // ADJUST PATH
 import DashboardItemConfigurator, { ConfiguratorThreePhaseGroup } from '@/components/DashboardItemConfigurator'; // ADJUST PATH
@@ -496,12 +497,6 @@ const UnifiedDashboardPage: React.FC = () => {
     logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath);
   }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]);
 
-  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => {
-      setSldLayoutId(newLayoutId);
-      // The localStorage update for DEFAULT_SLD_LAYOUT_ID_KEY is handled by an existing useEffect.
-      // logUserActivity(`SLDWidget changed layout to ${newLayoutId}`); // Optional: specific logging
-  }, [setSldLayoutId]); // Removed logUserActivity to simplify
-
   // useEffect hooks
   useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
   useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]); // Removed storeHasHydrated from deps as it's not a state/prop
@@ -587,10 +582,22 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
   // --- End of React Hooks Declarations ---
+
+  const storeHasHydrated = useAppStore.persist.hasHydrated(); // Not a hook, can be here
+  if (!storeHasHydrated || !authCheckComplete) { /* ... unchanged loading screen ... */
+    return(<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary"/><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
+  }
+
   // Non-hook derived constants (can be here or after hooks, but before use)
   const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
   const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
   const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
+
+  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => {
+      setSldLayoutId(newLayoutId);
+      // The localStorage update for DEFAULT_SLD_LAYOUT_ID_KEY is handled by an existing useEffect.
+      // logUserActivity(`SLDWidget changed layout to ${newLayoutId}`); // Optional: specific logging
+  }, [setSldLayoutId]); // Removed logUserActivity to simplify
 
   const commonRenderingProps = {
     isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,

@@ -209,48 +209,6 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const selectedNodesFromReactFlow = useMemo(() => nodes.filter(node => node.selected), [nodes]); // For UI button state
   const selectedEdgesFromReactFlow = useMemo(() => edges.filter(edge => edge.selected), [edges]);
   const clipboardNodesRef = useRef<CustomNodeType[]>([]);
-    const fetchAndSetAvailableLayouts = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const layoutsFromStorage: { id: string; name: string }[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
-          // Attempt to parse the layout to get a more descriptive name if available from meta, otherwise format the ID.
-          let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          try {
-              const layoutJson = localStorage.getItem(key);
-              if (layoutJson) {
-                  const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
-                  if (parsedLayout.meta?.name) {
-                      layoutName = parsedLayout.meta.name;
-                  } else if (parsedLayout.layoutId && parsedLayout.layoutId !== layoutIdKey) {
-                    // if meta.name is not present, but layoutId in content is different from key part
-                    layoutName = `${layoutName} (${parsedLayout.layoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})`;
-                  }
-              }
-          } catch (e) {
-              console.warn(`Could not parse layout ${layoutIdKey} from localStorage to get meta.name`, e);
-          }
-          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
-        }
-      }
-
-      const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
-      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS
-        .filter(id => !layoutIdsFromStorage.has(id)) // Add only if not already found in storage
-        .map(id => ({
-          id,
-          name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        }));
-
-      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
-      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
-
-      setDynamicAvailableLayouts(combinedLayouts);
-    }
-  }, []);
-
 
   const handleCreateNewLayout = useCallback(() => {
     if (!newLayoutNameInput.trim()) {
@@ -327,6 +285,47 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   }, [newLayoutNameInput, dynamicAvailableLayouts, constantSldLayouts, currentThemeHookValue, fetchAndSetAvailableLayouts, onLayoutIdChangeProp, isWebSocketConnected, sendJsonMessage, layoutId]);
   // Note: cloneDeep and createPlaceholderNode are assumed stable and not listed in deps here. Add if they are not.
 
+  const fetchAndSetAvailableLayouts = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const layoutsFromStorage: { id: string; name: string }[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
+          // Attempt to parse the layout to get a more descriptive name if available from meta, otherwise format the ID.
+          let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          try {
+              const layoutJson = localStorage.getItem(key);
+              if (layoutJson) {
+                  const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
+                  if (parsedLayout.meta?.name) {
+                      layoutName = parsedLayout.meta.name;
+                  } else if (parsedLayout.layoutId && parsedLayout.layoutId !== layoutIdKey) {
+                    // if meta.name is not present, but layoutId in content is different from key part
+                    layoutName = `${layoutName} (${parsedLayout.layoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})`;
+                  }
+              }
+          } catch (e) {
+              console.warn(`Could not parse layout ${layoutIdKey} from localStorage to get meta.name`, e);
+          }
+          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
+        }
+      }
+
+      const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
+      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS
+        .filter(id => !layoutIdsFromStorage.has(id)) // Add only if not already found in storage
+        .map(id => ({
+          id,
+          name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        }));
+
+      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
+      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
+
+      setDynamicAvailableLayouts(combinedLayouts);
+    }
+  }, []);
 
   useEffect(() => {
     fetchAndSetAvailableLayouts();
@@ -1353,7 +1352,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         transition={{ duration: 0.2, ease: "circOut" }}
     >
       {canEdit && onLayoutIdChangeProp && (
-          <div className="absolute top-3 left-3 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2"> {/* Added flex and gap */}
+          <div className="absolute top-3 left-64 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2"> {/* Changed left-3 to left-64 */}
             <Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''} disabled={!layoutId && dynamicAvailableLayouts.length === 0}>
               <SelectTrigger className="h-9 text-xs min-w-[12rem]"> {/* Added min-w */}
                 <div className="flex items-center">

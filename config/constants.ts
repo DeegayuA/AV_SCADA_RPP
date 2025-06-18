@@ -51,7 +51,6 @@ export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 
 
 export const USER = "viewer";
-export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
 
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'ranna_main_sld',
