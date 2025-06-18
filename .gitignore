@@ -44,3 +44,5 @@ next-env.d.ts
 /ios/
 /node_modules/.cache/
 /dist_electron
+*.tmp
+/user-data
