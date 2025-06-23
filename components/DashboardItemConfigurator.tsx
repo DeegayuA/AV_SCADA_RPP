@@ -308,7 +308,7 @@ const DashboardItemConfigurator: React.FC<DashboardItemConfiguratorProps> = ({
                                                         rowHeight={getRowHeight}
                                                         columnWidth={() => getColumnWidth(width)}
                                                         itemData={itemDataForGrid}
-                                                        className="custom-scrollbar"
+                                                        className="custom-scrollbar py-2"
                                                     >
                                                         {GridViewCell}
                                                     </VariableSizeGrid>

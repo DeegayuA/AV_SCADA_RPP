@@ -38,7 +38,7 @@ import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select"; 
 import { dataPoints as allPossibleDataPointsConfig, DataPoint } from '@/config/dataPoints';
-import { WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants';
+import { WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX } from '@/config/constants'; // Added LOCAL_STORAGE_KEY_PREFIX
 import { containerVariants, itemVariants } from '@/config/animationVariants';
 // playSound (the base one) is still used by playNotificationSound in lib/utils, but control_dash won't call it directly for notifications.
 // Specific sound functions like playSuccessSound might be used if needed, or the new playNotificationSound.
@@ -53,6 +53,7 @@ import ThemeToggle from '@/app/DashboardData/ThemeToggle'; // ADJUST PATH
 import DashboardSection from '@/app/DashboardData/DashboardSection'; // ADJUST PATH
 import { UserRole } from '@/types/auth'; // ADJUST PATH
 import SLDWidget from "@/app/circuit/sld/SLDWidget"; // ADJUST PATH
+import { SLDLayout } from '@/types/sld'; // Added SLDLayout
 import { useDynamicDefaultDataPointIds } from '@/app/utils/defaultDataPoints'; // ADJUST PATH
 import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph'; 
 import PowerTimelineGraphConfigurator from './PowerTimelineGraphConfigurator';
@@ -61,7 +62,7 @@ import { logActivity } from '@/lib/activityLog';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected"; isConnected: boolean; connectWebSocket: () => void;
-  soundEnabled: boolean; setSoundEnabled: Dispatch<SetStateAction<boolean>>; currentTime: string; delay: number;
+  currentTime: string; delay: number;
   version: string; onOpenConfigurator: () => void;
   isEditMode: boolean;
   toggleEditMode: () => void;
@@ -71,7 +72,7 @@ interface DashboardHeaderControlProps {
 
 const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, soundEnabled, setSoundEnabled, currentTime, delay,
+    plcStatus, isConnected, connectWebSocket, currentTime, delay,
     version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault,
   }) => {
     const router = useRouter(); 
@@ -331,11 +332,9 @@ const UnifiedDashboardPage: React.FC = () => {
   const [isSldModalOpen, setIsSldModalOpen] = useState(false);
   const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
   const [isSldConfigOpen, setIsSldConfigOpen] = useState(false);
+  const [availableSldLayoutsForPage, setAvailableSldLayoutsForPage] = useState<{ id: string; name: string }[]>([]);
   const [sldLayoutId, setSldLayoutId] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      const s = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY);
-      if (s && AVAILABLE_SLD_LAYOUT_IDS.includes(s)) return s;
-    }
+    // Initial value will be set in useEffect after availableSldLayoutsForPage is populated
     return AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant';
   });
   const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
@@ -501,6 +500,77 @@ const UnifiedDashboardPage: React.FC = () => {
   // useEffect hooks
   useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
   useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]); // Removed storeHasHydrated from deps as it's not a state/prop
+
+  const fetchAndUpdatePageLayouts = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      const layoutsFromStorage: { id: string; name: string }[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
+          let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          try {
+              const layoutJson = localStorage.getItem(key);
+              if (layoutJson) {
+                  const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
+                  if (parsedLayout.meta?.name) {
+                      layoutName = parsedLayout.meta.name;
+                  }
+              }
+          } catch (e) {
+              console.warn(`ControlDash: Could not parse layout ${layoutIdKey} from localStorage for meta.name`, e);
+          }
+          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
+        }
+      }
+
+      const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
+      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS
+        .filter(id => !layoutIdsFromStorage.has(id))
+        .map(id => ({
+          id,
+          name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        }));
+
+      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
+      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
+      setAvailableSldLayoutsForPage(combinedLayouts);
+    }
+  }, []); // AVAILABLE_SLD_LAYOUT_IDS is a constant
+
+  useEffect(() => {
+    fetchAndUpdatePageLayouts();
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+        fetchAndUpdatePageLayouts();
+      } else if (event.key === null) { // Storage was cleared
+        fetchAndUpdatePageLayouts();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [fetchAndUpdatePageLayouts]);
+
+  useEffect(() => {
+      if (availableSldLayoutsForPage.length > 0 && authCheckComplete) { // Ensure authCheck is also complete
+          const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY);
+          if (currentStoredId && availableSldLayoutsForPage.some(l => l.id === currentStoredId)) {
+              if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId);
+          } else if (availableSldLayoutsForPage.some(l => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'))) {
+              const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant';
+              if (sldLayoutId !== defaultId) setSldLayoutId(defaultId);
+              localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId); // Persist if falling back
+          } else { // Fallback to the first available dynamic layout if default constant is not in the dynamic list
+              const firstAvailableId = availableSldLayoutsForPage[0].id;
+              if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId);
+              localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId); // Persist this fallback
+          }
+      }
+  }, [availableSldLayoutsForPage, authCheckComplete]); // Removed sldLayoutId from deps to prevent infinite loop
+
+
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && allPossibleDataPoints.length > 0 && authCheckComplete) { const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY); if (s) { try { const p = JSON.parse(s) as string[]; const v = p.filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (v.length > 0) { setDisplayedDataPointIds(v); return; } else if (p.length > 0) localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } catch (e) { console.error("Parse err", e); localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } } const sm = getSmartDefaults(); setDisplayedDataPointIds(sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()); } }, [allPossibleDataPoints, getSmartDefaults, getHardcodedDefaultDataPointIds, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { if (displayedDataPointIds.length > 0) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify(displayedDataPointIds)); else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY)) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([])); } }, [displayedDataPointIds, authCheckComplete]);
@@ -511,17 +581,25 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
+  // --- Additional useCallback hooks that need to be declared before early returns ---
+  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => {
+      setSldLayoutId(newLayoutId);
+      // The localStorage update for DEFAULT_SLD_LAYOUT_ID_KEY is handled by an existing useEffect.
+      // logUserActivity(`SLDWidget changed layout to ${newLayoutId}`); // Optional: specific logging
+  }, [setSldLayoutId]); // Removed logUserActivity to simplify
+
   // --- End of React Hooks Declarations ---
 
   const storeHasHydrated = useAppStore.persist.hasHydrated(); // Not a hook, can be here
   if (!storeHasHydrated || !authCheckComplete) { /* ... unchanged loading screen ... */
     return(<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary"/><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
   }
-  
+
   // Non-hook derived constants (can be here or after hooks, but before use)
   const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
   const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
   const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
+
   const commonRenderingProps = {
     isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,
     playNotificationSound: playNotificationSound, lastToastTimestamps, onRemoveItem: handleRemoveItem,
@@ -534,15 +612,13 @@ const UnifiedDashboardPage: React.FC = () => {
       <div className="max-w-screen-4xl mx-auto">
         <HeaderConnectivityComponent
           plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
-          // soundEnabled and setSoundEnabled are no longer passed as SoundToggle uses Zustand
           currentTime={currentTime} delay={delay}
           version={VERSION}
           isEditMode={isGlobalEditMode}
           toggleEditMode={toggleEditModeAction}
           currentUserRole={currentUserRole}
           onOpenConfigurator={() => { if (currentUserRole === UserRole.ADMIN) setIsConfiguratorOpen(true); else toast.warning("Access Denied", { description: "Only administrators can add cards." }); } }
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} soundEnabled={false} setSoundEnabled={function (value: React.SetStateAction<boolean>): void {
-          } } />
+          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} />
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
 
@@ -554,17 +630,23 @@ const UnifiedDashboardPage: React.FC = () => {
                     <h3 className="text-lg sm:text-xl font-semibold">Plant Layout</h3>
                     {sldSpecificEditMode && (
                         <Dialog open={isSldConfigOpen} onOpenChange={setIsSldConfigOpen}>
-                            <DialogTrigger asChild><Button variant="outline"size="sm"className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5"/>Configure Layout: {sldLayoutId.replace(/_/g, ' ').replace(/\b\w/g, l=>l.toUpperCase())}</Button></DialogTrigger>
+                              <DialogTrigger asChild><Button variant="outline"size="sm"className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5"/>Configure Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l=>l.toUpperCase())}</Button></DialogTrigger>
                             <DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal>
-                                <div className="py-4"><Select onValueChange={handleSldLayoutSelect} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..."/></SelectTrigger><SelectContent>{AVAILABLE_SLD_LAYOUT_IDS.filter(Boolean).map(id=><SelectItem key={id}value={String(id)}>{String(id).replace(/_/g,' ').replace(/\b\w/g,(l:string)=>l.toUpperCase())}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div>
+                                  <div className="py-4"><Select onValueChange={handleSldLayoutSelect} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..."/></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map(layout=><SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div>
                             </DialogContent>
                         </Dialog>
                     )}
-                    {!sldSpecificEditMode && sldLayoutId && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {sldLayoutId.replace(/_/g, ' ').replace(/\b\w/g, l=>l.toUpperCase())}</span>}
+                      {!sldSpecificEditMode && sldLayoutId && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l=>l.toUpperCase())}</span>}
                 </div>
                 <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost"size="icon"onClick={()=>setIsSldModalOpen(true)}title="Open SLD"><Maximize2 className="h-5 w-5"/><span className="sr-only">Open SLD</span></Button></TooltipTrigger><TooltipContent><p>Open SLD in larger view</p></TooltipContent></Tooltip></TooltipProvider>
               </div>
-              <div style={{height: sldInternalMaxHeight}} className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10"><SLDWidget layoutId={sldLayoutId}isEditMode={sldSpecificEditMode}/></div>
+                <div style={{height: sldInternalMaxHeight}} className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10">
+                  <SLDWidget
+                    layoutId={sldLayoutId}
+                    isEditMode={sldSpecificEditMode}
+                    onLayoutIdChange={handleSldWidgetLayoutChange}
+                  />
+                </div>
             </CardContent>
           </Card>
           <Card className={cn("shadow-lg", sldSectionMinHeight)}>
@@ -655,12 +737,18 @@ const UnifiedDashboardPage: React.FC = () => {
           <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
             <DialogHeaderComponentInternal className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
                 <div className="flex items-center gap-2">
-                    <DialogTitleComponentInternal>Plant Layout{!sldSpecificEditMode&&sldLayoutId&&` : ${sldLayoutId.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}`}</DialogTitleComponentInternal>
-                    {sldSpecificEditMode && (<Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}><DialogTrigger asChild><Button variant="outline"size="sm"className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5"/>Layout: {sldLayoutId.replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal><div className="py-4"><Select onValueChange={(v)=>{setSldLayoutId(v);setIsModalSldLayoutConfigOpen(false);}}value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..."/></SelectTrigger><SelectContent>{AVAILABLE_SLD_LAYOUT_IDS.filter(Boolean).map((id)=><SelectItem key={id}value={String(id)}>{String(id).replace(/_/g,' ').replace(/\b\w/g,(l:string)=>l.toUpperCase())}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div></DialogContent></Dialog>)}
+                    <DialogTitleComponentInternal>Plant Layout{!sldSpecificEditMode&&sldLayoutId&&` : ${(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}`}</DialogTitleComponentInternal>
+                    {sldSpecificEditMode && (<Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}><DialogTrigger asChild><Button variant="outline"size="sm"className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5"/>Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal><div className="py-4"><Select onValueChange={(v)=>{setSldLayoutId(v);setIsModalSldLayoutConfigOpen(false);}}value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..."/></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map((layout)=><SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div></DialogContent></Dialog>)}
                 </div>
                 <DialogClose asChild><Button variant="ghost"size="icon"className="rounded-full"><X className="h-5 w-5"/><span className="sr-only">Close</span></Button></DialogClose>
             </DialogHeaderComponentInternal>
-            <div className="flex-grow p-2 sm:p-4 overflow-hidden"><SLDWidget layoutId={sldLayoutId}isEditMode={sldSpecificEditMode}/></div>
+            <div className="flex-grow p-2 sm:p-4 overflow-hidden">
+              <SLDWidget
+                layoutId={sldLayoutId}
+                isEditMode={sldSpecificEditMode}
+                onLayoutIdChange={handleSldWidgetLayoutChange}
+              />
+            </div>
           </DialogContent>
       </Dialog>
     </div>

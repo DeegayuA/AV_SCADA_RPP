@@ -2656,3 +2656,4 @@ export interface BaseDataPointConfig {
     precision?: number;
     enumSet?: Record<number | string, string>;
 }
+
