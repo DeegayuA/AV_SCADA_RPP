@@ -23,9 +23,9 @@ export const WS_URL = (() => {
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.251.229:4840";
-export const VERSION = "- Version: Ranna Day 1 | Release v2025.06.18 • 08:30 (GMT+5:30)";
-export const PLANT_NAME= "Ranna 2MW";
-export const PLANT_LOCATION = "Kahandamodara, Ranna, Sri Lanka";
+export const VERSION = "- Release v2025.06.24 • 12:30 (GMT+5:30)";
+export const PLANT_NAME= "Mini Grid";
+export const PLANT_LOCATION = "Athurugiriya, Colombo, Sri Lanka";
 export const PLANT_TYPE = "Solar Power Plant";
 export const PLANT_CAPACITY = "2000 kW"; // 2 MW
 export const PLANT_CAPACITY_WATTS = 2000000; // 2 MW in watts
