@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
 import { Orbit } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
-import { 
-    Settings, PlusCircle, Clock, Trash2, RotateCcw, Power, AlertTriangle, Check, 
-    ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList 
+import {
+    Settings, PlusCircle, Clock, Trash2, RotateCcw, Power, AlertTriangle, Check,
+    ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
