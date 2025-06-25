@@ -565,7 +565,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                           : config.numHourlyForecastsToShow <= 10
                           ? 'grid-cols-5 sm:grid-cols-5 md:grid-cols-5'
                           : 'grid-cols-6 sm:grid-cols-6 md:grid-cols-6'
-                        }`}> {/* Added items-stretch h-full */}
+                        }`}>
                           {forecast3Hour5Day.list.slice(0, config.numHourlyForecastsToShow || 5).map((item, index) => (
                           <motion.div
                             key={item.dt}
@@ -581,15 +581,15 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                         </div>
                       </motion.div>
                       )}
-                      {config.showHourlyForecast && (!forecast3Hour5Day || forecast3Hour5Day.list.length === 0) && !isAnyForecastLoading &&
-                      <motion.p layout className="text-xs text-muted-foreground/70 dark:text-white/50 flex items-center gap-1.5 pl-1 py-1 flex-grow h-full justify-center"><Clock3 className="w-3.5 h-3.5" />Hourly data unavailable.</motion.p> {/* Added h-full justify-center */}
-                      }
+                      {config.showHourlyForecast && (!forecast3Hour5Day || forecast3Hour5Day.list.length === 0) && !isAnyForecastLoading && (
+                        <motion.p layout className="text-xs text-muted-foreground/70 dark:text-white/50 flex items-center gap-1.5 pl-1 py-1 flex-grow h-full justify-center"><Clock3 className="w-3.5 h-3.5" />Hourly data unavailable.</motion.p>
+                      )}
                       
                       {/* Daily Summary Block (moved inside the Hourly+Daily responsive group) */}
                        {config.showDailySummary && dailyAggregatedForecast.length > 0 && (
                         <div className="flex-grow h-full flex flex-col"> {/* Added h-full flex flex-col */}
                         <h4 className="text-xs font-semibold text-foreground/70 dark:text-white/60 mt-1 mb-1.5 ml-0.5 flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5" />Next Days</h4>
-                        <div className="flex gap-1.5 items-stretch flex-grow"> {/* Added flex-grow */}
+                        <div className="flex gap-1.5 items-stretch"> {/* Added flex-grow */}
                           {dailyAggregatedForecast.map((day, index) => (
                           <motion.div
                             key={day.dt}
@@ -603,10 +603,8 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                           ))}
                         </div>
                         </div>
-                      )}
-                      {config.showDailySummary && dailyAggregatedForecast.length === 0 && !isAnyForecastLoading &&
-                        <motion.p layout className="text-xs text-muted-foreground/70 dark:text-white/50 flex items-center gap-1.5 pl-1 py-1 flex-grow mt-1 h-full justify-center"><CalendarDays className="w-3.5 h-3.5" />Daily summary unavailable.</motion.p> {/* Added h-full justify-center */}
-                      }
+                       )}
+                      
                     </div>
 
 
@@ -687,9 +685,9 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                       </TooltipProvider>
                       </motion.div>
                     )}
-                    {config.showAirPollution && (!airPollutionData || !currentAQI) && !isAnyForecastLoading && !config.showHourlyForecast && 
-                      <motion.p layout className="hidden sm:flex text-xs text-muted-foreground/70 dark:text-white/50 items-center gap-1.5 pl-1 py-1 flex-grow h-full justify-center"><AirVent className="w-3.5 h-3.5" />AQI data unavailable.</motion.p> {/* Added h-full justify-center */}
-                    }
+                    {config.showAirPollution && (!airPollutionData || !currentAQI) && !isAnyForecastLoading && !config.showHourlyForecast && (
+                      <motion.p layout className="hidden sm:flex text-xs text-muted-foreground/70 dark:text-white/50 items-center gap-1.5 pl-1 py-1 flex-grow h-full justify-center"><AirVent className="w-3.5 h-3.5" />AQI data unavailable.</motion.p>
+                    )}
                     </div>
                 </motion.div>
               )}
