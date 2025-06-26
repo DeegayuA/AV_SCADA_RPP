@@ -588,25 +588,23 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                       {/* Daily Summary Block (moved inside the Hourly+Daily responsive group) */}
                       {config.showDailySummary && dailyAggregatedForecast.length > 0 && (
                         <div className="flex-grow h-full flex flex-col"> {/* Added h-full flex flex-col */}
-                          <h4 className="text-xs font-semibold text-foreground/70 dark:text-white/60 mt-1 mb-1.5 ml-0.5 flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5" />Next Days</h4>
-                          <div className="flex gap-1.5 items-stretch flex-grow"> {/* Added flex-grow */}
-                            {dailyAggregatedForecast.map((day, index) => (
-                              <motion.div
-                                key={day.dt}
-                                initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 + index * 0.08, type: "spring", stiffness: 200, damping: 12 }}
-                                className="flex-1 flex flex-col items-center justify-between p-1.5 rounded-lg bg-background/40 hover:bg-background/70 dark:bg-black/20 dark:hover:bg-black/40 shadow-sm text-center space-y-0.5 transition-colors h-full"> {/* Added justify-between and h-full */}
-                                <p className="text-[10px] font-semibold text-muted-foreground dark:text-white/50">{day.dayName}</p>
-                                <DynamicWeatherIcon iconCode={day.icon} className="w-6 h-6 my-0" animate={false} />
-                                <div className="text-xs font-medium"><AnimatedValue value={day.temp_max.toFixed(0)} /><span className="opacity-70">/<AnimatedValue value={day.temp_min.toFixed(0)} />°</span></div>
-                                {day.pop > 0.15 && <Badge variant="outline" className="text-[9px] scale-90 px-1 py-0 font-normal bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400"><Droplets className="w-2 h-2 mr-0.5" />{(day.pop * 100).toFixed(0)}%</Badge>}
-                              </motion.div>
-                            ))}
-                          </div>
+                        <h4 className="text-xs font-semibold text-foreground/70 dark:text-white/60 mt-1 mb-1.5 ml-0.5 flex items-center gap-1.5"><CalendarDays className="w-3.5 h-3.5" />Next Days</h4>
+                        <div className="flex gap-1.5 items-stretch"> {/* Added flex-grow */}
+                          {dailyAggregatedForecast.map((day, index) => (
+                          <motion.div
+                            key={day.dt}
+                            initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 + index * 0.08, type: "spring", stiffness: 200, damping: 12 }}
+                            className="flex-1 flex flex-col items-center justify-between p-1.5 rounded-lg bg-background/40 hover:bg-background/70 dark:bg-black/20 dark:hover:bg-black/40 shadow-sm text-center space-y-0.5 transition-colors h-full"> {/* Added justify-between and h-full */}
+                            <p className="text-[10px] font-semibold text-muted-foreground dark:text-white/50">{day.dayName}</p>
+                            <DynamicWeatherIcon iconCode={day.icon} className="w-6 h-6 my-0" animate={false} />
+                            <div className="text-xs font-medium"><AnimatedValue value={day.temp_max.toFixed(0)} /><span className="opacity-70">/<AnimatedValue value={day.temp_min.toFixed(0)} />°</span></div>
+                            {day.pop > 0.15 && <Badge variant="outline" className="text-[9px] scale-90 px-1 py-0 font-normal bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400"><Droplets className="w-2 h-2 mr-0.5" />{(day.pop * 100).toFixed(0)}%</Badge>}
+                          </motion.div>
+                          ))}
                         </div>
-                      )}
-                      {config.showDailySummary && dailyAggregatedForecast.length === 0 && !isAnyForecastLoading && (
-                        <motion.p layout className="text-xs text-muted-foreground/70 dark:text-white/50 flex items-center gap-1.5 pl-1 py-1 flex-grow mt-1 h-full justify-center"><CalendarDays className="w-3.5 h-3.5" />Daily summary unavailable.</motion.p>
-                      )}
+                        </div>
+                       )}
+                      
                     </div>
 
 
