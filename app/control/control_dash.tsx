@@ -570,8 +570,7 @@ const UnifiedDashboardPage: React.FC = () => {
         localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId);
       }
     }
-  }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]); // sldLayoutId IS needed here to react to external changes if it was manually set
-  // or to correct if initial value wasn't valid
+  }, [availableSldLayoutsForPage, authCheckComplete]); // Removed sldLayoutId from dependencies to prevent infinite loop
 
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && allPossibleDataPoints.length > 0 && authCheckComplete) { const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY); if (s) { try { const p = JSON.parse(s) as string[]; const v = p.filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (v.length > 0) { setDisplayedDataPointIds(v); return; } else if (p.length > 0) localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } catch (e) { console.error("Parse err", e); localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } } const sm = getSmartDefaults(); setDisplayedDataPointIds(sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()); } }, [allPossibleDataPoints, getSmartDefaults, getHardcodedDefaultDataPointIds, authCheckComplete]);
@@ -667,73 +666,75 @@ const UnifiedDashboardPage: React.FC = () => {
         <div className="flex flex-col lg:flex-row gap-2 xl:gap-4 my-4 md:my-6">
           {/* Weather Card */}
           {weatherCardConfig && (
-            <div className="w-auto flex-shrink-0 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col rounded-lg">
-              <div className="flex items-center gap-2 pb-3 pt-4 px-4">
-                <CardTitle className="text-xl sm:text-2xl">Weather Data</CardTitle>
-              </div>
-                <div className="flex-grow overflow-hidden rounded-lg w-full h-full shadow-xl border-2 border-blue-500 dark:border-blue-400">
-                <WeatherCard
-                  initialConfig={weatherCardConfig}
-                  opcUaData={nodeValues}
-                  allPossibleDataPoints={allPossibleDataPoints}
-                  onConfigChange={handleWeatherConfigChange}
-                />
-              </div>
-            </div>
+            <Card className="w-auto flex-shrink-0 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
+              <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
+          <CardTitle className="text-xl sm:text-2xl">Weather Data</CardTitle>
+              </CardHeader>
+              <CardContent className="px-2 py-3 sm:px-3 flex-grow">
+          <div className="h-full">
+            <WeatherCard
+              initialConfig={weatherCardConfig}
+              opcUaData={nodeValues}
+              allPossibleDataPoints={allPossibleDataPoints}
+              onConfigChange={handleWeatherConfigChange}
+            />
+          </div>
+              </CardContent>
+            </Card>
           )}
 
           {/* Energy Timeline */}
           <Card className="flex-1 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
             <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
-                </div>
-                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start flex-wrap">
-                  {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}>
-                            <Settings className="h-4 w-4" />
-                            <span className="sr-only">Config Graph</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Configure Graph Data</p></TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
-                      <Button
-                        key={ts}
-                        variant={graphTimeScale === ts ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setGraphTimeScale(ts)}
-                        className="text-xs px-2 py-1 h-auto"
-                      >
-                        {ts.toUpperCase()}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
+          <div className="flex items-center gap-2">
+            <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start flex-wrap">
+            {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
+              <TooltipProvider>
+                <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}>
+                <Settings className="h-4 w-4" />
+                <span className="sr-only">Config Graph</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent><p>Configure Graph Data</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+            <div className="flex items-center gap-1 flex-wrap">
+              {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
+                <Button
+            key={ts}
+            variant={graphTimeScale === ts ? "default" : "outline"}
+            size="sm"
+            onClick={() => setGraphTimeScale(ts)}
+            className="text-xs px-2 py-1 h-auto"
+                >
+            {ts.toUpperCase()}
+                </Button>
+              ))}
+            </div>
+          </div>
               </div>
             </CardHeader>
             <CardContent className="px-2 py-3 sm:px-3 flex-grow">
               {(useDemoDataForGraph || (powerGraphGenerationDpIds && powerGraphGenerationDpIds.length > 0) || (powerGraphUsageDpIds && powerGraphUsageDpIds.length > 0)) ? (
-                <PowerTimelineGraph
-                  nodeValues={nodeValues}
-                  allPossibleDataPoints={allPossibleDataPoints}
-                  generationDpIds={powerGraphGenerationDpIds}
-                  usageDpIds={powerGraphUsageDpIds}
-                  exportDpIds={powerGraphExportDpIds}
-                  exportMode={powerGraphExportMode}
-                  timeScale={graphTimeScale}
-                />
+          <PowerTimelineGraph
+            nodeValues={nodeValues}
+            allPossibleDataPoints={allPossibleDataPoints}
+            generationDpIds={powerGraphGenerationDpIds}
+            usageDpIds={powerGraphUsageDpIds}
+            exportDpIds={powerGraphExportDpIds}
+            exportMode={powerGraphExportMode}
+            timeScale={graphTimeScale}
+          />
               ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  <p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p>
-                </div>
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p>
+          </div>
               )}
             </CardContent>
           </Card>
