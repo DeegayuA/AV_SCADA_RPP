@@ -757,7 +757,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                       </h1>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm text-white/90 text-shadow-sm"> 
+                    <div className="grid grid-cols-1 gap-x-4 gap-y-1.5 text-sm text-white/90 text-shadow-sm font-semibold"> 
                     <span className="flex items-center gap-1.5"><ThermometerSun className="w-3.5 h-3.5 opacity-80" />Feels: <AnimatedValue value={currentMain.feels_like.toFixed(0)} unit="°C" /></span>
                     <span className="flex items-center gap-1.5"><Droplets className="w-3.5 h-3.5 opacity-80" />Hum: <AnimatedValue value={currentMain.humidity} unit="%" /></span>
                     <span className="flex items-center gap-1.5"><Wind className="w-3.5 h-3.5 opacity-80" />Wind: <AnimatedValue value={currentWind.speed.toFixed(1)} unit="m/s" /> {degreesToCardinalSimple(currentWind.deg)}</span>
@@ -807,7 +807,6 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                 </motion.div>
               )}
             </AnimatePresence>
-            <p className="text-[9px] text-white/50 absolute bottom-1.5 right-2 hidden lg:block hover:text-white/80 transition-colors text-shadow-sm">From OpenWeatherMap API</p>
           </motion.div>
 
           <div className="hidden md:block w-px bg-white/20 dark:bg-white/10 my-4 opacity-50"></div> {/* Slightly more subtle separator */}
@@ -848,10 +847,10 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                           config.numHourlyForecastsToShow <= 3 ? 'grid-cols-3' :
                           config.numHourlyForecastsToShow <= 4 ? 'grid-cols-4 sm:grid-cols-4' :
                           config.numHourlyForecastsToShow <= 5 ? 'grid-cols-5 sm:grid-cols-5' :
-                          config.numHourlyForecastsToShow <= 6 ? 'grid-cols-3 min-[400px]:grid-cols-6 sm:grid-cols-6' : // Example more responsive tiering
-                          config.numHourlyForecastsToShow <= 8 ? 'grid-cols-4 min-[400px]:grid-cols-4 sm:grid-cols-4' :
-                          config.numHourlyForecastsToShow <= 10 ? 'grid-cols-5 min-[400px]:grid-cols-5 sm:grid-cols-5' :
-                          'grid-cols-3 min-[400px]:grid-cols-6 sm:grid-cols-6'
+                          config.numHourlyForecastsToShow <= 6 ? 'grid-cols-3 min-[300px]:grid-cols-6 sm:grid-cols-6' : // Example more responsive tiering
+                          config.numHourlyForecastsToShow <= 8 ? 'grid-cols-4 min-[300px]:grid-cols-4 sm:grid-cols-4' :
+                          config.numHourlyForecastsToShow <= 10 ? 'grid-cols-5 min-[300px]:grid-cols-5 sm:grid-cols-5' :
+                          'grid-cols-3 min-[300px]:grid-cols-6 sm:grid-cols-6'
                         }`}>
                           {forecast3Hour5Day.list.slice(0, config.numHourlyForecastsToShow || 5).map((item, index) => (
                           <motion.div
@@ -875,7 +874,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                       {config.showDailySummary && dailyAggregatedForecast.length > 0 && (
                         <div className="flex-grow h-full flex flex-col">
                         <h4 className="text-xs font-semibold text-foreground/80 dark:text-white/70 mt-1 mb-1.5 ml-0.5 flex items-center gap-1.5 text-shadow-sm"><CalendarDays className="w-3.5 h-3.5" />Next Days</h4>
-                        <div className="flex gap-1.5 items-stretch flex-grow">
+                        <div className="flex gap-1.5 items-stretch">
                           {dailyAggregatedForecast.map((day, index) => (
                           <motion.div
                             key={day.dt}
@@ -883,7 +882,12 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                             className="flex-1 flex flex-col items-center justify-between p-1.5 rounded-lg bg-background/50 hover:bg-background/80 dark:bg-black/30 dark:hover:bg-black/50 shadow-md text-center space-y-0.5 transition-colors h-full text-shadow-sm">
                             <p className="text-[10px] font-semibold text-muted-foreground dark:text-white/60">{day.dayName}</p>
                             <DynamicWeatherIcon iconCode={day.icon} className="w-6 h-6 my-0" animate={false} />
-                            <div className="text-xs font-medium text-foreground dark:text-white"><AnimatedValue value={day.temp_max.toFixed(0)} /><span className="opacity-70">/<AnimatedValue value={day.temp_min.toFixed(0)} />°</span></div>
+                            <div className="text-xs font-medium text-foreground dark:text-white">
+                              <AnimatedValue value={day.temp_max.toFixed(0)} />
+                              <span className="opacity-70">
+                                /<AnimatedValue value={day.temp_min.toFixed(0)} />°
+                              </span>
+                            </div>
                             {day.pop > 0.15 && <Badge variant="outline" className="text-[9px] scale-90 px-1 py-0 font-normal bg-blue-500/10 border-blue-500/30 text-blue-600 dark:text-blue-400"><Droplets className="w-2 h-2 mr-0.5" />{(day.pop * 100).toFixed(0)}%</Badge>}
                           </motion.div>
                           ))}
@@ -980,6 +984,8 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
               )}
             </AnimatePresence>
           </div>
+                      <p className="text-[9px] text-white/50 absolute bottom-1.5 left-2 hidden lg:block hover:text-white/80 transition-colors text-shadow-sm">From OpenWeatherMap API</p>
+
         </div>
 
         <AnimatePresence>
