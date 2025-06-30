@@ -135,10 +135,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Dynamically construct navMainItems based on user role
   const navMainItems = React.useMemo(() => {
     let items = [...navDataConfig.navMainBase];
+    // Add API Monitoring for all users
+    items.push(navDataConfig.apiMonitoringNavItem);
+    
     if (currentUser && currentUser.role === UserRole.ADMIN) {
       items.push(navDataConfig.adminNavItem);
       items.push(navDataConfig.adminSettingsNavItem);
-      items.push(navDataConfig.apiMonitoringNavItem); // Add API Monitoring for Admin
     }
     // Example: Add for other roles if needed
     // else if (currentUser && currentUser.role === UserRole.EDITOR) {
@@ -195,7 +197,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <Sidebar variant="inset" {...props} className="animate-pulse !bg-transparent dark:!bg-transparent pointer-events-none">
         <motion.div
           variants={headerVariants}
-          animate={isCollapsed ? "collapsed" : "expanded"}
+          animate="collapsed"
           transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
           className="flex items-center px-2.5 border-b border-slate-200/80 dark:border-slate-800 overflow-hidden"
         >
