@@ -201,9 +201,6 @@ const ApiMonitoringPage: React.FC = () => {
   // Initialize the status monitor
   useApiStatusMonitor();
 
-  // Initialize the status monitor
-  useApiStatusMonitor();
-
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingConfig, setEditingConfig] = useState<ApiConfig | null>(null);
 
@@ -243,44 +240,57 @@ const ApiMonitoringPage: React.FC = () => {
 
   const handleFetchData = async (config: ApiConfig) => {
     if (!config.isEnabled) {
-      toast.error("API is disabled.", { description: "Enable the API configuration to fetch data."});
+      toast.error("API is disabled.", { description: "Enable the API configuration to fetch data." });
       return;
     }
+
+    setCurrentFetchingConfig(config); // Set the config for the modal
+    setCurrentViewDataTitle(`Data for: ${config.name}`); // Title is now more generic or handled by modal
+
     if (config.type === 'read-range') {
-        // TODO: Implement read-range data fetching and display (likely in a separate component/modal)
-        toast.info("Read-range data viewing will be implemented in the next step.");
+      if (!config.nodeId) {
+        toast.error("Node ID is missing for this 'read-range' API configuration.");
         return;
-    }
-    if (config.type === 'read-one' && !config.nodeId) {
+      }
+      // For read-range, the modal handles its own data fetching.
+      // Reset parent-level data states for other types.
+      setCurrentViewData(null);
+      setViewDataError(null);
+      setIsViewDataLoading(false);
+      setIsViewDataModalOpen(true); // Just open the modal
+    } else if (config.type === 'read-one' || config.type === 'read-all') {
+      if (config.type === 'read-one' && !config.nodeId) {
         toast.error("Node ID is missing for this 'read-one' API configuration.");
         return;
-    }
-
-    setIsViewDataLoading(true);
-    setViewDataError(null);
-    setCurrentViewData(null);
-    setCurrentFetchingConfig(config);
-    setCurrentViewDataTitle(`Data for: ${config.name} (${config.type})`);
-    setIsViewDataModalOpen(true);
-
-    try {
-      let result: SingleDataResponse | AllDataResponse | null = null;
-      if (config.type === 'read-all') {
-        result = await fetchReadAll(config);
-      } else if (config.type === 'read-one' && config.nodeId) {
-        result = await fetchReadOne(config, config.nodeId);
       }
 
-      if (result) {
-        setCurrentViewData(result);
-      } else {
-        setViewDataError('Failed to fetch data or no active API URL was found.');
+      setIsViewDataLoading(true);
+      setViewDataError(null);
+      setCurrentViewData(null);
+      setIsViewDataModalOpen(true);
+
+      try {
+        let result: SingleDataResponse | AllDataResponse | null = null;
+        if (config.type === 'read-all') {
+          result = await fetchReadAll(config);
+        } else if (config.type === 'read-one' && config.nodeId) {
+          // Node ID presence is already checked
+          result = await fetchReadOne(config, config.nodeId);
+        }
+
+        if (result) {
+          setCurrentViewData(result);
+        } else {
+          setViewDataError('Failed to fetch data or no active API URL was found.');
+          toast.error('Failed to fetch data', { description: 'No active API URL or empty response.' });
+        }
+      } catch (error: any) {
+        console.error("Error fetching API data:", error);
+        setViewDataError(error.message || 'An unknown error occurred.');
+        toast.error('Error fetching data', { description: error.message });
+      } finally {
+        setIsViewDataLoading(false);
       }
-    } catch (error: any) {
-      console.error("Error fetching API data:", error);
-      setViewDataError(error.message || 'An unknown error occurred.');
-    } finally {
-      setIsViewDataLoading(false);
     }
   };
 
