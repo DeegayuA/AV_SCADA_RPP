@@ -87,4 +87,7 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
 'test_data_nodes_layout',
 ];
 
+// Keys for API Monitoring feature
+export const API_MONITORING_CONFIG_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringConfigs_v1`;
+export const API_MONITORING_DOWNTIME_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringDowntimes_v1`;
 
