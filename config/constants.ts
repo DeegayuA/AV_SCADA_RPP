@@ -25,12 +25,12 @@ export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.251.229:4840";
 export const VERSION = "- Release v2025.06.26 • 16:30 (GMT+5:30)";
 export const PLANT_NAME= "Mini Grid";
-export const PLANT_LOCATION = "Athurugiriya, Colombo, Sri Lanka";
+export const PLANT_LOCATION = "Ranna, Sri Lanka";
 export const PLANT_TYPE = "Solar Power Plant";
 export const PLANT_CAPACITY = "2000 kW"; // 2 MW
 export const PLANT_CAPACITY_WATTS = 2000000; // 2 MW in watts
 
-export const APP_NAME = "Mini Grid - AVR&D";
+export const APP_NAME = "Ranna 2MW - Synergy Power";
 export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app"; 
 export const APP_URL = "https://yourwebsite.com";
 export const APP_KEYWORDS = "solar, monitoring, control, energy, management";
