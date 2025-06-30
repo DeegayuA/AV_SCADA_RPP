@@ -21,6 +21,7 @@ import {
   // User, // Replaced by ShieldCheck for admin or can be other role-specific icon
   // ChevronsRight, 
   // Dot, 
+  ServerCog, // Added for API Monitoring
 } from "lucide-react";
 
 import { NavMain, NavMainItemProps } from "@/components/nav-main";
@@ -60,6 +61,7 @@ const activeAccents: ActiveAccents = {
   report: "text-amber-600 dark:text-amber-400 border-amber-500 indicator-bg-amber-500",
   projects: "text-orange-600 dark:text-orange-400 border-orange-500 indicator-bg-orange-500",
   admin: "text-red-600 dark:text-red-400 border-red-500 indicator-bg-red-500", // Added admin color
+  system: "text-gray-600 dark:text-gray-400 border-gray-500 indicator-bg-gray-500", // Added for system/API monitoring
   default: "text-primary border-primary indicator-bg-primary dark:text-primary-dark dark:border-primary-dark dark:indicator-bg-primary-dark"
 };
 
@@ -97,8 +99,9 @@ const navDataConfig = {
     { title: "Dashboard", url: "/dashboard", icon: Bot, sectionId: "Dashboard", colorKey: "dashboard" },
     { title: "Circuit Layouts", url: "/circuit", icon: BookOpen, sectionId: "Circuit Layouts", colorKey: "circuit" },
   ] as NavMainItemProps[],
-adminNavItem: { title: "Administration", url: "/admin", icon: ShieldCheck, sectionId: "Administration", colorKey: "admin" } as NavMainItemProps,
-adminSettingsNavItem: { title: "Mobile Config", url: "/mobile-config", icon: Settings2, sectionId: "Settings", colorKey: "settings" } as NavMainItemProps,
+  adminNavItem: { title: "Administration", url: "/admin", icon: ShieldCheck, sectionId: "Administration", colorKey: "admin" } as NavMainItemProps,
+  adminSettingsNavItem: { title: "Mobile Config", url: "/mobile-config", icon: Settings2, sectionId: "Settings", colorKey: "settings" } as NavMainItemProps,
+  apiMonitoringNavItem: { title: "API Monitoring", url: "/system/api-monitoring", icon: ServerCog, sectionId: "API Monitoring", colorKey: "system" } as NavMainItemProps,
   navSecondary: [
     { title: "Help Center", url: "/help", icon: ShieldQuestion, sectionId: "Help Center", colorKey: "help" },
     { title: "Privacy Policy", url: "/privacy-policy", icon: LifeBuoy, sectionId: "Privacy Policy", colorKey: "settings" },
@@ -132,10 +135,17 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   // Dynamically construct navMainItems based on user role
   const navMainItems = React.useMemo(() => {
     let items = [...navDataConfig.navMainBase];
+    // Add API Monitoring for all users
+    items.push(navDataConfig.apiMonitoringNavItem);
+    
     if (currentUser && currentUser.role === UserRole.ADMIN) {
       items.push(navDataConfig.adminNavItem);
       items.push(navDataConfig.adminSettingsNavItem);
     }
+    // Example: Add for other roles if needed
+    // else if (currentUser && currentUser.role === UserRole.EDITOR) {
+    //   items.push(navDataConfig.apiMonitoringNavItem);
+    // }
     return items;
   }, [currentUser]);
 
@@ -187,7 +197,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <Sidebar variant="inset" {...props} className="animate-pulse !bg-transparent dark:!bg-transparent pointer-events-none">
         <motion.div
           variants={headerVariants}
-          animate={isCollapsed ? "collapsed" : "expanded"}
+          animate="collapsed"
           transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
           className="flex items-center px-2.5 border-b border-slate-200/80 dark:border-slate-800 overflow-hidden"
         >

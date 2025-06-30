@@ -23,13 +23,14 @@ export const WS_URL = (() => {
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.251.229:4840";
-export const VERSION = "- Release v2025.06.13 • 15:30 (GMT+5:30)";
-export const PLANT_NAME= "Mini-Grid";
-export const PLANT_LOCATION = "Colombo, Sri Lanka";
-export const PLANT_TYPE = "Mini-Grid";
-export const PLANT_CAPACITY = "25 kW";
+export const VERSION = "- Release v2025.06.26 • 16:30 (GMT+5:30)";
+export const PLANT_NAME= "Mini Grid";
+export const PLANT_LOCATION = "Athurugiriya, Colombo, Sri Lanka";
+export const PLANT_TYPE = "Solar Power Plant";
+export const PLANT_CAPACITY = "2000 kW"; // 2 MW
+export const PLANT_CAPACITY_WATTS = 2000000; // 2 MW in watts
 
-export const APP_NAME = "Mini-Grid Control Panel";
+export const APP_NAME = "Mini Grid - AVR&D";
 export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app"; 
 export const APP_URL = "https://yourwebsite.com";
 export const APP_KEYWORDS = "solar, monitoring, control, energy, management";
@@ -37,19 +38,56 @@ export const APP_DESCRIPTION = "A web-based plant monitoring system for real-tim
 export const APP_LOGO = logo;
 export const APP_LOGO2 = logo2;
 export const APP_FAVICON = "/favicon.ico";
-export const APP_AUTHOR = "Atla Vision";
+export const APP_AUTHOR = "Synergy Power";
 export const APP_AUTHOR_URL = "https://yourwebsite.com";
-export const APP_COPYRIGHT = "© 2025 Alta Vision. All rights reserved.";
+export const APP_COPYRIGHT = "© 2025 Synergy Power. All rights reserved.";
 export const APP_COPYRIGHT_URL = "https://yourwebsite.com/copyright";
 export const APP_PRIVACY_POLICY = "https://yourwebsite.com/privacy-policy";
 export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";
 
-// Ensure this is defined and exported
-export const AVAILABLE_SLD_LAYOUT_IDS: string[] = ['ranna_sld','main_plant', 'secondary_plant', 'empty_template', 'new_project_canvas', 'test_data_nodes_layout'];
 // Potentially in a shared types file or at the top of PowerTimelineGraph.tsx
 export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
 export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 
 
 export const USER = "viewer";
-// export const USER = "admin";
+export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
+
+export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
+  'ranna_main_sld',
+  'Ranna_PLC',
+  'PV_Array01',
+  'PV_Array02',
+  // PV Arrays 3 to 18
+  'PV_Array03',
+  'PV_Array04',
+  'PV_Array05',
+  'PV_Array06',
+  'PV_Array07',
+  'PV_Array08',
+  'PV_Array09',
+  'PV_Array10',
+  'PV_Array11',
+  'PV_Array12',
+  'PV_Array13',
+  'PV_Array14',
+  'PV_Array15',
+  'PV_Array16',
+  'PV_Array17',
+  'PV_Array18',
+  // Weather and Misc
+  'weather',
+  'misc1',
+  'misc2',
+  'misc3',
+  'Power_Analyser1',
+  'Power_Analyser2',
+  'MiCom_Relay',
+  'empty_template',
+'test_data_nodes_layout',
+];
+
+// Keys for API Monitoring feature
+export const API_MONITORING_CONFIG_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringConfigs_v1`;
+export const API_MONITORING_DOWNTIME_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringDowntimes_v1`;
+
