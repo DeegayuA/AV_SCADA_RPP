@@ -14,6 +14,7 @@ interface WebSocketStatusProps {
     isConnected: boolean;
     onClick: () => void;
     wsAddress?: string;
+    onConnect?: () => void;
 }
 
 const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, onClick, wsAddress }) => {
