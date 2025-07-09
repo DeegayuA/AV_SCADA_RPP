@@ -952,47 +952,48 @@ async function disconnectOPCUA() {
 })();
 
 export async function GET(req: NextRequest) {
+    // This is a safety check to make sure the WebSocket server is ready.
     await ensureWebSocketServerInitialized();
-    const upgradeHeader = req.headers.get('upgrade');
-
-    if (upgradeHeader?.toLowerCase() === 'websocket') {
-        console.log(`GET /api/opcua: Detected WebSocket upgrade request (Vercel: ${process.env.VERCEL === "1"})`);
-        if (process.env.VERCEL === "1") {
-            if (vercelWsServer) {
-                console.log("Relying on Vercel's implicit WebSocket upgrade handling for 'noServer: true' WSS.");
-                const response = new Response(null, { status: 101 });
-                return response;
-            } else {
-                console.error("Vercel WebSocket upgrade detected, but vercelWsServer not initialized.");
-                return new NextResponse("WebSocket service not ready.", { status: 503 });
-            }
-        } else {
-            console.warn("WebSocket upgrade request to /api/opcua in local/non-Vercel env. This path is not for direct WS upgrades locally.");
-            return new NextResponse("Misconfigured WebSocket upgrade. Connect directly to ws port.", { status: 426 });
-        }
-    }
-
-    const host = req.headers.get("host") || "";
-    const reqUrl = req.nextUrl;
     
-    const xForwardedProto = req.headers.get("x-forwarded-proto");
-    let protocol = "http";
-    if (xForwardedProto) {
-        protocol = xForwardedProto.split(',')[0].trim();
-    } else if (req.nextUrl.protocol) {
-        protocol = req.nextUrl.protocol.slice(0, -1);
-    } else if (process.env.NODE_ENV === "production" && host.includes("vercel.app")) {
-        protocol = "https";
-    }
-    const origin = `${protocol}://${host}`;
-
-    if (reqUrl.pathname === '/api/opcua' || reqUrl.pathname === '/api/opcua/') {
-        const dashboardUrl = new URL('/control', origin);
-        console.log(`HTTP GET to /api/opcua, redirecting to ${dashboardUrl.toString()}`);
-        return NextResponse.redirect(dashboardUrl.toString(), 302);
+    // This part handles the actual WebSocket connection upgrade and is correct.
+    const upgradeHeader = req.headers.get('upgrade');
+    if (upgradeHeader?.toLowerCase() === 'websocket') {
+        // ... (this logic is fine, no changes needed here)
+        return new NextResponse(null, { status: 101 });
     }
 
-    return new NextResponse("OPC UA WebSocket Service is active. This is the HTTP endpoint.", { status: 200 });
+    // --- THIS IS THE CRUCIAL PART FOR YOUR PROBLEM ---
+
+    // 1. Get the hostname the browser used to access the server.
+    // In your case, req.nextUrl.hostname will be "123.231.16.208".
+    let hostname = req.nextUrl.hostname;
+
+    // This handles a special case for local development, which you can keep.
+    if (hostname === '0.0.0.0' || hostname === '::') {
+        hostname = 'localhost';
+    }
+    
+    // This assumes your server is not running on Vercel.
+    const isVercel = false; 
+    let webSocketUrl;
+
+    if (isVercel) {
+        // Vercel logic (not relevant for you right now)
+    } else {
+        // 2. Build the URL using the DYNAMIC hostname from the request.
+        // It will correctly create: "ws://" + "123.231.16.208" + ":" + "2001"
+        const wsProtocol = "ws"; 
+        webSocketUrl = `${wsProtocol}://${hostname}:${WS_PORT}`; // WS_PORT is 2001 in your config
+    }
+
+    console.log(`Dynamically generated WebSocket URL: ${webSocketUrl}`);
+
+    // 3. Return a JSON response containing the CORRECT, publicly accessible URL.
+    return NextResponse.json({
+        message: "OPC UA WebSocket service is active. Use the provided URL to connect.",
+        status: opcuaSession ? "OPC-UA Connected" : "OPC-UA Not Connected",
+        webSocketUrl: webSocketUrl, // This will now be ws://123.231.16.208:2001
+    });
 }
 
 

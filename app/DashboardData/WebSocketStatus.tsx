@@ -1,6 +1,5 @@
 'use client';
 
-// src/components/dashboard/WebSocketStatus.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
 import {
@@ -9,30 +8,29 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { WS_URL } from '@/config/constants';
 
-
+// CORRECTED PROPS INTERFACE
 interface WebSocketStatusProps {
     isConnected: boolean;
-    connectFn: () => void;
+    onClick: () => void;
+    wsAddress?: string;
 }
 
-const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, connectFn }) => {
-    const wsAddress = WS_URL;
+const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, onClick, wsAddress }) => {
     const title = isConnected
-        ? `WebSocket Connected (Live Data)\n${wsAddress}`
-        : `WebSocket Disconnected. Click to attempt reconnect.\n${wsAddress}`;
+        ? `WebSocket Connected (Live Data)\n${wsAddress || 'Unknown Address'}`
+        : `WebSocket Disconnected. Click to manage connection.\n${wsAddress || 'Default Address'}`;
     const pulseVariants = { pulse: { scale: [1, 1.15, 1], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } } };
 
     return (
         <TooltipProvider delayDuration={100}>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    {/* TooltipTrigger requires a single child */}
+                    {/* The div below now correctly uses the 'onClick' prop */}
                     <motion.div
                          className="flex items-center gap-2 cursor-pointer"
-                         onClick={connectFn}
-                         title={title} // Using title prop as a fallback, but tooltip is preferred
+                         onClick={onClick}
+                         title={title}
                          whileHover={{ scale: 1.05 }}
                          whileTap={{ scale: 0.95 }}
                          aria-label={`WebSocket Status: ${isConnected ? 'Live' : 'Offline'}`}

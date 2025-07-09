@@ -1,44 +1,47 @@
 [
   {
-    "name": "Auditing",
-    "address": "ns=0;i=2994",
-    "initialValue": true,
-    "dataType": "Boolean"
+    "name": "ServerArray",
+    "address": "ns=0;i=2254",
+    "initialValue": [
+      "urn:freeopcua:python:server"
+    ],
+    "dataType": "String"
   },
   {
     "name": "NamespaceArray",
     "address": "ns=0;i=2255",
     "initialValue": [
       "http://opcfoundation.org/UA/",
-      "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1",
-      "http://opcfoundation.org/UA/DI/",
-      "http://www.siemens.com/simatic-s7-opcua",
-      "http://OPC_UA"
+      "urn:freeopcua:python:server",
+      "http://python-s7-gateway.com"
     ],
     "dataType": "String"
   },
   {
-    "name": "ServerArray",
-    "address": "ns=0;i=2254",
-    "initialValue": [
-      "urn:SIMATIC.S7-1200.OPC-UA.Application:PLC_1"
-    ],
-    "dataType": "String"
+    "name": "UrisVersion",
+    "address": "ns=0;i=15004",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (20998)"
   },
   {
     "name": "ServerStatus",
     "address": "ns=0;i=2256",
     "initialValue": {
+<<<<<<< Updated upstream
       "startTime": "2025-06-09T11:00:36.920Z",
       "currentTime": "2025-06-16T09:18:40.305Z",
+=======
+      "startTime": "2025-07-07T05:29:05.191Z",
+      "currentTime": "2025-07-07T05:29:05.191Z",
+>>>>>>> Stashed changes
       "state": "Running",
       "buildInfo": {
-        "productUri": "https://www.siemens.com/s7-1200",
-        "manufacturerName": "SIEMENS AG",
-        "productName": "SIMATIC S7-1200 OPC UA",
-        "softwareVersion": "FW: V.4.6.0",
-        "buildNumber": "00",
-        "buildDate": "1970-01-01T00:00:00.000Z"
+        "productUri": "urn:freeopcua.github.io:python:server",
+        "manufacturerName": "FreeOpcUa",
+        "productName": "FreeOpcUa Python Server",
+        "softwareVersion": "1.0pre",
+        "buildNumber": "0",
+        "buildDate": "2025-07-07T10:59:05.191Z"
       },
       "secondsTillShutdown": 0,
       "shutdownReason": {}
@@ -52,137 +55,64 @@
     "dataType": "Byte"
   },
   {
-    "name": "ns=2:DeviceManual",
-    "address": "ns=3;s=DeviceManual",
-    "initialValue": "https://support.industry.siemens.com/cs/ww/en/view/109743003",
-    "dataType": "String"
+    "name": "Auditing",
+    "address": "ns=0;i=2994",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Boolean"
   },
   {
-    "name": "ns=2:DeviceRevision",
-    "address": "ns=3;s=DeviceRevision",
-    "initialValue": "6ES7 214-1BG40-0XB0  V04.06.00",
-    "dataType": "String"
+    "name": "EstimatedReturnTime",
+    "address": "ns=0;i=12885",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "DateTime"
   },
   {
-    "name": "ns=3:EngineeringRevision",
-    "address": "ns=3;s=EngineeringRevision",
-    "initialValue": "V19.0",
-    "dataType": "String"
+    "name": "LocalTime",
+    "address": "ns=0;i=17634",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (8912)"
   },
   {
-    "name": "ns=2:HardwareRevision",
-    "address": "ns=3;s=HardwareRevision",
-    "initialValue": "13",
-    "dataType": "String"
+    "name": "LastChange",
+    "address": "ns=0;i=32852",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (20998)"
   },
   {
-    "name": "ns=2:Manufacturer",
-    "address": "ns=3;s=Manufacturer",
-    "initialValue": {
-      "locale": "en-US",
-      "text": "Siemens AG"
-    },
-    "dataType": "LocalizedText"
-  },
-  {
-    "name": "ns=2:Model",
-    "address": "ns=3;s=Model",
-    "initialValue": {
-      "locale": "en-US",
-      "text": "CPU 1214C AC/DC/Rly"
-    },
-    "dataType": "LocalizedText"
-  },
-  {
-    "name": "ns=3:OperatingMode",
-    "address": "ns=3;s=OperatingMode",
-    "initialValue": 8,
-    "dataType": "SimaticOperatingState"
-  },
-  {
-    "name": "ns=3:OrderNumber",
-    "address": "ns=3;s=OrderNumber",
-    "initialValue": "6ES7 214-1BG40-0XB0 ",
-    "dataType": "String"
-  },
-  {
-    "name": "ns=2:RevisionCounter",
-    "address": "ns=3;s=RevisionCounter",
-    "initialValue": -1,
-    "dataType": "Int32"
-  },
-  {
-    "name": "ns=2:SerialNumber",
-    "address": "ns=3;s=SerialNumber",
-    "initialValue": "S V-PNC44234    ",
-    "dataType": "String"
-  },
-  {
-    "name": "ns=2:SoftwareRevision",
-    "address": "ns=3;s=SoftwareRevision",
-    "initialValue": "V04.06.00",
+    "name": "ServerProfileArray",
+    "address": "ns=0;i=2269",
+    "initialValue": "Error: Good (0x00000000)",
     "dataType": "String"
   },
   {
     "name": "LocaleIdArray",
     "address": "ns=0;i=2271",
-    "initialValue": [
-      "en-US"
-    ],
+    "initialValue": "Error: Good (0x00000000)",
     "dataType": "Unknown (295)"
   },
   {
-    "name": "MaxArrayLength",
-    "address": "ns=0;i=11702",
-    "initialValue": 131072,
-    "dataType": "UInt32"
+    "name": "MinSupportedSampleRate",
+    "address": "ns=0;i=2272",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (290)"
   },
   {
     "name": "MaxBrowseContinuationPoints",
     "address": "ns=0;i=2735",
-    "initialValue": 5,
-    "dataType": "UInt16"
-  },
-  {
-    "name": "MaxByteStringLength",
-    "address": "ns=0;i=12911",
-    "initialValue": 131072,
-    "dataType": "UInt32"
-  },
-  {
-    "name": "MaxHistoryContinuationPoints",
-    "address": "ns=0;i=2737",
-    "initialValue": 5,
+    "initialValue": "Error: Good (0x00000000)",
     "dataType": "UInt16"
   },
   {
     "name": "MaxQueryContinuationPoints",
     "address": "ns=0;i=2736",
-    "initialValue": 5,
+    "initialValue": "Error: Good (0x00000000)",
     "dataType": "UInt16"
   },
   {
-    "name": "MaxStringLength",
-    "address": "ns=0;i=11703",
-    "initialValue": 16382,
-    "dataType": "UInt32"
-  },
-  {
-    "name": "MinSupportedSampleRate",
-    "address": "ns=0;i=2272",
-    "initialValue": 1000,
-    "dataType": "Unknown (290)"
-  },
-  {
-    "name": "ServerProfileArray",
-    "address": "ns=0;i=2269",
-    "initialValue": [
-      "http://opcfoundation.org/UA-Profile/Server/StandardUA",
-      "http://opcfoundation.org/UA-Profile/Server/Methods",
-      "http://opcfoundation.org/UA-Profile/Server/StandardEventSubscription",
-      "http://opcfoundation.org/UA-Profile/Server/DataAccess"
-    ],
-    "dataType": "String"
+    "name": "MaxHistoryContinuationPoints",
+    "address": "ns=0;i=2737",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt16"
   },
   {
     "name": "SoftwareCertificates",
@@ -191,20 +121,81 @@
     "dataType": "Unknown (344)"
   },
   {
-    "name": "ns=2:MaxInactiveLockTime",
-    "address": "ns=2;i=6387",
+    "name": "MaxArrayLength",
+    "address": "ns=0;i=11702",
     "initialValue": "Error: Good (0x00000000)",
-    "dataType": "Unknown (290)"
+    "dataType": "UInt32"
   },
   {
-    "name": "EnabledFlag",
-    "address": "ns=0;i=2294",
-    "initialValue": true,
-    "dataType": "Boolean"
+    "name": "MaxStringLength",
+    "address": "ns=0;i=11703",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxByteStringLength",
+    "address": "ns=0;i=12911",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxSessions",
+    "address": "ns=0;i=24095",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxSubscriptions",
+    "address": "ns=0;i=24096",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxMonitoredItems",
+    "address": "ns=0;i=24097",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxSubscriptionsPerSession",
+    "address": "ns=0;i=24098",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxMonitoredItemsPerSubscription",
+    "address": "ns=0;i=24104",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxSelectClauseParameters",
+    "address": "ns=0;i=24099",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxWhereClauseParameters",
+    "address": "ns=0;i=24100",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "MaxMonitoredItemsQueueSize",
+    "address": "ns=0;i=31916",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "ConformanceUnits",
+    "address": "ns=0;i=24101",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "QualifiedName"
   },
   {
     "name": "ServerDiagnosticsSummary",
     "address": "ns=0;i=2275",
+<<<<<<< Updated upstream
     "initialValue": {
       "serverViewCount": 0,
       "currentSessionCount": 4,
@@ -219,11 +210,21 @@
       "securityRejectedRequestsCount": 0,
       "rejectedRequestsCount": 0
     },
+=======
+    "initialValue": "Error: Good (0x00000000)",
+>>>>>>> Stashed changes
     "dataType": "Unknown (859)"
+  },
+  {
+    "name": "SamplingIntervalDiagnosticsArray",
+    "address": "ns=0;i=2289",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (856)"
   },
   {
     "name": "SubscriptionDiagnosticsArray",
     "address": "ns=0;i=2290",
+<<<<<<< Updated upstream
     "initialValue": [
       {
         "sessionId": "ns=1;i=3190210086",
@@ -325,132 +326,190 @@
         "eventQueueOverflowCount": 0
       }
     ],
+=======
+    "initialValue": "Error: Good (0x00000000)",
+>>>>>>> Stashed changes
     "dataType": "Unknown (874)"
+  },
+  {
+    "name": "EnabledFlag",
+    "address": "ns=0;i=2294",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Boolean"
   },
   {
     "name": "RedundancySupport",
     "address": "ns=0;i=3709",
-    "initialValue": 0,
+    "initialValue": "Error: Good (0x00000000)",
     "dataType": "Unknown (851)"
   },
   {
-    "name": "ns=4:Backup_Supply_Contactor_Switch_Out_M",
-    "address": "ns=4;i=391",
-    "initialValue": false,
-    "dataType": "Boolean"
+    "name": "RedundantServerArray",
+    "address": "ns=0;i=11313",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (853)"
   },
   {
-    "name": "ns=4:Deye_Grid_Supply_switch_Out_M",
-    "address": "ns=4;i=392",
-    "initialValue": false,
-    "dataType": "Boolean"
-  },
-  {
-    "name": "ns=4:Gen_Supply_M",
-    "address": "ns=4;i=393",
-    "initialValue": false,
-    "dataType": "Boolean"
-  },
-  {
-    "name": "ns=4:Grid_Supply_M",
-    "address": "ns=4;i=394",
-    "initialValue": false,
-    "dataType": "Boolean"
-  },
-  {
-    "name": "ns=4:Main_Grid_Supply_Switch_Out_M",
-    "address": "ns=4;i=395",
-    "initialValue": false,
-    "dataType": "Boolean"
-  },
-  {
-    "name": "IsNamespaceSubset",
-    "address": "ns=0;i=15961",
+    "name": "Stepped",
+    "address": "ns=0;i=32644",
     "initialValue": "Error: Good (0x00000000)",
     "dataType": "Boolean"
   },
   {
-    "name": "NamespacePublicationDate",
-    "address": "ns=0;i=15960",
-    "initialValue": "Error: Good (0x00000000)",
-    "dataType": "DateTime"
-  },
-  {
-    "name": "NamespaceUri",
-    "address": "ns=0;i=15958",
+    "name": "Definition",
+    "address": "ns=0;i=32645",
     "initialValue": "Error: Good (0x00000000)",
     "dataType": "String"
   },
   {
-    "name": "NamespaceVersion",
-    "address": "ns=0;i=15959",
+    "name": "MaxTimeInterval",
+    "address": "ns=0;i=32646",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (290)"
+  },
+  {
+    "name": "MinTimeInterval",
+    "address": "ns=0;i=32647",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (290)"
+  },
+  {
+    "name": "ExceptionDeviation",
+    "address": "ns=0;i=32648",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Double"
+  },
+  {
+    "name": "ExceptionDeviationFormat",
+    "address": "ns=0;i=32649",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (890)"
+  },
+  {
+    "name": "StartOfArchive",
+    "address": "ns=0;i=32650",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (294)"
+  },
+  {
+    "name": "StartOfOnlineArchive",
+    "address": "ns=0;i=32656",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (294)"
+  },
+  {
+    "name": "ServerTimestampSupported",
+    "address": "ns=0;i=32682",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Boolean"
+  },
+  {
+    "name": "MaxTimeStoredValues",
+    "address": "ns=0;i=32752",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (290)"
+  },
+  {
+    "name": "MaxCountStoredValues",
+    "address": "ns=0;i=32753",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt32"
+  },
+  {
+    "name": "StartOfArchive",
+    "address": "ns=0;i=32756",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (294)"
+  },
+  {
+    "name": "StartOfOnlineArchive",
+    "address": "ns=0;i=32757",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (294)"
+  },
+  {
+    "name": "ApplicationUri",
+    "address": "ns=0;i=25706",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (23751)"
+  },
+  {
+    "name": "ProductUri",
+    "address": "ns=0;i=25725",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (23751)"
+  },
+  {
+    "name": "ApplicationType",
+    "address": "ns=0;i=25707",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (307)"
+  },
+  {
+    "name": "ServerCapabilities",
+    "address": "ns=0;i=12710",
     "initialValue": "Error: Good (0x00000000)",
     "dataType": "String"
   },
   {
-    "name": "StaticNodeIdTypes",
-    "address": "ns=0;i=15962",
-    "initialValue": "Error: Good (0x00000000)",
-    "dataType": "Unknown (256)"
-  },
-  {
-    "name": "StaticNumericNodeIdRange",
-    "address": "ns=0;i=15963",
-    "initialValue": "Error: Good (0x00000000)",
-    "dataType": "Unknown (291)"
-  },
-  {
-    "name": "StaticStringNodeIdPattern",
-    "address": "ns=0;i=15964",
+    "name": "SupportedPrivateKeyFormats",
+    "address": "ns=0;i=12639",
     "initialValue": "Error: Good (0x00000000)",
     "dataType": "String"
   },
   {
-    "name": "MaxMonitoredItemsPerCall",
-    "address": "ns=0;i=11714",
-    "initialValue": 1000,
+    "name": "MaxTrustListSize",
+    "address": "ns=0;i=12640",
+    "initialValue": "Error: Good (0x00000000)",
     "dataType": "UInt32"
   },
   {
-    "name": "MaxNodesPerBrowse",
-    "address": "ns=0;i=11710",
-    "initialValue": 2000,
-    "dataType": "UInt32"
+    "name": "MulticastDnsEnabled",
+    "address": "ns=0;i=12641",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Boolean"
   },
   {
-    "name": "MaxNodesPerWrite",
-    "address": "ns=0;i=11707",
-    "initialValue": 2000,
-    "dataType": "UInt32"
+    "name": "HasSecureElement",
+    "address": "ns=0;i=23597",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Boolean"
   },
   {
-    "name": "MaxNodesPerTranslateBrowsePathsToNodeIds",
-    "address": "ns=0;i=11712",
-    "initialValue": 2000,
-    "dataType": "UInt32"
+    "name": "SupportedTransportProfiles",
+    "address": "ns=0;i=17481",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "String"
   },
   {
-    "name": "MaxNodesPerRegisterNodes",
-    "address": "ns=0;i=11711",
-    "initialValue": 2000,
-    "dataType": "UInt32"
+    "name": "DefaultDatagramPublisherId",
+    "address": "ns=0;i=25480",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "UInt64"
   },
   {
-    "name": "MaxNodesPerMethodCall",
-    "address": "ns=0;i=11709",
-    "initialValue": 1,
-    "dataType": "UInt32"
+    "name": "ConfigurationVersion",
+    "address": "ns=0;i=25481",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (20998)"
   },
   {
-    "name": "MaxNodesPerRead",
-    "address": "ns=0;i=11705",
-    "initialValue": 2000,
-    "dataType": "UInt32"
+    "name": "DefaultSecurityKeyServices",
+    "address": "ns=0;i=32403",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (312)"
   },
   {
-    "name": "SessionDiagnosticsArray",
-    "address": "ns=0;i=3707",
+    "name": "ConfigurationProperties",
+    "address": "ns=0;i=32404",
+    "initialValue": "Error: Good (0x00000000)",
+    "dataType": "Unknown (14533)"
+  },
+  {
+    "name": "ns=2:L1 Phase voltage (Insta+A1:A225ntaneous) - V x 10",
+    "address": "ns=2;i=3",
     "initialValue": [
+<<<<<<< Updated upstream
       {
         "sessionId": "ns=1;i=3190210086",
         "sessionName": "ClientSession1",
@@ -1019,10 +1078,15 @@
           "errorCount": 0
         }
       }
+=======
+      0,
+      0
+>>>>>>> Stashed changes
     ],
-    "dataType": "Unknown (865)"
+    "dataType": "Int64"
   },
   {
+<<<<<<< Updated upstream
     "name": "ns=4:Power On Voltage",
     "address": "ns=4;i=3",
     "initialValue": 100,
@@ -3414,10 +3478,27 @@
         "nextSequenceNumber": 0,
         "eventQueueOverflowCount": 0
       }
+=======
+    "name": "ns=2:L1 Current (Instantaneous) -  mA",
+    "address": "ns=2;i=4",
+    "initialValue": [
+      0,
+      0
     ],
-    "dataType": "Unknown (874)"
+    "dataType": "Int64"
   },
   {
+    "name": "ns=2:L1 Active Power (Instantaneous) - W",
+    "address": "ns=2;i=5",
+    "initialValue": [
+      0,
+      0
+>>>>>>> Stashed changes
+    ],
+    "dataType": "Int64"
+  },
+  {
+<<<<<<< Updated upstream
     "name": "SessionDiagnostics",
     "address": "ns=1;s=Session_335972813.SessionDiagnostics",
     "initialValue": {
@@ -3943,5 +4024,1451 @@
     "address": "ns=1;s=Session_648760849.SubscriptionDiagnosticsArray",
     "initialValue": [],
     "dataType": "Unknown (874)"
+=======
+    "name": "ns=2:L1 Inductive Power (Instantaneous) - var",
+    "address": "ns=2;i=6",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L1 Capacitive Power (Instantaneous) - var",
+    "address": "ns=2;i=7",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L1 Apparent Power (Instantaneous) -  VA",
+    "address": "ns=2;i=8",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L1 Power Factor (Instantaneous) -  x 100",
+    "address": "ns=2;i=9",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Cos φ L1 (Instantaneous) -  x 100",
+    "address": "ns=2;i=10",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 Phase voltage (Instantaneous) - V x 10",
+    "address": "ns=2;i=11",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 Current (Instantaneous) -  mA",
+    "address": "ns=2;i=12",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 Active Power (Instantaneous) - W",
+    "address": "ns=2;i=13",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 Inductive Power (Instantaneous) -  var",
+    "address": "ns=2;i=14",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 Capacitive Power (Instantaneous) -  var",
+    "address": "ns=2;i=15",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 Apparent Power (Instantaneous) -  VA",
+    "address": "ns=2;i=16",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 Power Factor (Instantaneous) -  x 100",
+    "address": "ns=2;i=17",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Cos φ L2 (Instantaneous) - x 100",
+    "address": "ns=2;i=18",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 Phase voltage (Instantaneous) -  V x 10",
+    "address": "ns=2;i=19",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 Current (Instantaneous) -  mA",
+    "address": "ns=2;i=20",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 Active Power (Instantaneous) -  W",
+    "address": "ns=2;i=21",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 Inductive Power (Instantaneous) - var",
+    "address": "ns=2;i=22",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 Capacitive Power (Instantaneous) - var",
+    "address": "ns=2;i=23",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 Apparent Power (Instantaneous) -  VA",
+    "address": "ns=2;i=24",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 Power Factor (Instantaneous) -  x 100",
+    "address": "ns=2;i=25",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Cos φ L3 (Instantaneous) -  x 100",
+    "address": "ns=2;i=26",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Active Three-phase Power (Instantaneous) - W",
+    "address": "ns=2;i=27",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Inductive Three-phase power (Instantaneous) - var",
+    "address": "ns=2;i=28",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Capacitive Three-phase Power (Instantaneous) - var",
+    "address": "ns=2;i=29",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Apparent three-phase power (Instantaneous) - VA",
+    "address": "ns=2;i=30",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Three-phase Power Factor (Instantaneous) -  x100",
+    "address": "ns=2;i=31",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Three-phase Cos φ (Instantaneous) - x100",
+    "address": "ns=2;i=32",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L1 Frequency (Instantaneous) -  Hz x100",
+    "address": "ns=2;i=33",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L1-L2 Voltage (Instantaneous) - V x 10",
+    "address": "ns=2;i=34",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2-L3 Voltage (Instantaneous) - V x 10",
+    "address": "ns=2;i=35",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3-L1 Voltage (Instantaneous) - V x 10",
+    "address": "ns=2;i=36",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Neutral Current N (Instantaneous) -  mA",
+    "address": "ns=2;i=37",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L1 voltage % THD (Instantaneous) -  % x 100",
+    "address": "ns=2;i=38",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 voltage % THD (Instantaneous) - % x 100",
+    "address": "ns=2;i=39",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 voltage % THD (Instantaneous) - % x 100",
+    "address": "ns=2;i=40",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L1 current % THD (Instantaneous) - % x 100",
+    "address": "ns=2;i=41",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L2 current % THD (Instantaneous) - % x 100",
+    "address": "ns=2;i=42",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:L3 current % THD (Instantaneous) - % x 100",
+    "address": "ns=2;i=43",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Maximum demand kW III (Instantaneous) - W",
+    "address": "ns=2;i=44",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Maximum demand kVA III (Instantaneous) - VA",
+    "address": "ns=2;i=45",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Maximum demand I AVG (Instantaneous) - mA",
+    "address": "ns=2;i=46",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Maximum demand I L1 (Instantaneous) - mA",
+    "address": "ns=2;i=47",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Maximum demand I L2 (Instantaneous) - mA",
+    "address": "ns=2;i=48",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Maximum demand I L3 (Instantaneous) - mA",
+    "address": "ns=2;i=49",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy kW)[ Tariff 1] -  kWh",
+    "address": "ns=2;i=50",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy (W) [ Tariff 1]-  Wh",
+    "address": "ns=2;i=51",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (kvarhL) [ Tariff 1]-  kvarh",
+    "address": "ns=2;i=52",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (varhL)[ Tariff 1] -  varh",
+    "address": "ns=2;i=53",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (kvarhC)[ Tariff 1] -  kvarh",
+    "address": "ns=2;i=54",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (varhC)[ Tariff 1] -  varh",
+    "address": "ns=2;i=55",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (kVAh)[ Tariff 1] -  kVAh",
+    "address": "ns=2;i=56",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (VAh)[ Tariff 1] -  Vah",
+    "address": "ns=2;i=57",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed CO2 emissions (KgCO2)[ Tariff 1] -  x10",
+    "address": "ns=2;i=58",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumption cost ( $)[ Tariff 1] -  x10",
+    "address": "ns=2;i=59",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (kW)[ Tariff 1] -  kWh",
+    "address": "ns=2;i=60",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (W)[ Tariff 1] -  Wh",
+    "address": "ns=2;i=61",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (kvarhL)[ Tariff 1] - kvarh",
+    "address": "ns=2;i=62",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (varhL)[ Tariff 1] -  varh",
+    "address": "ns=2;i=63",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (kvarhC)[ Tariff 1] -  kvarh",
+    "address": "ns=2;i=64",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (varhC)[ Tariff 1] -  varh",
+    "address": "ns=2;i=66",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (kVAh)[ Tariff 1] -  kVAh",
+    "address": "ns=2;i=67",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (VAh)[ Tariff 1] -  Vah",
+    "address": "ns=2;i=68",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated CO2 emissions ( KgCO2)[ Tariff 1] -  x10",
+    "address": "ns=2;i=69",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generation Cost ($)[ Tariff 1] -  x10",
+    "address": "ns=2;i=70",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Hours per tariff [ Tariff 1]- sec",
+    "address": "ns=2;i=71",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy kW)[ Tariff 2] -  kWh",
+    "address": "ns=2;i=72",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy (W) [ Tariff 2]-  Wh",
+    "address": "ns=2;i=73",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (kvarhL) [ Tariff 2]-  kvarh",
+    "address": "ns=2;i=74",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (varhL)[ Tariff 2] -  varh",
+    "address": "ns=2;i=75",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (kvarhC)[ Tariff 2] -  kvarh",
+    "address": "ns=2;i=76",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (varhC)[ Tariff 2] -  varh",
+    "address": "ns=2;i=77",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (kVAh)[ Tariff 2] -  kVAh",
+    "address": "ns=2;i=78",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (VAh)[ Tariff 2] -  Vah",
+    "address": "ns=2;i=79",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed CO2 emissions (KgCO2)[ Tariff 2] -  x10",
+    "address": "ns=2;i=80",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumption cost ( $)[ Tariff 2] -  x10",
+    "address": "ns=2;i=81",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (kW)[ Tariff 2] -  kWh",
+    "address": "ns=2;i=82",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (W)[ Tariff 2] -  Wh",
+    "address": "ns=2;i=83",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (kvarhL)[ Tariff 2] - kvarh",
+    "address": "ns=2;i=84",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (varhL)[ Tariff 2] -  varh",
+    "address": "ns=2;i=85",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (kvarhC)[ Tariff 2] -  kvarh",
+    "address": "ns=2;i=86",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (varhC)[ Tariff 2] -  varh",
+    "address": "ns=2;i=87",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (kVAh)[ Tariff 2] -  kVAh",
+    "address": "ns=2;i=88",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (VAh)[ Tariff 2] -  Vah",
+    "address": "ns=2;i=89",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated CO2 emissions ( KgCO2)[ Tariff 2] -  x10",
+    "address": "ns=2;i=90",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generation Cost ($)[ Tariff 2] -  x10",
+    "address": "ns=2;i=91",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Hours per tariff [ Tariff 2]- sec",
+    "address": "ns=2;i=92",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy kW)[ Tariff 3] -  kWh",
+    "address": "ns=2;i=93",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy (W) [ Tariff 3]-  Wh",
+    "address": "ns=2;i=94",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (kvarhL) [ Tariff 3]-  kvarh",
+    "address": "ns=2;i=95",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (varhL)[ Tariff 3] -  varh",
+    "address": "ns=2;i=96",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (kvarhC)[ Tariff 3] -  kvarh",
+    "address": "ns=2;i=97",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (varhC)[ Tariff 3] -  varh",
+    "address": "ns=2;i=98",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (kVAh)[ Tariff 3] -  kVAh",
+    "address": "ns=2;i=99",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (VAh)[ Tariff 3] -  Vah",
+    "address": "ns=2;i=100",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed CO2 emissions (KgCO2)[ Tariff 3] -  x10",
+    "address": "ns=2;i=101",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumption cost ( $)[ Tariff 3] -  x10",
+    "address": "ns=2;i=102",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (kW)[ Tariff 3] -  kWh",
+    "address": "ns=2;i=103",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (W)[ Tariff 3] -  Wh",
+    "address": "ns=2;i=104",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (kvarhL)[ Tariff 3] - kvarh",
+    "address": "ns=2;i=105",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (varhL)[ Tariff 3] -  varh",
+    "address": "ns=2;i=106",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (kvarhC)[ Tariff 3] -  kvarh",
+    "address": "ns=2;i=107",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (varhC)[ Tariff 3] -  varh",
+    "address": "ns=2;i=108",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (kVAh)[ Tariff 3] -  kVAh",
+    "address": "ns=2;i=109",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (VAh)[ Tariff 3] -  Vah",
+    "address": "ns=2;i=110",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated CO2 emissions ( KgCO2)[ Tariff 3] -  x10",
+    "address": "ns=2;i=111",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generation Cost ($)[ Tariff 3] -  x10",
+    "address": "ns=2;i=112",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Hours per tariff [ Tariff 3]- sec",
+    "address": "ns=2;i=113",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy kW)[ Total] -  kWh",
+    "address": "ns=2;i=114",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed active energy (W) [  Total]-  Wh",
+    "address": "ns=2;i=115",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Sec3000_Lwrite_read",
+    "address": "ns=2;i=117",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Sec3000_Rwrite_read",
+    "address": "ns=2;i=118",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Inverter_Modbus_mode",
+    "address": "ns=2;i=119",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:time_pv",
+    "address": "ns=2;i=120",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (kvarhL) [  Total]-  kvarh",
+    "address": "ns=2;i=122",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed inductive reactive energy (varhL)[  Total] -  varh",
+    "address": "ns=2;i=123",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (kvarhC)[  Total] -  kvarh",
+    "address": "ns=2;i=124",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed capacitive reactive energy (varhC)[  Total] -  varh",
+    "address": "ns=2;i=125",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (kVAh)[  Total] -  kVAh",
+    "address": "ns=2;i=126",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed apparent energy (VAh)[  Total] -  Vah",
+    "address": "ns=2;i=127",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumed CO2 emissions (KgCO2)[  Total] -  x10",
+    "address": "ns=2;i=128",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Consumption cost ( $)[  Total] -  x10",
+    "address": "ns=2;i=129",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (kW)[  Total] -  kWh",
+    "address": "ns=2;i=130",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated active energy (W)[  Total] -  Wh",
+    "address": "ns=2;i=131",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (kvarhL)[  Total] - kvarh",
+    "address": "ns=2;i=132",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated inductive reactive energy (varhL)[  Total] -  varh",
+    "address": "ns=2;i=133",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (kvarhC)[  Total] -  kvarh",
+    "address": "ns=2;i=134",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated capacitive reactive energy (varhC)[  Total] -  varh",
+    "address": "ns=2;i=135",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (kVAh)[  Total] -  kVAh",
+    "address": "ns=2;i=136",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated apparent energy (VAh)[  Total] -  Vah",
+    "address": "ns=2;i=137",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generated CO2 emissions ( KgCO2)[  Total] -  x10",
+    "address": "ns=2;i=138",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Generation Cost ($)[  Total] -  x10",
+    "address": "ns=2;i=139",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Int64"
+  },
+  {
+    "name": "ns=2:Hours per tariff [  Total]- sec",
+    "address": "ns=2;i=140",
+    "initialValue": [
+      0,
+      0
+    ],
+    "dataType": "Read Error: Connection Break"
+  },
+  {
+    "name": "ns=2:L1 Phase voltage ( Maximum) - V x 10",
+    "address": "ns=2;i=141",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 Current ( Maximum) -  mA",
+    "address": "ns=2;i=142",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 Active Power ( Maximum) - W",
+    "address": "ns=2;i=143",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 Inductive Power ( Maximum) - var",
+    "address": "ns=2;i=144",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 Capacitive Power ( Maximum) - var",
+    "address": "ns=2;i=145",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 Apparent Power ( Maximum) -  VA",
+    "address": "ns=2;i=146",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 Power Factor ( Maximum) -  x 100",
+    "address": "ns=2;i=147",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Cos φ L1 ( Maximum) -  x 100",
+    "address": "ns=2;i=148",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 Phase voltage ( Maximum) - V x 10",
+    "address": "ns=2;i=149",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 Current ( Maximum) -  mA",
+    "address": "ns=2;i=150",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 Active Power ( Maximum) - W",
+    "address": "ns=2;i=151",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 Inductive Power ( Maximum) -  var",
+    "address": "ns=2;i=152",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 Capacitive Power ( Maximum) -  var",
+    "address": "ns=2;i=153",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 Apparent Power ( Maximum) -  VA",
+    "address": "ns=2;i=154",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 Power Factor ( Maximum) -  x 100",
+    "address": "ns=2;i=155",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Cos φ L2 ( Maximum) - x 100",
+    "address": "ns=2;i=156",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 Phase voltage ( Maximum) -  V x 10",
+    "address": "ns=2;i=157",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 Current ( Maximum) -  mA",
+    "address": "ns=2;i=158",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 Active Power ( Maximum) -  W",
+    "address": "ns=2;i=159",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 Inductive Power ( Maximum) - var",
+    "address": "ns=2;i=160",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 Capacitive Power ( Maximum) - var",
+    "address": "ns=2;i=161",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 Apparent Power ( Maximum) -  VA",
+    "address": "ns=2;i=162",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 Power Factor ( Maximum) -  x 100",
+    "address": "ns=2;i=163",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Cos φ L3 ( Maximum) -  x 100",
+    "address": "ns=2;i=164",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Active Three-phase Power ( Maximum) - W",
+    "address": "ns=2;i=165",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Inductive Three-phase power ( Maximum) - var",
+    "address": "ns=2;i=166",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Capacitive Three-phase Power ( Maximum) - var",
+    "address": "ns=2;i=167",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Apparent three-phase power ( Maximum) - VA",
+    "address": "ns=2;i=168",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Three-phase Power Factor ( Maximum) -  x100",
+    "address": "ns=2;i=169",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Three-phase Cos φ ( Maximum) - x100",
+    "address": "ns=2;i=170",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 Frequency ( Maximum) -  Hz x100",
+    "address": "ns=2;i=171",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1-L2 Voltage ( Maximum) - V x 10",
+    "address": "ns=2;i=172",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2-L3 Voltage ( Maximum) - V x 10",
+    "address": "ns=2;i=173",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3-L1 Voltage ( Maximum) - V x 10",
+    "address": "ns=2;i=174",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Neutral Current N ( Maximum) -  mA",
+    "address": "ns=2;i=175",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 voltage % THD ( Maximum) -  % x 100",
+    "address": "ns=2;i=176",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 voltage % THD ( Maximum) - % x 100",
+    "address": "ns=2;i=177",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 voltage % THD ( Maximum) - % x 100",
+    "address": "ns=2;i=178",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L1 current % THD ( Maximum) - % x 100",
+    "address": "ns=2;i=179",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L2 current % THD ( Maximum) - % x 100",
+    "address": "ns=2;i=180",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:L3 current % THD ( Maximum) - % x 100",
+    "address": "ns=2;i=181",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Maximum demand kW III ( Maximum) - W",
+    "address": "ns=2;i=182",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+  },
+  {
+    "name": "ns=2:Maximum demand kVA III ( Maximum) - VA",
+    "address": "ns=2;i=183",
+    "initialValue": "Read Error: Invalid Channel BadConnectionClosed",
+    "dataType": "Read Error: Invalid Channel BadConnectionClosed"
+>>>>>>> Stashed changes
   }
 ]
