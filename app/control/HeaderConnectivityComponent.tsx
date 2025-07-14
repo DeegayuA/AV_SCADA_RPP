@@ -1,58 +1,57 @@
-// app/control/HeaderComponent.tsx
 'use client';
-
 import React from 'react';
+import { UserRole } from '@/types/auth';
 import DashboardHeaderControl from './DashboardHeader';
-// Import the actual UI component you provided
-// import { VERSION } from '@/config/constants'; // No longer needed here, version will be passed as a prop
 
 interface HeaderComponentProps {
     plcStatus: 'online' | 'offline' | 'disconnected';
     isConnected: boolean;
-    connectWebSocket: () => void;
-    soundEnabled: boolean;
-    // CORRECTED TYPE: This must match what DashboardHeaderControl expects
-    setSoundEnabled: React.Dispatch<React.SetStateAction<boolean>>;
+    connectWebSocket: () => Promise<void>;
     currentTime: string;
     delay: number;
-    version: string; // Added: version is now a prop for DashboardHeaderControl
+    version: string;
     isEditMode: boolean;
-    setIsEditMode: (editMode: boolean) => void;
+    toggleEditMode: () => void;
     onOpenConfigurator: () => void;
     onRemoveAll: () => void;
     onResetToDefault: () => void;
+    currentUserRole?: UserRole;
+    onOpenWsConfigurator: () => void;
+    activeWsUrl: string;
 }
 
 const HeaderComponent: React.FC<HeaderComponentProps> = ({
     plcStatus,
     isConnected,
     connectWebSocket,
-    soundEnabled,
-    setSoundEnabled,
     currentTime,
     delay,
-    version, // Pass down version
+    version,
     isEditMode,
-    setIsEditMode,
+    toggleEditMode,
     onOpenConfigurator,
     onRemoveAll,
     onResetToDefault,
+    currentUserRole,
+    onOpenWsConfigurator,
+    activeWsUrl,
 }) => {
     return (
         <DashboardHeaderControl
             plcStatus={plcStatus}
             isConnected={isConnected}
             connectWebSocket={connectWebSocket}
-            soundEnabled={soundEnabled}
-            setSoundEnabled={setSoundEnabled}
             currentTime={currentTime}
             delay={delay}
-            version={version} // Pass the version prop
+            version={version}
             isEditMode={isEditMode}
-            setIsEditMode={setIsEditMode}
+            toggleEditMode={toggleEditMode}
             onOpenConfigurator={onOpenConfigurator}
             onRemoveAll={onRemoveAll}
             onResetToDefault={onResetToDefault}
+            currentUserRole={currentUserRole}
+            onOpenWsConfigurator={onOpenWsConfigurator}
+            activeWsUrl={activeWsUrl}
         />
     );
 };
