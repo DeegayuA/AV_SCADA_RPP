@@ -165,7 +165,7 @@ const unitToFactorMap: Record<PowerUnit, number> = { W: 1, kW: 1000, MW: 1000000
 const convertToWatts = (v: number, u?: string): number => { if (typeof v !== 'number' || !isFinite(v)) return 0; if (typeof u !== 'string' || !u.trim()) return v; const unitClean = u.trim().toUpperCase() as PowerUnit | string; const factor = unitToFactorMap[unitClean as PowerUnit]; return factor !== undefined ? v * factor : v; };
 const convertFromWatts = (v: number, targetUnit: PowerUnit): number => { if (typeof v !== 'number' || !isFinite(v)) return 0; return v / (unitToFactorMap[targetUnit] || 1);};
 
-const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
+const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     nodeValues, allPossibleDataPoints, generationDpIds, usageDpIds, exportDpIds,
     exportMode, timeScale, isLiveSourceAvailable = true, useDemoDataSource = false,
 }) => {
@@ -682,14 +682,14 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const dpsAreConfigured = generationDpIds.length > 0 && usageDpIds.length > 0;
 
     if (!effectiveUseDemoData && !dpsAreConfigured) {
-        return <div className="flex items-center justify-center h-[340px] text-muted-foreground p-4 text-center">Please configure Generation and Usage data points.</div>;
+        return <div className="flex items-center justify-center h-full text-muted-foreground p-4 text-center">Please configure Generation and Usage data points.</div>;
     }
     if (!isGraphReady && isCurrentlyDrawingLiveOrDemo && chartData.length === 0 && dataBufferRef.current.length === 0 && dpsAreConfigured) {
-        return <div className="flex flex-col items-center justify-center h-[340px] text-muted-foreground p-4 space-y-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span>Waiting for initial data...</span></div>;
+        return <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 space-y-2"><Loader2 className="h-8 w-8 animate-spin text-primary" /><span>Waiting for initial data...</span></div>;
     }
     if (isGraphReady && !isCurrentlyDrawingLiveOrDemo && chartData.length === 0 && dpsAreConfigured) {
         return (
-            <div className="flex flex-col items-center justify-center h-[340px] text-muted-foreground p-4 space-y-2">
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-4 space-y-2">
                 <AlertTriangleIcon className="h-8 w-8 text-amber-500" />
                 <span>No data available for this time period.</span>
                 <span>Try adjusting the time scale or navigating.</span>
@@ -801,7 +801,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.25, ease: "easeInOut" }}
-                    className="w-full h-[260px] sm:h-[280px]"
+                    className="w-full h-[280px] sm:h-[300px]"
                 >
                    {isGraphReady && dpsAreConfigured && (chartData.length > 0 || !isCurrentlyDrawingLiveOrDemo) ? (
                     <ChartContainer config={baseChartConfig} className="w-full h-full">

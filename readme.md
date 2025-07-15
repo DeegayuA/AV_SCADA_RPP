@@ -176,25 +176,45 @@ You can create a batch file to automate starting the Next.js server and launchin
 
 1.  **Create `start-next.bat`:** In the project's root directory, create a file named `start-next.bat`.
 2.  **Edit the Script:** Add commands similar to the example below (adjust paths and app ID as needed). *Note: The original script mentioned potential bug fixes; refer to the latest version in the repository if available.*
-    ```bat
-    @echo off
-    echo Starting AV Solar Local Control Panel...
-    cd /d "%~dp0"
-
-    REM Start the Next.js server in a new window
-    start "AV Solar Server" cmd /k "npm start"
-
-    echo Waiting for server to start...
-    timeout /t 5 /nobreak > nul
-
-    echo Launching PWA...
-    REM Replace YOUR_CHROME_APP_ID with the actual ID of your installed PWA
-    REM Find ID via chrome://apps -> Right-click app -> App Info
-    start "" "C:\Program Files\Google\Chrome\Application\chrome.exe" --profile-directory=Default --app-id=YOUR_CHROME_APP_ID
-
-    echo Done. The server window can be minimized.
-    exit
-    ```
+   ```bat
+      @echo off
+      setlocal
+      
+      REM === Step 0: Go to project folder ===
+      cd /d "C:\Users\User\Documents\GitHub\AV-Mini-Grid-Offline-Dashboard"
+      
+      REM === Step 1: Check if Next.js build exists ===
+      if not exist ".next" (
+          echo 🔧 No build found. Running next build...
+          call npm run build
+      ) else (
+          echo ✅ Build already exists.
+      )
+      
+      REM === Step 2: Start the Next.js server ===
+      echo 🚀 Starting the Next.js server...
+      start "Next.js Server" cmd /c "npm run start"
+      
+      REM === Step 3: Wait a moment for server to start ===
+      timeout /t 5 /nobreak > nul
+      
+      REM === Step 4: Launch Microsoft Edge in kiosk mode ===
+      echo 🖥️ Launching Microsoft Edge in kiosk mode...
+      start "" "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --kiosk http://localhost:3000 --edge-kiosk-type=fullscreen --no-first-run
+      
+      REM === Step 5: Monitor and restart Edge if it crashes ===
+      :monitor
+      timeout /t 60 /nobreak > nul
+      tasklist /fi "imagename eq msedge.exe" 2>NUL | find /i "msedge.exe" >NUL
+      if errorlevel 1 (
+          echo ⚠️ Microsoft Edge has crashed. Restarting...
+          start "" "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --kiosk http://localhost:3000 --edge-kiosk-type=fullscreen --no-first-run
+      )
+      goto monitor
+      
+      endlocal
+      
+   ```
     *   `%~dp0`: Ensures the script runs relative to its location.
     *   `timeout /t 5`: Waits 5 seconds for the server to potentially start. Adjust if needed.
     *   `YOUR_CHROME_APP_ID`: Replace this with the actual ID of the PWA you installed in Chrome (find it via `chrome://apps`).

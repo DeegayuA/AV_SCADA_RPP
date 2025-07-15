@@ -49,3 +49,4 @@ next-env.d.ts
 config/constants.ts
 config/dataPoints.ts
 config/desiredDataPointsConfig.ts
+config/constants.ts

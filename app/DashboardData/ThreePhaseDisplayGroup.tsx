@@ -8,8 +8,8 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ThreePhaseGroupInfo, NodeData } from './dashboardInterfaces';
-import { DataPoint } from '@/config/dataPoints'; // Make sure DataPoint is exported
-import { HelpCircle, Sigma, TrendingUp } from 'lucide-react'; // Sigma for Total/Average
+import { DataPoint } from '@/config/dataPoints';
+import { HelpCircle, Sigma, TrendingUp } from 'lucide-react';
 import ValueDisplayContent from './ValueDisplayContent';
 
 interface ThreePhaseDisplayGroupProps {
@@ -29,16 +29,15 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
 
         const calculationType = useMemo(() => {
             const unit = group.unit?.trim().toLowerCase() || '';
-if (
-    ['w', 'watt', 'watts', 'kw', 'kilowatt', 'kilowatts', 'kwh', 'kilowatt-hour', 'kilowatt-hours',
-     'wh', 'watt-hour', 'watt-hours', 'ah', 'va', 'kva', 'units'].includes(unit)
-) {
-           return 'sum';
+            if (
+                ['w', 'watt', 'watts', 'kw', 'kilowatt', 'kilowatts', 'kwh', 'kilowatt-hour', 'kilowatt-hours',
+                 'wh', 'watt-hour', 'watt-hours', 'ah', 'va', 'kva', 'units'].includes(unit)
+            ) {
+                return 'sum';
             }
             return 'average';
         }, [group.unit]);
 
-        // Calculate aggregated Value (Sum or Average)
         const aggregatedValueData = useMemo(() => {
             let sum = 0;
             let validPhasesCount = 0;
@@ -70,27 +69,31 @@ if (
             const firstPhasePoint = group.points.a || group.points.b || group.points.c;
             const label = calculationType === 'sum' ? 'Total' : 'Average';
             
-            let configuredDecimalPlaces = firstPhasePoint?.decimalPlaces;
-            if (calculationType === 'average') {
-                // For average, ensure at least some decimal places if original is 0 or undefined
-                if (configuredDecimalPlaces === undefined || configuredDecimalPlaces < 1) {
-                    configuredDecimalPlaces = 2; 
+            const sourceDP = firstPhasePoint?.decimalPlaces;
+            let effectiveDecimalPlaces: number;
+
+            if (calculationType === 'sum') {
+                if (sourceDP === undefined || sourceDP === null || sourceDP < 0) {
+                    effectiveDecimalPlaces = 2; // Default for sum if source DP is not well-defined
                 } else {
-                    // Optionally add one more decimal place for average if original is already defined
-                    configuredDecimalPlaces = configuredDecimalPlaces + 1;
+                    effectiveDecimalPlaces = Math.min(sourceDP, 2); // Use source DP, capped at 2
                 }
+            } else { // 'average'
+                // Averages generally look best with 2 DPs to capture fractional results,
+                // e.g., (1+2)/2 = 1.5, displayed as 1.50
+                effectiveDecimalPlaces = 2;
             }
 
             return {
-                id: `${group.groupKey}-${calculationType}`, // Unique ID
-                nodeId: `${group.groupKey}-${calculationType}-value`, // Unique Node ID for nodeValues map key
+                id: `${group.groupKey}-${calculationType}`,
+                nodeId: `${group.groupKey}-${calculationType}-value`,
                 name: label,
-                label: label, // Used by ValueDisplayContent if it had label logic
+                label: label,
                 dataType: firstPhasePoint?.dataType || 'Float',
-                unit: group.unit || firstPhasePoint?.unit || '', // Preserve original unit
-                factor: 1, // Value is pre-calculated
+                unit: group.unit || firstPhasePoint?.unit || '',
+                factor: 1, // Aggregated value is already factored
                 uiType: 'display',
-                decimalPlaces: configuredDecimalPlaces,
+                decimalPlaces: effectiveDecimalPlaces,
                 icon: calculationType === 'sum' ? Sigma : TrendingUp,
                 category: 'three-phase',
             };
@@ -112,7 +115,6 @@ if (
                                 </CardHeader>
                                 <CardContent className="p-3 text-sm">
                                     <div className="grid grid-cols-4 gap-x-2 gap-y-2 items-stretch">
-                                        {/* Phase and Total/Average Headers */}
                                         {(['a', 'b', 'c', 'summary'] as const).map(colType => (
                                             <div
                                                 key={`head-${group.groupKey}-${colType}`}
@@ -135,42 +137,60 @@ if (
                                             </div>
                                         ))}
 
-                                        {/* Phase Values */}
                                         {(['a', 'b', 'c'] as const).map((phase) => {
                                             const point = group.points[phase];
-                                            return (
-                                                <div key={`${group.groupKey}-${phase}`} className="text-center pt-1.5 min-h-[36px] flex flex-col items-center justify-center">
-                                                    {point ? (
+                                            if (point && point.nodeId) {
+                                                const rawValue = nodeValues[point.nodeId];
+                                                const displayValue = 
+                                                    (typeof rawValue === 'number' && !isNaN(rawValue))
+                                                        ? rawValue * (point.factor ?? 1)
+                                                        : rawValue;
+                                                
+                                                let dpForPhase: number;
+                                                const sourcePhaseDP = point.decimalPlaces;
+                                                if (sourcePhaseDP === undefined || sourcePhaseDP === null || sourcePhaseDP < 0) {
+                                                    dpForPhase = 2; // Default for individual phase if not well-defined
+                                                } else {
+                                                    dpForPhase = Math.min(sourcePhaseDP, 2); // Use source DP, capped at 2
+                                                }
+
+                                                const itemForDisplay: DataPoint = { 
+                                                    ...point, 
+                                                    decimalPlaces: dpForPhase 
+                                                };
+                                                
+                                                return (
+                                                    <div key={`${group.groupKey}-${phase}`} className="text-center pt-1.5 min-h-[36px] flex flex-col items-center justify-center">
                                                         <ValueDisplayContent
-                                                            item={point}
-                                                            nodeValues={nodeValues}
+                                                            item={itemForDisplay}
+                                                            nodeValues={{ [point.nodeId]: displayValue }}
                                                             isDisabled={isDisabled}
                                                             sendDataToWebSocket={sendDataToWebSocket}
                                                             playNotificationSound={playNotificationSound}
                                                             lastToastTimestamps={lastToastTimestamps}
                                                             isEditMode={isEditMode}
                                                         />
-                                                    ) : (
+                                                    </div>
+                                                );
+                                            } else {
+                                                return (
+                                                    <div key={`${group.groupKey}-${phase}`} className="text-center pt-1.5 min-h-[36px] flex flex-col items-center justify-center">
                                                         <span className="text-neutral-400 dark:text-neutral-600 text-lg">-</span>
-                                                    )}
-                                                </div>
-                                            );
+                                                    </div>
+                                                );
+                                            }
                                         })}
 
-                                        {/* Total/Average Value Column */}
                                         <div key={`${group.groupKey}-summary-value`} className="text-center pt-1.5 min-h-[36px] flex flex-col items-center justify-center font-semibold bg-neutral-100/80 dark:bg-neutral-800/60 rounded-lg">
                                             {aggregatedValueData.value !== undefined ? (
                                                 <ValueDisplayContent
                                                     item={totalOrAverageItemConfig}
-                                                    // Pass the pre-calculated value by adding it to a temporary nodeValues map
-                                                    // using the unique nodeId from totalOrAverageItemConfig
                                                     nodeValues={{ [totalOrAverageItemConfig.nodeId]: aggregatedValueData.value }}
                                                     isDisabled={isDisabled}
-                                                    // These props are likely not applicable for a calculated display-only value
                                                     sendDataToWebSocket={sendDataToWebSocket} 
                                                     playNotificationSound={playNotificationSound}
                                                     lastToastTimestamps={lastToastTimestamps}
-                                                    isEditMode={false} // Calculated value is not directly editable
+                                                    isEditMode={false}
                                                 />
                                             ) : (
                                                 <span className="text-neutral-400 dark:text-neutral-600 text-lg">-</span>

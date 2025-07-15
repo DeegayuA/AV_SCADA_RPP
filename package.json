@@ -4,9 +4,9 @@
   "private": true,
   "main": "electron-main.js",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev --hostname 0.0.0.0",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "docs": "typedoc",
     "export": "next build && next export",
@@ -128,8 +128,8 @@
   "description": "Offline Dashboard for Solar Mini Grid Management",
   "author": "Deeghayu Adhikari",
   "build": {
-    "appId": "com.example.solardashboard",
-    "productName": "Solar Dashboard",
+    "appId": "com.deegayu.avdashboard",
+    "productName": "AV R&D",
     "directories": {
       "output": "dist_electron"
     },
@@ -137,7 +137,9 @@
       "electron-main.js",
       "package.json",
       ".next/**",
-      "public/**"
+      "public/**",
+      "!**/*.md",
+      "!**/*.map"
     ],
     "asarUnpack": [
       "**/node_modules/next/**"

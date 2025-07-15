@@ -1,19 +1,18 @@
-// app/control/page.tsx (or control_dash.tsx)
+// app/control/control_dash.tsx (or whatever your filename is)
 'use client';
-import React, { useEffect, useState, useCallback, useRef, useMemo, Dispatch, SetStateAction } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { motion, Variants, TargetAndTransition } from 'framer-motion';
-import { cn } from "@/lib/utils";
-import { Orbit } from 'lucide-react';
+import { cn, playNotificationSound } from "@/lib/utils";
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
-import { 
-    Settings, PlusCircle, Clock, Trash2, RotateCcw, Power, AlertTriangle, Check, 
-    ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList 
+import {
+  Settings, Clock, Trash2, RotateCcw, AlertTriangle, Check,
+  ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ensureAppConfigIsSaved, initDB, updateDataPoint, queueControlAction, getControlQueue, clearControlQueue } from '@/lib/db'; 
+import { ensureAppConfigIsSaved, initDB, queueControlAction, getControlQueue, clearControlQueue } from '@/lib/db';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   AlertDialog,
@@ -22,60 +21,69 @@ import {
   AlertDialogContent,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogHeader as AlertDialogHeaderComponent, // Alias to avoid name clash
-  AlertDialogTitle as AlertDialogTitleComponent, // Alias
+  AlertDialogHeader as AlertDialogHeaderComponent,
+  AlertDialogTitle as AlertDialogTitleComponent,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
-  DialogHeader as DialogHeaderComponentInternal, // Alias
-  DialogTitle as DialogTitleComponentInternal, // Alias
+  DialogDescription,
+  DialogFooter,
+  DialogHeader as DialogHeaderComponentInternal,
+  DialogTitle as DialogTitleComponentInternal,
   DialogClose,
   DialogTrigger,
-} from "@/components/ui/dialog"; 
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import {
-    Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select"; 
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { dataPoints as allPossibleDataPointsConfig, DataPoint } from '@/config/dataPoints';
-import { WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX } from '@/config/constants'; // Added LOCAL_STORAGE_KEY_PREFIX
+import { WS_URL as FALLBACK_WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX } from '@/config/constants';
 import { containerVariants, itemVariants } from '@/config/animationVariants';
-// playSound (the base one) is still used by playNotificationSound in lib/utils, but control_dash won't call it directly for notifications.
-// Specific sound functions like playSuccessSound might be used if needed, or the new playNotificationSound.
-import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound, playNotificationSound } from '@/lib/utils';
-import { NodeData, ThreePhaseGroupInfo } from '@/app/DashboardData/dashboardInterfaces'; // ADJUST PATH
-import { groupDataPoints } from '@/app/DashboardData/groupDataPoints'; // ADJUST PATH
-import DashboardItemConfigurator, { ConfiguratorThreePhaseGroup } from '@/components/DashboardItemConfigurator'; // ADJUST PATH
-import PlcConnectionStatus from '@/app/DashboardData/PlcConnectionStatus'; // ADJUST PATH
-import WebSocketStatus from '@/app/DashboardData/WebSocketStatus'; // ADJUST PATH
-import SoundToggle from '@/app/DashboardData/SoundToggle'; // ADJUST PATH
-import ThemeToggle from '@/app/DashboardData/ThemeToggle'; // ADJUST PATH
-import DashboardSection from '@/app/DashboardData/DashboardSection'; // ADJUST PATH
-import { UserRole } from '@/types/auth'; // ADJUST PATH
-import SLDWidget from "@/app/circuit/sld/SLDWidget"; // ADJUST PATH
-import { SLDLayout } from '@/types/sld'; // Added SLDLayout
-import { useDynamicDefaultDataPointIds } from '@/app/utils/defaultDataPoints'; // ADJUST PATH
-import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph'; 
+import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound } from '@/lib/utils';
+import { NodeData, ThreePhaseGroupInfo } from '@/app/DashboardData/dashboardInterfaces';
+import { groupDataPoints } from '@/app/DashboardData/groupDataPoints';
+import DashboardItemConfigurator, { ConfiguratorThreePhaseGroup } from '@/components/DashboardItemConfigurator';
+import PlcConnectionStatus from '@/app/DashboardData/PlcConnectionStatus';
+import WebSocketStatus from '@/app/DashboardData/WebSocketStatus';
+import SoundToggle from '@/app/DashboardData/SoundToggle';
+import ThemeToggle from '@/app/DashboardData/ThemeToggle';
+import DashboardSection from '@/app/DashboardData/DashboardSection';
+import { UserRole } from '@/types/auth';
+import SLDWidget from "@/app/circuit/sld/SLDWidget";
+import { SLDLayout } from '@/types/sld';
+import { useDynamicDefaultDataPointIds } from '@/app/utils/defaultDataPoints';
+import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph';
 import PowerTimelineGraphConfigurator from './PowerTimelineGraphConfigurator';
-import { useAppStore, useCurrentUser, useIsEditMode } from '@/stores/appStore';
+import { useAppStore, useCurrentUser } from '@/stores/appStore';
 import { logActivity } from '@/lib/activityLog';
+import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
 
 interface DashboardHeaderControlProps {
-  plcStatus: "online" | "offline" | "disconnected"; isConnected: boolean; connectWebSocket: () => void;
-  currentTime: string; delay: number;
-  version: string; onOpenConfigurator: () => void;
+  plcStatus: "online" | "offline" | "disconnected";
+  isConnected: boolean;
+  connectWebSocket: () => void;
+  onClickWsStatus: () => void;
+  currentTime: string;
+  delay: number;
+  version: string;
+  onOpenConfigurator: () => void;
   isEditMode: boolean;
   toggleEditMode: () => void;
   currentUserRole?: UserRole;
-  onRemoveAll: () => void; onResetToDefault: () => void;
+  onRemoveAll: () => void;
+  onResetToDefault: () => void;
+  wsAddress?: string;
 }
 
 const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, currentTime, delay,
-    version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault,
+    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
+    version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault, wsAddress
   }) => {
-    const router = useRouter(); 
+    const router = useRouter();
     const currentPathname = usePathname();
     const headerTitle = currentPathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Dashboard';
     const isAdmin = currentUserRole === UserRole.ADMIN;
@@ -97,10 +105,11 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
             <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
-            <motion.div variants={itemVariants}><WebSocketStatus isConnected={isConnected} connectFn={connectWebSocket} /></motion.div>
+            <motion.div variants={itemVariants}>
+              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} />
+            </motion.div>
             <motion.div variants={itemVariants}><SoundToggle /></motion.div>
             <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
-
             {isAdmin && isEditMode && (
               <>
                 <motion.div variants={itemVariants}>
@@ -235,8 +244,8 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                        : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                          : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
+                      : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
+                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
                     }>
                       {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
                     </span>
@@ -245,9 +254,9 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
                 </Tooltip>
               </TooltipProvider>
             ) : (
-              <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground" onClick={connectWebSocket} title="Attempt manual WebSocket reconnection">
-                <Power className="mr-1 h-3 w-3" /> Reconnect
-              </Button>
+                <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
+                    (reconnect)
+                </Button>
             )}
           </div>
           <span className='font-mono'>{version || '?.?.?'}</span>
@@ -255,7 +264,6 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
       </>
     );
   });
-
 interface HeaderConnectivityComponentProps extends DashboardHeaderControlProps { }
 const HeaderConnectivityComponent: React.FC<HeaderConnectivityComponentProps> = (props) => {
   return <DashboardHeaderControl {...props} />;
@@ -290,8 +298,9 @@ const RenderingComponent: React.FC<RenderingComponentProps> = ({ sections, isEdi
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const DEFAULT_SLD_LAYOUT_ID_KEY = `userSldLayoutId_${PLANT_NAME.replace(/\s+/g, '_')}`;
+const CUSTOM_WEBSOCKET_URL_KEY = `customWebSocketUrl_${PLANT_NAME.replace(/\s+/g, '_')}`;
 
-const PAGE_SLUG = 'control_dashboard'; 
+const PAGE_SLUG = 'control_dashboard';
 const GRAPH_CONFIG_KEY_PREFIX = `powerGraphConfig_${PLANT_NAME.replace(/\s+/g, '_')}_${PAGE_SLUG}`;
 const GRAPH_GEN_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_generationDpIds`;
 const GRAPH_USAGE_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_usageDpIds`;
@@ -300,27 +309,23 @@ const GRAPH_EXPORT_MODE_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_exportMode`;
 const GRAPH_DEMO_MODE_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_demoMode`;
 const GRAPH_TIMESCALESETTING_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_timeScaleSetting`;
 
+const WEATHER_CARD_CONFIG_LS_KEY = `weatherCardConfig_${PLANT_NAME.replace(/\s+/g, '_') || 'defaultPlant'}`;
+
 const DEFAULT_DISPLAY_COUNT = 6;
 const CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD = 4;
 const OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD = 4;
 
 const UnifiedDashboardPage: React.FC = () => {
-  // --- Start of React Hooks Declarations ---
-
-  // Hooks from next/navigation and next-themes
   const router = useRouter();
   const currentPath = usePathname();
   const { resolvedTheme } = useTheme();
-
-  // Hooks from Zustand store (useAppStore)
   const currentUser = useCurrentUser();
   const { isEditMode: isGlobalEditMode, toggleEditMode: toggleEditModeAction } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     toggleEditMode: state.toggleEditMode,
   }));
-  const currentUserRole = currentUser?.role; // Derived from currentUser, can be defined after currentUser hook
+  const currentUserRole = currentUser?.role;
 
-  // useState hooks
   const [authCheckComplete, setAuthCheckComplete] = useState(false);
   const [nodeValues, setNodeValues] = useState<NodeData>({});
   const [isConnected, setIsConnected] = useState(false);
@@ -328,38 +333,31 @@ const UnifiedDashboardPage: React.FC = () => {
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
+  const [webSocketUrl, setWebSocketUrl] = useState<string>('');
+  const [isWsConfigModalOpen, setIsWsConfigModalOpen] = useState(false);
+  const [tempWsUrl, setTempWsUrl] = useState<string>('');
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
   const [isSldModalOpen, setIsSldModalOpen] = useState(false);
   const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
   const [isSldConfigOpen, setIsSldConfigOpen] = useState(false);
   const [availableSldLayoutsForPage, setAvailableSldLayoutsForPage] = useState<{ id: string; name: string }[]>([]);
-  const [sldLayoutId, setSldLayoutId] = useState<string>(() => {
-    // Initial value will be set in useEffect after availableSldLayoutsForPage is populated
-    return AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant';
-  });
+  const [sldLayoutId, setSldLayoutId] = useState<string>(AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant');
   const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
-  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>(() => {
-    if (typeof window !== 'undefined') {
-      const sT = localStorage.getItem(GRAPH_TIMESCALESETTING_KEY);
-      if (sT && ['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'].includes(sT)) return sT as TimeScale;
-    }
-    return '1m';
-  });
+  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>('1m');
   const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
   const [powerGraphGenerationDpIds, setPowerGraphGenerationDpIds] = useState<string[]>([]);
   const [powerGraphUsageDpIds, setPowerGraphUsageDpIds] = useState<string[]>([]);
   const [powerGraphExportDpIds, setPowerGraphExportDpIds] = useState<string[]>([]);
   const [powerGraphExportMode, setPowerGraphExportMode] = useState<'auto' | 'manual'>('auto');
-  const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false); // Note: UI for this was commented out
+  const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false);
+  const [weatherCardConfig, setWeatherCardConfig] = useState<WeatherCardConfig | null>(null);
 
-  // useRef hooks
   const ws = useRef<WebSocket | null>(null);
   const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 10; // This is a constant, but related to reconnectAttempts ref
+  const maxReconnectAttempts = 10;
   const lastToastTimestamps = useRef<Record<string, number>>({});
 
-  // useMemo hooks
   const allPossibleDataPoints = useMemo(() => allPossibleDataPointsConfig, []);
   const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
   const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
@@ -380,231 +378,119 @@ const UnifiedDashboardPage: React.FC = () => {
   const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => {
     const g: Record<string, ConfiguratorThreePhaseGroup> = {}, i: DataPoint[] = []; const cS = new Set(displayedDataPointIds); allPossibleDataPoints.forEach(dp => { if (dp.threePhaseGroup && dp.phase && ['a', 'b', 'c', 'x', 'total'].includes(dp.phase)) { if (!g[dp.threePhaseGroup]) { let rN = dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig, '').trim().replace(/ \([ABCX]\)$/i, '').trim(); g[dp.threePhaseGroup] = { name: dp.threePhaseGroup, representativeName: rN || dp.threePhaseGroup, ids: [], category: dp.category || 'miscellaneous' }; } g[dp.threePhaseGroup].ids.push(dp.id); } else if (!dp.threePhaseGroup) { i.push(dp); } }); const aGA = Array.from(new Set(Object.values(g).flatMap(grp => grp.ids))); const tIP = i.filter(ind => !aGA.includes(ind.id)); const cDA = Array.from(cS); return { threePhaseGroupsForConfig: Object.values(g).filter(grp => grp.ids.some(id => !cDA.includes(id))).sort((a, b) => a.representativeName.localeCompare(b.representativeName)), individualPointsForConfig: tIP.filter(dp => !cDA.includes(dp.id)).sort((a, b) => a.name.localeCompare(b.name)) };
   }, [allPossibleDataPoints, displayedDataPointIds]);
-
-  // useCallback hooks
   const getHardcodedDefaultDataPointIds = useCallback(() => {
-    const cIds = [
-      'grid-total-active-power-side-to-side', 'inverter-output-total-power', 'load-total-power',
-      'battery-capacity', 'battery-output-power', 'input-power-pv1',
-      'active-power-adjust', 'pf-reactive-power-adjust', 'export-power-percentage'
-    ].filter(id => allPossibleDataPoints.some(dp => dp.id === id));
-    if (cIds.length > 0) return cIds;
-    return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
+    const cIds = ['grid-total-active-power-side-to-side', 'inverter-output-total-power', 'load-total-power', 'battery-capacity', 'battery-output-power', 'input-power-pv1', 'active-power-adjust', 'pf-reactive-power-adjust', 'export-power-percentage'].filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (cIds.length > 0) return cIds; return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
   }, [allPossibleDataPoints]);
-
   const getSmartDefaults = useDynamicDefaultDataPointIds(allPossibleDataPoints);
-
   const processControlActionQueue = useCallback(async () => {
-    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) { return; }
-    const qA = await getControlQueue(); if (qA.length === 0) return;
-    console.log(`Processing ${qA.length} actions...`); toast.info("Processing Queued Actions", { description: `Found ${qA.length} pending command(s).` });
-    let allOk = true; for (const a of qA) { try { ws.current.send(JSON.stringify({ [a.nodeId]: a.value })); } catch (e) { allOk = false; console.error(`Fail queue ${a.nodeId}:`, e); toast.error("Queue Fail", { description: `Cmd ${a.nodeId || '??'} fail.` }); } }
-    await clearControlQueue(); if (allOk) toast.success("Queue OK", { description: "All sent." }); else toast.warning("Queue Incomplete");
-  }, []); // ws is a ref, so not typically in dep array unless its .current assignment changes its identity
-
-  const connectWebSocket = useCallback(async () => {
-    if (!authCheckComplete) return;
-    const f1 = 'opcuaRedirected', f2 = 'reloadingDueToDelay', f3 = 'redirectingDueToExtremeDelay';
+    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) { return; } const qA = await getControlQueue(); if (qA.length === 0) return; console.log(`Processing ${qA.length} actions...`); toast.info("Processing Queued Actions", { description: `Found ${qA.length} pending command(s).` }); let allOk = true; for (const a of qA) { try { ws.current.send(JSON.stringify({ [a.nodeId]: a.value })); } catch (e) { allOk = false; console.error(`Fail queue ${a.nodeId}:`, e); toast.error("Queue Fail", { description: `Cmd ${a.nodeId || '??'} fail.` }); } } await clearControlQueue(); if (allOk) toast.success("Queue OK", { description: "All sent." }); else toast.warning("Queue Incomplete");
+  }, []);
+  const connectWebSocket = useCallback(async (urlOverride?: string) => {
+    const targetUrl = urlOverride || webSocketUrl;
+    if (!authCheckComplete || !targetUrl) return;
     if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
-    if (typeof window !== 'undefined' && (sessionStorage.getItem(f1) || sessionStorage.getItem(f2) || sessionStorage.getItem(f3))) return;
-
-    setIsConnected(false);
-    const delayMs = Math.min(1000 + 2000 * Math.pow(1.5, reconnectAttempts.current), 30000);
+    setIsConnected(false); const delayMs = Math.min(1000 + 2000 * Math.pow(1.5, reconnectAttempts.current), 30000);
     if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
-
-    reconnectInterval.current = setTimeout(async () => {
-      if (typeof window === 'undefined') return;
-      try {
-        const response = await fetch('/api/opcua');
-        if (!response.ok) console.warn(`/api/opcua endpoint returned an error: ${response.status}. Proceeding with WebSocket connection attempt anyway.`);
-      } catch (error) { console.error("Error fetching /api/opcua:", error, "Proceeding with WebSocket connection attempt anyway."); }
-      
-      ws.current = new WebSocket(WS_URL);
-      ws.current.onopen = () => {
-        setIsConnected(true); setLastUpdateTime(Date.now()); reconnectAttempts.current = 0;
-        if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
-        toast.success('WS Connected', { id: 'ws-conn', description: 'Backend connected.', duration: 3000 });
-        playSuccessSound();
-        if (typeof window !== 'undefined') { [f1, f2, f3].forEach(f => sessionStorage.removeItem(f)); }
-        processControlActionQueue();
-      };
-      ws.current.onmessage = (e) => {
-        try { const d = JSON.parse(e.data as string); if (typeof d === 'object' && d !== null) { setNodeValues(p => ({ ...p, ...d })); setLastUpdateTime(Date.now()); } else console.warn("WS:non-obj", d); }
-        catch (err) { console.error("WS parse err", err, e.data); playErrorSound(); }
-      };
-      ws.current.onerror = (ev) => {
-        console.error("WS Err on", (ev.target as WebSocket)?.url, ev); setIsConnected(false);
-        fetch('/api/opcua').catch(err => console.error('Failed to ping /api/opcua after WS error:', err));
-        if (reconnectAttempts.current >= maxReconnectAttempts - 1) toast.error('WS Critical', { description: 'Connection failed after retries.' });
-      };
-      ws.current.onclose = (ev) => {
-        setIsConnected(false);
-        if (ev.code === 1000 || ev.code === 1001 || ev.code === 1005 || ev.code === 1006 || (typeof window !== 'undefined' && (sessionStorage.getItem(f1) || sessionStorage.getItem(f2) || sessionStorage.getItem(f3)))) {
-          reconnectAttempts.current = maxReconnectAttempts + 1; return;
-        }
-        if (reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); }
-        else { toast.error('WS Fail', { description: 'Max reconnects.' }); playErrorSound(); }
-      };
+    console.log(`Attempting to connect to WebSocket at: ${targetUrl}`); toast.info('Connecting...', { id: 'ws-conn', description: `Attempting connection to backend...` });
+    reconnectInterval.current = setTimeout(() => {
+      if (typeof window === 'undefined' || !targetUrl) return;
+      try { ws.current = new WebSocket(targetUrl); } catch (e: any) { console.error("WebSocket instantiation error:", e.message); toast.error('Connection Failed', { id: 'ws-conn', description: 'Invalid WebSocket URL format.', duration: 5000 }); if (reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); } return; }
+      ws.current.onopen = () => { setIsConnected(true); setLastUpdateTime(Date.now()); reconnectAttempts.current = 0; if (reconnectInterval.current) clearTimeout(reconnectInterval.current); toast.success('WS Connected', { id: 'ws-conn', description: 'Real-time link established.', duration: 3000 }); playSuccessSound(); processControlActionQueue(); };
+      ws.current.onmessage = (e) => { try { const d = JSON.parse(e.data as string); if (typeof d === 'object' && d !== null) { setNodeValues(p => ({ ...p, ...d })); setLastUpdateTime(Date.now()); } else console.warn("WS:non-obj", d); } catch (err) { console.error("WS parse err", err, e.data); playErrorSound(); } };
+      ws.current.onerror = (ev) => { console.error("WebSocket connection error:", ev); setIsConnected(false); if (reconnectAttempts.current === 0) { toast.error('Connection Error', { id: 'ws-conn', description: 'Could not connect to the backend server.', duration: 5000 }); } };
+      ws.current.onclose = (ev) => { setIsConnected(false); if (ev.code !== 1000 && ev.code !== 1001 && reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); } else if (reconnectAttempts.current >= maxReconnectAttempts) { toast.error('Connection Failed', { id: 'ws-conn-final', description: 'Max reconnects reached. Please check the URL or server status.', duration: 10000 }); playErrorSound(); } };
     }, delayMs);
-  }, [authCheckComplete, processControlActionQueue, WS_URL, maxReconnectAttempts]);
-
+  }, [authCheckComplete, processControlActionQueue, webSocketUrl, maxReconnectAttempts]);
   const sendDataToWebSocket = useCallback(async (nodeId: string, value: boolean | number | string) => {
-    if (currentUserRole === UserRole.VIEWER) { toast.warning("Restricted Action", { description: "Viewers cannot send commands." }); playWarningSound(); return; }
-    const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId);
-    let processedValue: any = value; let queueValue: any = undefined;
+    if (currentUserRole === UserRole.VIEWER) { toast.warning("Restricted Action", { description: "Viewers cannot send commands." }); playWarningSound(); return; } const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId); let processedValue: any = value; let queueValue: any = undefined;
     if (pointConfig?.dataType.includes('Int')) { let pN: number; if (typeof value === 'boolean') pN = value ? 1 : 0; else if (typeof value === 'string') pN = parseInt(value, 10); else pN = value as number; if (isNaN(pN)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; } processedValue = pN; queueValue = pN; }
     else if (pointConfig?.dataType === 'Boolean') { let pB: boolean; if (typeof value === 'number') pB = value !== 0; else if (typeof value === 'string') pB = value.toLowerCase() === 'true' || value === '1'; else pB = value as boolean; processedValue = pB; queueValue = pB; }
     else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') { let pF: number; if (typeof value === 'string') pF = parseFloat(value); else pF = value as number; if (isNaN(pF)) { toast.error('Send Error', { description: 'Invalid numeric value.' }); return; } processedValue = pF; queueValue = pF; }
     if (typeof processedValue === 'number' && !isFinite(processedValue)) { toast.error('Send Error', { description: 'Numeric value is not finite (Infinity or NaN).' }); playErrorSound(); return; }
     logActivity('DATA_POINT_CHANGE', { nodeId: nodeId, newValue: processedValue, dataPointName: pointConfig?.name || 'Unknown DataPoint', dataType: pointConfig?.dataType || 'Unknown Type' }, currentPath);
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      try { const payload = JSON.stringify({ [nodeId]: processedValue }); ws.current.send(payload); toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` }); playInfoSound(); }
-      catch (error) { console.error("WebSocket send error:", error); toast.error('Send Error', { description: 'Failed to send command. Queuing.' }); playErrorSound(); if (queueValue !== undefined) await queueControlAction(nodeId, queueValue); else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` }); }
+      try { const payload = JSON.stringify({ [nodeId]: processedValue }); ws.current.send(payload); toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` }); playInfoSound(); } catch (error) { console.error("WebSocket send error:", error); toast.error('Send Error', { description: 'Failed to send command. Queuing.' }); playErrorSound(); if (queueValue !== undefined) await queueControlAction(nodeId, queueValue); else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` }); }
     } else {
       toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` }); playWarningSound(); if (queueValue !== undefined) await queueControlAction(nodeId, queueValue); else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
-      if (!isConnected && authCheckComplete) connectWebSocket();
+      if (!isConnected && authCheckComplete && webSocketUrl) connectWebSocket();
     }
-  }, [currentUserRole, allPossibleDataPoints, ws, isConnected, authCheckComplete, connectWebSocket, currentPath, playInfoSound, playErrorSound, playWarningSound, queueControlAction]);
-
+  }, [currentUserRole, allPossibleDataPoints, isConnected, authCheckComplete, connectWebSocket, currentPath, webSocketUrl]);
   const checkPlcConnection = useCallback(async () => {
     if (!authCheckComplete) return; try { const r = await fetch('/api/opcua/status'); if (!r.ok) throw new Error(`API Err:${r.status}`); const d = await r.json(); const nS = d.connectionStatus; if (nS && ['online', 'offline', 'disconnected'].includes(nS)) setPlcStatus(nS); else { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (e) { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); }
   }, [plcStatus, authCheckComplete]);
-
-  const handleResetToDefault = useCallback(() => {
-    if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath);
-  }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
-
-  const handleRemoveAllItems = useCallback(() => {
-    if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath);
-  }, [currentUserRole, displayedDataPointIds, currentPath]);
-
+  const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
+  const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath); }, [currentUserRole, displayedDataPointIds, currentPath]);
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
     if (currentUserRole !== UserRole.ADMIN) return; const currentDisplayedSet = new Set(displayedDataPointIds); const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
     if (newIdsToAdd.length === 0 && selectedIds.length > 0) { toast.warning("Items already shown or none selected to add."); setIsConfiguratorOpen(false); return; }
     if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new DP${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath); }
     setIsConfiguratorOpen(false);
   }, [displayedDataPointIds, currentUserRole, currentPath]);
-
   const handleRemoveItem = useCallback((dpIdToRemove: string) => {
-    if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove); let newDisplayedIds: string[];
-    if (pointToRemove?.threePhaseGroup) { const removedItemsList = allPossibleDataPoints.filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup).map(dp => dp.id); newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id)); setDisplayedDataPointIds(newDisplayedIds); toast.info(`${pointToRemove.threePhaseGroup} group removed.`); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedGroupId: pointToRemove.threePhaseGroup, removedItemIds: removedItemsList, isGroup: true, currentDashboardIds: newDisplayedIds }, currentPath); }
-    else { newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove); setDisplayedDataPointIds(newDisplayedIds); toast.info("Data point removed."); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedId: dpIdToRemove, isGroup: false, currentDashboardIds: newDisplayedIds }, currentPath); }
+    if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove); let newDisplayedIds: string[]; if (pointToRemove?.threePhaseGroup) { const removedItemsList = allPossibleDataPoints.filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup).map(dp => dp.id); newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id)); setDisplayedDataPointIds(newDisplayedIds); toast.info(`${pointToRemove.threePhaseGroup} group removed.`); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedGroupId: pointToRemove.threePhaseGroup, removedItemIds: removedItemsList, isGroup: true, currentDashboardIds: newDisplayedIds }, currentPath); } else { newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove); setDisplayedDataPointIds(newDisplayedIds); toast.info("Data point removed."); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedId: dpIdToRemove, isGroup: false, currentDashboardIds: newDisplayedIds }, currentPath); }
   }, [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]);
-
-  const handleSldLayoutSelect = useCallback((newLayoutId: string) => {
-    const oldLayout = sldLayoutId; setSldLayoutId(newLayoutId);
-    if (isSldConfigOpen) setIsSldConfigOpen(false); if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false);
-    logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath);
-  }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]);
-
-  // useEffect hooks
-  useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
-  useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]); // Removed storeHasHydrated from deps as it's not a state/prop
-
+  const handleSldLayoutSelect = useCallback((newLayoutId: string) => { const oldLayout = sldLayoutId; setSldLayoutId(newLayoutId); if (isSldConfigOpen) setIsSldConfigOpen(false); if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false); logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath); }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]);
   const fetchAndUpdatePageLayouts = useCallback(() => {
     if (typeof window !== 'undefined') {
       const layoutsFromStorage: { id: string; name: string }[] = [];
       for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
-          let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          try {
-              const layoutJson = localStorage.getItem(key);
-              if (layoutJson) {
-                  const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
-                  if (parsedLayout.meta?.name) {
-                      layoutName = parsedLayout.meta.name;
-                  }
-              }
-          } catch (e) {
-              console.warn(`ControlDash: Could not parse layout ${layoutIdKey} from localStorage for meta.name`, e);
-          }
-          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
+        const key = localStorage.key(i); if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length); let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          try { const layoutJson = localStorage.getItem(key); if (layoutJson) { const parsedLayout = JSON.parse(layoutJson) as SLDLayout; if (parsedLayout.meta?.name) { layoutName = parsedLayout.meta.name; } } } catch (e) { console.warn(`ControlDash: Could not parse layout ${layoutIdKey} from localStorage for meta.name`, e); } layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
         }
-      }
-
-      const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
-      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS
-        .filter(id => !layoutIdsFromStorage.has(id))
-        .map(id => ({
-          id,
-          name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        }));
-
-      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
-      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
-      setAvailableSldLayoutsForPage(combinedLayouts);
+      } const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
+      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS.filter(id => !layoutIdsFromStorage.has(id)).map(id => ({ id, name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), }));
+      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants]; combinedLayouts.sort((a, b) => a.name.localeCompare(b.name)); setAvailableSldLayoutsForPage(combinedLayouts);
     }
-  }, []); // AVAILABLE_SLD_LAYOUT_IDS is a constant
+  }, []);
+  const handleSaveWsUrl = useCallback(() => {
+    setWebSocketUrl(tempWsUrl); localStorage.setItem(CUSTOM_WEBSOCKET_URL_KEY, tempWsUrl); setIsWsConfigModalOpen(false); toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}`, });
+    if (ws.current) { ws.current.onclose = null; ws.current.close(1000, 'Configuration changed'); }
+    reconnectAttempts.current = 0; if (reconnectInterval.current) clearTimeout(reconnectInterval.current); connectWebSocket(tempWsUrl);
+  }, [tempWsUrl, connectWebSocket]);
+  const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
+  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
 
+  useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
+  useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]);
   useEffect(() => {
-    fetchAndUpdatePageLayouts();
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-        fetchAndUpdatePageLayouts();
-      } else if (event.key === null) { // Storage was cleared
-        fetchAndUpdatePageLayouts();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [fetchAndUpdatePageLayouts]);
-
-  useEffect(() => {
-      if (availableSldLayoutsForPage.length > 0 && authCheckComplete) { // Ensure authCheck is also complete
-          const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY);
-          if (currentStoredId && availableSldLayoutsForPage.some(l => l.id === currentStoredId)) {
-              if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId);
-          } else if (availableSldLayoutsForPage.some(l => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'))) {
-              const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant';
-              if (sldLayoutId !== defaultId) setSldLayoutId(defaultId);
-              localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId); // Persist if falling back
-          } else { // Fallback to the first available dynamic layout if default constant is not in the dynamic list
-              const firstAvailableId = availableSldLayoutsForPage[0].id;
-              if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId);
-              localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId); // Persist this fallback
-          }
-      }
-  }, [availableSldLayoutsForPage, authCheckComplete]); // Removed sldLayoutId from deps to prevent infinite loop
-
-
+    if (!authCheckComplete) return; const fetchInitialUrl = async () => {
+      const customUrl = localStorage.getItem(CUSTOM_WEBSOCKET_URL_KEY);
+      if (customUrl) { setWebSocketUrl(customUrl); console.log(`Using custom WebSocket URL from localStorage: ${customUrl}`); return; }
+      try {
+        const response = await fetch('/api/opcua');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.webSocketUrl) { setWebSocketUrl(data.webSocketUrl); console.log(`Using dynamically determined WebSocket URL from API: ${data.webSocketUrl}`); }
+          else { throw new Error("API response did not contain webSocketUrl"); }
+        } else { throw new Error(`API fetch failed with status: ${response.status}`); }
+      } catch (error) { console.error("Failed to fetch dynamic WebSocket URL from API, using fallback:", error); setWebSocketUrl(FALLBACK_WS_URL); toast.error("Network Discovery Failed", { description: "Using fallback connection URL. May not work remotely.", duration: 8000 }); }
+    }; fetchInitialUrl();
+  }, [authCheckComplete]);
+  useEffect(() => { fetchAndUpdatePageLayouts(); const handleStorageChange = (event: StorageEvent) => { if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) { fetchAndUpdatePageLayouts(); } else if (event.key === null) { fetchAndUpdatePageLayouts(); } }; window.addEventListener('storage', handleStorageChange); return () => { window.removeEventListener('storage', handleStorageChange); }; }, [fetchAndUpdatePageLayouts]);
+  useEffect(() => { if (availableSldLayoutsForPage.length > 0 && authCheckComplete) { const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY); if (currentStoredId && availableSldLayoutsForPage.some(l => l.id === currentStoredId)) { if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId); } else if (availableSldLayoutsForPage.some(l => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'))) { const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'; if (sldLayoutId !== defaultId) setSldLayoutId(defaultId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId); } else { const firstAvailableId = availableSldLayoutsForPage[0].id; if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId); } } }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && allPossibleDataPoints.length > 0 && authCheckComplete) { const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY); if (s) { try { const p = JSON.parse(s) as string[]; const v = p.filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (v.length > 0) { setDisplayedDataPointIds(v); return; } else if (p.length > 0) localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } catch (e) { console.error("Parse err", e); localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } } const sm = getSmartDefaults(); setDisplayedDataPointIds(sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()); } }, [allPossibleDataPoints, getSmartDefaults, getHardcodedDefaultDataPointIds, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { if (displayedDataPointIds.length > 0) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify(displayedDataPointIds)); else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY)) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([])); } }, [displayedDataPointIds, authCheckComplete]);
   useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
   useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).Closing WS.`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); if (ws.current) ws.current.close(1011, "Crit Lag"); return; } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 15000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete]);
   useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
-  useEffect(() => { if (!authCheckComplete) return () => { }; if (typeof window === 'undefined') return; ['opcuaRedirected', 'reloadingDueToDelay', 'redirectingDueToExtremeDelay'].forEach(f => sessionStorage.removeItem(f)); reconnectAttempts.current = 0; connectWebSocket(); return () => { if (reconnectInterval.current) clearTimeout(reconnectInterval.current); if (ws.current && ws.current.readyState !== WebSocket.CLOSED) { ws.current.onopen = null; ws.current.onmessage = null; ws.current.onerror = null; ws.current.onclose = null; ws.current.close(1000, 'Unmounted'); ws.current = null; } }; }, [connectWebSocket, authCheckComplete]);
+  useEffect(() => {
+    if (!authCheckComplete || !webSocketUrl) return () => { }; reconnectAttempts.current = 0; connectWebSocket(); return () => { if (reconnectInterval.current) clearTimeout(reconnectInterval.current); if (ws.current && ws.current.readyState !== WebSocket.CLOSED) { ws.current.onopen = null; ws.current.onmessage = null; ws.current.onerror = null; ws.current.onclose = null; ws.current.close(1000, 'Component unmounted'); ws.current = null; } };
+  }, [connectWebSocket, authCheckComplete, webSocketUrl]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
 
-  // --- Additional useCallback hooks that need to be declared before early returns ---
-  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => {
-      setSldLayoutId(newLayoutId);
-      // The localStorage update for DEFAULT_SLD_LAYOUT_ID_KEY is handled by an existing useEffect.
-      // logUserActivity(`SLDWidget changed layout to ${newLayoutId}`); // Optional: specific logging
-  }, [setSldLayoutId]); // Removed logUserActivity to simplify
-
-  // --- End of React Hooks Declarations ---
-
-  const storeHasHydrated = useAppStore.persist.hasHydrated(); // Not a hook, can be here
-  if (!storeHasHydrated || !authCheckComplete) { /* ... unchanged loading screen ... */
-    return(<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary"/><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
+  const storeHasHydrated = useAppStore.persist.hasHydrated();
+  if (!storeHasHydrated || !authCheckComplete || weatherCardConfig === null) {
+    return (<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
   }
 
-  // Non-hook derived constants (can be here or after hooks, but before use)
   const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
   const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
   const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
-
-  const commonRenderingProps = {
-    isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket,
-    playNotificationSound: playNotificationSound, lastToastTimestamps, onRemoveItem: handleRemoveItem,
-    allPossibleDataPoints, containerVariants, currentUserRole,
-  };
+  const commonRenderingProps = { isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket, playNotificationSound, lastToastTimestamps, onRemoveItem: handleRemoveItem, allPossibleDataPoints, containerVariants, currentUserRole, };
   const hasAnyDynamicCardContent = topSections.length > 0 || !!gaugesOverviewSectionDefinition || bottomReadingsSections.length > 0;
 
   return (
@@ -612,144 +498,137 @@ const UnifiedDashboardPage: React.FC = () => {
       <div className="max-w-screen-4xl mx-auto">
         <HeaderConnectivityComponent
           plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
-          currentTime={currentTime} delay={delay}
-          version={VERSION}
-          isEditMode={isGlobalEditMode}
-          toggleEditMode={toggleEditModeAction}
-          currentUserRole={currentUserRole}
-          onOpenConfigurator={() => { if (currentUserRole === UserRole.ADMIN) setIsConfiguratorOpen(true); else toast.warning("Access Denied", { description: "Only administrators can add cards." }); } }
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} />
+          onClickWsStatus={() => { setTempWsUrl(webSocketUrl); setIsWsConfigModalOpen(true); }}
+          currentTime={currentTime} delay={delay} version={VERSION}
+          isEditMode={isGlobalEditMode} toggleEditMode={toggleEditModeAction}
+          currentUserRole={currentUserRole} onOpenConfigurator={() => setIsConfiguratorOpen(true)}
+          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} wsAddress={webSocketUrl} />
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 xl:gap-4 my-4 md:my-6">
-          <Card className={cn("lg:col-span-3 shadow-lg", sldSectionMinHeight)}>
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 xl:gap-4 my-4 md:my-6">
+          <Card className={cn(
+            threePhaseGroups.length > 0 ? "lg:col-span-4" : "lg:col-span-5",
+            "shadow-lg transition-all duration-300", sldSectionMinHeight
+          )}>
             <CardContent className="p-3 sm:p-4 h-full flex flex-col">
               <div className="flex justify-between items-center mb-2 sm:mb-3">
                 <div className="flex items-center gap-2">
-                    <h3 className="text-lg sm:text-xl font-semibold">Plant Layout</h3>
-                    {sldSpecificEditMode && (
-                        <Dialog open={isSldConfigOpen} onOpenChange={setIsSldConfigOpen}>
-                              <DialogTrigger asChild><Button variant="outline"size="sm"className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5"/>Configure Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l=>l.toUpperCase())}</Button></DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal>
-                                  <div className="py-4"><Select onValueChange={handleSldLayoutSelect} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..."/></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map(layout=><SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div>
-                            </DialogContent>
-                        </Dialog>
-                    )}
-                      {!sldSpecificEditMode && sldLayoutId && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l=>l.toUpperCase())}</span>}
+                  <h3 className="text-lg sm:text-xl font-semibold">Plant Layout</h3>
+                  {sldSpecificEditMode && (
+                    <Dialog open={isSldConfigOpen} onOpenChange={setIsSldConfigOpen}>
+                      <DialogTrigger asChild><Button variant="outline" size="sm" className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5" />Configure Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Button></DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal>
+                        <div className="py-4"><Select onValueChange={handleSldLayoutSelect} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..." /></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map(layout => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                  {!sldSpecificEditMode && sldLayoutId && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>}
                 </div>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost"size="icon"onClick={()=>setIsSldModalOpen(true)}title="Open SLD"><Maximize2 className="h-5 w-5"/><span className="sr-only">Open SLD</span></Button></TooltipTrigger><TooltipContent><p>Open SLD in larger view</p></TooltipContent></Tooltip></TooltipProvider>
+                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setIsSldModalOpen(true)} title="Open SLD"><Maximize2 className="h-5 w-5" /><span className="sr-only">Open SLD</span></Button></TooltipTrigger><TooltipContent><p>Open SLD in larger view</p></TooltipContent></Tooltip></TooltipProvider>
               </div>
-                <div style={{height: sldInternalMaxHeight}} className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10">
-                  <SLDWidget
-                    layoutId={sldLayoutId}
-                    isEditMode={sldSpecificEditMode}
-                    onLayoutIdChange={handleSldWidgetLayoutChange}
-                  />
-                </div>
+              <div style={{ height: sldInternalMaxHeight }} className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10">
+                <SLDWidget layoutId={sldLayoutId} isEditMode={sldSpecificEditMode} onLayoutIdChange={handleSldWidgetLayoutChange} />
+              </div>
             </CardContent>
           </Card>
-          <Card className={cn("shadow-lg", sldSectionMinHeight)}>
-            <CardContent className="p-3 sm:p-4 h-full flex flex-col">
-              <h3 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Three-Phase Elements</h3>
-              <div className="overflow-y-auto flex-grow" style={{maxHeight: sldInternalMaxHeight}}>{threePhaseGroups.length > 0 ? (<DashboardSection title="" gridCols="grid-cols-1 gap-y-3" items={threePhaseGroups} isDisabled={!isConnected} {...commonRenderingProps} />) : (<p className="text-muted-foreground italic text-sm pt-2"> {displayedDataPointIds.length > 0 ? "No three-phase groups." : "Add data points."} </p>)}</div>
+          
+          {threePhaseGroups.length > 0 && (
+            <Card className={cn("shadow-lg", sldSectionMinHeight)}>
+              <CardContent className="p-3 sm:p-4 h-full flex flex-col">
+                <h3 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Three-Phase Elements</h3>
+                <div className="overflow-y-auto flex-grow" style={{ maxHeight: sldInternalMaxHeight }}>
+                  <DashboardSection title="" gridCols="grid-cols-1 gap-y-3" items={threePhaseGroups} isDisabled={!isConnected} {...commonRenderingProps} />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        <div className="flex flex-col lg:flex-row gap-2 xl:gap-4 my-4 md:my-6">
+          {weatherCardConfig && (
+            <Card className="w-auto flex-shrink-0 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
+              <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
+                  <CardTitle className="text-xl sm:text-2xl">Weather Data</CardTitle>
+              </CardHeader>
+              <CardContent className="px-2 py-3 sm:px-3 flex-grow">
+                  <div className="h-full">
+                    <WeatherCard initialConfig={weatherCardConfig} opcUaData={nodeValues} allPossibleDataPoints={allPossibleDataPoints} onConfigChange={handleWeatherConfigChange} />
+                  </div>
+              </CardContent>
+            </Card>
+          )}
+
+          <Card className="flex-1 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
+            <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
+                  </div>
+                  <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start flex-wrap">
+                    {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
+                      <TooltipProvider>
+                        <Tooltip>
+                            <TooltipTrigger asChild><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}><Settings className="h-4 w-4" /><span className="sr-only">Config Graph</span></Button></TooltipTrigger>
+                            <TooltipContent><p>Configure Graph Data</p></TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
+                        <Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto">{ts.toUpperCase()}</Button>
+                      ))}
+                    </div>
+                  </div>
+              </div>
+            </CardHeader>
+            <CardContent className="px-2 py-3 sm:px-3 flex-grow">
+              {(useDemoDataForGraph || (powerGraphGenerationDpIds && powerGraphGenerationDpIds.length > 0) || (powerGraphUsageDpIds && powerGraphUsageDpIds.length > 0)) ? (
+                  <PowerTimelineGraph nodeValues={nodeValues} allPossibleDataPoints={allPossibleDataPoints} generationDpIds={powerGraphGenerationDpIds} usageDpIds={powerGraphUsageDpIds} exportDpIds={powerGraphExportDpIds} exportMode={powerGraphExportMode} timeScale={graphTimeScale} />
+              ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        <Card className="shadow-xl my-4 md:my-6 border-2 border-primary/20 dark:border-primary/30">
-          <CardHeader className="pb-3 pt-4 px-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-              <div className="flex items-center gap-2">
-                <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
-              </div>
-              <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start">
-                 {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
-                    <>
-                        <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="outline" size="icon" className="h-7 w-7" onClick={()=>setIsGraphConfiguratorOpen(true)}><Settings className="h-4 w-4"/><span className="sr-only">Config Graph</span></Button></TooltipTrigger><TooltipContent><p>Configure Graph Data</p></TooltipContent></Tooltip></TooltipProvider>
-                        {/* <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant={useDemoDataForGraph?"secondary":"outline"}size="icon"className="h-7 w-7"onClick={()=>setUseDemoDataForGraph(prev => !prev)}><Orbit className={cn("h-4 w-4",useDemoDataForGraph && "animate-spin-slow")}/><span className="sr-only">Demo Data</span></Button></TooltipTrigger><TooltipContent><p>{useDemoDataForGraph?"Switch to Live Data":"Switch to Demo Data"}</p></TooltipContent></Tooltip></TooltipProvider> */}
-                    </>
-                 )}
-                {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
-                  <Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto">
-                    {ts.toUpperCase()}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="px-2 py-3 sm:px-3">
-            {(useDemoDataForGraph || (powerGraphGenerationDpIds && powerGraphGenerationDpIds.length > 0) || (powerGraphUsageDpIds && powerGraphUsageDpIds.length > 0) ) ? (
-              <PowerTimelineGraph
-                nodeValues={nodeValues}
-                allPossibleDataPoints={allPossibleDataPoints}
-                generationDpIds={powerGraphGenerationDpIds} 
-                usageDpIds={powerGraphUsageDpIds} 
-                exportDpIds={powerGraphExportDpIds} 
-                exportMode={powerGraphExportMode} 
-                timeScale={graphTimeScale}
-                // useDemoData={useDemoDataForGraph}
-              />
-            ) : ( 
-              <div className="flex items-center justify-center h-[300px] text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode&&currentUserRole===UserRole.ADMIN&&" Click settings."}</p></div>
-            )}
-          </CardContent>
-        </Card>
-        
         {gaugesOverviewSectionDefinition && (<RenderingComponent sections={[gaugesOverviewSectionDefinition]} {...commonRenderingProps} />)}
         {bottomReadingsSections.length > 0 && (<RenderingComponent sections={bottomReadingsSections} {...commonRenderingProps} />)}
         {!hasAnyDynamicCardContent && currentlyDisplayedDataPoints.length > 0 && (<div className="text-center py-16 text-muted-foreground min-h-[100px] flex flex-col items-center justify-center"> <InfoIconLucide className="w-12 h-12 mb-4 text-gray-400" /><h3 className="text-xl font-semibold mb-2">No items match filters.</h3> <p>Selected data points might not fit configured dynamic sections.</p> {(isGlobalEditMode && currentUserRole === UserRole.ADMIN) && <p className="mt-2">Try changing data point types/categories.</p>} </div>)}
         {!hasAnyDynamicCardContent && currentlyDisplayedDataPoints.length === 0 && (<RenderingComponent sections={[]} {...commonRenderingProps} />)}
       </div>
 
-      {(isConfiguratorOpen && currentUserRole === UserRole.ADMIN) && (<DashboardItemConfigurator isOpen={isConfiguratorOpen} onClose={() => setIsConfiguratorOpen(false)} availableIndividualPoints={individualPointsForConfig} availableThreePhaseGroups={threePhaseGroupsForConfig} currentDisplayedIds={displayedDataPointIds} onAddMultipleDataPoints={handleAddMultipleDataPoints} onSaveNewDataPoint={async (data)=>{toast.info("Custom DP creation NI");return{success:false,error:"NI"};}}/>)}
-      
+      {(isConfiguratorOpen && currentUserRole === UserRole.ADMIN) && (<DashboardItemConfigurator isOpen={isConfiguratorOpen} onClose={() => setIsConfiguratorOpen(false)} availableIndividualPoints={individualPointsForConfig} availableThreePhaseGroups={threePhaseGroupsForConfig} currentDisplayedIds={displayedDataPointIds} onAddMultipleDataPoints={handleAddMultipleDataPoints} onSaveNewDataPoint={async (data) => { toast.info("Custom DP creation NI"); return { success: false, error: "NI" }; }} />)}
       {isGraphConfiguratorOpen && (
-        <PowerTimelineGraphConfigurator
-          isOpen={isGraphConfiguratorOpen}
-          onClose={()=>setIsGraphConfiguratorOpen(false)}
-          allPossibleDataPoints={allPossibleDataPoints}
-          currentGenerationDpIds={powerGraphGenerationDpIds}
-          currentUsageDpIds={powerGraphUsageDpIds}
-          currentExportDpIds={powerGraphExportDpIds}
-          initialExportMode={powerGraphExportMode}
-          onSaveConfiguration={(config) => {
-            setPowerGraphGenerationDpIds(config.generationDpIds);
-            setPowerGraphUsageDpIds(config.usageDpIds);
-            setPowerGraphExportDpIds(config.exportDpIds);
-            setPowerGraphExportMode(config.exportMode);
-            setIsGraphConfiguratorOpen(false);
-            toast.success('Graph configuration updated.');
-            logActivity(
-              'ADMIN_GRAPH_CONFIG_CHANGE',
-              {
-                generationDpIds: config.generationDpIds,
-                usageDpIds: config.usageDpIds,
-                exportDpIds: config.exportDpIds,
-                exportMode: config.exportMode
-              },
-              currentPath
-            );
-          }} />
+        <PowerTimelineGraphConfigurator isOpen={isGraphConfiguratorOpen} onClose={() => setIsGraphConfiguratorOpen(false)} allPossibleDataPoints={allPossibleDataPoints} currentGenerationDpIds={powerGraphGenerationDpIds} currentUsageDpIds={powerGraphUsageDpIds} currentExportDpIds={powerGraphExportDpIds} initialExportMode={powerGraphExportMode} onSaveConfiguration={(config) => {
+          setPowerGraphGenerationDpIds(config.generationDpIds); setPowerGraphUsageDpIds(config.usageDpIds); setPowerGraphExportDpIds(config.exportDpIds); setPowerGraphExportMode(config.exportMode); setIsGraphConfiguratorOpen(false); toast.success('Graph configuration updated.');
+          logActivity('ADMIN_GRAPH_CONFIG_CHANGE', { generationDpIds: config.generationDpIds, usageDpIds: config.usageDpIds, exportDpIds: config.exportDpIds, exportMode: config.exportMode }, currentPath);
+        }} />
       )}
-
+      <Dialog open={isWsConfigModalOpen} onOpenChange={setIsWsConfigModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeaderComponentInternal><DialogTitleComponentInternal>WebSocket Connection Settings</DialogTitleComponentInternal><DialogDescription>Modify the backend WebSocket URL. Changes will be applied after reconnecting.</DialogDescription></DialogHeaderComponentInternal>
+          <div className="py-4"><label htmlFor="ws-url-input" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-2 block">WebSocket URL</label><Input id="ws-url-input" value={tempWsUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempWsUrl(e.target.value)} placeholder="ws://example.com:2001" /><p className="text-xs text-muted-foreground mt-2">Example: `ws://192.168.1.100:2001`. Must be accessible from your device.</p></div>
+          <DialogFooter><DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose><Button type="submit" onClick={handleSaveWsUrl}>Save and Reconnect</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
-          <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
-            <DialogHeaderComponentInternal className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
-                <div className="flex items-center gap-2">
-                    <DialogTitleComponentInternal>Plant Layout{!sldSpecificEditMode&&sldLayoutId&&` : ${(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}`}</DialogTitleComponentInternal>
-                    {sldSpecificEditMode && (<Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}><DialogTrigger asChild><Button variant="outline"size="sm"className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5"/>Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g,' ').replace(/\b\w/g,l=>l.toUpperCase())}</Button></DialogTrigger><DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal><div className="py-4"><Select onValueChange={(v)=>{setSldLayoutId(v);setIsModalSldLayoutConfigOpen(false);}}value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..."/></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map((layout)=><SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div></DialogContent></Dialog>)}
-                </div>
-                <DialogClose asChild><Button variant="ghost"size="icon"className="rounded-full"><X className="h-5 w-5"/><span className="sr-only">Close</span></Button></DialogClose>
-            </DialogHeaderComponentInternal>
-            <div className="flex-grow p-2 sm:p-4 overflow-hidden">
-              <SLDWidget
-                layoutId={sldLayoutId}
-                isEditMode={sldSpecificEditMode}
-                onLayoutIdChange={handleSldWidgetLayoutChange}
-              />
+        <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
+          <DialogHeaderComponentInternal className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
+            <div className="flex items-center gap-2">
+              <DialogTitleComponentInternal>Plant Layout{!sldSpecificEditMode && sldLayoutId && ` : ${(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}</DialogTitleComponentInternal>
+              {sldSpecificEditMode && (
+                <Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}><DialogTrigger asChild><Button variant="outline" size="sm" className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5" />Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Button></DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal><div className="py-4"><Select onValueChange={(v) => { setSldLayoutId(v); setIsModalSldLayoutConfigOpen(false); }} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..." /></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map((layout) => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div></DialogContent>
+                </Dialog>
+              )}
             </div>
-          </DialogContent>
+            <DialogClose asChild><Button variant="ghost" size="icon" className="rounded-full"><X className="h-5 w-5" /><span className="sr-only">Close</span></Button></DialogClose>
+          </DialogHeaderComponentInternal>
+          <div className="flex-grow p-2 sm:p-4 overflow-hidden">
+            <SLDWidget layoutId={sldLayoutId} isEditMode={sldSpecificEditMode} onLayoutIdChange={handleSldWidgetLayoutChange} />
+          </div>
+        </DialogContent>
       </Dialog>
     </div>
   );
