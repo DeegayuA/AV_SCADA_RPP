@@ -4,8 +4,14 @@ import logo from "@/AV_logo.png"; // Ensure these paths are correct if this file
 import logo2 from "@/av_logo.svg";
 
 export const WS_PORT = 2001;
-export const WS_API_PATH = "/api/opcua"; // This is your existing API route
+export const WS_API_PATH = "/api/opcua";
 
+// --- ADDED ---: Define a consistent key for storing the user-provided WebSocket URL.
+export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
+export const WEBSOCKET_CUSTOM_URL_KEY = `${LOCAL_STORAGE_KEY_PREFIX}custom_websocket_url`;
+
+
+// --- MODIFIED ---: Updated the function to prioritize the user-defined URL from localStorage.
 // Define a function to get the WebSocket URL
 export const getWebSocketUrl = async (): Promise<string> => {
     // Default fallback for server-side or non-browser environments
@@ -15,26 +21,30 @@ export const getWebSocketUrl = async (): Promise<string> => {
         return defaultWsUrl;
     }
 
-    // Attempt to get from Capacitor Preferences first
+    // PRIORITY 1: Check for a user-defined URL in localStorage
+    const customUrl = localStorage.getItem(WEBSOCKET_CUSTOM_URL_KEY);
+    if (customUrl && customUrl.trim() !== '') {
+        console.log(`Using custom WebSocket URL from localStorage: ${customUrl}`);
+        return customUrl;
+    }
+
+    // PRIORITY 2: Attempt to get from Capacitor Preferences
     try {
         const capacitorPreferences = await import('@capacitor/preferences');
         if (window.Capacitor && window.Capacitor.isNativePlatform && capacitorPreferences.Preferences) {
             const { value } = await capacitorPreferences.Preferences.get({ key: 'backendUrl' });
             if (value) {
                 console.log(`Using backend URL from Preferences for WS: ${value}`);
-                // Assuming the saved URL is an HTTP base URL, convert it to a WS URL
                 const httpUrl = new URL(value);
                 const wsProtocol = httpUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-                // If the saved URL includes a path for API, we might need to handle it here
-                // For now, let's assume it's just the base `hostname:port`
-                return `${wsProtocol}//${httpUrl.host}`;
+                return `${wsProtocol}//${httpUrl.host}${WS_API_PATH}`;
             }
         }
     } catch (error) {
         console.warn('Could not check Capacitor Preferences, proceeding with default logic:', error);
     }
 
-    // Fallback to dynamic URL based on window.location
+    // PRIORITY 3: Fallback to dynamic URL based on window.location
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
 
@@ -52,10 +62,18 @@ export const getWebSocketUrl = async (): Promise<string> => {
     }
 };
 
+// --- MODIFIED ---: Updated the initial URL to also check localStorage synchronously.
 // Export a placeholder or a synchronously determined URL for components that can't be async
 // This will be the initial value before the async function resolves.
 export const WS_URL_INITIAL = (() => {
     if (typeof window !== 'undefined') {
+        // PRIORITY 1: Check for a user-defined URL in localStorage
+        const customUrl = localStorage.getItem(WEBSOCKET_CUSTOM_URL_KEY);
+        if (customUrl && customUrl.trim() !== '') {
+            return customUrl;
+        }
+
+        // PRIORITY 2: Fallback to dynamic URL logic
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const hostname = window.location.hostname;
         if (hostname === 'localhost') {
@@ -67,11 +85,13 @@ export const WS_URL_INITIAL = (() => {
         }
         return `${protocol}//${hostname}${WS_API_PATH}`;
     }
+    // Default for SSR or other environments
     return `ws://localhost:${WS_PORT}`;
 })();
+export const WS_URL = getWebSocketUrl();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://0.0.0.0:4841";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://123.231.16.208:4841";
-export const VERSION = "- Release v2025.06.26 • 16:30 (GMT+5:30)";
+export const VERSION = "- Release v2025.07.15 • 16:30 (GMT+5:30)";
 export const PLANT_NAME= "Ranna 2MW Solar Power Plant";
 export const PLANT_LOCATION = "Ranna, Sri Lanka";
 export const PLANT_TYPE = "Solar Power Plant";
@@ -97,16 +117,13 @@ export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";
 export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
 export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 
-
 export const USER = "viewer";
-export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
 
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'ranna_main_sld',
   'Ranna_PLC',
   'PV_Array01',
   'PV_Array02',
-  // PV Arrays 3 to 18
   'PV_Array03',
   'PV_Array04',
   'PV_Array05',
@@ -123,7 +140,6 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'PV_Array16',
   'PV_Array17',
   'PV_Array18',
-  // Weather and Misc
   'weather',
   'misc1',
   'misc2',
@@ -138,4 +154,3 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
 // Keys for API Monitoring feature
 export const API_MONITORING_CONFIG_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringConfigs_v1`;
 export const API_MONITORING_DOWNTIME_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringDowntimes_v1`;
-

@@ -464,7 +464,7 @@ const UnifiedDashboardPage: React.FC = () => {
           if (data.webSocketUrl) { setWebSocketUrl(data.webSocketUrl); console.log(`Using dynamically determined WebSocket URL from API: ${data.webSocketUrl}`); }
           else { throw new Error("API response did not contain webSocketUrl"); }
         } else { throw new Error(`API fetch failed with status: ${response.status}`); }
-      } catch (error) { console.error("Failed to fetch dynamic WebSocket URL from API, using fallback:", error); setWebSocketUrl(FALLBACK_WS_URL); toast.error("Network Discovery Failed", { description: "Using fallback connection URL. May not work remotely.", duration: 8000 }); }
+      } catch (error) { console.error("Failed to fetch dynamic WebSocket URL from API, using fallback:", error); setWebSocketUrl(await FALLBACK_WS_URL); toast.error("Network Discovery Failed", { description: "Using fallback connection URL. May not work remotely.", duration: 8000 }); }
     }; fetchInitialUrl();
   }, [authCheckComplete]);
   useEffect(() => { fetchAndUpdatePageLayouts(); const handleStorageChange = (event: StorageEvent) => { if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) { fetchAndUpdatePageLayouts(); } else if (event.key === null) { fetchAndUpdatePageLayouts(); } }; window.addEventListener('storage', handleStorageChange); return () => { window.removeEventListener('storage', handleStorageChange); }; }, [fetchAndUpdatePageLayouts]);

@@ -22,14 +22,14 @@ const Dashboard = () => {
   }));
 
   // WebSocket connection handling
-  const connectWebSocket = useCallback(() => {
+  const connectWebSocket = useCallback(async () => {
     if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
       console.log("WebSocket already open or connecting.");
       return;
     }
 
     console.log(`Attempting to connect WebSocket to: ${WS_URL}`);
-    ws.current = new WebSocket(WS_URL);
+    ws.current = new WebSocket(await WS_URL);
 
     ws.current.onopen = () => {
       console.log("WebSocket connected");

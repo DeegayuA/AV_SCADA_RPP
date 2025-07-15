@@ -1,6 +1,6 @@
 // hooks/useWebSocketListener.ts
 import { useAppStore } from '@/stores/appStore';
-import { getWebSocketUrl, WS_URL_INITIAL } from '@/config/constants';
+import { getWebSocketUrl, WS_URL_INITIAL, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner'; // Keep this for triggering toasts
 
@@ -20,7 +20,7 @@ interface ToastMessagePayload {
 
 interface WebSocketMessageFromServer {
   type: string;
-  payload: any; 
+  payload: any;
 }
 
 // Specific type for server-sent toast messages
@@ -39,6 +39,7 @@ export const useWebSocket = () => {
     const maxReconnectAttempts = useRef(10);
     const currentReconnectAttempts = useRef(0);
 
+    // Effect to fetch the optimal/default WebSocket URL on initial mount.
     useEffect(() => {
         let isMounted = true;
         const fetchWsUrl = async () => {
@@ -58,15 +59,24 @@ export const useWebSocket = () => {
     }, []);
 
     const connect = useCallback(() => {
-        if (!wsUrl) {
-            console.error("WebSocket: URL is not available yet. Cannot connect.");
+        if (!wsUrl || wsUrl.trim() === '') {
+            console.error("WebSocket: URL is not available or is empty. Cannot connect.");
             toast.error("Configuration Error", { description: "WebSocket URL is missing." });
             return;
         }
 
+        // Prevent creating a new connection if one is already open or connecting.
         if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
-            return;
+            // If the URL is the same, do nothing. If different, the parent useEffect will handle it.
+            if (ws.current.url === wsUrl) return;
         }
+
+        // Clean up any previous connection attempt before starting a new one.
+        if (ws.current) {
+            ws.current.onclose = null; // Disable the onclose handler to prevent reconnect loops on old instances.
+            ws.current.close(1000, "Initiating new connection");
+        }
+
 
         console.log(`WebSocket: Attempting connection #${currentReconnectAttempts.current + 1} to ${wsUrl}...`);
         ws.current = new WebSocket(wsUrl);
@@ -75,14 +85,11 @@ export const useWebSocket = () => {
             console.log("WebSocket: Connection established with", wsUrl);
             toast.success("Real-time Sync Active", { id: "ws-connect", duration: 3000 });
             setIsConnected(true);
-            currentReconnectAttempts.current = 0;
+            currentReconnectAttempts.current = 0; // Reset attempts on successful connection
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
         };
 
         ws.current.onmessage = (event) => {
-            // console.log("WebSocket: Raw event.data received:", event.data);
-            // console.log("WebSocket: typeof event.data:", typeof event.data);
-
             let messageDataString: string;
             if (typeof event.data === 'string') {
                 messageDataString = event.data;
@@ -97,7 +104,6 @@ export const useWebSocket = () => {
                 toast.error("WebSocket Error", { description: "Received unexpected data type."});
                 return;
             }
-            // console.log("WebSocket: Message data string for parsing:", messageDataString);
 
             let parsedJson: unknown;
             try {
@@ -105,13 +111,10 @@ export const useWebSocket = () => {
             } catch (e) {
                 console.error("WebSocket: Error parsing JSON string.", { raw: messageDataString, error: e });
                 setLastJsonMessage({ type: 'parse_error', payload: { raw: messageDataString, error: (e instanceof Error ? e.message : String(e)) } });
-                // Show a generic parse error toast to the user
                 toast.error("Data Error", { description: "Received malformed data from the server." });
                 return;
             }
 
-            // console.log("WebSocket: Parsed data object:", parsedJson);
-                
             if (typeof parsedJson === 'object' && parsedJson !== null) {
                 const data = parsedJson as Record<string, any>;
 
@@ -120,30 +123,17 @@ export const useWebSocket = () => {
                     const toastPayload = data.payload as ToastMessagePayload;
                     console.log("WebSocket: Received server-sent toast:", toastPayload);
                     switch (toastPayload.severity) {
-                        case 'success':
-                            toast.success(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
-                            break;
-                        case 'error':
-                            toast.error(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
-                            break;
-                        case 'warning':
-                            toast.warning(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
-                            break;
-                        case 'info':
-                            toast.info(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
-                            break;
-                        default: // Includes 'default' or any other severity
-                            toast(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id });
-                            break;
+                        case 'success': toast.success(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
+                        case 'error': toast.error(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
+                        case 'warning': toast.warning(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
+                        case 'info': toast.info(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
+                        default: toast(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
                     }
-                    // Optionally, you might still want to set it as lastJsonMessage if other parts of your app react to it
-                    // setLastJsonMessage(data as ServerToastMessage); 
-                    return; // Toast handled, no further processing of this message needed here.
+                    return; // Toast handled.
                 }
-                // ---- END TOAST HANDLER ----
 
-
-                if (typeof data.type === 'undefined') { 
+                if (typeof data.type === 'undefined') {
+                    // Logic to handle untyped OPC-UA data
                     const opcDataPayload: Record<string, string | number | boolean> = {};
                     let hasValidOpcData = false;
                     for (const key in data) {
@@ -152,25 +142,17 @@ export const useWebSocket = () => {
                             if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
                                 opcDataPayload[key] = value;
                                 hasValidOpcData = true;
-                            } else {
-                                // console.warn(`WebSocket: Received non-primitive value for OPC UA Node ID ${key}:`, value);
                             }
                         }
                     }
                     if (hasValidOpcData) {
                         useAppStore.getState().updateOpcUaNodeValues(opcDataPayload);
-                    } else {
-                        // console.warn("WebSocket: Received object data without 'type' field and no valid OPC-UA primitive values:", data);
                     }
-                } else if (typeof data.type === 'string') { 
-                    // console.log("Structured WebSocket message received:", data);
-                    const message: WebSocketMessageFromServer = {
-                        type: data.type,
-                        payload: data.payload
-                    };
+                } else if (typeof data.type === 'string') {
+                    const message: WebSocketMessageFromServer = { type: data.type, payload: data.payload };
                     setLastJsonMessage(message);
                 } else {
-                    console.warn("WebSocket: Received object data with invalid 'type' field (not a string):", data);
+                    console.warn("WebSocket: Received object with invalid 'type' field (not a string):", data);
                 }
             } else {
                 console.warn("WebSocket: Received JSON data that is not an object:", parsedJson);
@@ -179,85 +161,100 @@ export const useWebSocket = () => {
 
         ws.current.onerror = (errorEvent) => {
             console.error("WebSocket: Error event occurred:", errorEvent);
-            // A general error toast can be shown here, but it might be redundant
-            // if onclose also fires and handles reconnection toasts.
-            // toast.error("WebSocket Error", { description: "A connection error occurred." });
         };
 
         ws.current.onclose = (event) => {
             const reason = event.reason || (event.code === 1000 ? "Normal closure" : `Code ${event.code}`);
             console.log(`WebSocket: Connection closed. Reason: "${reason}", Clean: ${event.wasClean}`);
             setIsConnected(false);
-            
-            if (event.code !== 1000 && event.code !== 1001) { 
+
+            // Do not reconnect for normal closure or if user is navigating away.
+            if (event.code !== 1000 && event.code !== 1001) {
                 if (currentReconnectAttempts.current < maxReconnectAttempts.current) {
                     currentReconnectAttempts.current++;
-                    const delay = Math.min(1000 * Math.pow(1.8, currentReconnectAttempts.current), 30000); 
+                    const delay = Math.min(1000 * Math.pow(1.8, currentReconnectAttempts.current), 30000);
                     console.log(`WebSocket: Will attempt reconnect #${currentReconnectAttempts.current} in ${delay / 1000}s.`);
                     if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
                     reconnectIntervalId.current = setTimeout(connect, delay);
-                    // Update toast or show a new one for retrying
                     if(currentReconnectAttempts.current === 1) {
                          toast.warning("Real-time Sync Lost", { id: "ws-disconnect-retry", description: `Attempting to reconnect... (Attempt ${currentReconnectAttempts.current})`});
                     } else {
-                        toast.dismiss("ws-disconnect-retry"); // Dismiss old one if any
+                        toast.dismiss("ws-disconnect-retry");
                         toast.warning("Reconnecting...", { id: "ws-disconnect-retry", description: `Attempt #${currentReconnectAttempts.current}. Please wait.`});
                     }
                 } else {
                     console.error("WebSocket: Maximum reconnect attempts reached.");
-                    toast.error("Connection Failed", { id:"ws-max-reconnect", description: "Could not connect to the real-time server. Please check your connection or try again later." });
+                    toast.error("Connection Failed", { id:"ws-max-reconnect", description: "Could not connect to the real-time server. Check your connection or the URL." });
                 }
-            } else if (event.wasClean && event.code === 1000) { // Explicitly closed by server or client code
+            } else if (event.wasClean && event.code === 1000) {
                  toast.info("Real-time Sync Disconnected", { id: "ws-disconnect-clean", duration: 3000 });
-            } else if (event.code === 1001) { // Going Away (e.g. server shutting down or browser navigating away)
-                // Usually, no toast is needed here as the user is likely leaving the page.
-                console.log("WebSocket: Connection closed because the endpoint is going away.");
+            } else if (event.code === 1001) {
+                console.log("WebSocket: Connection closed because the endpoint is going away (page navigation).");
             }
         };
     }, [wsUrl]);
 
+    // This effect manages the connection lifecycle based on the wsUrl.
     useEffect(() => {
         if (typeof window !== 'undefined' && wsUrl) {
-           connect();
+            // When this effect runs (due to URL change), reset the reconnect state before connecting.
+            currentReconnectAttempts.current = 0;
+            if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
+            connect();
         }
+
+        // Cleanup function for when the component unmounts or when the URL changes.
         return () => {
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
             if (ws.current) {
-                console.log("WebSocket: Cleaning up connection on component unmount.");
+                console.log("WebSocket: Cleaning up connection on component unmount or URL change.");
                 ws.current.onopen = null;
                 ws.current.onmessage = null;
                 ws.current.onerror = null;
-                ws.current.onclose = null; 
+                ws.current.onclose = null; // Remove handler to prevent it firing on explicit close
                 if (ws.current.readyState === WebSocket.OPEN) {
-                    // Send a close code 1000 for normal closure.
-                    // Browsers often send 1001 automatically on page unload.
                     ws.current.close(1000, "Client component unmounting");
                 }
-                ws.current = null; // Clear the ref
+                ws.current = null;
             }
-            currentReconnectAttempts.current = 0; // Reset on unmount
-            setIsConnected(false); // Ensure state is reset
+            setIsConnected(false);
         };
-    }, [connect]); // `connect` is the main dependency here
+    }, [connect]); // `connect` is the key dependency, as it holds `wsUrl`.
 
     const sendJsonMessage = useCallback((message: WebSocketMessageToServer) => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
             try {
                 ws.current.send(JSON.stringify(message));
-                // console.log("WebSocket: Sent message:", message.type, message.payload);
             } catch (error) {
-                console.error("WebSocket: Error serializing or sending message:", error, "Message:", message);
+                console.error("WebSocket: Error serializing or sending message:", error);
                 toast.error("Message Send Error", { description: "Failed to send data to the server." });
             }
         } else {
-            console.warn("WebSocket: Attempted to send message while not connected. Message:", message.type);
             toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server. Message not sent."});
             if (!isConnected && (!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
-               // console.log("WebSocket: Triggering connect() from sendJsonMessage due to disconnected state.");
                connect(); // Attempt to reconnect if sending while disconnected
             }
         }
-    }, [isConnected, connect]); // connect is stable, isConnected makes this reactive if needed
+    }, [isConnected, connect]);
 
-    return { sendJsonMessage, lastJsonMessage, isConnected, connect };
+    // NEW: Function to allow external components to change the WebSocket URL
+    const changeWebSocketUrl = useCallback((newUrl: string) => {
+        const trimmedUrl = newUrl.trim();
+        // Only update if the URL is valid and different from the current one.
+        if (trimmedUrl && trimmedUrl !== wsUrl) {
+            console.log(`WebSocket: Setting new target URL: ${trimmedUrl}`);
+            toast.info("Updating Connection", { description: `Changing server URL...` });
+            localStorage.setItem(WEBSOCKET_CUSTOM_URL_KEY, trimmedUrl); // Persist user's choice
+            setWsUrl(trimmedUrl); // This state update triggers the useEffect hook to reconnect
+        }
+    }, [wsUrl]); // Depends on wsUrl to prevent re-renders of components using this function.
+
+    return {
+        sendJsonMessage,
+        lastJsonMessage,
+        isConnected,
+        connect, // Expose for manual reconnect attempts
+        changeWebSocketUrl, // NEW: Expose function to change URL
+        activeUrl: wsUrl,   // NEW: Expose the current URL being used
+    };
 };
