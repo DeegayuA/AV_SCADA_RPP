@@ -5,20 +5,68 @@ import logo2 from "@/av_logo.svg";
 
 export const WS_PORT = 2001;
 export const WS_API_PATH = "/api/opcua"; // This is your existing API route
-export const WS_URL = (() => {
+
+// Define a function to get the WebSocket URL
+export const getWebSocketUrl = async (): Promise<string> => {
+    // Default fallback for server-side or non-browser environments
+    const defaultWsUrl = `ws://localhost:${WS_PORT}`;
+
+    if (typeof window === 'undefined') {
+        return defaultWsUrl;
+    }
+
+    // Attempt to get from Capacitor Preferences first
+    try {
+        const capacitorPreferences = await import('@capacitor/preferences');
+        if (window.Capacitor && window.Capacitor.isNativePlatform && capacitorPreferences.Preferences) {
+            const { value } = await capacitorPreferences.Preferences.get({ key: 'backendUrl' });
+            if (value) {
+                console.log(`Using backend URL from Preferences for WS: ${value}`);
+                // Assuming the saved URL is an HTTP base URL, convert it to a WS URL
+                const httpUrl = new URL(value);
+                const wsProtocol = httpUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+                // If the saved URL includes a path for API, we might need to handle it here
+                // For now, let's assume it's just the base `hostname:port`
+                return `${wsProtocol}//${httpUrl.host}`;
+            }
+        }
+    } catch (error) {
+        console.warn('Could not check Capacitor Preferences, proceeding with default logic:', error);
+    }
+
+    // Fallback to dynamic URL based on window.location
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const hostname = window.location.hostname;
+
+    // Vercel default URL
+    if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+      return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
+    }
+
+    if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local')) {
+        // For local development, connect to hostname:port
+        return `${protocol}//${hostname}:${WS_PORT}`;
+    } else {
+        // For other deployed environments, connect to hostname/path
+        return `${protocol}//${hostname}${WS_API_PATH}`;
+    }
+};
+
+// Export a placeholder or a synchronously determined URL for components that can't be async
+// This will be the initial value before the async function resolves.
+export const WS_URL_INITIAL = (() => {
     if (typeof window !== 'undefined') {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const hostname = window.location.hostname;
-
-        if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.')) { // Better check for local/dev
-            // For local development, connect to hostname:port
-            return `${protocol}//${hostname}:${WS_PORT}`;
-        } else {
-            // For deployed environments (like Vercel), connect to hostname/path (standard port 443 for wss)
-            return `${protocol}//${hostname}${WS_API_PATH}`;
+        if (hostname === 'localhost') {
+            return `ws://localhost:${WS_PORT}`;
         }
+         // Vercel default URL
+        if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+            return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
+        }
+        return `${protocol}//${hostname}${WS_API_PATH}`;
     }
-    // Fallback for server-side or non-browser environments (local default)
     return `ws://localhost:${WS_PORT}`;
 })();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://0.0.0.0:4841";

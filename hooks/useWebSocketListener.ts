@@ -1,6 +1,6 @@
 // hooks/useWebSocketListener.ts
 import { useAppStore } from '@/stores/appStore';
-import { WS_URL } from '@/config/constants';
+import { getWebSocketUrl, WS_URL_INITIAL } from '@/config/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner'; // Keep this for triggering toasts
 
@@ -31,19 +31,36 @@ interface ServerToastMessage extends WebSocketMessageFromServer {
 
 
 export const useWebSocket = () => {
-    // lastJsonMessage can now hold any structured message from the server,
-    // including your custom 'toast' messages.
     const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessageFromServer | null>(null);
     const [isConnected, setIsConnected] = useState(false);
+    const [wsUrl, setWsUrl] = useState<string>(WS_URL_INITIAL);
     const ws = useRef<WebSocket | null>(null);
     const reconnectIntervalId = useRef<NodeJS.Timeout | null>(null);
     const maxReconnectAttempts = useRef(10);
     const currentReconnectAttempts = useRef(0);
 
+    useEffect(() => {
+        let isMounted = true;
+        const fetchWsUrl = async () => {
+            try {
+                const url = await getWebSocketUrl();
+                if (isMounted) {
+                    setWsUrl(url);
+                }
+            } catch (error) {
+                console.error("Error fetching WebSocket URL:", error);
+                toast.error("Network Error", { description: "Could not determine server address." });
+            }
+        };
+
+        fetchWsUrl();
+        return () => { isMounted = false; };
+    }, []);
+
     const connect = useCallback(() => {
-        if (!WS_URL) {
-            console.error("WebSocket: WS_URL is not defined. Cannot connect.");
-            toast.error("Configuration Error", { description: "WebSocket URL is missing."});
+        if (!wsUrl) {
+            console.error("WebSocket: URL is not available yet. Cannot connect.");
+            toast.error("Configuration Error", { description: "WebSocket URL is missing." });
             return;
         }
 
@@ -51,14 +68,14 @@ export const useWebSocket = () => {
             return;
         }
 
-        console.log(`WebSocket: Attempting connection #${currentReconnectAttempts.current + 1} to ${WS_URL}...`);
-        ws.current = new WebSocket(WS_URL);
+        console.log(`WebSocket: Attempting connection #${currentReconnectAttempts.current + 1} to ${wsUrl}...`);
+        ws.current = new WebSocket(wsUrl);
 
         ws.current.onopen = () => {
-            console.log("WebSocket: Connection established with", WS_URL);
+            console.log("WebSocket: Connection established with", wsUrl);
             toast.success("Real-time Sync Active", { id: "ws-connect", duration: 3000 });
             setIsConnected(true);
-            currentReconnectAttempts.current = 0; 
+            currentReconnectAttempts.current = 0;
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
         };
 
@@ -197,10 +214,10 @@ export const useWebSocket = () => {
                 console.log("WebSocket: Connection closed because the endpoint is going away.");
             }
         };
-    }, [WS_URL]); // Removed maxReconnectAttempts from dependencies as it's a ref
+    }, [wsUrl]);
 
     useEffect(() => {
-        if (typeof window !== 'undefined') { 
+        if (typeof window !== 'undefined' && wsUrl) {
            connect();
         }
         return () => {
