@@ -1,79 +1,74 @@
 // store/appStore.ts
 import { create } from 'zustand';
 import { persist, createJSONStorage, StateStorage } from 'zustand/middleware';
+import React, { useCallback } from 'react'; // forwardRef and createElement are part of React, moved useCallback here
+import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+
 import {
     DataPoint,
     CustomNodeType,
     CustomFlowEdge,
-} from '@/types/sld';
-import { User, UserRole } from '@/types/auth'; // Assuming auth types are correct
-import { logActivity } from '@/lib/activityLog'; // Import logActivity
+} from '@/types/sld'; // Corrected path
+import { ActiveAlarm } from '@/types';
+import { User, UserRole } from '@/types/auth';
+import { logActivity } from '@/lib/activityLog';
 import {
     ApiConfig,
     ApiDowntimeEvent,
     ApiInstanceConfig,
-    API_MONITORING_CONFIG_KEY,
-    API_MONITORING_DOWNTIME_KEY
-} from '@/types/apiMonitoring'; // Import new types and keys
-import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
-
-import React from 'react'; // forwardRef and createElement are part of React
-import { toast } from 'sonner';
-import { dataPoints as rawDataPoints } from '@/config/dataPoints'; // Assuming dataPoints are defined here
+} from '@/types/apiMonitoring';
+import { WebSocketMessageToServer } from '@/hooks/useWebSocketListener';
+import { dataPoints as rawDataPoints } from '@/config/dataPoints';
 
 // Process rawDataPoints for icons, ensure this pattern works for your icon components
 const dataPointsWithIcons = rawDataPoints.map((dp) => {
-  let iconComponent = dp.icon; // Assume dp.icon is already a React Component or null/undefined
-  // If dp.icon was a function that _returns_ a component or JSX, that's different.
-  // The original forwardRef approach might be if dp.icon itself needs a ref.
-  // For simple LucideIcon components, they are already functions/components.
-  if (dp.icon && typeof dp.icon === 'function' && !(React.isValidElement(dp.icon))) {
-      // This condition tries to check if it's a component function vs already an element instance
-      // If dp.icon is like `BatteryCharging`, it's already a component.
-      // The forwardRef example from original code seems complex if icons are just standard components.
-      // Simpler: just use the icon component directly if it's a valid React component type.
-      // For this example, assuming dp.icon are direct Lucide components:
-      // iconComponent = dp.icon; (no change needed if already a component)
-  }
-  return { ...dp, icon: iconComponent };
+  // Assuming dp.icon is already a valid React Component, no complex processing needed.
+  return { ...dp, icon: dp.icon };
 });
-
 
 const defaultUser: User = {
   email: 'guest@example.com',
   name: 'Guest Viewer',
   role: UserRole.VIEWER,
-  redirectPath: '/dashboard', // Example path
-  avatar: `https://avatar.vercel.sh/guest.png`, // Example avatar
+  redirectPath: '/dashboard',
+  avatar: `https://avatar.vercel.sh/guest.png`,
 };
 
 interface AppState {
-  opcUaNodeValues: Record<string, string | number | boolean>; // Renamed and typed
-  dataPoints: Record<string, DataPoint>; // Keyed by DataPoint ID for easy lookup
+  opcUaNodeValues: Record<string, string | number | boolean>;
+  dataPoints: Record<string, DataPoint>;
   isEditMode: boolean;
   currentUser: User | null;
-  selectedElementForDetails: CustomNodeType | CustomFlowEdge | null; // Added for detail sheet
+  selectedElementForDetails: CustomNodeType | CustomFlowEdge | null;
   soundEnabled: boolean;
-  activeAlarms: ActiveAlarm[]; // Added for system-wide alarm display
-  // API Monitoring State
+  activeAlarms: ActiveAlarm[];
   apiConfigs: Record<string, ApiConfig>;
   apiDowntimes: ApiDowntimeEvent[];
+  isWebSocketConnected: boolean;
+  activeWebSocketUrl: string;
+  sendJsonMessage: (message: WebSocketMessageToServer) => void;
+}
+interface TransientState {
+  setSendJsonMessage: (fn: (message: WebSocketMessageToServer) => void) => void;
 }
 
 const initialState: AppState = {
-  opcUaNodeValues: {}, // Initialized to empty object
-  dataPoints: dataPointsWithIcons.reduce<Record<string, DataPoint>>((acc, dp) => {
-    acc[dp.id] = { ...dp, label: dp.label || dp.name || dp.id }; // Ensure label exists
-    return acc;
-  }, {}),
-  isEditMode: false, // Default to false, admin can toggle
-  currentUser: defaultUser, // Default to guest or null if prefer explicit login
-  selectedElementForDetails: null, // Initialize as null
+  opcUaNodeValues: {},
+  dataPoints: dataPointsWithIcons.reduce<Record<string, DataPoint>>((acc, dp) => { acc[dp.id] = dp; return acc; }, {}),
+  isEditMode: false,
+  currentUser: defaultUser,
+  selectedElementForDetails: null,
   soundEnabled: typeof window !== 'undefined' ? localStorage.getItem('dashboardSoundEnabled') === 'true' : true,
-  activeAlarms: [], // Initialize as empty
-  // API Monitoring Initial State
+  activeAlarms: [],
   apiConfigs: {},
   apiDowntimes: [],
+  isWebSocketConnected: false,
+  activeWebSocketUrl: '',
+  // --- ADDED: Default function for sendJsonMessage to satisfy AppState type ---
+  sendJsonMessage: (message: WebSocketMessageToServer) => {
+    console.warn("WebSocket send function not yet initialized. Message ignored:", message);
+  },
 };
 
 interface ApiMonitoringActions {
@@ -88,40 +83,32 @@ interface ApiMonitoringActions {
   clearApiMonitoringData: () => void;
 }
 
-interface SLDActions extends ApiMonitoringActions { // Extend SLDActions with new ones
-  updateOpcUaNodeValues: (updates: Record<string, string | number | boolean>) => void; // Renamed and typed
-  setDataPoints: (dataPoints: Record<string, DataPoint>) => void; // For dynamic updates to metadata if needed
+interface SLDActions extends ApiMonitoringActions {
+  updateOpcUaNodeValues: (updates: Record<string, string | number | boolean>) => void;
+  setDataPoints: (dataPoints: Record<string, DataPoint>) => void;
   toggleEditMode: () => void;
   setCurrentUser: (user: User | null) => void;
   logout: () => void;
-  setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) => void; // Added action
+  setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) => void;
   updateNodeConfig: (nodeId: string, config: any, data?: any) => void;
   setSoundEnabled: (enabled: boolean) => void;
-  setActiveAlarms: (alarms: ActiveAlarm[]) => void; // Added action
+  setActiveAlarms: (alarms: ActiveAlarm[]) => void;
+  setWebSocketStatus: (isConnected: boolean, url: string) => void;
 }
 
 const onRehydrateStorageCallback = (
-    hydratedState: (AppState & Partial<ApiMonitoringActions>) | undefined, // Updated type
+    hydratedState: (AppState & SLDActions & TransientState) | undefined,
     error?: Error | unknown
 ): void => {
     if (error) {
         console.error("Zustand (appStore): Failed to rehydrate state from storage.", error);
         const errorMessage = error instanceof Error ? error.message : String(error);
         toast.error("Session Restore Failed", { description: `Could not restore your session data. Details: ${errorMessage}. Some settings may be reset.` });
-    } else {
-        // console.log("Zustand (appStore): Hydration from storage complete.");
-        if (hydratedState?.currentUser && hydratedState.currentUser.email !== defaultUser.email) {
-            // console.log("Zustand (appStore): Rehydrated with User:", hydratedState.currentUser.email, "Role:", hydratedState.currentUser.role);
-        }
-        // Load API configs and downtimes from localStorage if they exist in the hydrated state
-        // This ensures that persisted API monitoring data is loaded into the store on startup.
-        // Note: This is a bit manual; Zustand's persist middleware handles the actual hydration.
-        // This callback is more for logging or reacting to hydration.
-        // If `apiConfigs` and `apiDowntimes` are part of the persisted state, they will be automatically restored.
+    } else if (hydratedState?.currentUser && hydratedState.currentUser.email !== defaultUser.email) {
+        // console.log("Zustand (appStore): Rehydrated with User:", hydratedState.currentUser.email);
     }
 };
 
-// Define the storage explicitly to handle potential SSR issues if localStorage isn't available immediately
 const safeLocalStorage: StateStorage = typeof window !== 'undefined'
   ? {
       getItem: (name) => {
@@ -152,92 +139,91 @@ const safeLocalStorage: StateStorage = typeof window !== 'undefined'
       setItem: () => {},
       removeItem: () => {},
     };
-export const useAppStore = create<AppState & SLDActions>()(
+
+export const useAppStore = create<AppState & SLDActions & TransientState>()(
   persist(
     (set, get) => ({
       ...initialState,
 
-      updateOpcUaNodeValues: (updates: Record<string, string | number | boolean>) => // Renamed and typed
+      setSendJsonMessage: (fn: (message: WebSocketMessageToServer) => void) => set({ sendJsonMessage: fn }),
+
+      updateOpcUaNodeValues: (updates) =>
         set((state) => {
           if (typeof updates !== 'object' || updates === null) {
-            // console.warn("Zustand (appStore): updateOpcUaNodeValues received non-object data. Ignoring update.", updates);
-            return state; // No change if updates is not a valid object
+            console.warn("Zustand (appStore): updateOpcUaNodeValues received non-object data. Ignoring update.", updates);
+            return state;
           }
-          // Merge updates with existing opcUaNodeValues
           return { opcUaNodeValues: { ...state.opcUaNodeValues, ...updates }};
         }),
 
-      setDataPoints: (newDataPoints: Record<string, DataPoint>) =>
+      setDataPoints: (newDataPoints) =>
         set({ dataPoints: newDataPoints }),
 
       toggleEditMode: () => {
         const currentUser = get().currentUser;
-        if (currentUser?.role === UserRole.ADMIN) { 
+        if (currentUser?.role === UserRole.ADMIN) {
           set((state) => ({ isEditMode: !state.isEditMode }));
           toast.info(`Edit Mode ${get().isEditMode ? "Enabled" : "Disabled"}`);
         } else {
-          console.warn('Attempt to toggle edit mode by non-admin/editor user:', currentUser?.email);
+          console.warn('Attempt to toggle edit mode by non-admin user:', currentUser?.email);
           toast.error("Access Denied", { description: "You do not have permission to change edit mode." });
         }
       },
 
-      setCurrentUser: (user: User | null) => {
-        const previousUser = get().currentUser; // Get current user before update
+      setCurrentUser: (user) => {
+        const previousUser = get().currentUser;
         const currentEditMode = get().isEditMode;
 
-        set({ 
-            currentUser: user, 
-            isEditMode: user && (user.role === UserRole.ADMIN) ? currentEditMode : false 
+        set({
+            currentUser: user,
+            isEditMode: user?.role === UserRole.ADMIN ? currentEditMode : false
         });
 
         if (previousUser && user === null) {
-          // User is being logged out
           logActivity(
             'LOGOUT',
             { email: previousUser.email, role: previousUser.role },
             typeof window !== 'undefined' ? window.location.pathname : undefined
           );
-        } else if (!previousUser && user) {
-          // User is logging in - this is already handled by the login page.
-          // No action needed here to avoid double logging for login.
         }
-        // Removed toast.info for login from here as it's better handled on the login page
       },
 
       logout: () => {
-        // Also log when explicit logout action is called
         const previousUser = get().currentUser;
-        if (previousUser && previousUser.email !== defaultUser.email) { // Avoid logging if already guest
+        if (previousUser && previousUser.email !== defaultUser.email) {
           logActivity(
             'LOGOUT',
             { email: previousUser.email, role: previousUser.role },
             typeof window !== 'undefined' ? window.location.pathname : undefined
           );
         }
-        set({ currentUser: defaultUser, isEditMode: false, selectedElementForDetails: null }); // Revert to default user on logout, clear selected element
+        set({ currentUser: defaultUser, isEditMode: false, selectedElementForDetails: null });
         toast.success("Logged Out", { description: "You have been successfully signed out." });
       },
 
-      setSelectedElementForDetails: (element: CustomNodeType | CustomFlowEdge | null) =>
+      setSelectedElementForDetails: (element) =>
         set({ selectedElementForDetails: element }),
-      
-      updateNodeConfig: (nodeId: string, config: any, data?: any) => {
-        // Implementation of updateNodeConfig
-        // You need to implement this method according to your requirements
+
+      updateNodeConfig: (nodeId, config, data) => {
         console.log('Updating node config for', nodeId, config, data);
-        // Example implementation - update with actual logic as needed
         set((state) => {
-          // Update logic here - this is just a placeholder
+          // Placeholder for actual implementation
           return state;
         });
       },
-      setSoundEnabled: (enabled: boolean) => {
+
+      setSoundEnabled: (enabled) => {
         set({ soundEnabled: enabled });
         if (typeof window !== 'undefined') {
           localStorage.setItem('dashboardSoundEnabled', String(enabled));
         }
       },
-      setActiveAlarms: (alarms: ActiveAlarm[]) => set({ activeAlarms: alarms }),
+      setActiveAlarms: (alarms) => set({ activeAlarms: alarms }),
+
+      setWebSocketStatus: (isConnected, url) => set({
+        isWebSocketConnected: isConnected,
+        activeWebSocketUrl: url
+      }),
 
       // --- API Monitoring Actions ---
       addApiConfig: (newConfigPartial) => set((state) => {
@@ -259,7 +245,7 @@ export const useAppStore = create<AppState & SLDActions>()(
       updateApiConfig: (configId, updates) => set((state) => {
         const existingConfig = state.apiConfigs[configId];
         if (!existingConfig) return state;
-        // Handle localApi and onlineApi updates carefully if they are partial
+
         let updatedLocalApi = existingConfig.localApi;
         if (updates.localApi) {
             updatedLocalApi = { ...existingConfig.localApi, ...updates.localApi };
@@ -280,7 +266,6 @@ export const useAppStore = create<AppState & SLDActions>()(
 
       removeApiConfig: (configId) => set((state) => {
         const { [configId]: _, ...remainingConfigs } = state.apiConfigs;
-        // Also remove related downtimes
         const remainingDowntimes = state.apiDowntimes.filter(dt => dt.apiConfigId !== configId);
         return { apiConfigs: remainingConfigs, apiDowntimes: remainingDowntimes };
       }),
@@ -294,10 +279,9 @@ export const useAppStore = create<AppState & SLDActions>()(
             ...(urlType === 'local' ? config.localApi : config.onlineApi),
             status,
             lastChecked: nowISO,
-            error: errorMsg || undefined, // Set error on the instance, or clear it if no errorMsg
+            error: errorMsg || undefined,
         };
 
-        // Clear instance error if status is now online or disabled
         if (status === 'online' || status === 'disabled') {
             delete updatedInstanceConf.error;
         }
@@ -309,14 +293,9 @@ export const useAppStore = create<AppState & SLDActions>()(
             updatedConfig.onlineApi = updatedInstanceConf;
         }
 
-        // Update overall ApiConfig lastError. This could be more sophisticated,
-        // e.g., prioritizing local errors or combining them.
-        // For now, if the current instance being updated has an error, set it as the main error.
-        // If it's online, clear the main error only if the other instance is also not in error.
         if (updatedInstanceConf.error) {
             updatedConfig.lastError = `${urlType === 'local' ? 'Local' : 'Online'} Error: ${updatedInstanceConf.error}`;
         } else {
-            // If this instance is now fine, check the other one before clearing the main error
             const otherInstance = urlType === 'local' ? updatedConfig.onlineApi : updatedConfig.localApi;
             if (!otherInstance.error) {
                  delete updatedConfig.lastError;
@@ -325,23 +304,16 @@ export const useAppStore = create<AppState & SLDActions>()(
             }
         }
 
-
-        // Basic downtime tracking within this action for simplicity of transition
-        // More robust logic might be in a separate service/hook that calls these store actions
         if (status === 'offline' || status === 'error') {
             if (!updatedInstanceConf.downtimeStart) {
                 updatedInstanceConf.downtimeStart = nowISO;
-                // Potentially create a new ApiDowntimeEvent here if not handled by dedicated actions
             }
         } else if (status === 'online') {
             if (updatedInstanceConf.downtimeStart) {
-                // End the downtime period
-                // This might also be a place to create/resolve an ApiDowntimeEvent
                 delete updatedInstanceConf.downtimeStart;
                 delete updatedInstanceConf.currentDowntimeDuration;
             }
         }
-
 
         return { apiConfigs: { ...state.apiConfigs, [configId]: updatedConfig } };
       }),
@@ -356,20 +328,19 @@ export const useAppStore = create<AppState & SLDActions>()(
           endTime: null,
           acknowledged: false,
         };
-        // Also update the specific ApiInstanceConfig
         const config = state.apiConfigs[apiConfigId];
         if (config) {
             const instanceToUpdate = urlType === 'local' ? config.localApi : config.onlineApi;
             const updatedInstanceConf: ApiInstanceConfig = {
                 ...instanceToUpdate,
-                downtimeStart: startTime.toISOString(), // Ensure this is also set on the instance
+                downtimeStart: startTime.toISOString(),
             };
             const updatedConfig = { ...config };
             if (urlType === 'local') updatedConfig.localApi = updatedInstanceConf;
             else updatedConfig.onlineApi = updatedInstanceConf;
 
             return {
-                apiDowntimes: [...state.apiDowntimes.filter(d => !(d.apiConfigId === apiConfigId && d.urlType === urlType && d.endTime === null)), newDowntime], // Avoid duplicate ongoing downtimes
+                apiDowntimes: [...state.apiDowntimes.filter(d => !(d.apiConfigId === apiConfigId && d.urlType === urlType && d.endTime === null)), newDowntime],
                 apiConfigs: { ...state.apiConfigs, [apiConfigId]: updatedConfig }
             };
         }
@@ -388,17 +359,15 @@ export const useAppStore = create<AppState & SLDActions>()(
           return dt;
         });
 
-        if (!downtimeResolved) return state; // No open downtime found to resolve for this specific instance
+        if (!downtimeResolved) return state;
 
-        // Also clear downtimeStart from ApiInstanceConfig
         const config = state.apiConfigs[apiConfigId];
         if (config) {
             const instanceConf = urlType === 'local' ? config.localApi : config.onlineApi;
-            // Only update if downtimeStart was actually set (consistency)
             if (instanceConf.downtimeStart) {
                  const updatedInstanceConf = {...instanceConf};
                  delete updatedInstanceConf.downtimeStart;
-                 delete updatedInstanceConf.currentDowntimeDuration; // This will be recalculated by UI or a selector
+                 delete updatedInstanceConf.currentDowntimeDuration;
 
                  const updatedConfig = { ...config };
                  if (urlType === 'local') updatedConfig.localApi = updatedInstanceConf;
@@ -416,22 +385,18 @@ export const useAppStore = create<AppState & SLDActions>()(
       loadApiConfigs: (configs) => set({ apiConfigs: configs }),
       loadApiDowntimes: (downtimes) => set({ apiDowntimes: downtimes }),
       clearApiMonitoringData: () => set ({ apiConfigs: {}, apiDowntimes: [] }),
-
     }),
     {
-      name: 'app-user-session-storage', // More specific name
-      storage: createJSONStorage(() => safeLocalStorage), // Use safe local storage
-      partialize: (state: AppState & SLDActions): Partial<AppState> => ({ // Only persist these parts
-        // currentUser: state.currentUser, // Example: persist currentUser
+      name: 'app-user-session-storage',
+      storage: createJSONStorage(() => safeLocalStorage),
+      partialize: (state: AppState & SLDActions & TransientState): Partial<AppState> => ({
         isEditMode: state.isEditMode,
-        soundEnabled: state.soundEnabled, // Persist soundEnabled
-        // activeAlarms: state.activeAlarms, // Persisting active alarms might be too much, they should be re-read from DB
-        // Do NOT persist opcUaNodeValues or dataPoints metadata from constants
-        // selectedElementForDetails should also NOT be persisted as it's transient UI state
-        apiConfigs: state.apiConfigs, // Persist API configurations
-        apiDowntimes: state.apiDowntimes, // Persist API downtimes
+        soundEnabled: state.soundEnabled,
+        apiConfigs: state.apiConfigs,
+        apiDowntimes: state.apiDowntimes,
+        currentUser: state.currentUser,
       }),
-      onRehydrateStorage: (state) => onRehydrateStorageCallback(state as (AppState & Partial<ApiMonitoringActions>) | undefined), // Cast type
+      onRehydrateStorage: (state) => onRehydrateStorageCallback(state as (AppState & SLDActions & TransientState) | undefined),
     }
   )
 );
@@ -440,18 +405,19 @@ export const useAppStore = create<AppState & SLDActions>()(
 export const useIsEditMode = () => useAppStore((state) => state.isEditMode);
 export const useCurrentUser = () => useAppStore((state) => state.currentUser);
 export const useCurrentUserRole = () => useAppStore((state) => state.currentUser?.role);
-export const useSelectedElementForDetails = () => useAppStore((state) => state.selectedElementForDetails); // New hook
+export const useSelectedElementForDetails = () => useAppStore((state) => state.selectedElementForDetails);
 export const useSoundEnabled = () => useAppStore((state) => state.soundEnabled);
-export const useActiveAlarms = () => useAppStore((state) => state.activeAlarms); // New hook
+export const useActiveAlarms = () => useAppStore((state) => state.activeAlarms);
 
 // API Monitoring Hooks
 export const useApiConfigs = () => useAppStore((state) => state.apiConfigs);
 export const useApiDowntimes = () => useAppStore((state) => state.apiDowntimes);
+export const useWebSocketStatus = () => useAppStore((state) => ({
+    isConnected: state.isWebSocketConnected,
+    activeUrl: state.activeWebSocketUrl,
+}));
+export const useSendJsonMessage = () => useAppStore((state) => state.sendJsonMessage);
 
 // Get a single OPC UA node value, subscribing only to changes for that ID
-export const useOpcUaNodeValue = (nodeId: string | undefined): string | number | boolean | undefined => 
+export const useOpcUaNodeValue = (nodeId: string | undefined): string | number | boolean | undefined =>
     useAppStore(useCallback((state) => nodeId ? state.opcUaNodeValues[nodeId] : undefined, [nodeId]));
-
-// useCallback imported from React for useOpcUaNodeValue hook
-import { useCallback } from 'react';
-import { ActiveAlarm } from '@/types';
