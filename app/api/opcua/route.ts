@@ -218,7 +218,7 @@ async function browseAllNodes(session: ClientSession): Promise<DiscoveredDataPoi
               initialValue: initialValue,
               dataType: dataTypeString,
             });
-            console.log(`Found Variable: ${name} (${discoveredNodeIdString}), Value: ${initialValue}, DataType: ${dataTypeString}`);
+            // console.log(`Found Variable: ${name} (${discoveredNodeIdString}), Value: ${initialValue}, DataType: ${dataTypeString}`);
           }
 
           // If the node is an Object or might have children, add it to the queue for further browsing
@@ -261,7 +261,7 @@ async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ succ
 
     discoveryProgressCache = { status: "Saving results to file...", percentage: 95, details: `Preparing to save ${discoveredDataPoints.length} discovered data points.`, timestamp: Date.now() };
     console.log(`Discovered ${discoveredDataPoints.length} datapoints. Attempting to save to file...`);
-    const filePath = path.join(process.cwd(), 'discovered_datapoints.json');
+    const filePath = path.join(process.cwd(), 'config', 'discovered_datapoints.json');
     const jsonData = JSON.stringify(discoveredDataPoints, null, 2);
 
     try {
@@ -489,7 +489,7 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
                 } catch (writeError: any) {
                     const errorMsg = `OPC UA write error for '${dataPointConfig.name || opcUaNodeId}': ${writeError?.message || 'Unknown'}`;
                     console.error(errorMsg);
-                    sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
+sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
                     sendToastToClient(ws, 'error', errorMsg);
                     if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
                         opcuaSession = null; stopDataPolling(); attemptReconnect("controlWrite_error_session_lost");
@@ -953,46 +953,58 @@ async function disconnectOPCUA() {
 
 export async function GET(req: NextRequest) {
     await ensureWebSocketServerInitialized();
+    
+    const isVercel = process.env.VERCEL === "1";
     const upgradeHeader = req.headers.get('upgrade');
 
     if (upgradeHeader?.toLowerCase() === 'websocket') {
-        console.log(`GET /api/opcua: Detected WebSocket upgrade request (Vercel: ${process.env.VERCEL === "1"})`);
-        if (process.env.VERCEL === "1") {
-            if (vercelWsServer) {
-                console.log("Relying on Vercel's implicit WebSocket upgrade handling for 'noServer: true' WSS.");
-                const response = new Response(null, { status: 101 });
-                return response;
-            } else {
-                console.error("Vercel WebSocket upgrade detected, but vercelWsServer not initialized.");
-                return new NextResponse("WebSocket service not ready.", { status: 503 });
-            }
+        if (isVercel) {
+            console.log("Detected WebSocket upgrade request on Vercel. Allowing environment to handle it.");
+            return new NextResponse(null, { status: 101 });
         } else {
-            console.warn("WebSocket upgrade request to /api/opcua in local/non-Vercel env. This path is not for direct WS upgrades locally.");
-            return new NextResponse("Misconfigured WebSocket upgrade. Connect directly to ws port.", { status: 426 });
+            console.warn(`WebSocket upgrade request received on main app port, but this is a non-Vercel environment. Clients must connect directly to the WebSocket port: ${WS_PORT}.`);
+            return new NextResponse("Misconfigured WebSocket upgrade. Connect directly to the dedicated WebSocket port.", { status: 426 });
         }
     }
 
-    const host = req.headers.get("host") || "";
-    const reqUrl = req.nextUrl;
+    // --- Dynamic HTTP GET Request Handling ---
+
+    // 1. Get the hostname the browser used to access the page.
+    let hostname = req.nextUrl.hostname;
+
+    // 2. Sanitize the hostname. This is key for avoiding "localhost" issues when accessed remotely.
+    if (hostname === '0.0.0.0' || hostname === '::') {
+        console.warn(
+            `Request hostname is '${hostname}', a non-routable listen-all address. ` +
+            `Replacing with 'localhost' for the client's WebSocket URL. ` +
+            `To connect from other devices, please use the server's network IP address in your browser.`
+        );
+        hostname = 'localhost';
+    }
+
+    // 3. Construct the dynamic WebSocket URL based on the determined hostname.
+    const isSecure = req.headers.get("x-forwarded-proto") === "https" || req.nextUrl.protocol === "https:";
     
-    const xForwardedProto = req.headers.get("x-forwarded-proto");
-    let protocol = "http";
-    if (xForwardedProto) {
-        protocol = xForwardedProto.split(',')[0].trim();
-    } else if (req.nextUrl.protocol) {
-        protocol = req.nextUrl.protocol.slice(0, -1);
-    } else if (process.env.NODE_ENV === "production" && host.includes("vercel.app")) {
-        protocol = "https";
-    }
-    const origin = `${protocol}://${host}`;
+    let webSocketUrl;
 
-    if (reqUrl.pathname === '/api/opcua' || reqUrl.pathname === '/api/opcua/') {
-        const dashboardUrl = new URL('/control', origin);
-        console.log(`HTTP GET to /api/opcua, redirecting to ${dashboardUrl.toString()}`);
-        return NextResponse.redirect(dashboardUrl.toString(), 302);
+    if (isVercel) {
+        // This is already dynamic and correct for production on Vercel
+        const wsProtocol = isSecure ? "wss" : "ws";
+        webSocketUrl = `${wsProtocol}://${hostname}/api/opcua`;
+    } else {
+        // This now works for localhost AND any local network IP
+        const wsProtocol = "ws"; // Typically 'ws' for local dev, not 'wss'
+        webSocketUrl = `${wsProtocol}://${hostname}:${WS_PORT}`;
     }
 
-    return new NextResponse("OPC UA WebSocket Service is active. This is the HTTP endpoint.", { status: 200 });
+    console.log(`Responding with dynamically determined WebSocket URL: ${webSocketUrl}`);
+
+    // For a standard HTTP GET, respond with the service status and the calculated WebSocket URL.
+    return NextResponse.json({
+        message: "OPC UA WebSocket service is active. Use the provided URL to connect.",
+        status: opcuaSession ? "OPC-UA Connected" : "OPC-UA Not Connected",
+        webSocketUrl: webSocketUrl,
+    });
 }
 
 

@@ -1,30 +1,82 @@
 // config/constants.ts
 
-import logo from "@/AV_logo.png"; // Ensure these paths are correct if this file is in a different dir
+import logo from "@/AV_logo.png";
 import logo2 from "@/av_logo.svg";
 
+// Base configuration
 export const WS_PORT = 2001;
-export const WS_API_PATH = "/api/opcua"; // This is your existing API route
-export const WS_URL = (() => {
-    if (typeof window !== 'undefined') {
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const hostname = window.location.hostname;
+export const WS_API_PATH = "/api/opcua";
+export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
+export const WEBSOCKET_CUSTOM_URL_KEY = `${LOCAL_STORAGE_KEY_PREFIX}custom_websocket_url`;
 
-        if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.')) { // Better check for local/dev
-            // For local development, connect to hostname:port
-            return `${protocol}//${hostname}:${WS_PORT}`;
-        } else {
-            // For deployed environments (like Vercel), connect to hostname/path (standard port 443 for wss)
-            return `${protocol}//${hostname}${WS_API_PATH}`;
-        }
+/**
+ * Gets the definitive WebSocket URL.
+ * THIS IS THE SINGLE SOURCE OF TRUTH for the WebSocket address in the entire application.
+ * The logic follows a specific priority:
+ * 1. User-defined custom URL in localStorage.
+ * 2. Backend URL from Capacitor Preferences (for native mobile apps).
+ * 3. Dynamic URL based on the deployment environment (Vercel, local network, etc.).
+ *
+ * @returns {Promise<string>} A promise that resolves to the WebSocket URL to use.
+ */
+export const getWebSocketUrl = async (): Promise<string> => {
+    // Default fallback for server-side or non-browser environments
+    const defaultWsUrl = `ws://localhost:${WS_PORT}`;
+
+    if (typeof window === 'undefined') {
+        return defaultWsUrl;
     }
-    // Fallback for server-side or non-browser environments (local default)
-    return `ws://localhost:${WS_PORT}`;
-})();
-export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
-export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.251.229:4840";
-export const VERSION = "- Release v2025.06.26 • 16:30 (GMT+5:30)";
-export const PLANT_NAME= "Mini Grid";
+
+    // PRIORITY 1: Check for a user-defined URL in localStorage
+    const customUrl = localStorage.getItem(WEBSOCKET_CUSTOM_URL_KEY);
+    if (customUrl && customUrl.trim() !== '') {
+        console.log(`Using custom WebSocket URL from localStorage: ${customUrl}`);
+        return customUrl;
+    }
+
+    // PRIORITY 2: Attempt to get from Capacitor Preferences (for native apps)
+    try {
+        // Dynamic import to avoid errors in non-Capacitor environments
+        const capacitorPreferences = await import('@capacitor/preferences');
+        if (window.Capacitor && window.Capacitor.isNativePlatform && capacitorPreferences.Preferences) {
+            const { value } = await capacitorPreferences.Preferences.get({ key: 'backendUrl' });
+            if (value) {
+                console.log(`Using backend URL from Capacitor Preferences for WS: ${value}`);
+                const httpUrl = new URL(value);
+                const wsProtocol = httpUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+                return `${wsProtocol}//${httpUrl.host}${WS_API_PATH}`;
+            }
+        }
+    } catch (error) {
+        // This is an expected warning if Capacitor is not available.
+        // console.warn('Could not check Capacitor Preferences, proceeding with default logic:', error);
+    }
+
+    // PRIORITY 3: Fallback to dynamic URL based on window.location (for web)
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const hostname = window.location.hostname;
+
+    // Vercel deployment check
+    if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+      return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
+    }
+
+    // Local network / development check
+    if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local')) {
+        return `${protocol}//${hostname}:${WS_PORT}`;
+    }
+
+    // Fallback for other deployed environments
+    return `${protocol}//${hostname}${WS_API_PATH}`;
+};
+
+
+// --- Other Application Constants ---
+
+export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://0.0.0.0:4841";
+export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://123.231.16.208:4841";
+export const VERSION = "- Release v2025.07.15 • 16:30 (GMT+5:30)";
+export const PLANT_NAME= "Ranna 2MW Solar Power Plant";
 export const PLANT_LOCATION = "Ranna, Sri Lanka";
 export const PLANT_TYPE = "Solar Power Plant";
 export const PLANT_CAPACITY = "2000 kW"; // 2 MW
@@ -45,20 +97,16 @@ export const APP_COPYRIGHT_URL = "https://yourwebsite.com/copyright";
 export const APP_PRIVACY_POLICY = "https://yourwebsite.com/privacy-policy";
 export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";
 
-// Potentially in a shared types file or at the top of PowerTimelineGraph.tsx
 export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
 export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 
-
 export const USER = "viewer";
-export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
 
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'ranna_main_sld',
   'Ranna_PLC',
   'PV_Array01',
   'PV_Array02',
-  // PV Arrays 3 to 18
   'PV_Array03',
   'PV_Array04',
   'PV_Array05',
@@ -75,7 +123,6 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'PV_Array16',
   'PV_Array17',
   'PV_Array18',
-  // Weather and Misc
   'weather',
   'misc1',
   'misc2',
@@ -84,10 +131,8 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'Power_Analyser2',
   'MiCom_Relay',
   'empty_template',
-'test_data_nodes_layout',
+  'test_data_nodes_layout',
 ];
 
-// Keys for API Monitoring feature
 export const API_MONITORING_CONFIG_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringConfigs_v1`;
 export const API_MONITORING_DOWNTIME_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringDowntimes_v1`;
-

@@ -443,6 +443,7 @@ export interface WeatherCardConfig {
   numOpcSensorsToShow: number;
   numHourlyForecastsToShow: number;
   numDailyForecastsToShow: number;
+  enabled?: boolean;
 }
 interface WeatherCardProps { initialConfig: WeatherCardConfig; opcUaData: NodeData; allPossibleDataPoints: DataPoint[]; onConfigChange: (newConfig: WeatherCardConfig) => void; }
 export const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${process.env.NEXT_PUBLIC_PLANT_NAME || 'defaultPlant'}`;
