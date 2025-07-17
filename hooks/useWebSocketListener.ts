@@ -179,7 +179,7 @@ export const useWebSocket = () => {
                 // to prevent the reconnect logic from firing on a deliberate unmount.
                 globalWs.onclose = null;
                 if (globalWs.readyState === WebSocket.OPEN) {
-                    globalWs.close(1001, "Client component unmounting");
+                    globalWs.close(1000, "Client component unmounting");
                 }
             }
         };
