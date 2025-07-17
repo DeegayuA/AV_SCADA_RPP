@@ -62,11 +62,8 @@ export const getWebSocketUrl = async (): Promise<string> => {
       return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
     }
 
-    // If the port is specified, use it. Otherwise, use the default WebSocket port.
-    const wsPort = port ? `:${port}` : `:${WS_PORT}`;
-
-    // Construct the base URL
-    let baseUrl = `${protocol}//${hostname}${wsPort}`;
+    // Construct the base URL, always using the default WebSocket port.
+    const baseUrl = `${protocol}//${hostname.split(':')[0]}:${WS_PORT}`;
 
     // For local development, we don't need the API path. For other environments, we do.
     if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local')) {
