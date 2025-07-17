@@ -22,15 +22,16 @@ interface WebSocketMessageFromServer {
   payload: any;
 }
 
-// NOTE: This hook should be initialized ONLY ONCE in a top-level provider/layout
-// to ensure a single, persistent WebSocket connection is created.
+// Global singleton instance of the WebSocket.
+// This ensures that even if the hook is called multiple times, we only have one WebSocket object.
+let globalWs: WebSocket | null = null;
+
 export const useWebSocket = () => {
     const { setWebSocketStatus, updateOpcUaNodeValues, setSendJsonMessage } = useAppStore.getState();
 
     const [isConnected, setIsConnected] = useState(false);
     const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessageFromServer | null>(null);
     const [wsUrl, setWsUrl] = useState<string>('');
-    const ws = useRef<WebSocket | null>(null);
     const reconnectIntervalId = useRef<NodeJS.Timeout | null>(null);
     const maxReconnectAttempts = useRef(10);
     const currentReconnectAttempts = useRef(0);
@@ -54,19 +55,19 @@ export const useWebSocket = () => {
 
     const connect = useCallback(() => {
         if (!wsUrl || wsUrl.trim() === '') return;
-        if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
-            if (ws.current.url === wsUrl) return; // Already connecting/connected to the correct URL
+        if (globalWs && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING)) {
+            if (globalWs.url === wsUrl) return; // Already connecting/connected to the correct URL
         }
 
-        if (ws.current) {
-            ws.current.onclose = null; // Prevent stale onclose handler from firing
-            ws.current.close(1000, "Initiating new connection");
+        if (globalWs) {
+            globalWs.onclose = null; // Prevent stale onclose handler from firing
+            globalWs.close(1000, "Initiating new connection");
         }
 
         console.log(`WebSocket: Attempting connection #${currentReconnectAttempts.current + 1} to ${wsUrl}...`);
-        ws.current = new WebSocket(wsUrl);
+        globalWs = new WebSocket(wsUrl);
 
-        ws.current.onopen = () => {
+        globalWs.onopen = () => {
             console.log("WebSocket: Connection established with", wsUrl);
             toast.dismiss("ws-reconnect-loader"); // Dismiss any lingering reconnect toast
             toast.dismiss("ws-max-reconnect");
@@ -78,7 +79,7 @@ export const useWebSocket = () => {
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
         };
 
-        ws.current.onmessage = (event) => {
+        globalWs.onmessage = (event) => {
             let messageDataString: string;
             if (typeof event.data === 'string') {
                 messageDataString = event.data;
@@ -117,11 +118,11 @@ export const useWebSocket = () => {
             }
         };
 
-        ws.current.onerror = (errorEvent) => {
+        globalWs.onerror = (errorEvent) => {
             console.error("WebSocket: Error event occurred:", errorEvent);
         };
 
-        ws.current.onclose = (event) => {
+        globalWs.onclose = (event) => {
             const reason = event.reason || (event.code === 1000 ? "Normal closure" : `Code ${event.code}`);
             console.log(`WebSocket: Connection closed. Reason: "${reason}", Clean: ${event.wasClean}`);
             setIsConnected(false);
@@ -151,12 +152,12 @@ export const useWebSocket = () => {
     }, [wsUrl, setWebSocketStatus, updateOpcUaNodeValues]);
     
     const sendJsonMessage = useCallback((message: WebSocketMessageToServer) => {
-        if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            try { ws.current.send(JSON.stringify(message)); }
+        if (globalWs && globalWs.readyState === WebSocket.OPEN) {
+            try { globalWs.send(JSON.stringify(message)); }
             catch (error) { console.error("WebSocket: Error sending message:", error); toast.error("Message Send Error"); }
         } else {
             toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server."});
-            if (!useAppStore.getState().isWebSocketConnected && (!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
+            if (!useAppStore.getState().isWebSocketConnected && (!globalWs || globalWs.readyState === WebSocket.CLOSED)) {
                connect();
             }
         }
@@ -173,12 +174,12 @@ export const useWebSocket = () => {
         return () => {
             console.log("WebSocket: Cleaning up global connection in main hook unmount.");
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
-            if (ws.current) {
+            if (globalWs) {
                 // IMPORTANT: Detach the onclose handler BEFORE closing the connection
                 // to prevent the reconnect logic from firing on a deliberate unmount.
-                ws.current.onclose = null; 
-                if (ws.current.readyState === WebSocket.OPEN) {
-                    ws.current.close(1001, "Client component unmounting");
+                globalWs.onclose = null;
+                if (globalWs.readyState === WebSocket.OPEN) {
+                    globalWs.close(1001, "Client component unmounting");
                 }
             }
         };

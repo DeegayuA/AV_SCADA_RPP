@@ -71,10 +71,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="robots" content="noindex, nofollow" />
       </head>
       <body className={inter.className}>
-        {isLoading && <LoadingScreen onDone={() => setIsLoading(false)} />}
         <ThemeProvider attribute="class">
+          {isLoading && <LoadingScreen onDone={() => setIsLoading(false)} />}
           <NotificationSystemProvider />
-          {!isLoading && children}
+          {children}
           <ActiveAlarmsDisplay />
           <PageViewLogger />
         </ThemeProvider>
