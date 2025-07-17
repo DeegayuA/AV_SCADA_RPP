@@ -1,21 +1,20 @@
 // hooks/useWebSocketListener.ts
 import { useAppStore } from '@/stores/appStore';
-import { getWebSocketUrl, WS_URL_INITIAL, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
+import { getWebSocketUrl, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants'; // Removed WS_URL_INITIAL
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { toast } from 'sonner'; // Keep this for triggering toasts
+import { toast } from 'sonner';
 
 export interface WebSocketMessageToServer {
   type: string;
   payload?: any;
 }
 
-// Define a more specific structure for expected toast messages from the server
 interface ToastMessagePayload {
-  severity: 'success' | 'error' | 'warning' | 'info' | 'default'; // Added 'default'
+  severity: 'success' | 'error' | 'warning' | 'info' | 'default';
   message: string;
-  description?: string; // Optional description for sonner
-  duration?: number;    // Optional duration
-  id?: string;          // Optional id for the toast
+  description?: string;
+  duration?: number;
+  id?: string;
 }
 
 interface WebSocketMessageFromServer {
@@ -23,30 +22,30 @@ interface WebSocketMessageFromServer {
   payload: any;
 }
 
-// Specific type for server-sent toast messages
 interface ServerToastMessage extends WebSocketMessageFromServer {
   type: 'toast';
   payload: ToastMessagePayload;
 }
 
-
 export const useWebSocket = () => {
     const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessageFromServer | null>(null);
     const [isConnected, setIsConnected] = useState(false);
-    const [wsUrl, setWsUrl] = useState<string>(WS_URL_INITIAL);
+    // --- FIX: Initialize with an empty string to prevent premature connection ---
+    const [wsUrl, setWsUrl] = useState<string>('');
     const ws = useRef<WebSocket | null>(null);
     const reconnectIntervalId = useRef<NodeJS.Timeout | null>(null);
     const maxReconnectAttempts = useRef(10);
     const currentReconnectAttempts = useRef(0);
 
-    // Effect to fetch the optimal/default WebSocket URL on initial mount.
+    // Effect to fetch the WebSocket URL on initial mount.
+    // It will set the URL and trigger the connection effect only once the URL is resolved.
     useEffect(() => {
         let isMounted = true;
         const fetchWsUrl = async () => {
             try {
                 const url = await getWebSocketUrl();
                 if (isMounted) {
-                    setWsUrl(url);
+                    setWsUrl(url); // This will trigger the connection effect below
                 }
             } catch (error) {
                 console.error("Error fetching WebSocket URL:", error);
@@ -59,24 +58,20 @@ export const useWebSocket = () => {
     }, []);
 
     const connect = useCallback(() => {
+        // This guard is now crucial. It prevents connection until wsUrl is set.
         if (!wsUrl || wsUrl.trim() === '') {
-            console.error("WebSocket: URL is not available or is empty. Cannot connect.");
-            toast.error("Configuration Error", { description: "WebSocket URL is missing." });
+            console.log("WebSocket: URL not yet determined. Waiting...");
             return;
         }
 
-        // Prevent creating a new connection if one is already open or connecting.
         if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
-            // If the URL is the same, do nothing. If different, the parent useEffect will handle it.
             if (ws.current.url === wsUrl) return;
         }
 
-        // Clean up any previous connection attempt before starting a new one.
         if (ws.current) {
-            ws.current.onclose = null; // Disable the onclose handler to prevent reconnect loops on old instances.
+            ws.current.onclose = null;
             ws.current.close(1000, "Initiating new connection");
         }
-
 
         console.log(`WebSocket: Attempting connection #${currentReconnectAttempts.current + 1} to ${wsUrl}...`);
         ws.current = new WebSocket(wsUrl);
@@ -85,7 +80,7 @@ export const useWebSocket = () => {
             console.log("WebSocket: Connection established with", wsUrl);
             toast.success("Real-time Sync Active", { id: "ws-connect", duration: 3000 });
             setIsConnected(true);
-            currentReconnectAttempts.current = 0; // Reset attempts on successful connection
+            currentReconnectAttempts.current = 0;
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
         };
 
@@ -118,7 +113,6 @@ export const useWebSocket = () => {
             if (typeof parsedJson === 'object' && parsedJson !== null) {
                 const data = parsedJson as Record<string, any>;
 
-                // ---- HANDLE SERVER-SENT TOASTS ----
                 if (data.type === 'toast' && data.payload && typeof data.payload.message === 'string' && typeof data.payload.severity === 'string') {
                     const toastPayload = data.payload as ToastMessagePayload;
                     console.log("WebSocket: Received server-sent toast:", toastPayload);
@@ -129,11 +123,10 @@ export const useWebSocket = () => {
                         case 'info': toast.info(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
                         default: toast(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
                     }
-                    return; // Toast handled.
+                    return;
                 }
 
                 if (typeof data.type === 'undefined') {
-                    // Logic to handle untyped OPC-UA data
                     const opcDataPayload: Record<string, string | number | boolean> = {};
                     let hasValidOpcData = false;
                     for (const key in data) {
@@ -168,7 +161,6 @@ export const useWebSocket = () => {
             console.log(`WebSocket: Connection closed. Reason: "${reason}", Clean: ${event.wasClean}`);
             setIsConnected(false);
 
-            // Do not reconnect for normal closure or if user is navigating away.
             if (event.code !== 1000 && event.code !== 1001) {
                 if (currentReconnectAttempts.current < maxReconnectAttempts.current) {
                     currentReconnectAttempts.current++;
@@ -196,14 +188,13 @@ export const useWebSocket = () => {
 
     // This effect manages the connection lifecycle based on the wsUrl.
     useEffect(() => {
+        // It will only run the connect logic after the fetchWsUrl effect has set a valid URL.
         if (typeof window !== 'undefined' && wsUrl) {
-            // When this effect runs (due to URL change), reset the reconnect state before connecting.
             currentReconnectAttempts.current = 0;
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
             connect();
         }
 
-        // Cleanup function for when the component unmounts or when the URL changes.
         return () => {
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
             if (ws.current) {
@@ -211,7 +202,7 @@ export const useWebSocket = () => {
                 ws.current.onopen = null;
                 ws.current.onmessage = null;
                 ws.current.onerror = null;
-                ws.current.onclose = null; // Remove handler to prevent it firing on explicit close
+                ws.current.onclose = null;
                 if (ws.current.readyState === WebSocket.OPEN) {
                     ws.current.close(1000, "Client component unmounting");
                 }
@@ -232,29 +223,27 @@ export const useWebSocket = () => {
         } else {
             toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server. Message not sent."});
             if (!isConnected && (!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
-               connect(); // Attempt to reconnect if sending while disconnected
+               connect();
             }
         }
     }, [isConnected, connect]);
 
-    // NEW: Function to allow external components to change the WebSocket URL
     const changeWebSocketUrl = useCallback((newUrl: string) => {
         const trimmedUrl = newUrl.trim();
-        // Only update if the URL is valid and different from the current one.
         if (trimmedUrl && trimmedUrl !== wsUrl) {
             console.log(`WebSocket: Setting new target URL: ${trimmedUrl}`);
             toast.info("Updating Connection", { description: `Changing server URL...` });
-            localStorage.setItem(WEBSOCKET_CUSTOM_URL_KEY, trimmedUrl); // Persist user's choice
-            setWsUrl(trimmedUrl); // This state update triggers the useEffect hook to reconnect
+            localStorage.setItem(WEBSOCKET_CUSTOM_URL_KEY, trimmedUrl);
+            setWsUrl(trimmedUrl);
         }
-    }, [wsUrl]); // Depends on wsUrl to prevent re-renders of components using this function.
+    }, [wsUrl]);
 
     return {
         sendJsonMessage,
         lastJsonMessage,
         isConnected,
-        connect, // Expose for manual reconnect attempts
-        changeWebSocketUrl, // NEW: Expose function to change URL
-        activeUrl: wsUrl,   // NEW: Expose the current URL being used
+        connect,
+        changeWebSocketUrl,
+        activeUrl: wsUrl,
     };
 };

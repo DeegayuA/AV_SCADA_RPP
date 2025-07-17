@@ -40,7 +40,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { dataPoints as allPossibleDataPointsConfig, DataPoint } from '@/config/dataPoints';
-import { WS_URL as FALLBACK_WS_URL, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX } from '@/config/constants';
+import { getWebSocketUrl, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX } from '@/config/constants';
 import { containerVariants, itemVariants } from '@/config/animationVariants';
 import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound } from '@/lib/utils';
 import { NodeData, ThreePhaseGroupInfo } from '@/app/DashboardData/dashboardInterfaces';
@@ -254,9 +254,9 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
                 </Tooltip>
               </TooltipProvider>
             ) : (
-                <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
-                    (reconnect)
-                </Button>
+              <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
+                (reconnect)
+              </Button>
             )}
           </div>
           <span className='font-mono'>{version || '?.?.?'}</span>
@@ -464,7 +464,12 @@ const UnifiedDashboardPage: React.FC = () => {
           if (data.webSocketUrl) { setWebSocketUrl(data.webSocketUrl); console.log(`Using dynamically determined WebSocket URL from API: ${data.webSocketUrl}`); }
           else { throw new Error("API response did not contain webSocketUrl"); }
         } else { throw new Error(`API fetch failed with status: ${response.status}`); }
-      } catch (error) { console.error("Failed to fetch dynamic WebSocket URL from API, using fallback:", error); setWebSocketUrl(await FALLBACK_WS_URL); toast.error("Network Discovery Failed", { description: "Using fallback connection URL. May not work remotely.", duration: 8000 }); }
+      } catch (error) {
+        console.error("Failed to fetch dynamic WebSocket URL from API, using fallback:", error);
+        const fallbackUrl = await getWebSocketUrl();
+        setWebSocketUrl(fallbackUrl);
+        toast.error("Network Discovery Failed", { description: "Using fallback connection URL. May not work remotely.", duration: 8000 });
+      }
     }; fetchInitialUrl();
   }, [authCheckComplete]);
   useEffect(() => { fetchAndUpdatePageLayouts(); const handleStorageChange = (event: StorageEvent) => { if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) { fetchAndUpdatePageLayouts(); } else if (event.key === null) { fetchAndUpdatePageLayouts(); } }; window.addEventListener('storage', handleStorageChange); return () => { window.removeEventListener('storage', handleStorageChange); }; }, [fetchAndUpdatePageLayouts]);
@@ -532,7 +537,7 @@ const UnifiedDashboardPage: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           {threePhaseGroups.length > 0 && (
             <Card className={cn("shadow-lg", sldSectionMinHeight)}>
               <CardContent className="p-3 sm:p-4 h-full flex flex-col">
@@ -549,12 +554,12 @@ const UnifiedDashboardPage: React.FC = () => {
           {weatherCardConfig && (
             <Card className="w-auto flex-shrink-0 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
               <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
-                  <CardTitle className="text-xl sm:text-2xl">Weather Data</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl">Weather Data</CardTitle>
               </CardHeader>
               <CardContent className="px-2 py-3 sm:px-3 flex-grow">
-                  <div className="h-full">
-                    <WeatherCard initialConfig={weatherCardConfig} opcUaData={nodeValues} allPossibleDataPoints={allPossibleDataPoints} onConfigChange={handleWeatherConfigChange} />
-                  </div>
+                <div className="h-full">
+                  <WeatherCard initialConfig={weatherCardConfig} opcUaData={nodeValues} allPossibleDataPoints={allPossibleDataPoints} onConfigChange={handleWeatherConfigChange} />
+                </div>
               </CardContent>
             </Card>
           )}
@@ -562,31 +567,31 @@ const UnifiedDashboardPage: React.FC = () => {
           <Card className="flex-1 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
             <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <div className="flex items-center gap-2">
-                    <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
+                </div>
+                <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start flex-wrap">
+                  {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}><Settings className="h-4 w-4" /><span className="sr-only">Config Graph</span></Button></TooltipTrigger>
+                        <TooltipContent><p>Configure Graph Data</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
+                      <Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto">{ts.toUpperCase()}</Button>
+                    ))}
                   </div>
-                  <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start flex-wrap">
-                    {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
-                      <TooltipProvider>
-                        <Tooltip>
-                            <TooltipTrigger asChild><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}><Settings className="h-4 w-4" /><span className="sr-only">Config Graph</span></Button></TooltipTrigger>
-                            <TooltipContent><p>Configure Graph Data</p></TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
-                        <Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto">{ts.toUpperCase()}</Button>
-                      ))}
-                    </div>
-                  </div>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="px-2 py-3 sm:px-3 flex-grow">
               {(useDemoDataForGraph || (powerGraphGenerationDpIds && powerGraphGenerationDpIds.length > 0) || (powerGraphUsageDpIds && powerGraphUsageDpIds.length > 0)) ? (
-                  <PowerTimelineGraph nodeValues={nodeValues} allPossibleDataPoints={allPossibleDataPoints} generationDpIds={powerGraphGenerationDpIds} usageDpIds={powerGraphUsageDpIds} exportDpIds={powerGraphExportDpIds} exportMode={powerGraphExportMode} timeScale={graphTimeScale} />
+                <PowerTimelineGraph nodeValues={nodeValues} allPossibleDataPoints={allPossibleDataPoints} generationDpIds={powerGraphGenerationDpIds} usageDpIds={powerGraphUsageDpIds} exportDpIds={powerGraphExportDpIds} exportMode={powerGraphExportMode} timeScale={graphTimeScale} />
               ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
+                <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
               )}
             </CardContent>
           </Card>

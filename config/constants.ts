@@ -1,18 +1,17 @@
 // config/constants.ts
 
-import logo from "@/AV_logo.png"; // Ensure these paths are correct if this file is in a different dir
+import logo from "@/AV_logo.png";
 import logo2 from "@/av_logo.svg";
 
 export const WS_PORT = 2001;
 export const WS_API_PATH = "/api/opcua";
 
-// --- ADDED ---: Define a consistent key for storing the user-provided WebSocket URL.
 export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
 export const WEBSOCKET_CUSTOM_URL_KEY = `${LOCAL_STORAGE_KEY_PREFIX}custom_websocket_url`;
 
 
-// --- MODIFIED ---: Updated the function to prioritize the user-defined URL from localStorage.
-// Define a function to get the WebSocket URL
+// --- MODIFIED ---: This is now the SINGLE SOURCE OF TRUTH for the WebSocket URL.
+// It prioritizes a user-defined URL from localStorage.
 export const getWebSocketUrl = async (): Promise<string> => {
     // Default fallback for server-side or non-browser environments
     const defaultWsUrl = `ws://localhost:${WS_PORT}`;
@@ -28,7 +27,7 @@ export const getWebSocketUrl = async (): Promise<string> => {
         return customUrl;
     }
 
-    // PRIORITY 2: Attempt to get from Capacitor Preferences
+    // PRIORITY 2: Attempt to get from Capacitor Preferences (for native apps)
     try {
         const capacitorPreferences = await import('@capacitor/preferences');
         if (window.Capacitor && window.Capacitor.isNativePlatform && capacitorPreferences.Preferences) {
@@ -44,51 +43,27 @@ export const getWebSocketUrl = async (): Promise<string> => {
         console.warn('Could not check Capacitor Preferences, proceeding with default logic:', error);
     }
 
-    // PRIORITY 3: Fallback to dynamic URL based on window.location
+    // PRIORITY 3: Fallback to dynamic URL based on window.location (for web)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
 
-    // Vercel default URL
+    // Vercel deployment
     if (process.env.NEXT_PUBLIC_VERCEL_URL) {
       return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
     }
 
+    // Local network / development
     if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local')) {
-        // For local development, connect to hostname:port
         return `${protocol}//${hostname}:${WS_PORT}`;
-    } else {
-        // For other deployed environments, connect to hostname/path
-        return `${protocol}//${hostname}${WS_API_PATH}`;
     }
+
+    // Deployed environments (fallback)
+    return `${protocol}//${hostname}${WS_API_PATH}`;
 };
 
-// --- MODIFIED ---: Updated the initial URL to also check localStorage synchronously.
-// Export a placeholder or a synchronously determined URL for components that can't be async
-// This will be the initial value before the async function resolves.
-export const WS_URL_INITIAL = (() => {
-    if (typeof window !== 'undefined') {
-        // PRIORITY 1: Check for a user-defined URL in localStorage
-        const customUrl = localStorage.getItem(WEBSOCKET_CUSTOM_URL_KEY);
-        if (customUrl && customUrl.trim() !== '') {
-            return customUrl;
-        }
+// --- REMOVED ---: WS_URL_INITIAL and WS_URL were removed to prevent the race condition
+// and establish getWebSocketUrl as the single source of truth.
 
-        // PRIORITY 2: Fallback to dynamic URL logic
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const hostname = window.location.hostname;
-        if (hostname === 'localhost') {
-            return `ws://localhost:${WS_PORT}`;
-        }
-         // Vercel default URL
-        if (process.env.NEXT_PUBLIC_VERCEL_URL) {
-            return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
-        }
-        return `${protocol}//${hostname}${WS_API_PATH}`;
-    }
-    // Default for SSR or other environments
-    return `ws://localhost:${WS_PORT}`;
-})();
-export const WS_URL = getWebSocketUrl();
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://0.0.0.0:4841";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://123.231.16.208:4841";
 export const VERSION = "- Release v2025.07.15 • 16:30 (GMT+5:30)";
@@ -99,7 +74,7 @@ export const PLANT_CAPACITY = "2000 kW"; // 2 MW
 export const PLANT_CAPACITY_WATTS = 2000000; // 2 MW in watts
 
 export const APP_NAME = "Mini Grid - AVR&D";
-export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app"; 
+export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app";
 export const APP_URL = "https://yourwebsite.com";
 export const APP_KEYWORDS = "solar, monitoring, control, energy, management";
 export const APP_DESCRIPTION = "A web-based plant monitoring system for real-time data visualization and control.";
@@ -113,7 +88,6 @@ export const APP_COPYRIGHT_URL = "https://yourwebsite.com/copyright";
 export const APP_PRIVACY_POLICY = "https://yourwebsite.com/privacy-policy";
 export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";
 
-// Potentially in a shared types file or at the top of PowerTimelineGraph.tsx
 export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
 export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 
@@ -148,9 +122,8 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
   'Power_Analyser2',
   'MiCom_Relay',
   'empty_template',
-'test_data_nodes_layout',
+  'test_data_nodes_layout',
 ];
 
-// Keys for API Monitoring feature
 export const API_MONITORING_CONFIG_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringConfigs_v1`;
 export const API_MONITORING_DOWNTIME_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringDowntimes_v1`;
