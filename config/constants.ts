@@ -3,15 +3,22 @@
 import logo from "@/AV_logo.png";
 import logo2 from "@/av_logo.svg";
 
+// Base configuration
 export const WS_PORT = 2001;
 export const WS_API_PATH = "/api/opcua";
-
 export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
 export const WEBSOCKET_CUSTOM_URL_KEY = `${LOCAL_STORAGE_KEY_PREFIX}custom_websocket_url`;
 
-
-// --- MODIFIED ---: This is now the SINGLE SOURCE OF TRUTH for the WebSocket URL.
-// It prioritizes a user-defined URL from localStorage.
+/**
+ * Gets the definitive WebSocket URL.
+ * THIS IS THE SINGLE SOURCE OF TRUTH for the WebSocket address in the entire application.
+ * The logic follows a specific priority:
+ * 1. User-defined custom URL in localStorage.
+ * 2. Backend URL from Capacitor Preferences (for native mobile apps).
+ * 3. Dynamic URL based on the deployment environment (Vercel, local network, etc.).
+ *
+ * @returns {Promise<string>} A promise that resolves to the WebSocket URL to use.
+ */
 export const getWebSocketUrl = async (): Promise<string> => {
     // Default fallback for server-side or non-browser environments
     const defaultWsUrl = `ws://localhost:${WS_PORT}`;
@@ -29,40 +36,42 @@ export const getWebSocketUrl = async (): Promise<string> => {
 
     // PRIORITY 2: Attempt to get from Capacitor Preferences (for native apps)
     try {
+        // Dynamic import to avoid errors in non-Capacitor environments
         const capacitorPreferences = await import('@capacitor/preferences');
         if (window.Capacitor && window.Capacitor.isNativePlatform && capacitorPreferences.Preferences) {
             const { value } = await capacitorPreferences.Preferences.get({ key: 'backendUrl' });
             if (value) {
-                console.log(`Using backend URL from Preferences for WS: ${value}`);
+                console.log(`Using backend URL from Capacitor Preferences for WS: ${value}`);
                 const httpUrl = new URL(value);
                 const wsProtocol = httpUrl.protocol === 'https:' ? 'wss:' : 'ws:';
                 return `${wsProtocol}//${httpUrl.host}${WS_API_PATH}`;
             }
         }
     } catch (error) {
-        console.warn('Could not check Capacitor Preferences, proceeding with default logic:', error);
+        // This is an expected warning if Capacitor is not available.
+        // console.warn('Could not check Capacitor Preferences, proceeding with default logic:', error);
     }
 
     // PRIORITY 3: Fallback to dynamic URL based on window.location (for web)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
 
-    // Vercel deployment
+    // Vercel deployment check
     if (process.env.NEXT_PUBLIC_VERCEL_URL) {
       return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
     }
 
-    // Local network / development
+    // Local network / development check
     if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local')) {
         return `${protocol}//${hostname}:${WS_PORT}`;
     }
 
-    // Deployed environments (fallback)
+    // Fallback for other deployed environments
     return `${protocol}//${hostname}${WS_API_PATH}`;
 };
 
-// --- REMOVED ---: WS_URL_INITIAL and WS_URL were removed to prevent the race condition
-// and establish getWebSocketUrl as the single source of truth.
+
+// --- Other Application Constants ---
 
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://0.0.0.0:4841";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://123.231.16.208:4841";

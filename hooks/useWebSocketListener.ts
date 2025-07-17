@@ -17,27 +17,24 @@ interface ToastMessagePayload {
   id?: string;
 }
 
-// A more specific base type for messages from server
 interface WebSocketMessageFromServer {
   type: string;
   payload: any;
 }
 
+// NOTE: This hook should be initialized ONLY ONCE in a top-level provider/layout
+// to ensure a single, persistent WebSocket connection is created.
 export const useWebSocket = () => {
-    // Get state setters from the central Zustand store
     const { setWebSocketStatus, updateOpcUaNodeValues, setSendJsonMessage } = useAppStore.getState();
 
-    // Add local state for components needing direct access
     const [isConnected, setIsConnected] = useState(false);
     const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessageFromServer | null>(null);
-
     const [wsUrl, setWsUrl] = useState<string>('');
     const ws = useRef<WebSocket | null>(null);
     const reconnectIntervalId = useRef<NodeJS.Timeout | null>(null);
     const maxReconnectAttempts = useRef(10);
     const currentReconnectAttempts = useRef(0);
 
-    // Effect to fetch the WebSocket URL on initial mount.
     useEffect(() => {
         let isMounted = true;
         const fetchWsUrl = async () => {
@@ -51,22 +48,18 @@ export const useWebSocket = () => {
                 toast.error("Network Error", { description: "Could not determine server address." });
             }
         };
-
         fetchWsUrl();
         return () => { isMounted = false; };
     }, []);
 
     const connect = useCallback(() => {
-        if (!wsUrl || wsUrl.trim() === '') {
-            return;
-        }
-
+        if (!wsUrl || wsUrl.trim() === '') return;
         if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) {
-            if (ws.current.url === wsUrl) return;
+            if (ws.current.url === wsUrl) return; // Already connecting/connected to the correct URL
         }
 
         if (ws.current) {
-            ws.current.onclose = null;
+            ws.current.onclose = null; // Prevent stale onclose handler from firing
             ws.current.close(1000, "Initiating new connection");
         }
 
@@ -75,9 +68,12 @@ export const useWebSocket = () => {
 
         ws.current.onopen = () => {
             console.log("WebSocket: Connection established with", wsUrl);
+            toast.dismiss("ws-reconnect-loader"); // Dismiss any lingering reconnect toast
+            toast.dismiss("ws-max-reconnect");
             toast.success("Real-time Sync Active", { id: "ws-connect", duration: 3000 });
-            setIsConnected(true); // Update local state
-            setWebSocketStatus(true, wsUrl); // Update global Zustand state
+            
+            setIsConnected(true);
+            setWebSocketStatus(true, wsUrl);
             currentReconnectAttempts.current = 0;
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
         };
@@ -93,24 +89,13 @@ export const useWebSocket = () => {
                 toast.error("WebSocket Error", { description: "Received unexpected data type."});
                 return;
             }
-
             try {
                 const parsedJson = JSON.parse(messageDataString) as unknown;
-
                 if (typeof parsedJson === 'object' && parsedJson !== null) {
                     const message = parsedJson as WebSocketMessageFromServer;
-                    
-                    // Always update lastJsonMessage for consumers like SLDWidget
                     setLastJsonMessage(message);
 
-                    // Handle different message types
-                    const componentSpecificMessageTypes = new Set([
-                        'layout-data',
-                        'layout-error',
-                        'layout-saved-confirmation',
-                        'layout-save-error',
-                    ]);
-
+                    const componentSpecificMessageTypes = new Set(['layout-data', 'layout-error', 'layout-saved-confirmation', 'layout-save-error']);
                     if (message.type === 'toast') {
                         const toastPayload = message.payload as ToastMessagePayload;
                         switch (toastPayload.severity) {
@@ -120,10 +105,7 @@ export const useWebSocket = () => {
                             case 'info': toast.info(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
                             default: toast(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
                         }
-                    } else if (componentSpecificMessageTypes.has(message.type)) {
-                        // This message is handled by a component (like SLDWidget) watching lastJsonMessage. Do nothing further.
-                    } else {
-                        // Assume any other structured message is an OPC UA update
+                    } else if (!componentSpecificMessageTypes.has(message.type)) {
                         updateOpcUaNodeValues(message as Record<string, any>);
                     }
                 } else {
@@ -142,41 +124,38 @@ export const useWebSocket = () => {
         ws.current.onclose = (event) => {
             const reason = event.reason || (event.code === 1000 ? "Normal closure" : `Code ${event.code}`);
             console.log(`WebSocket: Connection closed. Reason: "${reason}", Clean: ${event.wasClean}`);
-            setIsConnected(false); // Update local state
-            setWebSocketStatus(false, wsUrl); // Update global Zustand state
+            setIsConnected(false);
+            setWebSocketStatus(false, wsUrl);
 
-            if (event.code !== 1000 && event.code !== 1001) {
-                if (currentReconnectAttempts.current < maxReconnectAttempts.current) {
-                    currentReconnectAttempts.current++;
-                    const delay = Math.min(1000 * Math.pow(1.8, currentReconnectAttempts.current), 30000);
-                    console.log(`WebSocket: Will attempt reconnect #${currentReconnectAttempts.current} in ${delay / 1000}s.`);
-                    if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
-                    reconnectIntervalId.current = setTimeout(connect, delay);
-                    
-                    const toastId = "ws-disconnect-retry";
-                    const description = `Attempting to reconnect... (Attempt ${currentReconnectAttempts.current})`;
-                    const message = currentReconnectAttempts.current === 1 ? "Real-time Sync Lost" : "Reconnecting...";
-                    toast.warning(message, { id: toastId, description });
-                } else {
-                    console.error("WebSocket: Maximum reconnect attempts reached.");
-                    toast.error("Connection Failed", { id:"ws-max-reconnect", description: "Could not connect to the real-time server. Check connection/URL." });
-                }
-            } else if (event.wasClean && event.code === 1000) {
-                 toast.info("Real-time Sync Disconnected", { id: "ws-disconnect-clean", duration: 3000 });
+            // Do not reconnect on normal closure (1000) or page navigation (1001)
+            if (event.code === 1000 || event.code === 1001) {
+                if (event.wasClean) toast.info("Real-time Sync Disconnected", { id: "ws-disconnect-clean", duration: 3000 });
+                return;
+            }
+
+            // Attempt to reconnect on abnormal closures
+            if (currentReconnectAttempts.current < maxReconnectAttempts.current) {
+                currentReconnectAttempts.current++;
+                const delay = Math.min(1000 * Math.pow(1.8, currentReconnectAttempts.current), 30000);
+                console.log(`WebSocket: Will attempt reconnect #${currentReconnectAttempts.current} in ${delay / 1000}s.`);
+                reconnectIntervalId.current = setTimeout(connect, delay);
+                
+                // Use a silent loading toast for a better UX than repeated warnings
+                const message = currentReconnectAttempts.current === 1 ? "Connection Lost. Retrying..." : "Reconnecting...";
+                toast.loading(message, { id: "ws-reconnect-loader", description: `Attempt #${currentReconnectAttempts.current}` });
+            } else {
+                console.error("WebSocket: Maximum reconnect attempts reached.");
+                toast.error("Connection Failed", { id: "ws-max-reconnect", description: "Could not connect to the real-time server. Please check your network or refresh.", duration: Infinity });
             }
         };
     }, [wsUrl, setWebSocketStatus, updateOpcUaNodeValues]);
     
     const sendJsonMessage = useCallback((message: WebSocketMessageToServer) => {
         if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-            try {
-                ws.current.send(JSON.stringify(message));
-            } catch (error) {
-                console.error("WebSocket: Error serializing or sending message:", error);
-                toast.error("Message Send Error", { description: "Failed to send data to the server." });
-            }
+            try { ws.current.send(JSON.stringify(message)); }
+            catch (error) { console.error("WebSocket: Error sending message:", error); toast.error("Message Send Error"); }
         } else {
-            toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server. Message not sent."});
+            toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server."});
             if (!useAppStore.getState().isWebSocketConnected && (!ws.current || ws.current.readyState === WebSocket.CLOSED)) {
                connect();
             }
@@ -184,19 +163,20 @@ export const useWebSocket = () => {
     }, [connect]);
 
     useEffect(() => {
-        // Set the globally available sender function
         setSendJsonMessage(sendJsonMessage);
     }, [sendJsonMessage, setSendJsonMessage]);
 
     useEffect(() => {
-        if (typeof window !== 'undefined' && wsUrl) {
+        if (wsUrl) {
             connect();
         }
         return () => {
+            console.log("WebSocket: Cleaning up global connection in main hook unmount.");
             if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
             if (ws.current) {
-                console.log("WebSocket: Cleaning up global connection on hook unmount.");
-                ws.current.onclose = null; // Prevent onclose from triggering reconnect
+                // IMPORTANT: Detach the onclose handler BEFORE closing the connection
+                // to prevent the reconnect logic from firing on a deliberate unmount.
+                ws.current.onclose = null; 
                 if (ws.current.readyState === WebSocket.OPEN) {
                     ws.current.close(1001, "Client component unmounting");
                 }
@@ -214,11 +194,5 @@ export const useWebSocket = () => {
         }
     }, [wsUrl]);
 
-    return {
-        sendJsonMessage,
-        lastJsonMessage,
-        isConnected,
-        changeWebSocketUrl,
-        connect,
-    };
+    return { sendJsonMessage, lastJsonMessage, isConnected, changeWebSocketUrl, connect };
 };
