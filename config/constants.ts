@@ -55,19 +55,22 @@ export const getWebSocketUrl = async (): Promise<string> => {
     // PRIORITY 3: Fallback to dynamic URL based on window.location (for web)
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const hostname = window.location.hostname;
+    const port = window.location.port;
 
     // Vercel deployment check
     if (process.env.NEXT_PUBLIC_VERCEL_URL) {
       return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
     }
 
-    // Local network / development check
-    if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local')) {
-        return `${protocol}//${hostname}:${WS_PORT}`;
-    }
+    // Construct the base URL, always using the default WebSocket port.
+    const baseUrl = `${protocol}//${hostname.split(':')[0]}:${WS_PORT}`;
 
-    // Fallback for other deployed environments
-    return `${protocol}//${hostname}${WS_API_PATH}`;
+    // For local development, we don't need the API path. For other environments, we do.
+    if (hostname === 'localhost' || hostname.startsWith('192.168.') || hostname.startsWith('10.') || hostname.endsWith('.local')) {
+        return baseUrl;
+    } else {
+        return `${baseUrl}${WS_API_PATH}`;
+    }
 };
 
 
