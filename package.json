@@ -5,7 +5,7 @@
   "main": "electron-main.js",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
-    "build": "tsc",
+    "build": "next build",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "docs": "typedoc",
