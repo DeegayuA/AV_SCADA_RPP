@@ -5,7 +5,7 @@
   "main": "electron-main.js",
   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
-    "build": "next build",
+    "build": "tsc",
     "start": "next start -H 0.0.0.0",
     "lint": "next lint",
     "docs": "typedoc",
@@ -16,7 +16,10 @@
     "cap:android": "npx cap open android",
     "cap:ios": "npx cap open ios",
     "mobile:dev:android": "npm run export && npx cap run android -l --external",
-    "mobile:dev:ios": "npm run export && npx cap run ios -l --external"
+    "mobile:dev:ios": "npm run export && npx cap run ios -l --external",
+    "inject:RUSL": "cp config/config.RUSL.ts config/dataPoints.ts && cp config/config.RUSL.constants.ts config/constants.ts",
+    "inject:Ranna": "cp config/config.Ranna.ts config/dataPoints.ts && cp config/config.Ranna.constants.ts config/constants.ts",
+    "inject:Colombo": "cp config/config.Colombo.ts config/dataPoints.ts && cp config/config.Colombo.constants.ts config/constants.ts"
   },
   "dependencies": {
     "@capacitor/core": "^7.3.0",
