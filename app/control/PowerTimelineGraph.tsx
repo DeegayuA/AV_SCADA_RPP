@@ -138,8 +138,8 @@ interface ChartDataPoint {
 interface GridFeedSegment { type: 'export' | 'import'; data: ChartDataPoint[]; }
 interface PowerTimelineGraphProps {
     nodeValues: NodeData; allPossibleDataPoints: DataPoint[]; generationDpIds: string[];
-    usageDpIds: string[]; exportDpIds: string[]; exportMode: 'auto' | 'manual';
-    timeScale: TimeScale; isLiveSourceAvailable?: boolean; useDemoDataSource?: boolean;
+    usageDpIds: string[]; exportDpIds: string[]; windDpIds: string[]; exportMode: 'auto' | 'manual';
+    timeScale: TimeScale; isLiveSourceAvailable?: boolean; useDemoDataSource?: boolean; useWindDemoDataSource?: boolean;
 }
 
 const timeScaleAggregationInterval: Record<TimeScale, number | null> = {
@@ -166,8 +166,8 @@ const convertToWatts = (v: number, u?: string): number => { if (typeof v !== 'nu
 const convertFromWatts = (v: number, targetUnit: PowerUnit): number => { if (typeof v !== 'number' || !isFinite(v)) return 0; return v / (unitToFactorMap[targetUnit] || 1);};
 
 const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
-    nodeValues, allPossibleDataPoints, generationDpIds, usageDpIds, exportDpIds,
-    exportMode, timeScale, isLiveSourceAvailable = true, useDemoDataSource = false,
+    nodeValues, allPossibleDataPoints, generationDpIds, usageDpIds, exportDpIds, windDpIds,
+    exportMode, timeScale, isLiveSourceAvailable = true, useDemoDataSource = false, useWindDemoDataSource = false,
 }) => {
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const { resolvedTheme } = useTheme();
@@ -197,7 +197,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
       }
     }, [timeScale]);
 
-    const effectiveUseDemoData = useMemo(() => useDemoDataSource && !isForcedLiveUiButtonActive && historicalTimeOffsetMs === 0, [useDemoDataSource, isForcedLiveUiButtonActive, historicalTimeOffsetMs]);
+    const effectiveUseDemoData = useMemo(() => (useDemoDataSource || useWindDemoDataSource) && !isForcedLiveUiButtonActive && historicalTimeOffsetMs === 0, [useDemoDataSource, useWindDemoDataSource, isForcedLiveUiButtonActive, historicalTimeOffsetMs]);
     const effectiveIsLive = useMemo(() => (isLiveSourceAvailable || isForcedLiveUiButtonActive) && !effectiveUseDemoData && historicalTimeOffsetMs === 0, [isLiveSourceAvailable, isForcedLiveUiButtonActive, effectiveUseDemoData, historicalTimeOffsetMs]);
 
     const processDataPoint = useCallback((timestamp: number, gen: number, use: number, gridFeedVal: number): ChartDataPoint => {
@@ -263,7 +263,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
       if (effectiveUseDemoData) {
           const demoIngestInterval = 1000;
           const generateAndBufferDemo = () => {
-              const demo = generateDemoValues();
+              const demo = useWindDemoDataSource ? { generation: getSimulatedHistoricalWindData(timeScale, new Date(), 15000).generation[0].value, usage: generateUsageData(Date.now(), 600, 200), gridFeed: 0 } : generateDemoValues();
               dataBufferRef.current.push(processDataPoint(Date.now(), demo.generation, demo.usage, demo.gridFeed));
           };
           if (dpsConfigured) {
@@ -399,7 +399,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
             }
             isSufficient = liveGridFeedVal >= 0;
         } else if (effectiveIsLive && dpsConfigured && nodeValues && Object.keys(nodeValues).length > 0 && allPossibleDataPoints && allPossibleDataPoints.length > 0) {
-            liveGen = sumValuesForDpIds(generationDpIds);
+            liveGen = sumValuesForDpIds(generationDpIds) + sumValuesForDpIds(windDpIds);
             liveUse = sumValuesForDpIds(usageDpIds);
             if (exportMode === 'manual' && exportDpIds.length > 0) {
                 liveGridFeedVal = sumValuesForDpIds(exportDpIds);

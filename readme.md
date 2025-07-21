@@ -1,11 +1,11 @@
-# AV Solar Local Control Panel
+# AV Regenerative Energy Local Control Panel
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 <!-- Add other relevant badges here, e.g., Build Status, Version -->
 
 **Version:** 1.0
 
-Welcome to the **AV Solar Local Control Panel**! This dashboard provides a local web interface to monitor and potentially control parameters of an AV Solar Mini-Grid system (or similar systems) communicating via OPC UA. It's designed to run offline on a local machine and can be installed as a Progressive Web App (PWA) for a native-like experience.
+Welcome to the **AV Regenerative Energy Local Control Panel**! This dashboard provides a local web interface to monitor and potentially control parameters of an AV Regenerative Energy Mini-Grid system (or similar systems) communicating via OPC UA. It's designed to run offline on a local machine and can be installed as a Progressive Web App (PWA) for a native-like experience.
 
 A key feature of this project is its **dynamically generated UI**. The dashboard components (displays, gauges, switches, buttons) are not hardcoded but are created based on the configuration defined in the `src/config/dataPoints.ts` file. This makes the dashboard adaptable to different system configurations or entirely new projects with minimal code changes.
 
@@ -39,7 +39,7 @@ For detailed technical documentation of the codebase, including modules, compone
 
 ## 2. Key Features
 
-*   **Local Control & Monitoring:** Access your solar system data directly on your local network.
+*   **Local Control & Monitoring:** Access your regenerative energy system data directly on your local network.
 *   **Offline Capability:** Designed to run without constant internet access after initial setup.
 *   **OPC UA Integration:** Communicates with compatible devices using the OPC UA protocol.
 *   **Dynamic UI Generation:** Interface components are generated based on a central configuration file (`dataPoints.ts`), allowing easy adaptation for different devices or projects.
@@ -105,7 +105,7 @@ Follow these steps to set up and run the application locally:
     This will typically start the server on `http://localhost:3000`.
 
 5.  **Access the Dashboard:**
-    Open your web browser (e.g., Google Chrome) and navigate to `http://localhost:3000`. You should see the AV Solar Local Control Panel interface.
+    Open your web browser (e.g., Google Chrome) and navigate to `http://localhost:3000`. You should see the AV Regenerative Energy Local Control Panel interface.
 
 ---
 
@@ -123,7 +123,7 @@ For a more integrated desktop experience, you can install the running web applic
 
 ## 7. Adapting for a New Project (Dynamic UI Configuration)
 
-This dashboard is designed to be adaptable. The user interface elements are generated dynamically based on the configuration defined in the `src/config/dataPoints.ts` file. To adapt this dashboard for a different solar system, generator, or any device exposing data via OPC UA, follow these steps:
+This dashboard is designed to be adaptable. The user interface elements are generated dynamically based on the configuration defined in the `src/config/dataPoints.ts` file. To adapt this dashboard for a different regenerative energy system, generator, or any device exposing data via OPC UA, follow these steps:
 
 1.  **Identify Device Data Points:**
     *   Determine the specific **OPC UA Node IDs** for the parameters you want to monitor or control on your target device.
@@ -303,4 +303,4 @@ Special thanks to the entire open-source community for providing the tools that 
 
 ---
 
-🎉 **You're all set!** Enjoy using the AV Solar Local Control Panel.
+🎉 **You're all set!** Enjoy using the AV Regenerative Energy Local Control Panel.

@@ -1,5 +1,5 @@
 {
-  "name": "solar-minigrid-dashboard",
+  "name": "regenerative-minigrid-dashboard",
   "version": "1.6.0",
   "private": true,
   "main": "electron-main.js",

@@ -62,6 +62,8 @@ import BusbarNode from './nodes/BusbarNode';
 import GenericDeviceNode from './nodes/GenericDeviceNode';
 import TransformerNode from './nodes/TransformerNode';
 import GeneratorNode from './nodes/GeneratorNode';
+import WindTurbineNode from './nodes/WindTurbineNode';
+import WindInverterNode from './nodes/WindInverterNode';
 import PLCNode from './nodes/PLCNode';
 import SensorNode from './nodes/SensorNode';
 import FuseNode from './nodes/FuseNode';
@@ -112,6 +114,8 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.GenericDevice]: GenericDeviceNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Transformer]: TransformerNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Generator]: GeneratorNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.WindTurbine]: WindTurbineNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.WindInverter]: WindInverterNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.PLC]: PLCNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Sensor]: SensorNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Gauge]: GaugeNode as unknown as ComponentType<NodeProps>, 

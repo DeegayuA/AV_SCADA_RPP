@@ -25,9 +25,9 @@ import { logActivity } from '@/lib/activityLog'; // Added import
 import React from 'react';
 
 // Background images
-import bg1 from "@/img/solar_bg00001.jpg";
-import bg2 from "@/img/solar_bg00002.jpg";
-import bg3 from "@/img/solar_bg00003.jpg";
+import bg1 from "@/img/wind_bg00001.jpg";
+import bg2 from "@/img/wind_bg00002.jpg";
+import bg3 from "@/img/wind_bg00003.jpg";
 const imageUrls: StaticImageData[] = [bg1, bg2, bg3, bg1, bg2, bg3];
 
 
@@ -492,7 +492,7 @@ export default function LoginPage() {
         <AnimatePresence mode="sync">
             <motion.div key={currentImageIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1, transition: { duration: 1.8, ease: [0.22, 1, 0.36, 1] } }}
             exit={{ opacity: 0, scale: 1.05, transition: { duration: 0.9, ease: "easeIn" } }} className="absolute inset-0" >
-            <Image src={imageUrls[currentImageIndex]} alt="Advanced solar panel technology" fill style={{ objectFit: 'cover' }} quality={75} priority={currentImageIndex === 0} className="brightness-[0.55] dark:brightness-[0.4] saturate-100"/>
+            <Image src={imageUrls[currentImageIndex]} alt="Advanced regenerative energy technology" fill style={{ objectFit: 'cover' }} quality={75} priority={currentImageIndex === 0} className="brightness-[0.55] dark:brightness-[0.4] saturate-100"/>
             </motion.div>
         </AnimatePresence>
         <div className="absolute inset-0 bg-gradient-to-br from-sky-900/40 via-transparent to-slate-900/60 dark:from-sky-950/60 dark:to-slate-950/80" />
@@ -507,7 +507,7 @@ export default function LoginPage() {
                 </AnimatePresence>
             </motion.div>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.8 } }} className="text-md sm:text-lg text-sky-100/90 dark:text-sky-200/80 leading-relaxed shadow-text-md" >
-                Log in to monitor, control, and optimize your solar energy ecosystem with precision and ease.
+                Log in to monitor, control, and optimize your regenerative energy ecosystem with precision and ease.
             </motion.p>
         </div>
         <ThemeToggleButton />

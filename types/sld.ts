@@ -393,12 +393,14 @@ export enum SLDElementType {
   Panel = 'panel',
   Generator = 'generator',
   Grid = 'grid',
+  WindTurbine = 'windTurbine',
 
   // Storage
   Battery = 'battery',
 
   // Conversion & Transformation
   Inverter = 'inverter',
+  WindInverter = 'windInverter',
   Transformer = 'transformer',
 
   // Switching & Protection
