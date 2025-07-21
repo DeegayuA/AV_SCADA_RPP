@@ -25,6 +25,10 @@
     "generate:docs": "typedoc --out docs/api --theme hierarchy --readme none --excludeExternals --excludePrivate --excludeProtected --hideGenerator --disableSources --tsconfig tsconfig.json --plugin typedoc-plugin-markdown --plugin typedoc-theme-hierarchy",
     "vercel-build": "npm run export && npm run build && npm run cap:sync",
     "merge:prod": "bash scripts/merge_to_production.sh"
+  ,
+  "start:rusl": "git checkout Prod_RUSL_Mini_Grid && npm install && npm start",
+  "start:ranna": "git checkout Prod_Ranna_2MW && npm install && npm start",
+  "start:colombo": "git checkout Prod_Colombo_Office_Mini_Grid && npm install && npm start"
   },
   "dependencies": {
     "@capacitor/core": "^7.3.0",
