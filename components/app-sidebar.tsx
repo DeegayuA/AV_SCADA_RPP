@@ -70,8 +70,8 @@ interface NavChildItemForSectionLogic {
   name?: string;
   url: string;
   sectionId: string;
-  // icon?: LucideIcon; // icon could be useful here too
-  // colorKey?: string;
+  icon?: LucideIcon; // icon could be useful here too
+  colorKey?: keyof ActiveAccents;
 }
 
 // Define NavProjectItemProps interface - assuming it's used elsewhere or keep projects minimal
@@ -128,7 +128,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
   const { state: sidebarState, isMobile } = useSidebar();
   const isCollapsed = !isMobile && sidebarState === "collapsed";
-
+  // Set default collapsed state for non-mobile devices
+  React.useEffect(() => {
+    if (!isMobile && sidebarState === "expanded") {
+      // Auto-collapse on component mount for desktop
+      const sidebarElement = document.querySelector('[data-sidebar="sidebar"]');
+      if (sidebarElement) {
+        const collapseButton = sidebarElement.querySelector('[data-sidebar="trigger"]');
+        if (collapseButton instanceof HTMLElement) {
+          collapseButton.click();
+        }
+      }
+    }
+  }, [isMobile, sidebarState]);
   const storeHasHydrated = useAppStore.persist.hasHydrated();
   const currentUser = useAppStore((state) => state.currentUser);
 
