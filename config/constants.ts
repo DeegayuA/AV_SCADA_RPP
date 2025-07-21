@@ -82,8 +82,8 @@ export const PLANT_TYPE = "Solar Power Plant";
 export const PLANT_CAPACITY = "2000 kW"; // 2 MW
 export const PLANT_CAPACITY_WATTS = 2000000; // 2 MW in watts
 
-export const APP_NAME = "Mini Grid - AVR&D";
-export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app";
+export const APP_NAME = "Ranna 2MW - Synergy Power";
+export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app"; 
 export const APP_URL = "https://yourwebsite.com";
 export const APP_KEYWORDS = "solar, monitoring, control, energy, management";
 export const APP_DESCRIPTION = "A web-based plant monitoring system for real-time data visualization and control.";
