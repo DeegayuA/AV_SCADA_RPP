@@ -25,10 +25,13 @@ import { logActivity } from '@/lib/activityLog'; // Added import
 import React from 'react';
 
 // Background images
-import bg1 from "@/img/wind_bg00001.jpg";
-import bg2 from "@/img/wind_bg00002.jpg";
-import bg3 from "@/img/wind_bg00003.jpg";
-const imageUrls: StaticImageData[] = [bg1, bg2, bg3, bg1, bg2, bg3];
+import bg1 from "@/img/solar_bg00001.jpg";
+import bg2 from "@/img/solar_bg00002.jpg";
+import bg3 from "@/img/solar_bg00003.jpg";
+import bg4 from "@/img/solar_bg00004.jpg";
+import bg5 from "@/img/solar_bg00005.jpg";
+import bg6 from "@/img/solar_bg00006.jpg";
+const imageUrls: StaticImageData[] = [bg1, bg2, bg3, bg4, bg5, bg6];
 
 
 const rotatingMessages = [

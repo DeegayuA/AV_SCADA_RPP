@@ -52205,7 +52205,7 @@ export const dataPoints: ExtendedDataPoint[] = [
     "description": "Power derating slope for Demand Response Enabling Device (DRED) events for Inverter 20.",
     "category": "Inverter20 Power Control",
     "isWritable": true
-  }
+  },
   // https://colab.research.google.com/drive/1w6D6KRAfUENskWvgG8EYVrcn9lsLkS_G?usp=sharing - cluster analysis ipynb link
   {
     "label": "Wind Turbine Speed",

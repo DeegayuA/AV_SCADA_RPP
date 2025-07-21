@@ -934,4 +934,55 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     );
 };
 
+function getSimulatedHistoricalWindData(timeScale: TimeScale, currentDate: Date, maxWindOutputW: number) {
+    const now = currentDate.getTime();
+    const { durationMs } = timeScaleConfig[timeScale];
+    
+    // Generate wind data for the time window
+    const dataPoints: { timestamp: number; value: number }[] = [];
+    const pointCount = Math.min(100, Math.max(10, Math.floor(durationMs / (5 * 60 * 1000)))); // One point every 5 minutes, capped
+    
+    for (let i = 0; i < pointCount; i++) {
+        const timestamp = now - durationMs + (i * durationMs / pointCount);
+        const timeOfDayMinutes = new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
+        
+        // Wind is more active during certain times (early morning and evening)
+        const windTimePattern = Math.sin((timeOfDayMinutes / (24 * 60)) * 2 * Math.PI + Math.PI) * 0.3 + 0.7;
+        
+        // Add some randomness and variability
+        const windVariability = Math.sin((timestamp / (30 * 60 * 1000)) * 2 * Math.PI) * 0.4 + 0.6; // 30min cycle
+        const windNoise = (Math.random() - 0.5) * 0.3; // Random noise
+        
+        // Combine factors
+        let windFactor = windTimePattern * windVariability + windNoise;
+        windFactor = Math.max(0, Math.min(1, windFactor)); // Clamp between 0 and 1
+        
+        const windOutputW = windFactor * maxWindOutputW;
+        const windOutputInTargetUnit = convertFromWatts(windOutputW, CHART_TARGET_UNIT);
+        
+        dataPoints.push({
+            timestamp,
+            value: windOutputInTargetUnit
+        });
+    }
+    
+    return {
+        generation: dataPoints
+    };
+}
+
+function generateUsageData(timestamp: number, baseUsageW: number, variationW: number): number {
+    const timeOfDayMinutes = new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
+    
+    // Basic usage pattern with morning and evening peaks
+    const morningPeak = Math.exp(-Math.pow(timeOfDayMinutes - 7.5 * 60, 2) / (2 * Math.pow(60, 2)));
+    const eveningPeak = Math.exp(-Math.pow(timeOfDayMinutes - 18.5 * 60, 2) / (2 * Math.pow(60, 2)));
+    
+    const peakUsage = (morningPeak + eveningPeak * 1.2) * variationW;
+    const randomVariation = (Math.random() - 0.5) * variationW * 0.3;
+    
+    const totalUsageW = baseUsageW + peakUsage + randomVariation;
+    return convertFromWatts(Math.max(100, totalUsageW), CHART_TARGET_UNIT);
+}
+
 export default PowerTimelineGraph;
