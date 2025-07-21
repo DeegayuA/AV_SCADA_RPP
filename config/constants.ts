@@ -78,7 +78,7 @@ export const getWebSocketUrl = async (): Promise<string> => {
 
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://0.0.0.0:4841";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://123.231.16.208:4841";
-export const VERSION = "- Release v2025.07.15 • 16:30 (GMT+5:30)";
+export const VERSION = "- Release v2025.07.21 • 11:30 (GMT+5:30)";
 export const PLANT_NAME= "Ranna 2MW Solar Power Plant";
 export const PLANT_LOCATION = "Ranna, Sri Lanka";
 export const PLANT_TYPE = "Solar Power Plant";
