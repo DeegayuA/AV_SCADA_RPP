@@ -77,7 +77,7 @@ export const getWebSocketUrl = async (): Promise<string> => {
 // --- Other Application Constants ---
 
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
-export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://123.231.16.208:4841";
+export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.178.74:4840";
 export const VERSION = "- Release v2025.07.21 • 11:30 (GMT+5:30)";
 export const PLANT_NAME = "Colombo Office Mini Grid";
 export const PLANT_LOCATION = "Athurugiriya, Sri Lanka";

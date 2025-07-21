@@ -23,7 +23,8 @@
     "inject:default": "cp config/config.default.ts config/dataPoints.ts && cp config/config/config.default.constants.ts config/constants.ts",
     "inject": "npm run inject:RUSL && npm run inject:Ranna && npm run inject:Colombo && npm run inject:default",
     "generate:docs": "typedoc --out docs/api --theme hierarchy --readme none --excludeExternals --excludePrivate --excludeProtected --hideGenerator --disableSources --tsconfig tsconfig.json --plugin typedoc-plugin-markdown --plugin typedoc-theme-hierarchy",
-    "vercel-build": "npm run export && npm run build && npm run cap:sync"
+    "vercel-build": "npm run export && npm run build && npm run cap:sync",
+    "merge:prod": "bash scripts/merge_to_production.sh"
   },
   "dependencies": {
     "@capacitor/core": "^7.3.0",

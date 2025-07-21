@@ -1,0 +1,34 @@
+name: Auto Merge to Production Branches
+
+on:
+  push:
+    branches:
+      - main_dev
+
+jobs:
+  merge-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main_dev
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          fetch-depth: 0  # Required for pushing to other branches
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Merge main_dev into production branches
+        run: |
+          PROD_BRANCHES=("Prod_RUSL_Mini_Grid" "Prod_Ranna_2MW")
+
+          for BRANCH in "${PROD_BRANCHES[@]}"; do
+            echo "Merging into $BRANCH..."
+            git checkout $BRANCH
+            git pull origin $BRANCH
+            git merge origin/main_dev --no-edit || true
+            git push origin $BRANCH
+          done
