@@ -21,14 +21,36 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Merge main_dev into production branches
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Merge main_dev into production branches or create PR if conflict
         run: |
           PROD_BRANCHES=("Prod_RUSL_Mini_Grid" "Prod_Ranna_2MW")
 
           for BRANCH in "${PROD_BRANCHES[@]}"; do
-            echo "Merging into $BRANCH..."
+            echo "Processing branch: $BRANCH"
             git checkout $BRANCH
             git pull origin $BRANCH
-            git merge origin/main_dev --no-edit || true
-            git push origin $BRANCH
+
+            if git merge origin/main_dev --no-edit; then
+              echo "✅ Merged successfully into $BRANCH"
+              git push origin $BRANCH
+            else
+              echo "⚠️ Merge conflict detected. Creating Pull Request..."
+              git merge --abort
+              git checkout -b "auto-pr-${BRANCH}" origin/main_dev
+              git push origin "auto-pr-${BRANCH}"
+
+              gh pr create --base "$BRANCH" \
+                           --head "auto-pr-${BRANCH}" \
+                           --title "Auto PR: Merge main_dev into $BRANCH" \
+                           --body "This PR was created automatically due to a merge conflict."
+            fi
           done
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}
