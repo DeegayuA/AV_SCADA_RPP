@@ -131,7 +131,7 @@ export default function TermsOfServicePage() {
             </LegalSection>
 
             <LegalSection id="services" title={`2. Use of ${APP_NAME} Services`} icon={Zap} customDelayIndex={1}>
-                <p>Subject to your compliance with these Terms, we grant you a limited, non-exclusive, non-transferable, non-sublicensable license to access and use the Service for your internal business operations related to solar energy management as permitted by your subscription agreement and assigned user role.</p>
+                <p>Subject to your compliance with these Terms, we grant you a limited, non-exclusive, non-transferable, non-sublicensable license to access and use the Service for your internal business operations related to regenerative energy management as permitted by your subscription agreement and assigned user role.</p>
                 <p>You acknowledge that the Service provides tools for monitoring and potentially controlling sensitive industrial equipment. You are responsible for ensuring that any actions taken through the Service are performed by authorized and qualified personnel in accordance with all applicable safety procedures and regulations.</p>
             </LegalSection>
             

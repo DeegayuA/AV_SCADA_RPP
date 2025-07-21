@@ -9,7 +9,9 @@ import {
   ChevronLeft
 } from "lucide-react";
 import { useLocalStorage } from "@/hooks/useLocalStorage"; // Keep if you have a specific hook
-import SLDWidget from "@/app/circuit/sld/SLDWidget"; // Assuming path is corrected
+import SLDWidget from "@/app/circuit/sld/SLDWidget";
+import WindTurbineNode from "@/app/circuit/sld/nodes/WindTurbineNode";
+import WindInverterNode from "@/app/circuit/sld/nodes/WindInverterNode";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 
 // Shadcn UI Components (as before)

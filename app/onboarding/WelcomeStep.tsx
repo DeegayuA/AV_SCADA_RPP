@@ -132,7 +132,7 @@ export default function WelcomeStep() {
 
         <motion.p variants={itemVariants(0.3, 20, 3)}
           className="text-sm sm:text-base text-gray-600 dark:text-gray-400 max-w-md sm:max-w-lg mb-8 sm:mb-10 leading-relaxed">
-          Let's quickly set up your solar minigrid monitoring. Get started by creating a new configuration, or if you're an admin, restore from a backup.
+          Let's quickly set up your regenerative energy minigrid monitoring. Get started by creating a new configuration, or if you're an admin, restore from a backup.
         </motion.p>
         <motion.p
           variants={itemVariants(0.3, 20, 3)}

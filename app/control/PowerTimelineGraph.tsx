@@ -138,8 +138,8 @@ interface ChartDataPoint {
 interface GridFeedSegment { type: 'export' | 'import'; data: ChartDataPoint[]; }
 interface PowerTimelineGraphProps {
     nodeValues: NodeData; allPossibleDataPoints: DataPoint[]; generationDpIds: string[];
-    usageDpIds: string[]; exportDpIds: string[]; exportMode: 'auto' | 'manual';
-    timeScale: TimeScale; isLiveSourceAvailable?: boolean; useDemoDataSource?: boolean;
+    usageDpIds: string[]; exportDpIds: string[]; windDpIds: string[]; exportMode: 'auto' | 'manual';
+    timeScale: TimeScale; isLiveSourceAvailable?: boolean; useDemoDataSource?: boolean; useWindDemoDataSource?: boolean;
 }
 
 const timeScaleAggregationInterval: Record<TimeScale, number | null> = {
@@ -166,8 +166,8 @@ const convertToWatts = (v: number, u?: string): number => { if (typeof v !== 'nu
 const convertFromWatts = (v: number, targetUnit: PowerUnit): number => { if (typeof v !== 'number' || !isFinite(v)) return 0; return v / (unitToFactorMap[targetUnit] || 1);};
 
 const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
-    nodeValues, allPossibleDataPoints, generationDpIds, usageDpIds, exportDpIds,
-    exportMode, timeScale, isLiveSourceAvailable = true, useDemoDataSource = false,
+    nodeValues, allPossibleDataPoints, generationDpIds, usageDpIds, exportDpIds, windDpIds,
+    exportMode, timeScale, isLiveSourceAvailable = true, useDemoDataSource = false, useWindDemoDataSource = false,
 }) => {
     const [chartData, setChartData] = useState<ChartDataPoint[]>([]);
     const { resolvedTheme } = useTheme();
@@ -197,7 +197,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
       }
     }, [timeScale]);
 
-    const effectiveUseDemoData = useMemo(() => useDemoDataSource && !isForcedLiveUiButtonActive && historicalTimeOffsetMs === 0, [useDemoDataSource, isForcedLiveUiButtonActive, historicalTimeOffsetMs]);
+    const effectiveUseDemoData = useMemo(() => (useDemoDataSource || useWindDemoDataSource) && !isForcedLiveUiButtonActive && historicalTimeOffsetMs === 0, [useDemoDataSource, useWindDemoDataSource, isForcedLiveUiButtonActive, historicalTimeOffsetMs]);
     const effectiveIsLive = useMemo(() => (isLiveSourceAvailable || isForcedLiveUiButtonActive) && !effectiveUseDemoData && historicalTimeOffsetMs === 0, [isLiveSourceAvailable, isForcedLiveUiButtonActive, effectiveUseDemoData, historicalTimeOffsetMs]);
 
     const processDataPoint = useCallback((timestamp: number, gen: number, use: number, gridFeedVal: number): ChartDataPoint => {
@@ -263,7 +263,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
       if (effectiveUseDemoData) {
           const demoIngestInterval = 1000;
           const generateAndBufferDemo = () => {
-              const demo = generateDemoValues();
+              const demo = useWindDemoDataSource ? { generation: getSimulatedHistoricalWindData(timeScale, new Date(), 15000).generation[0].value, usage: generateUsageData(Date.now(), 600, 200), gridFeed: 0 } : generateDemoValues();
               dataBufferRef.current.push(processDataPoint(Date.now(), demo.generation, demo.usage, demo.gridFeed));
           };
           if (dpsConfigured) {
@@ -399,7 +399,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
             }
             isSufficient = liveGridFeedVal >= 0;
         } else if (effectiveIsLive && dpsConfigured && nodeValues && Object.keys(nodeValues).length > 0 && allPossibleDataPoints && allPossibleDataPoints.length > 0) {
-            liveGen = sumValuesForDpIds(generationDpIds);
+            liveGen = sumValuesForDpIds(generationDpIds) + sumValuesForDpIds(windDpIds);
             liveUse = sumValuesForDpIds(usageDpIds);
             if (exportMode === 'manual' && exportDpIds.length > 0) {
                 liveGridFeedVal = sumValuesForDpIds(exportDpIds);
@@ -933,5 +933,56 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     </TooltipProvider>
     );
 };
+
+function getSimulatedHistoricalWindData(timeScale: TimeScale, currentDate: Date, maxWindOutputW: number) {
+    const now = currentDate.getTime();
+    const { durationMs } = timeScaleConfig[timeScale];
+    
+    // Generate wind data for the time window
+    const dataPoints: { timestamp: number; value: number }[] = [];
+    const pointCount = Math.min(100, Math.max(10, Math.floor(durationMs / (5 * 60 * 1000)))); // One point every 5 minutes, capped
+    
+    for (let i = 0; i < pointCount; i++) {
+        const timestamp = now - durationMs + (i * durationMs / pointCount);
+        const timeOfDayMinutes = new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
+        
+        // Wind is more active during certain times (early morning and evening)
+        const windTimePattern = Math.sin((timeOfDayMinutes / (24 * 60)) * 2 * Math.PI + Math.PI) * 0.3 + 0.7;
+        
+        // Add some randomness and variability
+        const windVariability = Math.sin((timestamp / (30 * 60 * 1000)) * 2 * Math.PI) * 0.4 + 0.6; // 30min cycle
+        const windNoise = (Math.random() - 0.5) * 0.3; // Random noise
+        
+        // Combine factors
+        let windFactor = windTimePattern * windVariability + windNoise;
+        windFactor = Math.max(0, Math.min(1, windFactor)); // Clamp between 0 and 1
+        
+        const windOutputW = windFactor * maxWindOutputW;
+        const windOutputInTargetUnit = convertFromWatts(windOutputW, CHART_TARGET_UNIT);
+        
+        dataPoints.push({
+            timestamp,
+            value: windOutputInTargetUnit
+        });
+    }
+    
+    return {
+        generation: dataPoints
+    };
+}
+
+function generateUsageData(timestamp: number, baseUsageW: number, variationW: number): number {
+    const timeOfDayMinutes = new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
+    
+    // Basic usage pattern with morning and evening peaks
+    const morningPeak = Math.exp(-Math.pow(timeOfDayMinutes - 7.5 * 60, 2) / (2 * Math.pow(60, 2)));
+    const eveningPeak = Math.exp(-Math.pow(timeOfDayMinutes - 18.5 * 60, 2) / (2 * Math.pow(60, 2)));
+    
+    const peakUsage = (morningPeak + eveningPeak * 1.2) * variationW;
+    const randomVariation = (Math.random() - 0.5) * variationW * 0.3;
+    
+    const totalUsageW = baseUsageW + peakUsage + randomVariation;
+    return convertFromWatts(Math.max(100, totalUsageW), CHART_TARGET_UNIT);
+}
 
 export default PowerTimelineGraph;

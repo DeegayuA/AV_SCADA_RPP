@@ -21,7 +21,7 @@ export const APP_URL = APP_BASE_URL; // Canonical URL for the app's homepage
 export const APP_DEFAULT_TITLE = `${APP_NAME} | ${PLANT_NAME}`;
 export const APP_TITLE_TEMPLATE = `%s | ${APP_NAME}`; // For Next.js metadata object to add page specific titles
 export const APP_DESCRIPTION = `A web-based plant monitoring system for ${PLANT_NAME} at ${PLANT_LOCATION}. Real-time data visualization and control. Capacity: ${PLANT_CAPACITY}.`;
-export const APP_KEYWORDS = `solar, mini-grid, ${PLANT_NAME}, ${PLANT_LOCATION}, monitoring, control, energy, management, real-time, data visualization`;
+export const APP_KEYWORDS = `regenerative energy, mini-grid, ${PLANT_NAME}, ${PLANT_LOCATION}, monitoring, control, energy, management, real-time, data visualization`;
 export const APP_FAVICON = logoSvg.src;
 export const APP_APPLE_TOUCH_ICON = APP_LOGO_PNG_SRC; // Often reuse the main logo, or have a dedicated one
 

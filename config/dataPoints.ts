@@ -66,7 +66,7 @@ export interface DataPointConfig {
   min?: number;
   max?: number;
   description?: string;
-  category: 'battery' | 'grid' | 'inverter' | 'control' | 'three-phase' | 'pv' | 'settings' | 'status' | 'energy' | string; 
+  category: 'battery' | 'grid' | 'inverter' | 'control' | 'three-phase' | 'pv' | 'wind' | 'settings' | 'status' | 'energy' | string;
   factor?: number;
   phase?: 'a' | 'b' | 'c' | 'x';
   isSinglePhase?: boolean;
@@ -52205,8 +52205,46 @@ export const dataPoints: ExtendedDataPoint[] = [
     "description": "Power derating slope for Demand Response Enabling Device (DRED) events for Inverter 20.",
     "category": "Inverter20 Power Control",
     "isWritable": true
-  }
+  },
   // https://colab.research.google.com/drive/1w6D6KRAfUENskWvgG8EYVrcn9lsLkS_G?usp=sharing - cluster analysis ipynb link
+  {
+    "label": "Wind Turbine Speed",
+    "id": "wind-turbine-1-speed",
+    "name": "Wind Turbine 1 Speed",
+    "nodeId": "ns=2;s=wind.turbine1.speed",
+    "dataType": "Float",
+    "uiType": "gauge",
+    "icon": "Wind",
+    "unit": "RPM",
+    "description": "The rotational speed of the wind turbine.",
+    "category": "wind",
+    "min": 0,
+    "max": 2000
+  },
+  {
+    "label": "Wind Turbine Power",
+    "id": "wind-turbine-1-power",
+    "name": "Wind Turbine 1 Power",
+    "nodeId": "ns=2;s=wind.turbine1.power",
+    "dataType": "Float",
+    "uiType": "display",
+    "icon": "Power",
+    "unit": "kW",
+    "description": "The power output of the wind turbine.",
+    "category": "wind"
+  },
+  {
+    "label": "Wind Inverter 1 Power",
+    "id": "wind-inverter-1-power",
+    "name": "Wind Inverter 1 Power",
+    "nodeId": "ns=2;s=wind.inverter1.power",
+    "dataType": "Float",
+    "uiType": "display",
+    "icon": "Power",
+    "unit": "kW",
+    "description": "The power output of the wind inverter.",
+    "category": "inverter"
+  }
 ] as any[];
 
 // Export Node IDs for convenience if used by other parts of the application
