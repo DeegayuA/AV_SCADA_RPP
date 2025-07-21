@@ -1005,7 +1005,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
             </motion.div>)}
         </AnimatePresence>
       </Card>
-      <style jsx global>{`
+      <style>{`
         .text-shadow { text-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         .text-shadow-sm { text-shadow: 0 1px 2px rgba(0,0,0,0.15); }
       `}</style>
