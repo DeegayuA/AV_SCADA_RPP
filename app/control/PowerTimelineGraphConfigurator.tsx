@@ -18,11 +18,13 @@ interface PowerTimelineGraphConfiguratorProps {
   currentGenerationDpIds: string[];
   currentUsageDpIds: string[];
   currentExportDpIds: string[];
+  currentWindDpIds: string[];
   initialExportMode?: 'auto' | 'manual';
   onSaveConfiguration: (config: {
     generationDpIds: string[];
     usageDpIds: string[];
     exportDpIds: string[];
+    windDpIds: string[];
     exportMode: 'auto' | 'manual';
   }) => void;
 }
@@ -189,6 +191,7 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
 const STEPS = [
   { id: 'generation', title: 'Generation', description: 'Select data points that represent power generation.' },
   { id: 'usage', title: 'Usage', description: 'Choose data points for tracking power consumption.' },
+  { id: 'wind', title: 'Wind', description: 'Select data points for wind generation.' },
   { id: 'export', title: 'Export', description: 'Configure how exported power is calculated or tracked.' },
 ] as const;
 
@@ -200,6 +203,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
   currentGenerationDpIds,
   currentUsageDpIds,
   currentExportDpIds,
+  currentWindDpIds,
   initialExportMode = 'auto',
   onSaveConfiguration,
 }) => {
@@ -209,6 +213,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
   const [generationDpIds, setGenerationDpIds] = useState<string[]>([]);
   const [usageDpIds, setUsageDpIds] = useState<string[]>([]);
   const [exportDpIds, setExportDpIds] = useState<string[]>([]);
+  const [windDpIds, setWindDpIds] = useState<string[]>([]);
   const [exportMode, setExportMode] = useState<'auto' | 'manual'>(initialExportMode);
 
   const dataPointsMap = useMemo(() => {
@@ -224,6 +229,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
       setGenerationDpIds([...currentGenerationDpIds]);
       setUsageDpIds([...currentUsageDpIds]);
       setExportDpIds([...currentExportDpIds]);
+      setWindDpIds([...currentWindDpIds]);
 
       let mode = initialExportMode;
       if (currentExportDpIds.length > 0 && initialExportMode === 'auto') {
@@ -235,7 +241,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
       }
       setExportMode(mode);
     }
-  }, [isOpen, currentGenerationDpIds, currentUsageDpIds, currentExportDpIds, initialExportMode]);
+  }, [isOpen, currentGenerationDpIds, currentUsageDpIds, currentExportDpIds, currentWindDpIds, initialExportMode]);
 
   const handleNext = () => {
     if (currentStepIndex < STEPS.length - 1) {
@@ -256,6 +262,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
       generationDpIds,
       usageDpIds,
       exportDpIds: exportMode === 'manual' ? exportDpIds : [],
+      windDpIds,
       exportMode,
     });
     onClose();
@@ -328,6 +335,19 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
             onDataPointRemove={(id) => removeDataPoint(id, setUsageDpIds)}
             dataPointsMap={dataPointsMap}
             icon={<Activity className="h-5 w-5" />}
+          />
+        );
+        case 'wind':
+        return (
+          <CategoryDataPointManager
+            instanceId="wind"
+            categoryTitle="Wind Generation Data Points"
+            allPossibleDataPoints={allPossibleDataPoints}
+            selectedDataPointIds={windDpIds}
+            onDataPointAdd={(id) => addDataPoint(id, windDpIds, setWindDpIds)}
+            onDataPointRemove={(id) => removeDataPoint(id, setWindDpIds)}
+            dataPointsMap={dataPointsMap}
+            icon={<Zap className="h-5 w-5" />}
           />
         );
       case 'export':
