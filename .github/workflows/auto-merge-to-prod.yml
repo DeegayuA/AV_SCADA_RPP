@@ -1,0 +1,49 @@
+name: Auto Merge to Production
+
+on:
+  push:
+    branches:
+      - main_dev
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # Fetch all history for all branches
+
+    - name: Set up Git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: Get production branches
+      id: prod_branches
+      run: |
+        branches=$(git branch -r | grep 'origin/Prod_' | sed 's/origin\///')
+        echo "::set-output name=branches::$branches"
+
+    - name: Merge to production branches
+      run: |
+        for branch in ${{ steps.prod_branches.outputs.branches }}; do
+          echo "Processing branch $branch"
+          git checkout $branch
+          git pull origin $branch
+          git merge origin/main_dev --no-edit
+
+          # Determine which inject script to run
+          if [[ "$branch" == "Prod_RUSL_Mini_Grid" ]]; then
+            npm run inject:RUSL
+          elif [[ "$branch" == "Prod_Ranna_2MW" ]]; then
+            npm run inject:Ranna
+          elif [[ "$branch" == "Prod_Colombo_Office_Mini_Grid" ]]; then
+            npm run inject:Colombo
+          fi
+
+          git add .
+          git commit -m "Auto-merge main_dev and update configs"
+          git push origin $branch
+        done
