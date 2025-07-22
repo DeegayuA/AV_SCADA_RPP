@@ -35,6 +35,110 @@ export const sldLayouts: Record<string, SLDLayout> = {
     edges: [],
     viewport: { x: 0, y: 0, zoom: 1 },
   },
+  'ranna_2MW_wind_grid': {
+    layoutId: 'ranna_2MW_wind_grid',
+    meta: {
+      name: 'Ranna 2MW Wind & Grid',
+      description: 'An SLD for a 2MW system with a wind turbine and grid connection.',
+    },
+    nodes: [
+      // Wind Turbine and Inverter
+      {
+        id: 'wind-turbine-1',
+        type: SLDElementType.WindTurbine,
+        position: { x: -200, y: 50 },
+        data: {
+          label: 'Wind Turbine 1',
+          elementType: SLDElementType.WindTurbine,
+          status: 'nominal',
+          dataPointLinks: [
+            { dataPointId: 'wind-turbine-1-speed', targetProperty: 'speed' },
+            { dataPointId: 'wind-turbine-1-power', targetProperty: 'power' },
+          ],
+        },
+      },
+      {
+        id: 'wind-inverter-1',
+        type: SLDElementType.WindInverter,
+        position: { x: -200, y: 200 },
+        data: {
+          label: 'Wind Inverter 1',
+          elementType: SLDElementType.WindInverter,
+          status: 'nominal',
+          dataPointLinks: [
+            { dataPointId: 'wind-inverter-1-power', targetProperty: 'power' },
+          ],
+        },
+      },
+      // Existing grid components
+      {
+        id: 'grid-1',
+        type: SLDElementType.Grid,
+        position: { x: 800, y: 150 },
+        data: {
+          label: 'National Grid',
+          elementType: SLDElementType.Grid,
+          status: 'nominal',
+        },
+      },
+      // Busbars
+      {
+        id: 'busbar-ac-1',
+        type: SLDElementType.Busbar,
+        position: { x: 200, y: 150 },
+        data: {
+          label: 'AC Busbar',
+          elementType: SLDElementType.Busbar,
+          status: 'nominal',
+        },
+        style: { width: '400px', height: '10px' },
+      },
+      {
+        id: 'busbar-wind',
+        type: SLDElementType.Busbar,
+        position: { x: -200, y: 300 },
+        data: {
+          label: 'Wind Busbar',
+          elementType: SLDElementType.Busbar,
+          status: 'nominal',
+        },
+        style: { width: '200px', height: '10px' },
+      },
+      // Breakers
+      {
+        id: 'breaker-grid',
+        type: SLDElementType.Breaker,
+        position: { x: 650, y: 140 },
+        data: {
+          label: 'Grid Breaker',
+          elementType: SLDElementType.Breaker,
+          status: 'closed',
+        },
+      },
+      {
+        id: 'breaker-wind',
+        type: SLDElementType.Breaker,
+        position: { x: 0, y: 290 },
+        data: {
+          label: 'Wind Breaker',
+          elementType: SLDElementType.Breaker,
+          status: 'closed',
+        },
+      },
+    ],
+    edges: [
+      // Wind Turbine to Inverter
+      { id: 'e-wind-turbine-to-inverter', source: 'wind-turbine-1', target: 'wind-inverter-1', data: { label: 'DC' } },
+      // Inverter to Wind Busbar
+      { id: 'e-wind-inverter-to-busbar', source: 'wind-inverter-1', target: 'busbar-wind', data: { label: 'AC' } },
+      // Wind Busbar to Main Busbar
+      { id: 'e-wind-busbar-to-main-busbar', source: 'busbar-wind', target: 'busbar-ac-1', sourceHandle: 'right', targetHandle: 'left', data: { label: 'AC' } },
+      // Main Busbar to Grid
+      { id: 'e-busbar-to-grid-breaker', source: 'busbar-ac-1', target: 'breaker-grid', sourceHandle: 'right', data: { label: 'AC' } },
+      { id: 'e-grid-breaker-to-grid', source: 'breaker-grid', target: 'grid-1', data: { label: 'AC' } },
+    ],
+    viewport: { x: 0, y: 0, zoom: 0.8 },
+  },
   'test_data_nodes_layout': {
     layoutId: 'test_data_nodes_layout',
     meta: { description: "Test layout for GenericDeviceNode and GaugeNode" },
