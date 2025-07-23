@@ -1765,7 +1765,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         ? selectedEdgesFromReactFlow[0]
         : null
     }
-    availableDataPoints={Object.values(appDataPoints)}
+    availableDataPoints={Object.values(appDataPoints).map(dp => ({
+      ...dp,
+      icon: typeof dp.icon === 'string' ? undefined : dp.icon
+    }))}
     mode={animationConfiguratorTarget.mode}
     initialGlobalSettings={activeGlobalAnimationSettings as DialogGlobalAnimationSettings | undefined}
     onConfigure={(

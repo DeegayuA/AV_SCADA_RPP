@@ -32,7 +32,7 @@ const PALETTE = {
 };
 
 const getIconForPoint = (point: DataPointConfig): React.ElementType => {
-    if (point.icon) return point.icon;
+    if (point.icon && typeof point.icon !== 'string') return point.icon;
     if (point.unit === 'V' || point.unit === 'A' || point.unit === 'W') return Zap;
     if (point.unit === '°C' || point.unit === '°F') return Thermometer;
     if (point.unit === '%') return Percent;

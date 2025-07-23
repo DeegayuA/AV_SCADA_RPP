@@ -40,6 +40,13 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { dataPoints as allPossibleDataPointsConfig, DataPoint } from '@/config/dataPoints';
+
+// Extend DataPoint type to include missing properties
+interface ExtendedDataPoint extends DataPoint {
+  threePhaseGroup?: string;
+  phase?: string;
+  icon?: any; 
+}
 import { getWebSocketUrl, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX } from '@/config/constants';
 import { containerVariants, itemVariants } from '@/config/animationVariants';
 import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound } from '@/lib/utils';
@@ -299,6 +306,7 @@ const RenderingComponent: React.FC<RenderingComponentProps> = ({ sections, isEdi
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const DEFAULT_SLD_LAYOUT_ID_KEY = `userSldLayoutId_${PLANT_NAME.replace(/\s+/g, '_')}`;
 const CUSTOM_WEBSOCKET_URL_KEY = `customWebSocketUrl_${PLANT_NAME.replace(/\s+/g, '_')}`;
+const CUSTOM_DATA_POINTS_KEY = `${LOCAL_STORAGE_KEY_PREFIX}_customDataPoints_v1`;
 
 const PAGE_SLUG = 'control_dashboard';
 const GRAPH_CONFIG_KEY_PREFIX = `powerGraphConfig_${PLANT_NAME.replace(/\s+/g, '_')}_${PAGE_SLUG}`;
@@ -308,12 +316,16 @@ const GRAPH_EXPORT_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_exportDpIds`;
 const GRAPH_EXPORT_MODE_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_exportMode`;
 const GRAPH_DEMO_MODE_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_demoMode`;
 const GRAPH_TIMESCALESETTING_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_timeScaleSetting`;
+const GRAPH_WIND_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_windDpIds`;
 
 const WEATHER_CARD_CONFIG_LS_KEY = `weatherCardConfig_${PLANT_NAME.replace(/\s+/g, '_') || 'defaultPlant'}`;
+
 
 const DEFAULT_DISPLAY_COUNT = 6;
 const CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD = 4;
 const OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD = 4;
+
+type NewDataPointData = Omit<DataPoint, 'id'> & { id?: string };
 
 const UnifiedDashboardPage: React.FC = () => {
   const router = useRouter();
@@ -348,18 +360,18 @@ const UnifiedDashboardPage: React.FC = () => {
   const [powerGraphGenerationDpIds, setPowerGraphGenerationDpIds] = useState<string[]>([]);
   const [powerGraphUsageDpIds, setPowerGraphUsageDpIds] = useState<string[]>([]);
   const [powerGraphExportDpIds, setPowerGraphExportDpIds] = useState<string[]>([]);
+  const [allPossibleDataPoints, setAllPossibleDataPoints] = useState<ExtendedDataPoint[]>(allPossibleDataPointsConfig);
   const [powerGraphExportMode, setPowerGraphExportMode] = useState<'auto' | 'manual'>('auto');
+  const [powerGraphWindDpIds, setPowerGraphWindDpIds] = useState<string[]>([]);
   const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false);
   const [weatherCardConfig, setWeatherCardConfig] = useState<WeatherCardConfig | null>(null);
 
+  const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as ExtendedDataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
   const ws = useRef<WebSocket | null>(null);
+  const lastToastTimestamps = useRef<Record<string, number>>({});
   const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 10;
-  const lastToastTimestamps = useRef<Record<string, number>>({});
-
-  const allPossibleDataPoints = useMemo(() => allPossibleDataPointsConfig, []);
-  const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as DataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
   const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
   const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch' || p.uiType === 'input'), [individualPoints]);
   const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
@@ -423,9 +435,61 @@ const UnifiedDashboardPage: React.FC = () => {
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
     if (currentUserRole !== UserRole.ADMIN) return; const currentDisplayedSet = new Set(displayedDataPointIds); const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
     if (newIdsToAdd.length === 0 && selectedIds.length > 0) { toast.warning("Items already shown or none selected to add."); setIsConfiguratorOpen(false); return; }
-    if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new DP${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath); }
+    if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new card${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath); }
     setIsConfiguratorOpen(false);
   }, [displayedDataPointIds, currentUserRole, currentPath]);
+  const handleSaveNewDataPoint = useCallback(async (data: any) => {
+    if (currentUserRole !== UserRole.ADMIN) {
+        toast.error("Permission Denied", { description: "You are not authorized to create new data points." });
+        return { success: false, error: "Permission Denied." };
+    }
+    if (!data.name || !data.nodeId || !data.dataType || !data.uiType) {
+        toast.error("Validation Failed", { description: "Missing required fields for the new data point." });
+        return { success: false, error: "Missing required fields." };
+    }
+
+    const finalId = (data.id || data.name.toLowerCase().replace(/\s+/g, '-')).replace(/[^a-z0-9-]/g, '');
+    if (!finalId) {
+        toast.error("Validation Failed", { description: "Could not generate a valid ID from the provided name." });
+        return { success: false, error: "Invalid ID." };
+    }
+    if (allPossibleDataPoints.some(p => p.id === finalId)) {
+        toast.error("Conflict", { description: `A data point with the ID '${finalId}' already exists.` });
+        return { success: false, error: `ID '${finalId}' already exists.` };
+    }
+    if (allPossibleDataPoints.some(p => p.nodeId === data.nodeId)) {
+        toast.error("Conflict", { description: `A data point with the OPC UA Node ID '${data.nodeId}' already exists.` });
+        return { success: false, error: `Node ID '${data.nodeId}' already exists.` };
+    }
+
+    const newPoint: DataPoint = {
+      ...data,
+      id: finalId,
+      label: data.label || data.name,
+      category: data.category || 'Custom',
+      unit: data.unit || '',
+      description: data.description || '',
+      precision: data.precision ?? 2,
+      min: data.min ?? 0,
+      max: data.max ?? 100,
+      threePhaseGroup: data.threePhaseGroup || undefined,
+      phase: data.phase || undefined,
+    };
+    
+    const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
+    const customPoints = storedCustomPoints ? JSON.parse(storedCustomPoints) : [];
+    const updatedCustomPoints = [...customPoints, newPoint];
+    localStorage.setItem(CUSTOM_DATA_POINTS_KEY, JSON.stringify(updatedCustomPoints));
+    
+    setAllPossibleDataPoints(prevPoints => [...prevPoints, newPoint].sort((a,b) => a.name.localeCompare(b.name)));
+    setDisplayedDataPointIds(prevIds => [...prevIds, newPoint.id]);
+    
+    toast.success("Data Point Created", { description: `'${newPoint.name}' has been created and added to the dashboard.` });
+    logActivity('ADMIN_DASHBOARD_CREATE_CARD', { newDataPoint: newPoint }, currentPath);
+    
+    return { success: true, newPoint: newPoint };
+  }, [allPossibleDataPoints, currentUserRole, currentPath]);
+
   const handleRemoveItem = useCallback((dpIdToRemove: string) => {
     if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove); let newDisplayedIds: string[]; if (pointToRemove?.threePhaseGroup) { const removedItemsList = allPossibleDataPoints.filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup).map(dp => dp.id); newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id)); setDisplayedDataPointIds(newDisplayedIds); toast.info(`${pointToRemove.threePhaseGroup} group removed.`); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedGroupId: pointToRemove.threePhaseGroup, removedItemIds: removedItemsList, isGroup: true, currentDashboardIds: newDisplayedIds }, currentPath); } else { newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove); setDisplayedDataPointIds(newDisplayedIds); toast.info("Data point removed."); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedId: dpIdToRemove, isGroup: false, currentDashboardIds: newDisplayedIds }, currentPath); }
   }, [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]);
@@ -453,6 +517,28 @@ const UnifiedDashboardPage: React.FC = () => {
 
   useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
   useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]);
+  
+  useEffect(() => {
+    if (authCheckComplete && typeof window !== 'undefined') {
+        const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
+        let customPoints: DataPoint[] = [];
+        if (storedCustomPoints) {
+            try {
+                const parsed = JSON.parse(storedCustomPoints);
+                if (Array.isArray(parsed)) customPoints = parsed;
+            } catch (e) {
+                console.error("Failed to parse custom data points:", e);
+            }
+        }
+        if (customPoints.length > 0) {
+            const combined = [...allPossibleDataPointsConfig, ...customPoints];
+            const uniqueMap = new Map<string, DataPoint>();
+            combined.forEach(p => { if (!uniqueMap.has(p.id)) uniqueMap.set(p.id, p); });
+            setAllPossibleDataPoints(Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name)));
+        }
+    }
+  }, [authCheckComplete]);
+  
   useEffect(() => {
     if (!authCheckComplete) return; const fetchInitialUrl = async () => {
       const customUrl = localStorage.getItem(CUSTOM_WEBSOCKET_URL_KEY);
@@ -480,11 +566,8 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
   useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).Closing WS.`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); if (ws.current) ws.current.close(1011, "Crit Lag"); return; } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 15000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete]);
   useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
-  useEffect(() => {
-    if (!authCheckComplete || !webSocketUrl) return () => { }; reconnectAttempts.current = 0; connectWebSocket(); return () => { if (reconnectInterval.current) clearTimeout(reconnectInterval.current); if (ws.current && ws.current.readyState !== WebSocket.CLOSED) { ws.current.onopen = null; ws.current.onmessage = null; ws.current.onerror = null; ws.current.onclose = null; ws.current.close(1000, 'Component unmounted'); ws.current = null; } };
-  }, [connectWebSocket, authCheckComplete, webSocketUrl]);
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphWindDpIds(JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_WIND_KEY, JSON.stringify(powerGraphWindDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphWindDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
 
   const storeHasHydrated = useAppStore.persist.hasHydrated();
@@ -588,51 +671,128 @@ const UnifiedDashboardPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent className="px-2 py-3 sm:px-3 flex-grow">
-              {(useDemoDataForGraph || (powerGraphGenerationDpIds && powerGraphGenerationDpIds.length > 0) || (powerGraphUsageDpIds && powerGraphUsageDpIds.length > 0)) ? (
-                <PowerTimelineGraph nodeValues={nodeValues} allPossibleDataPoints={allPossibleDataPoints} generationDpIds={powerGraphGenerationDpIds} usageDpIds={powerGraphUsageDpIds} exportDpIds={powerGraphExportDpIds} exportMode={powerGraphExportMode} timeScale={graphTimeScale} windDpIds={[]} />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
-              )}
+              <div className="h-full">
+                {(useDemoDataForGraph || (powerGraphGenerationDpIds && powerGraphGenerationDpIds.length > 0) || (powerGraphUsageDpIds && powerGraphUsageDpIds.length > 0)) ? (
+                  <PowerTimelineGraph nodeValues={nodeValues} allPossibleDataPoints={allPossibleDataPoints} generationDpIds={powerGraphGenerationDpIds} usageDpIds={powerGraphUsageDpIds} exportDpIds={powerGraphExportDpIds} exportMode={powerGraphExportMode} timeScale={graphTimeScale} windDpIds={powerGraphWindDpIds} />
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
-
-        {gaugesOverviewSectionDefinition && (<RenderingComponent sections={[gaugesOverviewSectionDefinition]} {...commonRenderingProps} />)}
-        {bottomReadingsSections.length > 0 && (<RenderingComponent sections={bottomReadingsSections} {...commonRenderingProps} />)}
-        {!hasAnyDynamicCardContent && currentlyDisplayedDataPoints.length > 0 && (<div className="text-center py-16 text-muted-foreground min-h-[100px] flex flex-col items-center justify-center"> <InfoIconLucide className="w-12 h-12 mb-4 text-gray-400" /><h3 className="text-xl font-semibold mb-2">No items match filters.</h3> <p>Selected data points might not fit configured dynamic sections.</p> {(isGlobalEditMode && currentUserRole === UserRole.ADMIN) && <p className="mt-2">Try changing data point types/categories.</p>} </div>)}
-        {!hasAnyDynamicCardContent && currentlyDisplayedDataPoints.length === 0 && (<RenderingComponent sections={[]} {...commonRenderingProps} />)}
       </div>
 
-      {(isConfiguratorOpen && currentUserRole === UserRole.ADMIN) && (<DashboardItemConfigurator isOpen={isConfiguratorOpen} onClose={() => setIsConfiguratorOpen(false)} availableIndividualPoints={individualPointsForConfig} availableThreePhaseGroups={threePhaseGroupsForConfig} currentDisplayedIds={displayedDataPointIds} onAddMultipleDataPoints={handleAddMultipleDataPoints} onSaveNewDataPoint={async (data) => { toast.info("Custom DP creation NI"); return { success: false, error: "NI" }; }} />)}
-      {isGraphConfiguratorOpen && (
-        <PowerTimelineGraphConfigurator isOpen={isGraphConfiguratorOpen} onClose={() => setIsGraphConfiguratorOpen(false)} allPossibleDataPoints={allPossibleDataPoints} currentGenerationDpIds={powerGraphGenerationDpIds} currentUsageDpIds={powerGraphUsageDpIds} currentExportDpIds={powerGraphExportDpIds} initialExportMode={powerGraphExportMode} onSaveConfiguration={(config) => {
-          setPowerGraphGenerationDpIds(config.generationDpIds); setPowerGraphUsageDpIds(config.usageDpIds); setPowerGraphExportDpIds(config.exportDpIds); setPowerGraphExportMode(config.exportMode); setIsGraphConfiguratorOpen(false); toast.success('Graph configuration updated.');
-          logActivity('ADMIN_GRAPH_CONFIG_CHANGE', { generationDpIds: config.generationDpIds, usageDpIds: config.usageDpIds, exportDpIds: config.exportDpIds, exportMode: config.exportMode }, currentPath);
-        }} />
-      )}
-      <Dialog open={isWsConfigModalOpen} onOpenChange={setIsWsConfigModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeaderComponentInternal><DialogTitleComponentInternal>WebSocket Connection Settings</DialogTitleComponentInternal><DialogDescription>Modify the backend WebSocket URL. Changes will be applied after reconnecting.</DialogDescription></DialogHeaderComponentInternal>
-          <div className="py-4"><label htmlFor="ws-url-input" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 mb-2 block">WebSocket URL</label><Input id="ws-url-input" value={tempWsUrl} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTempWsUrl(e.target.value)} placeholder="ws://example.com:2001" /><p className="text-xs text-muted-foreground mt-2">Example: `ws://192.168.1.100:2001`. Must be accessible from your device.</p></div>
-          <DialogFooter><DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose><Button type="submit" onClick={handleSaveWsUrl}>Save and Reconnect</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {gaugesOverviewSectionDefinition && (<RenderingComponent sections={[gaugesOverviewSectionDefinition]} {...commonRenderingProps} />)}
+
+      {bottomReadingsSections.length > 0 && (<RenderingComponent sections={bottomReadingsSections} {...commonRenderingProps} />)}
+
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
         <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
           <DialogHeaderComponentInternal className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
             <div className="flex items-center gap-2">
               <DialogTitleComponentInternal>Plant Layout{!sldSpecificEditMode && sldLayoutId && ` : ${(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}</DialogTitleComponentInternal>
               {sldSpecificEditMode && (
-                <Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}><DialogTrigger asChild><Button variant="outline" size="sm" className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5" />Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Button></DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal><div className="py-4"><Select onValueChange={(v) => { setSldLayoutId(v); setIsModalSldLayoutConfigOpen(false); }} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..." /></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map((layout) => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div></DialogContent>
+                <Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                      <LayoutList className="h-3.5 w-3.5 mr-1.5" />
+                      Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-[425px]">
+                    <DialogHeaderComponentInternal>
+                      <DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal>
+                    </DialogHeaderComponentInternal>
+                    <div className="py-4">
+                      <Select onValueChange={(v) => { setSldLayoutId(v); setIsModalSldLayoutConfigOpen(false); }} value={sldLayoutId}>
+                        <SelectTrigger className="w-full mb-2">
+                          <SelectValue placeholder="Choose..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableSldLayoutsForPage.map((layout) => (
+                            <SelectItem key={layout.id} value={layout.id}>
+                              {layout.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p>
+                    </div>
+                  </DialogContent>
                 </Dialog>
               )}
             </div>
-            <DialogClose asChild><Button variant="ghost" size="icon" className="rounded-full"><X className="h-5 w-5" /><span className="sr-only">Close</span></Button></DialogClose>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" className="rounded-full">
+                <X className="h-5 w-5" />
+                <span className="sr-only">Close</span>
+              </Button>
+            </DialogClose>
           </DialogHeaderComponentInternal>
           <div className="flex-grow p-2 sm:p-4 overflow-hidden">
             <SLDWidget layoutId={sldLayoutId} isEditMode={sldSpecificEditMode} onLayoutIdChange={handleSldWidgetLayoutChange} />
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <PowerTimelineGraphConfigurator
+        isOpen={isGraphConfiguratorOpen}
+        onClose={() => setIsGraphConfiguratorOpen(false)}
+        allPossibleDataPoints={allPossibleDataPoints}
+        currentGenerationDpIds={powerGraphGenerationDpIds}
+        currentUsageDpIds={powerGraphUsageDpIds}
+        currentExportDpIds={powerGraphExportDpIds}
+        currentWindDpIds={powerGraphWindDpIds}
+        initialExportMode={powerGraphExportMode}
+        onSaveConfiguration={(config) => {
+          setPowerGraphGenerationDpIds(config.generationDpIds);
+          setPowerGraphUsageDpIds(config.usageDpIds);
+          setPowerGraphExportDpIds(config.exportDpIds);
+          setPowerGraphWindDpIds(config.windDpIds);
+          setPowerGraphExportMode(config.exportMode);
+          setIsGraphConfiguratorOpen(false);
+        }}
+      />
+
+      <DashboardItemConfigurator
+        isOpen={isConfiguratorOpen}
+        onClose={() => setIsConfiguratorOpen(false)}
+        availableIndividualPoints={individualPointsForConfig}
+        availableThreePhaseGroups={threePhaseGroupsForConfig}
+        currentDisplayedIds={displayedDataPointIds}
+        onAddMultipleDataPoints={handleAddMultipleDataPoints}
+        onSaveNewDataPoint={handleSaveNewDataPoint}
+        itemTypeName="Dashboard Card"
+      />
+
+      <Dialog open={isWsConfigModalOpen} onOpenChange={setIsWsConfigModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeaderComponentInternal>
+            <DialogTitleComponentInternal>Configure WebSocket URL</DialogTitleComponentInternal>
+            <DialogDescription>
+              Enter the WebSocket URL for real-time data connection.
+            </DialogDescription>
+          </DialogHeaderComponentInternal>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <label htmlFor="wsUrl" className="text-sm font-medium">
+                WebSocket URL
+              </label>
+              <Input
+                id="wsUrl"
+                value={tempWsUrl}
+                onChange={(e) => setTempWsUrl(e.target.value)}
+                placeholder="ws://localhost:4000"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveWsUrl}>Save</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

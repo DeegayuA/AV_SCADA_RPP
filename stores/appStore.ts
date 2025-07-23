@@ -23,8 +23,11 @@ import { dataPoints as rawDataPoints } from '@/config/dataPoints';
 
 // Process rawDataPoints for icons, ensure this pattern works for your icon components
 const dataPointsWithIcons = rawDataPoints.map((dp) => {
-  // Assuming dp.icon is already a valid React Component, no complex processing needed.
-  return { ...dp, icon: dp.icon };
+  // Filter out string icons to match DataPoint type requirements
+  return { 
+    ...dp, 
+    icon: typeof dp.icon === 'string' ? undefined : dp.icon 
+  };
 });
 
 const defaultUser: User = {

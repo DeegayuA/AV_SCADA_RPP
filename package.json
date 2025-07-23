@@ -3,7 +3,7 @@
   "version": "1.6.0",
   "private": true,
   "main": "electron-main.js",
-  "scripts": {
+   "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
     "build": "tsc",
     "start": "next start -H 0.0.0.0",
@@ -22,13 +22,9 @@
     "inject:Colombo": "cp config/config.Colombo.ts config/dataPoints.ts && cp config/config.Colombo.constants.ts config/constants.ts",
     "inject:default": "cp config/config.default.ts config/dataPoints.ts && cp config/config/config.default.constants.ts config/constants.ts",
     "inject": "npm run inject:RUSL && npm run inject:Ranna && npm run inject:Colombo && npm run inject:default",
-    "generate:docs": "typedoc --out docs/api --theme hierarchy --readme none --excludeExternals --excludePrivate --excludeProtected --hideGenerator --disableSources --tsconfig tsconfig.json --plugin typedoc-plugin-markdown --plugin typedoc-theme-hierarchy",
-    "vercel-build": "npm run export && npm run build && npm run cap:sync",
+    "generate:docs": "typedoc --ousld t docs/api --theme hierarchy --readme none --excludeExternals --excludePrivate --excludeProtected --hideGenerator --disableSources --tsconfig tsconfig.json --plugin typedoc-plugin-markdown --plugin typedoc-theme-hierarchy",
+    "vercel-build": "next build", 
     "merge:prod": "bash scripts/merge_to_production.sh"
-  ,
-  "start:rusl": "git checkout Prod_RUSL_Mini_Grid && npm install && npm start",
-  "start:ranna": "git checkout Prod_Ranna_2MW && npm install && npm start",
-  "start:colombo": "git checkout Prod_Colombo_Office_Mini_Grid && npm install && npm start"
   },
   "dependencies": {
     "@capacitor/core": "^7.3.0",

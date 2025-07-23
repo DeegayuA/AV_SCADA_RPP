@@ -24,7 +24,7 @@ export interface DataPoint {
   | 'String' | 'DateTime' | 'ByteString' | 'Guid' | 'Byte' | 'SByte'
   | 'Int64' | 'UInt64' | 'StatusCode' | 'LocalizedText';
   uiType?: 'display' | 'button' | 'switch' | 'gauge' | 'input';
-  icon?: LucideIcon | React.FC<React.SVGProps<SVGSVGElement>>;
+  icon?: LucideIcon | React.FC<React.SVGProps<SVGSVGElement>> | string; // Allow string for legacy support, but prefer LucideIcon or React component
   unit?: string;
   min?: number;
   max?: number;

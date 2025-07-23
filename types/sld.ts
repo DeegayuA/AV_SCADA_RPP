@@ -2,7 +2,36 @@
 import type { Node, Edge, Viewport } from 'reactflow';
 import type { LucideIcon } from 'lucide-react';
 import { UserRole } from './auth'; // Assuming this path and type are correct
+export interface WindTurbineNodeData extends BaseNodeData {
+  elementType: SLDElementType.WindTurbine;
+  config?: BaseNodeData['config'] & {
+    turbineType?: 'Horizontal' | 'Vertical' | string;
+    ratedPowerkW?: number;
+    cutInWindSpeedMs?: number;
+    ratedWindSpeedMs?: number;
+    cutOutWindSpeedMs?: number;
+    rotorDiameterM?: number;
+    hubHeightM?: number;
+    generatorType?: 'Synchronous' | 'Asynchronous' | 'PMSG' | string;
+    gearboxRatio?: number;
+    powerCurveData?: Array<{ windSpeed: number; power: number }>;
+  };
+}
 
+export interface WindInverterNodeData extends BaseNodeData {
+  elementType: SLDElementType.WindInverter;
+  config?: BaseNodeData['config'] & {
+    ratedPowerkW?: number;
+    inputVoltageRange?: { min: number; max: number };
+    outputVoltage?: number;
+    efficiency?: number;
+    gridTieCapable?: boolean;
+    powerFactorRange?: { min: number; max: number };
+    maxInputCurrent?: number;
+    protectionFeatures?: string[];
+    certifications?: string[];
+  };
+}
 export interface DataPoint {
   label: string;
   id: string;
@@ -303,14 +332,14 @@ export interface SwitchNodeData extends BaseNodeData {
   };
 }
 
-// Union of all specific node data types
+// --- Union of all specific node data types ---
 export type CustomNodeData =
   | TextLabelNodeData | DataLabelNodeData | InverterNodeData | PanelNodeData
   | BreakerNodeData | MeterNodeData | BatteryNodeData | ContactorNodeData
   | GridNodeData | LoadNodeData | BusbarNodeData | GenericDeviceNodeData
   | TransformerNodeData | GeneratorNodeData | PLCNodeData | SensorNodeData
   | IsolatorNodeData | ATSNodeData | JunctionBoxNodeData | FuseNodeData | GaugeNodeData
-  | SwitchNodeData;
+  | SwitchNodeData | WindTurbineNodeData | WindInverterNodeData;
 
   export type DynamicFlowType =
   | 'bidirectional_from_net'          // Uses gridNetFlowDataPointId, +/- determines direction

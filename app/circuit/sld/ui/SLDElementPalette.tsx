@@ -11,13 +11,15 @@ import {
     FuseNodeData,
     IsolatorNodeData,
     JunctionBoxNodeData,
+    WindTurbineNodeData, // Import new type
+    WindInverterNodeData, // Import new type
 } from '@/types/sld';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { motion } from 'framer-motion';
 import {
     BatteryCharging, Rows3, Cable, CircuitBoard, PlugZap, Zap, DatabaseZap, Thermometer,
     SlidersHorizontal, FileText, TextCursorInput, Cpu, ToyBrick, Workflow, GitFork, BoxSelect,
-    Unplug, ShieldAlert, ListFilter, SearchCode, Gauge as GaugeIcon // Added GaugeIcon
+    Unplug, ShieldAlert, ListFilter, SearchCode, Gauge as GaugeIcon, Wind, Fan // Added Wind and Fan icons
 } from 'lucide-react';
 
 // Adjust the import path if SearchableSelect is not directly in ./
@@ -36,13 +38,21 @@ export const categorizedComponents: PaletteCategory[] = [
         defaultData: { label: 'Utility Grid', status: 'connected', config: {voltageLevel: "11kV"}, elementType: SLDElementType.Grid } },
       { type: SLDElementType.Generator, label: 'Generator', icon: <Zap size={16}/>,
         defaultData: { label: 'Backup Gen', status: 'offline', config: {fuelType: "Diesel", ratingKVA: "150"}, elementType: SLDElementType.Generator } },
+      {
+        type: SLDElementType.WindTurbine, label: 'Wind Turbine', icon: <Wind size={16} />,
+        defaultData: { label: 'Wind Turbine', status: 'producing', config: { ratedPowerkW: 2000 }, elementType: SLDElementType.WindTurbine } as Partial<WindTurbineNodeData>
+      },
     ],
   },
   {
     name: 'Conversion & Switching',
     components: [
-      { type: SLDElementType.Inverter, label: 'Inverter', icon: <CircuitBoard size={16}/>,
-        defaultData: { label: 'Inverter', status: 'nominal', config: { ratedPower: 100}, elementType: SLDElementType.Inverter } },
+      { type: SLDElementType.Inverter, label: 'PV Inverter', icon: <CircuitBoard size={16}/>,
+        defaultData: { label: 'PV Inverter', status: 'nominal', config: { ratedPower: 100}, elementType: SLDElementType.Inverter } },
+      {
+        type: SLDElementType.WindInverter, label: 'Wind Inverter', icon: <Fan size={16} />,
+        defaultData: { label: 'Wind Inverter', status: 'nominal', config: { ratedPowerkW: 2000 }, elementType: SLDElementType.WindInverter } as Partial<WindInverterNodeData>
+      },
       { type: SLDElementType.Transformer, label: 'Transformer', icon: <GitFork size={16}/>,
         defaultData: { label: 'Transformer', status: 'nominal', config: {ratingMVA: "1", primaryVoltage: "11kV", secondaryVoltage: "0.4kV" }, elementType: SLDElementType.Transformer } },
       { type: SLDElementType.Breaker, label: 'Breaker', icon: <PlugZap size={16}/>,

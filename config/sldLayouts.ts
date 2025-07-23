@@ -1,3 +1,4 @@
+// config/sldLayouts.ts
 import {
     SLDLayout,
     SLDElementType,
@@ -6,7 +7,7 @@ import {
     TransformerNodeData, MeterNodeData, BusbarNodeData, GenericDeviceNodeData,
     GridNodeData, LoadNodeData, BatteryNodeData, DataLabelNodeData, GeneratorNodeData,
     SensorNodeData, PLCNodeData, ContactorNodeData, FuseNodeData, IsolatorNodeData,
-    ATSNodeData, JunctionBoxNodeData, // Added JunctionBoxNodeData
+    ATSNodeData, JunctionBoxNodeData, WindTurbineNodeData, WindInverterNodeData,
     // Edge Data type
     CustomFlowEdgeData
 } from '@/types/sld';
@@ -55,7 +56,7 @@ export const sldLayouts: Record<string, SLDLayout> = {
             { dataPointId: 'wind-turbine-1-speed', targetProperty: 'speed' },
             { dataPointId: 'wind-turbine-1-power', targetProperty: 'power' },
           ],
-        },
+        } as WindTurbineNodeData,
       },
       {
         id: 'wind-inverter-1',
@@ -68,7 +69,7 @@ export const sldLayouts: Record<string, SLDLayout> = {
           dataPointLinks: [
             { dataPointId: 'wind-inverter-1-power', targetProperty: 'power' },
           ],
-        },
+        } as WindInverterNodeData,
       },
       // Existing grid components
       {
@@ -169,20 +170,9 @@ export const sldLayouts: Record<string, SLDLayout> = {
             minVal: 0,
             maxVal: 100,
             unit: '%',
-            // valueDataPointLink is preferred for GaugeNode specific value
-            // but the requirement was to put it in dataPointLinks.
-            // GaugeNode will try to use data.config.valueDataPointLink first,
-            // then fall back to data.dataPointLinks[0] if targetProperty is 'value'.
-            // To be explicit for GaugeNode's primary value, it should ideally be:
-            // valueDataPointLink: { dataPointId: 'sim_tank_level_1', targetProperty: 'value' }
-            // For now, adhering to the dataPointLinks array structure as requested for the test.
           },
           dataPointLinks: [
-            // Link for the main value of the gauge.
-            // GaugeNode will use the first link with targetProperty 'value' if valueDataPointLink isn't set in its config.
             { dataPointId: 'sim_tank_level_1', targetProperty: 'value' },
-            // Example of a secondary link, perhaps for styling, though not directly used by GaugeNode's core value display.
-            // { dataPointId: 'sim_tank_status_1', targetProperty: 'status' } 
           ],
         } as CustomNodeData, // Using CustomNodeData as GaugeNodeData might not be directly imported here yet
       },
