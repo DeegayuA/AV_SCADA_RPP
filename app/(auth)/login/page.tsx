@@ -49,8 +49,7 @@ const users: User[] = [ // Mock users
   { email: 'viewer@av.lk', passwordHash: 'viewer123', role: UserRole.VIEWER, avatar: `https://avatar.vercel.sh/viewer-energy.png`, name: 'Guest Observer', redirectPath: '/dashboard' },
 ];
 
-// ... (GoogleIcon, loginSchema, columnVariants, imageVariants, formElementVariants, types remain the same)
-
+// ... (GoogleIcon, loginSchema types remain the same)
 const GoogleIcon = () => (
     <motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
       <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
@@ -68,17 +67,17 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 const columnVariants = {
   hidden: { opacity: 0, x: -40, },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: [0.25, 0.1, 0.25, 1], }, },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.6, ease: "easeOut" as const, }, },
 };
 
 const imageVariants = {
   hidden: { opacity: 0, x: 40, },
-  visible: { opacity: 1, x: 0, transition: { duration: 0.7, ease: [0.25, 0.1, 0.25, 1], delay: 0.1, }, },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.7, ease: "easeOut" as const, delay: 0.1, }, },
 };
 
 const formElementVariants = (delayOffset: number = 0) => ({
   hidden: { opacity: 0, y: 15 },
-  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: (i * 0.07) + delayOffset + parseFloat(String(0.3)), duration: 0.4, ease: "easeOut" } }),
+  visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: (i * 0.07) + delayOffset + parseFloat(String(0.3)), duration: 0.4, ease: "easeOut" as const } }),
 });
 type IconType = ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>;
 interface FormItemConfigBase { name: "email" | "password"; label: string; placeholder: string; icon: IconType; type: string; }
@@ -449,7 +448,7 @@ export default function LoginPage() {
             animate="visible" 
             className="flex min-h-screen items-center justify-center p-4 sm:p-8 md:p-10 lg:p-12 relative overflow-hidden" >
         <div className="mx-auto flex w-full max-w-sm sm:max-w-md flex-col gap-y-6 sm:gap-y-8 z-10">
-            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.5, ease: "circOut" } }}
+            <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.5, ease: "circOut" as const } }}
             className="flex flex-col items-center text-center" >
             <AppLogo className="h-14 w-14 sm:h-16 sm:w-16 mb-3 text-primary" />
             <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-gray-800 dark:text-gray-100">
@@ -494,7 +493,7 @@ export default function LoginPage() {
         className="relative hidden lg:flex flex-col items-center justify-center bg-slate-900 overflow-hidden" >
         <AnimatePresence mode="sync">
             <motion.div key={currentImageIndex} initial={{ opacity: 0, scale: 1.1 }} animate={{ opacity: 1, scale: 1, transition: { duration: 1.8, ease: [0.22, 1, 0.36, 1] } }}
-            exit={{ opacity: 0, scale: 1.05, transition: { duration: 0.9, ease: "easeIn" } }} className="absolute inset-0" >
+            exit={{ opacity: 0, scale: 1.05, transition: { duration: 0.9, ease: "easeIn" as const } }} className="absolute inset-0" >
             <Image src={imageUrls[currentImageIndex]} alt="Advanced regenerative energy technology" fill style={{ objectFit: 'cover' }} quality={75} priority={currentImageIndex === 0} className="brightness-[0.55] dark:brightness-[0.4] saturate-100"/>
             </motion.div>
         </AnimatePresence>
@@ -503,7 +502,7 @@ export default function LoginPage() {
             <motion.div className="mb-6 flex items-center justify-center text-3xl sm:text-4xl font-extrabold tracking-tight text-white leading-tight shadow-text-lg">
                     <AnimatePresence mode="wait">
                     <motion.div key={currentMessageIndex} initial={{ opacity: 0, y: 30, filter: "blur(8px)" }} animate={{ opacity: 1, y: 0, filter: "blur(0px)", transition: { duration: 0.6, delay:0.1, ease: [0.22, 1, 0.36, 1] } }}
-                        exit={{ opacity: 0, y: -25, filter: "blur(8px)", transition: { duration: 0.4, ease: "easeIn" } }} className="flex items-center" >
+                        exit={{ opacity: 0, y: -25, filter: "blur(8px)", transition: { duration: 0.4, ease: "easeIn" as const } }} className="flex items-center" >
                         <RotatingMessageIcon className="mr-3 inline-block h-7 w-7 sm:h-8 sm:w-8 text-sky-300 opacity-80" />
                         <span>{rotatingMessages[currentMessageIndex].title}</span>
                     </motion.div>
@@ -546,7 +545,7 @@ const LoginFormInternalContent = React.memo(({
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0, transition: { delay: 0.2, duration: 0.5, ease: "circOut" } }}
+      animate={{ opacity: 1, y: 0, transition: { delay: 0.2, duration: 0.5, ease: "circOut" as const } }}
       className="space-y-5 sm:space-y-6"
     >
       <div className="text-center">
@@ -683,11 +682,11 @@ const ThemeToggleButton = React.memo(() => {
         onClick={cycleTheme} aria-label="Toggle theme" >
         <AnimatePresence mode="wait" initial={false}>
           {theme === 'dark' ?
-            <motion.div key="sun-icon" initial={{ y: -12, opacity: 0, rotate: -45 }} animate={{ y: 0, opacity: 1, rotate: 0 }} exit={{ y: 12, opacity: 0, rotate: 45 }} transition={{ duration: 0.25, ease: "circOut" }}>
+            <motion.div key="sun-icon" initial={{ y: -12, opacity: 0, rotate: -45 }} animate={{ y: 0, opacity: 1, rotate: 0 }} exit={{ y: 12, opacity: 0, rotate: 45 }} transition={{ duration: 0.25, ease: "circOut" as const }}>
               <Sun className="h-5 w-5 sm:h-[22px] sm:w-[22px] text-yellow-300" />
             </motion.div>
             :
-            <motion.div key="moon-icon" initial={{ y: -12, opacity: 0, rotate: 45 }} animate={{ y: 0, opacity: 1, rotate: 0 }} exit={{ y: 12, opacity: 0, rotate: -45 }} transition={{ duration: 0.25, ease: "circOut" }}>
+            <motion.div key="moon-icon" initial={{ y: -12, opacity: 0, rotate: 45 }} animate={{ y: 0, opacity: 1, rotate: 0 }} exit={{ y: 12, opacity: 0, rotate: -45 }} transition={{ duration: 0.25, ease: "circOut" as const }}>
               <Moon className="h-5 w-5 sm:h-[22px] sm:w-[22px] text-sky-500" />
             </motion.div>
           }

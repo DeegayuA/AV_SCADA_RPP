@@ -1,8 +1,9 @@
 // components/sld/nodes/TextLabelNode.tsx
-import React, { memo, useMemo, useState, useLayoutEffect, useEffect, useRef } from 'react';
+import React, { memo, useMemo, useState, useLayoutEffect, useEffect } from 'react';
 import { NodeProps, Handle, Position, useReactFlow, Node as ReactFlowNode } from 'reactflow';
-import { motion, AnimatePresence } from 'framer-motion';
-import { TextLabelNodeData, TextNodeStyleConfig, SLDElementType, DataPointLink } from '@/types/sld';
+// --- FIX: Import MotionStyle, Transition, and Variants ---
+import { motion, AnimatePresence, MotionStyle, Transition, Variants } from 'framer-motion';
+import { TextLabelNodeData, TextNodeStyleConfig, SLDElementType } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import { TextLabelConfigPopover } from '../ui/TextLabelConfigPopover';
 import { measureTextNode, getDerivedStyle, applyValueMapping, formatDisplayValue } from './nodeUtils';
@@ -34,7 +35,7 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
     currentUser: state.currentUser,
     globalOpcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
-    setSelectedElementForDetails: state.setSelectedElementForDetails, // If you want an info button later
+    setSelectedElementForDetails: state.setSelectedElementForDetails,
   }));
   
   const isDarkMode = useIsDarkMode();
@@ -42,7 +43,6 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
   
   const [calculatedDimensions, setCalculatedDimensions] = useState<{ width: number; height: number }>({ width: MIN_WIDTH, height: MIN_HEIGHT });
 
-  // --- Reactive Text Content ---
   const textLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'text'), [data.dataPointLinks]);
   const textDataPointConfig = useMemo(() => textLink ? dataPoints[textLink.dataPointId] : undefined, [textLink, dataPoints]);
   const textOpcUaNodeId = useMemo(() => textDataPointConfig?.nodeId, [textDataPointConfig]);
@@ -56,16 +56,13 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
     return data.text || data.label || '';
   }, [textLink, textDataPointConfig, reactiveTextValue, data.text, data.label]);
 
-  // --- Derived Styles ---
   const opcUaValuesForDerivedStyle = useMemo(() => {
     const values: Record<string, any> = {};
-    // Include reactive text value if its nodeId is present
     if (textOpcUaNodeId && reactiveTextValue !== undefined) {
       values[textOpcUaNodeId] = reactiveTextValue;
     }
-    // Include values for any other style-related dataPointLinks
     data.dataPointLinks?.forEach(link => {
-      if (link.targetProperty !== 'text') { // Already handled above for 'text'
+      if (link.targetProperty !== 'text') {
         const dpConfig = dataPoints[link.dataPointId];
         if (dpConfig?.nodeId && globalOpcUaNodeValues.hasOwnProperty(dpConfig.nodeId)) {
           values[dpConfig.nodeId] = globalOpcUaNodeValues[dpConfig.nodeId];
@@ -79,32 +76,22 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
 
   useLayoutEffect(() => {
     const { styleConfig = {} } = data;
-    // Measurement should ideally consider the final font styles applied, whether from styleConfig or derivedNodeStyles
-    // For simplicity here, we use styleConfig for measurement, as derived styles might be more for color/bg.
-    // If derived styles change font size/weight, this might need refinement.
     const fontToMeasure = {
         fontFamily: styleConfig.fontFamily || 'Arial, sans-serif',
         fontSize: styleConfig.fontSize || '14px',
         fontWeight: styleConfig.fontWeight || 'normal',
         fontStyle: styleConfig.fontStyle || 'normal',
     };
-
     const dimensions = measureTextNode({
-      text: displayText || ' ', // Use a space if text is empty for min measurement
+      text: displayText || ' ',
       ...fontToMeasure,
       padding: styleConfig.padding || '4px',
     });
-    
     const newWidth = Math.max(MIN_WIDTH, dimensions.width);
     const newHeight = Math.max(MIN_HEIGHT, dimensions.height);
 
-    // Check if dimensions actually changed to prevent unnecessary re-renders/updates
     if (newWidth !== calculatedDimensions.width || newHeight !== calculatedDimensions.height) {
         setCalculatedDimensions({ width: newWidth, height: newHeight });
-        
-        // Update the node in React Flow store IF its current dimensions don't match.
-        // This is important if React Flow itself is not aware of the auto-sized dimensions,
-        // especially on initial load or if dimensions change significantly.
         setNodes((nds) =>
           nds.map((n) => {
             if (n.id === id && (n.width !== newWidth || n.height !== newHeight)) {
@@ -116,8 +103,8 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
     }
   }, [displayText, data.styleConfig, id, setNodes, calculatedDimensions.width, calculatedDimensions.height]);
 
-
-  const nodeMainStyle = useMemo((): React.CSSProperties => {
+  // --- FIX: Change return type to MotionStyle ---
+  const nodeMainStyle = useMemo((): MotionStyle => {
     const { styleConfig = {} } = data;
     let justifyContent = 'flex-start';
     if (styleConfig.textAlign === 'center') justifyContent = 'center';
@@ -126,16 +113,17 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
     const baseBg = styleConfig.backgroundColor || 'transparent';
     const finalBg = derivedNodeStyles.backgroundColor || baseBg;
     
-    let finalBorderColor = 'transparent'; // Default border is transparent
+    let finalBorderColor = 'transparent';
     if (derivedNodeStyles.borderColor) {
         finalBorderColor = derivedNodeStyles.borderColor;
     }
 
-
-    let currentBoxShadow = 'none'; // Default no shadow
+    let currentBoxShadow = 'none';
     if (selected) {
-        currentBoxShadow = `0 0 0 1.5px ${electricCyan}`; // Simpler selection shadow for text
+        currentBoxShadow = `0 0 0 1.5px ${electricCyan}`;
     }
+
+    const cssTransition = 'box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out';
 
     return {
       width: `${calculatedDimensions.width}px`,
@@ -145,30 +133,30 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
       borderColor: finalBorderColor,
       borderWidth: (finalBorderColor && finalBorderColor !== 'transparent') ? '1px' : '0px',
       borderStyle: (finalBorderColor && finalBorderColor !== 'transparent') ? 'solid' : 'none',
-      borderRadius: styleConfig.borderRadius || '4px', // Default border radius
+      borderRadius: styleConfig.borderRadius || '4px',
       display: 'flex',
-      alignItems: 'center', // Use center alignment as default
-      justifyContent: justifyContent,
+      alignItems: 'center',
+      justifyContent,
       boxShadow: currentBoxShadow,
       opacity: derivedNodeStyles.opacity ?? 1,
       cursor: isEditMode ? 'pointer' : 'default',
-      transition: 'box-shadow 0.2s ease-in-out, background-color 0.2s ease-in-out, border-color 0.2s ease-in-out', // CSS transitions
+      transition: cssTransition,
     };
   }, [data, calculatedDimensions, selected, electricCyan, derivedNodeStyles, isEditMode]);
 
-  const textSpanStyle = useMemo((): React.CSSProperties => {
+  // --- FIX: Change return type to MotionStyle ---
+  const textSpanStyle = useMemo((): MotionStyle => {
     const { styleConfig = {} } = data;
-    const defaultColor = isDarkMode ? '#E0E0E0' : '#202020'; // Theme-aware default
+    const defaultColor = isDarkMode ? '#E0E0E0' : '#202020';
     const finalColor = derivedNodeStyles.color || styleConfig.color || defaultColor;
 
     return {
       fontSize: styleConfig.fontSize || '14px',
-      fontWeight: styleConfig.fontWeight || 'normal',
+      fontWeight: styleConfig.fontWeight || 'normal' as any, // Cast to any to avoid conflict
       fontStyle: styleConfig.fontStyle || 'normal',
       fontFamily: styleConfig.fontFamily || 'Arial, sans-serif',
       color: finalColor,
-      lineHeight: 'normal', // Allow line height config
-      // textAlign is handled by parent's justifyContent
+      lineHeight: 'normal',
     };
   }, [data.styleConfig, derivedNodeStyles, isDarkMode]);
 
@@ -181,11 +169,7 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
       nds.map((n) => {
         if (n.id === id) {
           const oldData = n.data as TextLabelNodeData;
-          const updatedNodeData: TextLabelNodeData = {
-            ...oldData,
-            styleConfig: { ...(oldData.styleConfig || {}), ...newStyleConfig },
-          };
-          return { ...n, data: updatedNodeData };
+          return { ...n, data: { ...oldData, styleConfig: { ...(oldData.styleConfig || {}), ...newStyleConfig } } };
         }
         return n;
       })
@@ -196,30 +180,23 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
     handleUpdateWrapper((nds) =>
       nds.map((n) => {
         if (n.id === id) {
-          const oldData = n.data as TextLabelNodeData;
-          // If primarily using reactive text, updating data.text might be for fallback or manual override
-          const updatedNodeData: TextLabelNodeData = { ...oldData, text: newText };
-          return { ...n, data: updatedNodeData };
+          return { ...n, data: { ...n.data, text: newText } };
         }
         return n;
       })
     );
   };
-  // The handleLabelUpdate would be similar if data.label is distinct from data.text for editing.
-  // For simplicity, assuming TextLabelConfigPopover updates 'text'. If it needs to update 'label', add a similar handler.
+  
   const handleLabelUpdate = (newLabel: string) => {
      handleUpdateWrapper((nds) =>
       nds.map((n) => {
         if (n.id === id) {
-          const oldData = n.data as TextLabelNodeData;
-          const updatedNodeData: TextLabelNodeData = { ...oldData, label: newLabel };
-          return { ...n, data: updatedNodeData };
+          return { ...n, data: { ...n.data, label: newLabel } };
         }
         return n;
       })
     );
   }
-
 
   const nodeForPopover: ReactFlowNode<TextLabelNodeData> = {
     id, type: type || SLDElementType.TextLabel, data,
@@ -229,27 +206,33 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
     connectable: isConnectable || false,
   };
 
+  // Explicitly type transitions to satisfy TypeScript
+  const exitTransition: Transition = { duration: 0.15 };
+  const mainTransition: Transition = { type: 'spring', stiffness: 260, damping: 20 };
+  const textExitTransition: Transition = { duration: 0.1 };
+  const textTransition: Transition = { duration: 0.2, ease: "easeInOut" };
+
+
   return (
     <TextLabelConfigPopover
       node={nodeForPopover}
       onUpdateNodeStyle={handleStyleConfigUpdate}
-      onUpdateNodeText={handleTextUpdate} // Or separate updates for text/label
+      onUpdateNodeText={handleTextUpdate}
       onUpdateNodeLabel={handleLabelUpdate}
       isEditMode={!!isEditMode}
     >
       <motion.div
-        className="sld-node text-label-node group" // Removed custom-node-hover, using framer's whileHover
+        className="sld-node text-label-node group"
         style={nodeMainStyle}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ 
             opacity: 1, 
             scale: 1,
-            boxShadow: nodeMainStyle.boxShadow // Ensure anirunningmat animation targets this
+            boxShadow: selected ? `0 0 0 1.5px ${electricCyan}` : 'none'
         }}
-        exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-        transition={{ type: 'spring', stiffness: 260, damping: 20 }}
-        whileHover={isEditMode && !selected ? { scale: 1.03, boxShadow: `0 0 8px 2px rgba(0,0,0,0.1)` } : undefined}
-        // tabIndex={isEditMode ? 0 : -1} // Popover typically handles focus trigger
+        exit={{ opacity: 0, scale: 0.9, transition: exitTransition }}
+        transition={mainTransition}
+        whileHover={isEditMode && !selected ? { scale: 1.03, boxShadow: `0 0 8px 2px rgba(0,0,0,0.1)` } : {}}
       >
         {isEditMode && (
           <>
@@ -262,15 +245,15 @@ const TextLabelNode: React.FC<NodeProps<TextLabelNodeData>> = (props) => {
         
         <AnimatePresence mode="wait">
           <motion.p
-            key={displayText} // Crucial for AnimatePresence to detect change
+            key={displayText}
             style={textSpanStyle}
-            className="whitespace-pre-wrap" // leading-tight removed to use configured line-height
+            className="whitespace-pre-wrap"
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -5, transition: {duration: 0.1} }}
-            transition={{ duration: 0.2, ease: "easeInOut" }}
+            exit={{ opacity: 0, y: -5, transition: textExitTransition }}
+            transition={textTransition}
           >
-            {displayText || (isEditMode ? '...' : '')} {/* Show placeholder dots in edit mode if empty */}
+            {displayText || (isEditMode ? '...' : '')}
           </motion.p>
         </AnimatePresence>
       </motion.div>

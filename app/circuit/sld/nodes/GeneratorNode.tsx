@@ -100,7 +100,7 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generator
       spinning: { rotate: 360 },
       still: { rotate: 0 },
     };
-    const transition = isSpinning ? { loop: Infinity, ease: "linear", duration: 5 } : { duration: 0.5 };
+    const transition = isSpinning ? { loop: Infinity, ease: "linear" as const, duration: 5 } : { duration: 0.5 };
 
     return (
       <motion.svg 
@@ -125,12 +125,12 @@ const GeneratorNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generator
   );
 
   // Merge styles: derivedNodeStyles override class-based styles
-  const componentStyle: React.CSSProperties = {
+  const componentStyle = {
     // Border color is applied to the outer div if derived, otherwise class handles it.
-    borderColor: derivedNodeStyles.borderColor || undefined,
+    ...(derivedNodeStyles.borderColor && { borderColor: derivedNodeStyles.borderColor }),
     // Background and color are primarily for the inner content wrapper.
     // Opacity can be for the outer div.
-    opacity: derivedNodeStyles.opacity || undefined,
+    ...(derivedNodeStyles.opacity && { opacity: derivedNodeStyles.opacity }),
   };
   // Text and BG colors for the inner wrapper, derived or from status.
   const contentBgColor = derivedNodeStyles.backgroundColor || statusClasses.split(' ')[1];

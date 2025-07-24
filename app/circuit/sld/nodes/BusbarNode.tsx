@@ -115,7 +115,7 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
         height: `${busbarHeight}px`,
         borderColor: appearance.borderColorVar,
         '--tw-ring-color': selected ? sldAccentVar : 'transparent',
-      } as React.CSSProperties}
+      }}
       initial="initial"
       transition={{ type: 'spring', stiffness: 400, damping: 17 }}
       whileHover={{ scale: isNodeEditable ? 1.02 : 1.01 }} // Subtle hover

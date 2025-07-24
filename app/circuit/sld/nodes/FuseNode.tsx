@@ -147,7 +147,7 @@ const FuseNode: React.FC<ExtendedNodeProps<FuseNodeData>> = (props) => {
       className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
       style={{
         borderColor: appearance.borderColorVar,
-        opacity: data.opacity,
+        opacity: data.opacity ?? 1,
       }}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 10 }}

@@ -73,11 +73,11 @@ const DynamicBatteryVisual: React.FC<DynamicBatteryVisualProps> = React.memo(({
     idle: { opacity: 1 },
     charging: { 
         opacity: [1, 0.85, 1], 
-        transition: { duration: 1.2 + (1 - normalizedAnimationIntensity) * 1.3, repeat: Infinity, ease: "easeInOut" } 
+        transition: { duration: 1.2 + (1 - normalizedAnimationIntensity) * 1.3, repeat: Infinity, ease: "easeInOut" as const } 
     },
     discharging: { 
         opacity: [1, 0.85, 1], 
-        transition: { duration: 1.2 + (1 - normalizedAnimationIntensity) * 1.3, repeat: Infinity, ease: "easeInOut" }
+        transition: { duration: 1.2 + (1 - normalizedAnimationIntensity) * 1.3, repeat: Infinity, ease: "easeInOut" as const }
     }
   };
 
@@ -526,19 +526,19 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => {
         boxShadow: (batteryAction === 'CHARGING' || batteryAction === 'DISCHARGING') && 
                     !selected && !isRecentStatusChange && (appearance.glowColorVar && appearance.glowColorVar !== 'transparent')
         ? [ 
-            nodeMainStyle.boxShadow,
-            `${nodeMainStyle.boxShadow}, 0 0 3px 0.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', `, ${0.2 + powerFlowRatio * 0.15})`).replace('var(','rgba(')}`,
-            `${nodeMainStyle.boxShadow}, 0 0 7px 1.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', `, ${0.3 + powerFlowRatio * 0.25})`).replace('var(','rgba(')}`,
-            `${nodeMainStyle.boxShadow}, 0 0 3px 0.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', `, ${0.2 + powerFlowRatio * 0.15})`).replace('var(','rgba(')}`,
-            nodeMainStyle.boxShadow,
+            nodeMainStyle.boxShadow ?? 'none',
+            `${nodeMainStyle.boxShadow ?? 'none'}, 0 0 3px 0.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', `, ${0.2 + powerFlowRatio * 0.15})`).replace('var(','rgba(')}`,
+            `${nodeMainStyle.boxShadow ?? 'none'}, 0 0 7px 1.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', `, ${0.3 + powerFlowRatio * 0.25})`).replace('var(','rgba(')}`,
+            `${nodeMainStyle.boxShadow ?? 'none'}, 0 0 3px 0.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', `, ${0.2 + powerFlowRatio * 0.15})`).replace('var(','rgba(')}`,
+            nodeMainStyle.boxShadow ?? 'none',
           ]
         : nodeMainStyle.boxShadow
     }}
       exit={{ 
-        opacity: 0, scale: 0.92, y:2, transition: { duration: 0.08, ease: "easeOut" } 
+        opacity: 0, scale: 0.92, y:2, transition: { duration: 0.08, ease: "easeOut" as const } 
     }}
       transition={{ 
-          boxShadow: { duration: 1.4 + (1-powerFlowRatio)*1.2, repeat: Infinity, ease: "easeInOut" },
+          boxShadow: { duration: 1.4 + (1-powerFlowRatio)*1.2, repeat: Infinity, ease: "easeInOut" as const },
           default: {type: 'spring', stiffness: 240, damping: 22}
     }}
       whileHover={ (isNodeEditable || !selected ) ? { 
@@ -607,7 +607,7 @@ const BatteryNode: React.FC<ExtendedNodeProps> = (props) => {
                     title={`Status: ${displayStatusText}`} 
                     style={{ color: appearance.statusTextColorVar }}
                     initial={{opacity:0, y:1}} animate={{opacity:1, y:0}} exit={{opacity:0, y:-1}}
-                    transition={{duration: 0.12, ease:"circOut"}}
+                    transition={{duration: 0.12, ease:"circOut" as const}}
                     >
                     {displayStatusText}
                     </motion.p>

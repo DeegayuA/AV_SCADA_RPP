@@ -1,16 +1,16 @@
 // components/sld/nodes/MotorNode.tsx
 import React, { memo, useMemo } from 'react';
-import { NodeProps, Handle, Position } from 'reactflow'; // Reverted to NodeProps
-import { motion } from 'framer-motion';
-// Added CustomNodeData to the import line
-import { BaseNodeData, CustomNodeType, CustomNodeData, DataPointLink, DataPoint, SLDElementType } from '@/types/sld'; // Added CustomNodeType, SLDElementType and CustomNodeData
+import { NodeProps, Handle, Position } from 'reactflow';
+// --- FIX: Import Transition type ---
+import { motion, Transition } from 'framer-motion';
+import { BaseNodeData, CustomNodeType, CustomNodeData, SLDElementType } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
 import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { CogIcon, PlayCircleIcon, PauseCircleIcon, AlertCircleIcon, XCircleIcon, InfoIcon } from 'lucide-react'; // Added InfoIcon
-import { Button } from "@/components/ui/button"; // Added Button
+import { CogIcon, PlayCircleIcon, PauseCircleIcon, AlertCircleIcon, XCircleIcon, InfoIcon } from 'lucide-react';
+import { Button } from "@/components/ui/button";
 
-interface MotorNodeData extends BaseNodeData { 
-    elementType: SLDElementType.Motor; // Use the correct SLDElementType
+interface MotorNodeData extends BaseNodeData {
+    elementType: SLDElementType.Motor;
     config?: BaseNodeData['config'] & {
         ratedPowerkW?: number;
         voltage?: string;
@@ -18,13 +18,13 @@ interface MotorNodeData extends BaseNodeData {
     }
 }
 
-const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted to NodeProps
-  const { data, selected, isConnectable, id, type, zIndex, dragging, xPos, yPos } = props; // Fixed destructuring
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({ // Changed realtimeData to opcUaNodeValues
+const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => {
+  const { data, selected, isConnectable, id, type, zIndex, dragging, xPos, yPos } = props;
+  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues, // Changed
+    opcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
   }));
 
@@ -35,24 +35,23 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
 
   const processedStatus = useMemo(() => {
     const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
-      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
+    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) {
+      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues);
       return applyValueMapping(rawValue, statusLink);
     }
-    return data.status || 'stopped'; // Default status
+    return data.status || 'stopped';
   }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
 
   const powerDisplay = useMemo(() => {
     const powerLink = data.dataPointLinks?.find(link => link.targetProperty === 'powerConsumption' || link.targetProperty === 'activePower');
-    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) { // Added dataPoints and opcUaNodeValues checks
+    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) {
         const dpMeta = dataPoints[powerLink.dataPointId];
-        const rawValue = getDataPointValue(powerLink.dataPointId, dataPoints, opcUaNodeValues); // Correct parameter order
+        const rawValue = getDataPointValue(powerLink.dataPointId, dataPoints, opcUaNodeValues);
         const mappedValue = applyValueMapping(rawValue, powerLink);
         return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
     }
     return data.config?.ratedPowerkW ? `${data.config.ratedPowerkW}kW` : 'N/A';
   }, [data.dataPointLinks, data.config?.ratedPowerkW, opcUaNodeValues, dataPoints]);
-
 
   const { StatusIcon, statusText, baseClasses, isSpinning } = useMemo(() => {
     let icon = CogIcon;
@@ -73,7 +72,7 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
       case 'stopped': case 'offline': case 'off':
         icon = PauseCircleIcon; text = 'STOPPED';
         classes = 'border-neutral-500 bg-neutral-500/10 text-neutral-500'; break;
-      default: // Unknown or other statuses
+      default:
         icon = CogIcon; text = text || 'UNKNOWN';
         classes = 'border-gray-400 bg-gray-400/10 text-gray-500'; break;
     }
@@ -81,7 +80,7 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
   }, [processedStatus]);
 
   const derivedNodeStyles = useMemo(() => 
-    getDerivedStyle(data, dataPoints, opcUaNodeValues), // Fixed parameter order to match function definition
+    getDerivedStyle(data, dataPoints, opcUaNodeValues),
     [data, dataPoints, opcUaNodeValues]
   );
   
@@ -90,7 +89,10 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
       spinning: { rotate: 360 },
       still: { rotate: 0 },
     };
-    const transition = isSpinning ? { loop: Infinity, ease: "linear", duration: 2 } : { duration: 0.5 }; // Faster spin than generator
+    // --- FIX: Add the Transition type annotation ---
+    const transition: Transition = isSpinning 
+      ? { repeat: Infinity, ease: "linear", duration: 2 } 
+      : { duration: 0.5 };
 
     return (
       <motion.svg 
@@ -119,11 +121,10 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
   `;
   const effectiveIconColorClass = derivedNodeStyles.color ? '' : baseClasses.split(' ')[2];
 
-
   return (
     <motion.div
       className={mainDivClasses}
-      style={derivedNodeStyles} // Allow DPLinks to override all styles
+      style={derivedNodeStyles as React.CSSProperties & { [key: string]: any }}
       variants={{ hover: { scale: isNodeEditable ? 1.03 : 1 }, initial: { scale: 1 } }}
       whileHover="hover" initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
@@ -138,7 +139,7 @@ const MotorNode: React.FC<NodeProps<MotorNodeData>> = (props) => { // Reverted t
             const fullNodeObject: CustomNodeType = {
                 id, 
                 type, 
-                position: { x: xPos, y: yPos }, // Construct position from xPos and yPos
+                position: { x: xPos, y: yPos },
                 data: data as unknown as CustomNodeData,
                 selected, 
                 dragging, 

@@ -124,7 +124,7 @@ const LoadNode: React.FC<ExtendedNodeProps> = (props) => {
         borderColor: appearance.borderColorVar,
         opacity: (data as any).opacity || 1, // Safe access with default value
         '--tw-ring-color': selected ? sldAccentVar : 'transparent',
-      } as React.CSSProperties}
+      } as any}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
       whileHover={{ scale: isNodeEditable ? 1.03 : 1.01 }}

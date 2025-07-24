@@ -14,13 +14,13 @@ import { APP_AUTHOR } from '@/config/constants';
 
 const pageVariants = {
   initial: { opacity: 0, scale: 0.98, y: 10 },
-  animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
-  exit: { opacity: 0, scale: 0.98, y: -10, transition: { duration: 0.3, ease: "easeIn" } },
+  animate: { opacity: 1, scale: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } },
+  exit: { opacity: 0, scale: 0.98, y: -10, transition: { duration: 0.3, ease: "easeIn" as const } },
 };
 
 const headerVariants = {
   initial: { opacity: 0, y: -20 },
-  animate: { opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.5, ease: "easeOut" } },
+  animate: { opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.5, ease: "easeOut" as const } },
 };
 
 const cardVariants = {
@@ -29,13 +29,13 @@ const cardVariants = {
     opacity: 1,
     y: 0,
     scale: 1,
-    transition: { delay: 0.2 + i * 0.1, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] },
+    transition: { delay: 0.2 + i * 0.1, duration: 0.4, ease: [0.25, 0.1, 0.25, 1] as const },
   }),
   hover: {
     y: -5,
     // Using Tailwind's shadow classes directly is often preferred for consistency
     boxShadow: "var(--tw-shadow-xl, 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1))",
-    transition: { duration: 0.2, ease: "easeOut" }
+    transition: { duration: 0.2, ease: "easeOut" as const }
   }
 };
 

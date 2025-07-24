@@ -181,7 +181,7 @@ const GaugeNode: React.FC<NodeProps<GaugeNodeData>> = (props) => {
       style={{
         borderColor: appearance.borderColorVar,
         '--ring-color': selected ? sldAccentVar : 'transparent',
-      } as React.CSSProperties}
+      } as any}
       title={data.label}
       initial={{ scale: 1 }}
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}

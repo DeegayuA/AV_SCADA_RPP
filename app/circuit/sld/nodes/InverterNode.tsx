@@ -57,8 +57,8 @@ const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = Reac
             x: [-0.4, 0.4, -0.4],
             scale: [1, 1.015 + acPowerRatio * 0.02, 1],
             transition: {
-                x: { duration: 0.7 + (1 - acPowerRatio) * 0.6, repeat: Infinity, ease: "easeInOut" },
-                scale: { duration: 1.3 + (1 - acPowerRatio) * 1.1, repeat: Infinity, ease: "easeInOut" }
+                x: { duration: 0.7 + (1 - acPowerRatio) * 0.6, repeat: Infinity, ease: "easeInOut" as const },
+                scale: { duration: 1.3 + (1 - acPowerRatio) * 1.1, repeat: Infinity, ease: "easeInOut" as const }
             }
         },
         static: { x: 0, scale: 1 }
@@ -502,12 +502,12 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                     ]
                     : nodeMainStyle.boxShadow
             }}
-            exit={{ opacity: 0, scale: 0.92, y: 2, transition: { duration: 0.08, ease: "easeOut" } }}
+            exit={{ opacity: 0, scale: 0.92, y: 2, transition: { duration: 0.08, ease: "easeOut" as const } }}
             transition={{
-                opacity: { duration: 0.15, ease: "easeOut" },
+                opacity: { duration: 0.15, ease: "easeOut" as const },
                 scale: { type: "spring", stiffness: 250, damping: 22 },
                 y: { type: "spring", stiffness: 250, damping: 22 },
-                boxShadow: { duration: 1.4 + (1 - acPowerRatio) * 1.2, repeat: Infinity, ease: "easeInOut" }
+                boxShadow: { duration: 1.4 + (1 - acPowerRatio) * 1.2, repeat: Infinity, ease: "easeInOut" as const }
             }}
             whileHover={{
                 scale: isNodeEditable ? 1.02 : ((hasAnyAcDetailLinks || !isEditMode) ? 1.015 : 1.008),
@@ -588,7 +588,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                                 key={`status-${displayStatusText}`}
                                 className="text-[10px] font-normal leading-normal tracking-tight w-full"
                                 style={{ color: appearance.statusTextColorVar }} title={`Status: ${displayStatusText}`}
-                                initial={{ opacity: 0, y: 1 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -1 }} transition={{ duration: 0.1, ease: "circOut" }}
+                                initial={{ opacity: 0, y: 1 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -1 }} transition={{ duration: 0.1, ease: "circOut" as const }}
                             >
                                 {displayStatusText}
                             </motion.p>

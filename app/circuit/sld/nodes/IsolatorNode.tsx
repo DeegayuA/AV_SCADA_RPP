@@ -129,8 +129,8 @@ const IsolatorNode: React.FC<ExtendedNodeProps> = (props) => {
     <motion.div
       className={mainDivClasses}
       style={{
-        borderColor: derivedNodeStyles.borderColor || undefined,
-        opacity: derivedNodeStyles.opacity || undefined,
+        ...(derivedNodeStyles.borderColor && { borderColor: derivedNodeStyles.borderColor }),
+        ...(derivedNodeStyles.opacity && { opacity: derivedNodeStyles.opacity }),
         // backgroundColor and color are now primarily for the node-content-wrapper
       }}
       // variants={{ hover: { scale: isNodeEditable ? 1.04 : 1 }, initial: { scale: 1 } }} // Prefer CSS hover
