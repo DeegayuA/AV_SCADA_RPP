@@ -109,17 +109,17 @@ const BusbarNode: React.FC<NodeProps<BusbarNodeData>> = (props) => {
 
   return (
     <motion.div
-      className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
-      style={{
-        width: `${busbarWidth}px`,
-        height: `${busbarHeight}px`,
-        borderColor: appearance.borderColorVar,
-        '--tw-ring-color': selected ? sldAccentVar : 'transparent',
-      }}
-      initial="initial"
-      transition={{ type: 'spring', stiffness: 400, damping: 17 }}
-      whileHover={{ scale: isNodeEditable ? 1.02 : 1.01 }} // Subtle hover
-    >
+  className={`${mainDivClasses} ${selected ? `ring-2 ring-offset-2 ring-offset-black/10 dark:ring-offset-white/10` : ''}`}
+  style={{
+    width: `${busbarWidth}px`,
+    height: `${busbarHeight}px`,
+    borderColor: appearance.borderColorVar,
+    '--tw-ring-color': selected ? sldAccentVar : 'transparent',
+  } as any} // 👈 fixes the error
+  initial="initial"
+  transition={{ type: 'spring', stiffness: 400, damping: 17 }}
+  whileHover={{ scale: isNodeEditable ? 1.02 : 1.01 }}
+>
       {!isEditMode && (
         <Button
           variant="ghost"
