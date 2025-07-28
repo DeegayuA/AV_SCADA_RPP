@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, SkipForward, Server, Cloud, CheckCircle2, XCircle, Info, RefreshCw, RadioTower, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils'; 
-import { useOnboarding } from '../onboarding/OnboardingContext';
+import { useOnboarding, OnboardingProvider } from '../onboarding/OnboardingContext';
 
 type ConnectionStatus = 'idle' | 'testing' | 'success' | 'failed';
 
@@ -62,7 +62,7 @@ const buttonPulseAnimation = {
 };
 
 
-export default function OpcuaTestStep() {
+function OpcuaTestStepInner() {
   const { onboardingData, nextStep } = useOnboarding();
   const [testResults, setTestResults] = useState<EndpointTestResult[]>([]);
   
@@ -314,5 +314,13 @@ export default function OpcuaTestStep() {
         </motion.div>
       </motion.div>
     </motion.div>
+  );
+}
+
+export default function OpcuaTestStep() {
+  return (
+    <OnboardingProvider>
+      <OpcuaTestStepInner />
+    </OnboardingProvider>
   );
 }
