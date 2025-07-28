@@ -45,7 +45,7 @@ const DataPointGaugeCard: React.FC<DataPointGaugeCardProps> = React.memo(
         const PointIcon = getIconForPoint(point);
         const value = typeof nodeValue === 'number' ? nodeValue : (nodeValue === null ? null : undefined);
 
-        const cardHoverEffect = isDisabled ? {} : { scale: 1.02, transition: { type: 'spring', stiffness: 300, damping: 20 } };
+        const cardHoverEffect = isDisabled ? undefined : { scale: 1.02, transition: { type: 'spring' as const, stiffness: 300, damping: 20 } };
 
         const cardStyle: React.CSSProperties = {
             height: '100%',

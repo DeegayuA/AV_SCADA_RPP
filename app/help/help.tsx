@@ -1,8 +1,9 @@
 // app/help/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState } from 'react';
+// FIX: Import the 'Variants' type from Framer Motion
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -85,7 +86,7 @@ const helpSectionsData: HelpSection[] = [
         description: 'Master your dashboard: interpret widgets, data trends, understand alerts, and connectivity indicators for effective system monitoring.',
         faqs: [
             { id: 'dash-widgets', question: 'How to Interpret Dashboard Widgets?', answer: <p>Dashboards use various widgets like gauges, charts (line, bar, pie), status indicators, and Single Line Diagrams (SLDs). Hover over elements for tooltips with exact values or more details. Pay attention to units (kW, kWh, V, A, Hz, °C, %) and color codings which often indicate status (e.g., green for normal, yellow for warning, red for alarm).</p>, keywords: ['gauges', 'charts', 'graphs', 'sld', 'single line diagram', 'data visualization', 'metrics', 'kpi'] },
-            { id: 'dash-connection', question: 'Understanding PLC & WebSocket Status', answer: <span><Network className="mr-1 inline h-4 w-4 text-sky-500" /> <strong>PLC Status</strong> (e.g., Online, Offline, Disconnected) reflects the communication health with the physical Programmable Logic Controllers at the plant. If offline, real-time data and control are impacted. <Wifi className="ml-2 mr-1 inline h-4 w-4 text-green-500" /> <strong>WebSocket Status</strong> (e.g., Connected, Disconnected) indicates your browser&apos;s live data stream connection to the {APP_NAME} server. Both should be green/connected for optimal experience.</span>, keywords: ['connectivity', 'real-time data', 'plc', 'websocket', 'communication', 'online', 'offline'] },
+            { id: 'dash-connection', question: 'Understanding PLC & WebSocket Status', answer: <span><Network className="mr-1 inline h-4 w-4 text-sky-500" /> <strong>PLC Status</strong> (e.g., Online, Offline, Disconnected) reflects the communication health with the physical Programmable Logic Controllers at the plant. If offline, real-time data and control are impacted. <Wifi className="ml-2 mr-1 inline h-4 w-4 text-green-500" /> <strong>WebSocket Status</strong> (e.g., Connected, Disconnected) indicates your browser's live data stream connection to the {APP_NAME} server. Both should be green/connected for optimal experience.</span>, keywords: ['connectivity', 'real-time data', 'plc', 'websocket', 'communication', 'online', 'offline'] },
             { id: 'dash-datapoints', question: 'Common Data Points and Their Meanings', answer: <p>Key metrics often include:<ul><li><strong>Power (kW, MW):</strong> Instantaneous rate of energy generation or consumption.</li><li><strong>Energy (kWh, MWh):</strong> Total amount of energy generated or consumed over a period.</li><li><strong>Voltage (V):</strong> Electrical potential.</li><li><strong>Current (A):</strong> Flow of electrical charge.</li><li><strong>Frequency (Hz):</strong> AC power stability indicator.</li><li><strong>State of Charge (SoC %):</strong> Remaining battery capacity.</li><li><strong>Irradiance (W/m²):</strong> Solar radiation intensity.</li><li><strong>Temperature (°C/°F):</strong> Component or ambient temperature.</li></ul>Refer to data point labels and units for specific interpretations.</p>, keywords: ['kw', 'kwh', 'soc', 'voltage', 'current', 'frequency', 'irradiance', 'temperature', 'units', 'metrics'] },
             { id: 'dash-alarms', question: 'Understanding Alarms and Notifications', answer: <p><Bell className="inline h-4 w-4 mr-1 text-yellow-500" />The system generates alarms for critical events (e.g., equipment faults, overloads, low battery) and notifications for informational events. These are often displayed in a dedicated panel or as toast messages. Pay immediate attention to active alarms and follow established procedures. Acknowledge alarms once addressed (if applicable).</p>, keywords: ['alerts', 'events', 'faults', 'warnings', 'critical', 'notification center'] },
             { id: 'dash-layout', question: 'Customizing Dashboard Layout (if available)', answer: <p><Settings className="inline h-4 w-4 mr-1 text-indigo-500" />Some user roles might have the ability to customize their dashboard layout, adding, removing, or rearranging widgets. Look for an "Edit Mode" or "Customize Dashboard" button, typically in the header or user menu. Save your changes once done.</p>, keywords: ['customize', 'personalize', 'widgets', 'edit mode', 'layout configuration'] },
@@ -157,14 +158,15 @@ const helpSectionsData: HelpSection[] = [
     },
 ];
 
-
-const pageVariants = {
+// FIX: Explicitly type the variant objects with the 'Variants' type.
+// This is more robust than `as const` and solves the readonly array issue.
+const pageVariants: Variants = {
   initial: { opacity: 0, filter: "blur(5px)" },
   animate: { opacity: 1, filter: "blur(0px)", transition: { duration: 0.6, ease: "circOut" } },
   exit: { opacity: 0, filter: "blur(5px)", transition: { duration: 0.3, ease: "circIn" } },
 };
 
-const cardVariants = {
+const cardVariants: Variants = {
   initial: { opacity: 0, y: 30, scale: 0.98 },
   animate: (i:number) => ({ 
     opacity: 1, y: 0, scale: 1, 
@@ -177,7 +179,7 @@ const cardVariants = {
   }
 };
 
-const faqItemVariants = {
+const faqItemVariants: Variants = {
   initial: { opacity: 0, height: 0 },
   animate: { opacity: 1, height: 'auto', transition: { duration: 0.3, ease: "easeOut" } },
   exit: { opacity: 0, height: 0, transition: { duration: 0.2, ease: "easeIn" } }
@@ -188,6 +190,9 @@ export default function HelpPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const { theme } = useTheme();
   const [activeAccordionItems, setActiveAccordionItems] = useState<string[]>([]);
+
+  // useEffect is not used, so we can remove it to clean up the code.
+  // useEffect(() => {}, []); 
 
   const toggleAccordionItem = (value: string) => {
     setActiveAccordionItems(prev => 

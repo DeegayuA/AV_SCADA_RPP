@@ -1,7 +1,8 @@
-// components/onboarding/ReviewStep.tsx
+// app/onboarding/ReviewStep.tsx
 'use client';
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,9 +13,8 @@ import { DataPointConfig, IconComponentType } from '@/config/dataPoints';
 import { cn } from '@/lib/utils';
 import * as lucideIcons from 'lucide-react';
 
-
-// --- Framer Motion Variants (copied from DataPointConfigStep for consistency) ---
-const containerVariants = {
+// --- Framer Motion Variants (FIXED with explicit 'Variants' type) ---
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -23,7 +23,7 @@ const containerVariants = {
   exit: { opacity: 0, transition: { staggerChildren: 0.05, staggerDirection: -1 } }
 };
 
-const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 2) => ({
+const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 2): Variants => ({
   hidden: { opacity: 0, y: yOffset, filter: `blur(${blurAmount}px)` },
   visible: {
     opacity: 1, y: 0, filter: 'blur(0px)',
@@ -37,9 +37,9 @@ const buttonMotionProps = (delay: number = 0, primary: boolean = false) => ({
   whileHover: {
     scale: 1.03,
     boxShadow: primary ? "0px 6px 20px hsla(var(--primary)/0.25)" : "0px 4px 15px hsla(var(--foreground)/0.1)",
-    transition: { type: "spring", stiffness: 300, damping: 10 }
+    transition: { type: "spring" as const, stiffness: 300, damping: 10 }
   },
-  whileTap: { scale: 0.97, transition: {type: "spring", stiffness: 350, damping: 12} }
+  whileTap: { scale: 0.97, transition: {type: "spring" as const, stiffness: 350, damping: 12} }
 });
 
 const DEFAULT_ICON = Merge; 
@@ -128,10 +128,10 @@ const DataPointListSection: React.FC<DataPointListProps> = ({ points, listTitle,
 
 
 export default function ReviewStep() {
-  const { onboardingData, configuredDataPoints } = useOnboarding();
+  const { onboardingData } = useOnboarding();
+  const { plantName, plantLocation, plantCapacity, appName, opcUaEndpointOffline, opcUaEndpointOnline, configuredDataPoints } = onboardingData;
 
   const downloadConfiguration = () => {
-    // ... (existing downloadConfiguration logic remains the same)
     const appVersion = process.env.NEXT_PUBLIC_APP_VERSION || "dev";
     const configToDownload = {
       plantDetails: {
@@ -145,12 +145,12 @@ export default function ReviewStep() {
         opcUaEndpointOffline: onboardingData.opcUaEndpointOffline,
         opcUaEndpointOnline: onboardingData.opcUaEndpointOnline,
       },
-      configuredDataPoints: configuredDataPoints.map(dp => {
+      configuredDataPoints: configuredDataPoints?.map(dp => {
         const iconName = Object.keys(lucideIcons).find(
             key => (lucideIcons as any)[key] === dp.icon
         ) || (typeof dp.icon === 'string' ? dp.icon : 'Merge');
         return {...dp, icon: iconName};
-      }),
+      }) || [],
       metadata: {
         onboardingCompleted: true, 
         timestamp: new Date().toISOString(),
@@ -168,16 +168,12 @@ export default function ReviewStep() {
     toast.success("Configuration JSON Downloaded", { description: "Your setup has been saved to a JSON file."});
   };
 
-  // Segregate data points
-  // This relies on the 'Manually Added' category being set reliably by the manual form
-  // and not being commonly used by automated processes or file uploads.
-  // A more robust solution would involve an `origin` field on DataPointConfig.
-  const manualDataPoints = configuredDataPoints.filter(
-    dp => dp.category === 'Manually Added'
-  );
-  const automatedDataPoints = configuredDataPoints.filter(
-    dp => dp.category !== 'Manually Added'
-  );
+  const manualDataPoints = configuredDataPoints?.filter(
+    dp => (dp as any).source === 'manual' // Assuming a 'source' property exists from the merged discovery step
+  ) || [];
+  const automatedDataPoints = configuredDataPoints?.filter(
+    dp => (dp as any).source !== 'manual'
+  ) || [];
 
   return (
     <motion.div
@@ -188,9 +184,7 @@ export default function ReviewStep() {
         exit="exit"
         className="space-y-6 sm:space-y-8 p-4 sm:p-6"
     >
-        {/* --- Header Card --- */}
         <motion.div variants={itemVariants(0)}>
-            {/* ... (Existing Header Card ... ) */}
             <Card className="shadow-xl dark:shadow-black/30 border-border/60 bg-gradient-to-br from-card via-card to-card/90 dark:from-neutral-800 dark:via-neutral-800 dark:to-neutral-800/90 backdrop-blur-lg">
                 <CardHeader className="border-b border-border/50 dark:border-neutral-700/50 pb-4">
                     <div className="flex items-center space-x-3.5">
@@ -216,9 +210,7 @@ export default function ReviewStep() {
             </Card>
         </motion.div>
 
-        {/* --- Plant & Application Details Card --- */}
         <motion.div variants={itemVariants(0.1)}>
-            {/* ... (Existing Plant Card ...) */}
              <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                 <CardHeader className="border-b border-border/50 dark:border-neutral-700/50">
                     <div className="flex items-center space-x-3">
@@ -238,9 +230,7 @@ export default function ReviewStep() {
             </Card>
         </motion.div>
 
-        {/* --- OPC UA Endpoints Card --- */}
         <motion.div variants={itemVariants(0.2)}>
-            {/* ... (Existing OPC UA Card ...) */}
             <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                 <CardHeader className="border-b border-border/50 dark:border-neutral-700/50">
                      <div className="flex items-center space-x-3">
@@ -257,7 +247,6 @@ export default function ReviewStep() {
             </Card>
         </motion.div>
 
-        {/* --- Data Points Configuration Card with Sections --- */}
         <motion.div variants={itemVariants(0.3)}>
             <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                 <CardHeader className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-border/50 dark:border-neutral-700/50">
@@ -266,7 +255,7 @@ export default function ReviewStep() {
                         <div>
                             <CardTitle className="text-lg font-medium">Data Points Configuration</CardTitle>
                             <CardDescription className="text-xs sm:text-sm text-muted-foreground pt-0.5">
-                                Total Data Points: <span className="font-semibold text-primary">{configuredDataPoints.length}</span>
+                                Total Data Points: <span className="font-semibold text-primary">{configuredDataPoints?.length || 0}</span>
                             </CardDescription>
                         </div>
                     </div>
@@ -278,20 +267,20 @@ export default function ReviewStep() {
                     </motion.div>
                 </CardHeader>
                 <CardContent className="pt-5 space-y-6">
-                    {configuredDataPoints.length > 0 ? (
+                    {configuredDataPoints && configuredDataPoints.length > 0 ? (
                         <>
                            <DataPointListSection
                                 points={automatedDataPoints}
-                                listTitle="From Automated Processes (File/Discovery)"
+                                listTitle="From Automated Processes (File/Discovery/AI)"
                                 listIcon={Binary}
-                                emptyMessage="No data points were identified from automated processes or file uploads (excluding those marked 'Manually Added')."
+                                emptyMessage="No data points were identified from automated processes."
                            />
-                           <div className="border-t border-border/50 dark:border-neutral-700/50 my-3"></div> {/* Separator */}
+                           <div className="border-t border-border/50 dark:border-neutral-700/50 my-3"></div>
                            <DataPointListSection
                                 points={manualDataPoints}
                                 listTitle="Manually Added Data Points"
                                 listIcon={PencilLine}
-                                emptyMessage="No data points have been added using the manual entry form with the 'Manually Added' category."
+                                emptyMessage="No data points have been added using the manual entry form."
                            />
                         </>
                     ) : (
@@ -307,7 +296,7 @@ export default function ReviewStep() {
 
         <motion.div variants={itemVariants(0.4)} className="text-center pt-2">
             <p className="text-xs text-muted-foreground flex items-center justify-center">
-               <ExternalLink size={14} className="mr-1.5 shrink-0"/> The "Confirm & Save Settings" button is part of the main navigation controls below.
+               <ExternalLink size={14} className="mr-1.5 shrink-0"/> The "Finish & Save" button is part of the main navigation controls below.
             </p>
         </motion.div>
     </motion.div>

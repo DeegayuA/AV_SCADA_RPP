@@ -68,7 +68,7 @@ const letterVariants = {
     y: 0,
     scale: 1,
     rotateX: 0,
-    transition: { type: "spring", damping: 14, stiffness: 180 }, // Snappier spring
+    transition: { type: "spring" as const, damping: 14, stiffness: 180 }, // Snappier spring
   },
   exit: {
     opacity: 0,
@@ -76,7 +76,7 @@ const letterVariants = {
     scale: 0.85,
     rotateX: 25,
     transformOrigin: "center top",
-    transition: { duration: 0.12, type: "easeOut" } // Snappier
+    transition: { duration: 0.12, ease: "easeOut" as const } // Snappier
   }
 };
 const loadingLetterVariants = {
@@ -86,7 +86,7 @@ const loadingLetterVariants = {
     x: 0,
     skewX: 0,
     scaleY: 1,
-    transition: { type: "spring", damping: 11, stiffness: 200 }, // Snappier spring
+    transition: { type: "spring" as const, damping: 11, stiffness: 200 }, // Snappier spring
   },
   exit: { opacity: 0, x: 12, skewX: 20, transition: { duration: 0.08 } } // Snappier
 };
@@ -97,7 +97,7 @@ const pageNameLetterVariants = {
     scale: 1,
     rotate: 0,
     y:0,
-    transition: { type: "spring", damping: 10, stiffness: 150 }, // Snappier spring
+    transition: { type: "spring" as const, damping: 10, stiffness: 150 }, // Snappier spring
   },
   exit: letterVariants.exit,
 };

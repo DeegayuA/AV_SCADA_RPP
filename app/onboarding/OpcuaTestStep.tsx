@@ -1,11 +1,10 @@
 // components/onboarding/OpcuaTestStep.tsx
 'use client';
 import React, { useState, useMemo, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// Import 'Variants'
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-// Card components might not be used directly if we are making custom "panes"
-// For now, let's assume they might be part of the internal structure or we create custom components.
-import { Loader2, SkipForward, Server, Cloud, CheckCircle2, XCircle, ChevronRightCircle, Info, RefreshCw, RadioTower, AlertTriangle } from 'lucide-react';
+import { Loader2, SkipForward, Server, Cloud, CheckCircle2, XCircle, Info, RefreshCw, RadioTower, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useOnboarding } from './OnboardingContext';
 import { cn } from '@/lib/utils'; 
@@ -19,8 +18,8 @@ interface EndpointTestResult {
   message?: string;
 }
 
-// --- Framer Motion Variants ---
-const staggeredContainerVariants = {
+// --- Framer Motion Variants (FIXED) ---
+const staggeredContainerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -33,7 +32,7 @@ const staggeredContainerVariants = {
   exit: { opacity: 0, y: -15, transition: { duration: 0.25 } }
 };
 
-const itemVariants = (delay: number = 0) => ({
+const itemVariants = (delay: number = 0): Variants => ({
   hidden: { opacity: 0, y: 20, filter: 'blur(3px)' },
   visible: { 
     opacity: 1, y: 0, filter: 'blur(0px)', 
@@ -41,7 +40,7 @@ const itemVariants = (delay: number = 0) => ({
   },
 });
 
-const testItemVariants = {
+const testItemVariants: Variants = {
     hidden: { opacity: 0, scale: 0.95, y:10 },
     visible: { 
         opacity: 1, scale: 1, y:0,
@@ -50,16 +49,17 @@ const testItemVariants = {
     exit: { opacity: 0, scale: 0.95, y:-10, transition: { duration: 0.2 }}
 };
 
-const statusIconContainerVariants = {
+const statusIconContainerVariants: Variants = {
   initial: { scale: 0.5, opacity: 0, rotate: -45 },
   animate: { scale: 1, opacity: 1, rotate: 0, transition: { type: 'spring', stiffness: 200, damping: 12 } },
   exit: { scale: 0.5, opacity: 0, rotate: 45, transition: { duration: 0.2 } }
 };
 
+// FIX: Add 'as const' to ensure correct type inference for direct use in the 'animate' prop.
 const buttonPulseAnimation = {
   scale: [1, 1.05, 1],
   transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut", delay:0.5 }
-};
+} as const;
 
 
 export default function OpcuaTestStep() {
@@ -72,10 +72,10 @@ export default function OpcuaTestStep() {
     
     const endpoints = [];
     if (offlineEp) {
-      endpoints.push({ name: "Local PLC Endpoint", id: 'offline', icon: Server, url: `opc.tcp://${offlineEp}` });
+      endpoints.push({ name: "Local PLC Endpoint", id: 'offline' as const, icon: Server, url: `opc.tcp://${offlineEp}` });
     }
     if (onlineEp) {
-      endpoints.push({ name: "Remote Server Endpoint", id: 'online', icon: Cloud,  url: `opc.tcp://${onlineEp}` });
+      endpoints.push({ name: "Remote Server Endpoint", id: 'online' as const, icon: Cloud,  url: `opc.tcp://${onlineEp}` });
     }
     return endpoints;
   }, [onboardingData.opcUaEndpointOffline, onboardingData.opcUaEndpointOnline]);
@@ -91,7 +91,6 @@ export default function OpcuaTestStep() {
     );
   }, [endpointsToTest]);
 
-  // handleTestConnection logic remains identical to previous version, as it's backend-related
   const handleTestConnection = async (endpointId: 'offline' | 'online', endpointName: string, endpointUrl: string) => {
     setTestResults(prev => prev.map(r => r.endpointUrl === endpointUrl ? { ...r, status: 'testing', message: 'Verifying backend connection status...' } : r));
     
@@ -166,7 +165,7 @@ export default function OpcuaTestStep() {
       initial="hidden" 
       animate="visible" 
       exit="exit"
-      className="space-y-6 sm:space-y-8 p-4 sm:p-6" // ADHERING TO YOUR PADDING REQUEST
+      className="space-y-6 sm:space-y-8 p-4 sm:p-6"
     >
       <motion.div variants={itemVariants(0)} className="flex items-start gap-3 sm:gap-4">
         <RadioTower className="h-7 w-7 sm:h-8 sm:w-8 text-primary mt-0.5 sm:mt-1 shrink-0 opacity-80" />
@@ -202,17 +201,15 @@ export default function OpcuaTestStep() {
         {endpointsToTest.map(({ id, name, icon: EndpointIcon, url }, index) => {
           const result = testResults.find(r => r.endpointUrl === url);
           
-          let statusRingColor = "border-muted-foreground/30";
           let statusTextColor = "text-muted-foreground";
           let statusIconElement = <Info className="h-5 w-5" />;
           let buttonLabel = `Verify ${id === 'offline' ? 'Local' : 'Remote'} Connection`;
           let buttonIcon = <RefreshCw className="h-4 w-4" />;
-          let buttonVariant: "default" | "outline" | "secondary" | "destructive" = "default"; // Simplified
+          let buttonVariant: "default" | "outline" | "secondary" | "destructive" = "default";
           let buttonDisabled = false;
           let showPulse = false;
 
           if (result?.status === 'testing') {
-            statusRingColor = "border-primary/50";
             statusTextColor = "text-primary dark:text-primary-light";
             statusIconElement = <Loader2 className="h-5 w-5 animate-spin" />;
             buttonLabel = "Testing...";
@@ -220,21 +217,19 @@ export default function OpcuaTestStep() {
             buttonVariant = "outline";
             buttonDisabled = true;
           } else if (result?.status === 'success') {
-            statusRingColor = "border-green-500/60 dark:border-green-400/60";
             statusTextColor = "text-green-600 dark:text-green-400";
             statusIconElement = <CheckCircle2 className="h-5 w-5" />;
             buttonLabel = "Test Again";
             buttonIcon = <RefreshCw className="h-4 w-4" />;
             buttonVariant = "secondary";
           } else if (result?.status === 'failed') {
-            statusRingColor = "border-red-500/60 dark:border-red-400/60";
             statusTextColor = "text-red-600 dark:text-red-400";
             statusIconElement = <XCircle className="h-5 w-5" />;
             buttonLabel = "Retry Test";
             buttonIcon = <RefreshCw className="h-4 w-4" />;
             buttonVariant = "destructive";
           } else { // idle
-            showPulse = true; // Pulse button in idle state
+            showPulse = true;
           }
 
           return (
@@ -275,7 +270,7 @@ export default function OpcuaTestStep() {
                             initial={{ opacity: 0, x: -10 }}
                             animate={{ opacity: 1, x: 0, transition: { duration: 0.3, ease:'circOut' } }}
                             exit={{ opacity: 0, x: 10, transition: { duration: 0.2, ease: 'circIn' } }}
-                            className="text-right sm:text-left leading-tight" // Adjusted text alignment
+                            className="text-right sm:text-left leading-tight"
                         >
                             {result?.message}
                         </motion.span>
@@ -283,7 +278,7 @@ export default function OpcuaTestStep() {
                 </div>
                 <motion.div 
                   className="w-full sm:w-auto"
-                  animate={showPulse && !buttonDisabled ? buttonPulseAnimation : {}}
+                  // animate={showPulse && !buttonDisabled ? buttonPulseAnimation : {}}
                   whileHover={!buttonDisabled ? {scale:1.03} : {}}
                   whileTap={!buttonDisabled ? {scale:0.97} : {}}
                 >

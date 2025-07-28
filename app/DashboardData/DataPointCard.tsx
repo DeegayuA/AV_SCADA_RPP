@@ -1,15 +1,18 @@
-// src/components/dashboard/DataPointCard.tsx
+// app/DashboardData/DataPointCard.tsx
 import React from 'react';
-import { DataPoint } from '@/config/dataPoints'; // DataPointConfig alias was redundant
+import { DataPoint } from '@/config/dataPoints';
 import { NodeData } from './dashboardInterfaces';
 import DataPointDisplayCard from './DataPointDisplayCard';
 import DataPointGaugeCard from './DataPointGaugeCard';
 import DataPointButton from './DataPointButton';
 import DataPointSwitch from './DataPointSwitch';
 import DataPointInputCard from './DataPointInputCard';
-import { motion } from 'framer-motion';
-import { itemVariants } from '@/config/animationVariants';
+import { motion, Variants } from 'framer-motion';
+import { itemVariants as _itemVariants } from '@/config/animationVariants';
 import { Card } from '@/components/ui/card';
+
+// Cast to Variants to satisfy TypeScript
+const itemVariants = _itemVariants as Variants;
 
 interface DataPointCardProps {
     point: DataPoint;
@@ -26,29 +29,27 @@ interface DataPointCardProps {
 const DataPointCard: React.FC<DataPointCardProps> = React.memo(
     ({
         point,
-        nodeValues, // This is the full NodeData object
+        nodeValues,
         isDisabled,
         currentHoverEffect,
         sendDataToWebSocket,
         playNotificationSound,
         lastToastTimestamps,
-        isEditMode, // Added isEditMode to destructuring
-        // onRemoveItem is destructured but not used in this snippet, but kept for completeness
+        isEditMode,
+        onRemoveItem, // Destructured for completeness, used by sub-components
     }) => {
-        const nodeValue = nodeValues[point.nodeId]; // This is for components that need the single value
+        const nodeValue = nodeValues[point.nodeId];
 
         let content;
         if (point.uiType === 'display') {
             content = (
                 <DataPointDisplayCard
                     point={point}
-                    // FIX: Pass the entire nodeValues map, not just the single value
                     nodeValues={nodeValues}
                     isDisabled={isDisabled}
                     currentHoverEffect={currentHoverEffect}
                     playNotificationSound={playNotificationSound}
                     lastToastTimestamps={lastToastTimestamps}
-                    // FIX: Pass down sendDataToWebSocket and isEditMode
                     sendDataToWebSocket={sendDataToWebSocket}
                     isEditMode={isEditMode}
                 />
@@ -57,11 +58,8 @@ const DataPointCard: React.FC<DataPointCardProps> = React.memo(
             content = (
                 <DataPointGaugeCard
                     point={point}
-                    nodeValue={nodeValue} // GaugeCard might still expect a single value
+                    nodeValue={nodeValue}
                     isDisabled={isDisabled}
-                    // DataPointGaugeCard might also need playNotificationSound, lastToastTimestamps, sendDataToWebSocket, isEditMode depending on its implementation
-                    // If DataPointGaugeCard internally uses ValueDisplayContent, it will need these.
-                    // For now, assuming it doesn't or handles it differently. If errors arise there, it will need similar updates.
                 />
             );
         } else if (point.uiType === 'button') {
@@ -70,29 +68,25 @@ const DataPointCard: React.FC<DataPointCardProps> = React.memo(
                     point={point}
                     isDisabled={isDisabled}
                     sendData={sendDataToWebSocket}
-                    
-                    // DataPointButton might need playNotificationSound if it toasts on action
                 />
             );
         } else if (point.uiType === 'switch') {
             content = (
                 <DataPointSwitch
                     point={point}
-                    nodeValue={nodeValue} // Switch likely needs the current value
+                    nodeValue={nodeValue}
                     isDisabled={isDisabled}
                     sendData={sendDataToWebSocket}
-                    // DataPointSwitch might need playNotificationSound if it toasts on action
                 />
             );
-        } else if (point.uiType === 'input') { // New condition
+        } else if (point.uiType === 'input') {
             content = (
                 <DataPointInputCard
                     point={point}
                     nodeValue={nodeValue}
                     isDisabled={isDisabled}
-                    sendData={sendDataToWebSocket}  
+                    sendData={sendDataToWebSocket}
                     isEditMode={isEditMode}
-                                   
                 />
             );
         } else {

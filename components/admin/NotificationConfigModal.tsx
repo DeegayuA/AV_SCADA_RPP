@@ -1,7 +1,9 @@
+// components/admin/NotificationConfigModal.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -23,29 +25,29 @@ import {
 import { NotificationRule } from '@/types/notifications';
 import { dataPoints as allPossibleDataPoints, DataPoint } from '@/config/dataPoints';
 import { toast } from 'sonner';
-import { PlusCircle, BellRing, ArrowLeft, Inbox, Loader2, Edit3, Trash2, FlaskConical } from 'lucide-react'; // Added FlaskConical
+import { PlusCircle, BellRing, ArrowLeft, Inbox, Loader2, Edit3, Trash2, FlaskConical } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge'; // For dev badge
+import { Badge } from '@/components/ui/badge';
 
 interface NotificationConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-const listVariants = {
+// FIX: Add explicit 'Variants' types
+const listVariants: Variants = {
   initial: { opacity: 0, x: -30 },
   animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: 'easeOut' } },
   exit: { opacity: 0, x: 30, transition: { duration: 0.2, ease: 'easeIn' } },
 };
 
-const formVariants = {
+const formVariants: Variants = {
   initial: { opacity: 0, x: 30 },
   animate: { opacity: 1, x: 0, transition: { duration: 0.3, ease: 'easeOut' } },
   exit: { opacity: 0, x: -30, transition: { duration: 0.2, ease: 'easeIn' } },
 };
 
-// Determine if in development environment
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 
 export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = ({
@@ -81,7 +83,7 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
         setEditingRule(null);
         setShowForm(false);
     }
-  }, [isOpen, fetchRules]);
+  }, [isOpen, fetchRules, editingRule]);
 
 
   const handleAddNew = () => {
@@ -146,39 +148,26 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
   };
 
   const handleTestRule = (rule: NotificationRule) => {
-    // This is a placeholder for actual test logic.
-    // In a real app, you might trigger a test event or evaluate the rule against current data.
-    // For now, it just shows a toast.
     console.log("Testing Rule:", rule);
     toast.info(`Simulating test for rule: "${rule.name}"`, {
       description: `Condition: ${rule.dataPointKey} ${rule.condition} ${String(rule.thresholdValue)}.\nSeverity: ${rule.severity}. Message: "${rule.message}".`,
       duration: 8000,
       icon: <FlaskConical className="text-blue-500" />
     });
-    // Example of a more specific test notification type if you have one
-    // import { notifications } from '@/lib/notifications'; (your notification system)
-    // notifications.show({
-    //    title: `Test: ${rule.name}`,
-    //    message: rule.message || `Test notification triggered for ${rule.dataPointKey}.`,
-    //    severity: rule.severity, // Or a 'test' severity
-    //    // ... any other properties your notification system uses
-    // });
   };
 
 
   const typedAllPossibleDataPoints: DataPoint[] = allPossibleDataPoints as DataPoint[];
-
   const titleText = showForm ? (editingRule ? 'Edit Notification Rule' : 'Add New Notification Rule') : 'Notification Rules';
   const descriptionText = showForm 
     ? (editingRule ? `Modifying settings for "${editingRule.name}".` : 'Define a new condition for triggering alerts.')
     : 'Manage conditions that trigger system alarms and notifications.';
 
-
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="max-w-5xl h-[85vh] sm:h-[80vh] flex flex-col p-0 overflow-hidden dark:bg-slate-800/90 dark:backdrop-blur-sm">
         <DialogHeader className="p-6 border-b dark:border-slate-700">
-            <div className="flex items-center justify-between"> {/* For title and dev badge */}
+            <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                     {showForm && (
                         <motion.div initial={{opacity:0, scale:0.5}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.5}}>
@@ -261,7 +250,7 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
                       rules={rules}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
-                      onTestRule={IS_DEVELOPMENT ? handleTestRule : undefined} // Pass only in dev
+                      onTestRule={IS_DEVELOPMENT ? handleTestRule : undefined}
                     />
                   )}
                 </ScrollArea>

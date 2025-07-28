@@ -2,16 +2,18 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { motion, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Zap, BarChart3, Settings2, ChevronRight } from 'lucide-react'; // Example icons
+import { Zap, BarChart3, Settings2, ChevronRight } from 'lucide-react';
 
 interface WelcomeExperienceProps {
-  userName?: string; // Optional user name for personalization
-  onGetStarted?: () => void; // Optional action for a primary button
+  userName?: string;
+  onGetStarted?: () => void;
 }
 
-const containerVariants = {
+// FIX: Add explicit 'Variants' types to all variant objects
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -22,7 +24,7 @@ const containerVariants = {
   },
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
@@ -35,7 +37,7 @@ const itemVariants = {
   },
 };
 
-const iconVariants = {
+const iconVariants: Variants = {
   initial: { scale: 0.8, opacity: 0 },
   animate: { 
     scale: 1, 
@@ -52,7 +54,7 @@ const iconVariants = {
 const WelcomeExperience: React.FC<WelcomeExperienceProps> = ({ userName, onGetStarted }) => {
   return (
     <motion.div
-      className="flex flex-col items-center justify-center text-center p-8 md:p-12 rounded-lg " // Removed bg-card for more flexibility if used on custom bg
+      className="flex flex-col items-center justify-center text-center p-8 md:p-12 rounded-lg"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
@@ -62,7 +64,7 @@ const WelcomeExperience: React.FC<WelcomeExperienceProps> = ({ userName, onGetSt
         initial="initial"
         animate="animate"
         whileHover="hover"
-        className="mb-6 p-4 bg-primary/10 dark:bg-primary/20 rounded-full " // A soft background for the main icon
+        className="mb-6 p-4 bg-primary/10 dark:bg-primary/20 rounded-full"
       >
         <Zap className="h-16 w-16 md:h-20 md:w-20 text-primary" />
       </motion.div>
@@ -72,7 +74,6 @@ const WelcomeExperience: React.FC<WelcomeExperienceProps> = ({ userName, onGetSt
       <motion.p variants={itemVariants} className="text-lg text-muted-foreground mb-8 max-w-2xl">
         You're now connected to the Solar Minigrid Command Center. Monitor, control, and optimize your energy system with precision.
       </motion.p>
-      {/* Optional Feature Highlights Section */}
       <motion.div 
         variants={itemVariants}
         className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10 w-full max-w-3xl"
@@ -101,9 +102,9 @@ const WelcomeExperience: React.FC<WelcomeExperienceProps> = ({ userName, onGetSt
           </Button>
         </motion.div>
       )}
-      {!onGetStarted && ( // Fallback if no primary action provided for this context
+      {!onGetStarted && (
          (<motion.p variants={itemVariants} className="text-sm text-muted-foreground mt-4">Navigate using the sidebar or header options to access system features.
-                    </motion.p>)
+          </motion.p>)
       )}
     </motion.div>
   );

@@ -3,7 +3,7 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion'; // Import Variants
 import {
     Tooltip,
     TooltipContent,
@@ -29,7 +29,8 @@ const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnecte
         return `Connection Offline. Click to manage.\nTarget Server: ${addressInfo}`;
     };
 
-    const pulseVariants = {
+    // Corrected: Added the explicit 'Variants' type annotation
+    const pulseVariants: Variants = {
         pulse: {
             scale: [1, 1.15, 1],
             transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" }

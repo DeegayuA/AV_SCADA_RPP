@@ -60,8 +60,8 @@ const getInitials = (name: string): string => {
 
 const menuItemVariants = {
   initial: { opacity: 0, x: -10 },
-  animate: { opacity: 1, x: 0, transition: { duration: 0.2, ease: "easeOut" } },
-  exit: { opacity: 0, x: 10, transition: { duration: 0.15, ease: "easeIn" } },
+  animate: { opacity: 1, x: 0, transition: { duration: 0.2, ease: "easeOut" as const } },
+  exit: { opacity: 0, x: 10, transition: { duration: 0.15, ease: "easeIn" as const } },
 };
 
 // Props might be empty now if no external data is passed to NavUser

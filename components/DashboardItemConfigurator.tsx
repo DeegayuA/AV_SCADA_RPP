@@ -395,7 +395,7 @@ const GridViewCell = memo(({ columnIndex, rowIndex, style, data }: GridChildComp
 
     return (
         <motion.div 
-            style={style} 
+            style={style as any} 
             className="flex items-center justify-center p-1 sm:p-1.5"
             initial={{ opacity: 0, y: 15 }} // Slightly reduced y
             animate={{ opacity: 1, y: 0 }}
@@ -471,7 +471,7 @@ const EnhancedSingleItemCard: React.FC<EnhancedSingleItemCardProps> = memo(({
         initial: { scale: 1, y: 0, boxShadow: "0 1px 2px rgba(0,0,0,0.07)" },
         hover: { 
             scale: 1.02, y: -1, boxShadow: "0 3px 8px rgba(0,0,0,0.12)",
-            transition: { type: "spring", stiffness: 350, damping: 15, duration: 0.1 }
+            transition: { type: "spring" as const, stiffness: 350, damping: 15, duration: 0.1 }
         },
     };
 

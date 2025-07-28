@@ -1,8 +1,8 @@
 'use client';
 import React from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
-import { itemVariants } from '@/config/animationVariants';
+import { motion, Variants } from 'framer-motion';
+import { itemVariants as _itemVariants } from '@/config/animationVariants';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { PLANT_NAME } from '@/config/constants';
 import { UserRole } from '@/types/auth';
@@ -25,6 +25,8 @@ import PlcConnectionStatus from '@/app/DashboardData/PlcConnectionStatus';
 import WebSocketStatus from '@/app/DashboardData/WebSocketStatus';
 import SoundToggle from '@/app/DashboardData/SoundToggle';
 import ThemeToggle from '@/app/DashboardData/ThemeToggle';
+
+const itemVariants: Variants = _itemVariants as Variants;
 
 interface DashboardHeaderControlProps {
     plcStatus: "online" | "offline" | "disconnected";

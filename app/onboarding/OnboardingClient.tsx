@@ -3,7 +3,8 @@
 
 import React, { useEffect, useState, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { AnimatePresence, motion, Variants } from 'framer-motion';
 import { Loader2, CheckCircle, XOctagon, Sparkles, UserCog, AlertTriangle, ArrowLeft, ArrowRight, Sun, Moon } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -19,42 +20,30 @@ import { User, UserRole } from '@/types/auth';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
 import { OnboardingProvider, useOnboarding, OnboardingContextType, OnboardingStep } from './OnboardingContext';
-// Assuming WelcomeStep.tsx is as per the initial problem description for THIS thread
 import WelcomeStep from './WelcomeStep'; 
 import PlantConfigStep from './PlantConfigStep';
-// import DataPointConfigStep from './DataPointConfigStep'; // Removed import
 import OpcuaTestStep from './OpcuaTestStep';
-import DatapointDiscoveryStep from './DatapointDiscoveryStep'; // This now includes DataPointConfigStep functionality
-// import GeminiKeyConfigStep from './GeminiKeyConfigStep'; // Fully removed as per current task
+import DatapointDiscoveryStep from './DatapointDiscoveryStep';
 import ReviewStep from './ReviewStep';
 import { useTheme } from 'next-themes';
 
-// CSS for animated gradient (typically in globals.css)
-// @keyframes gradient-animation {
-//   0% { background-position: 0% 50%; }
-//   50% { background-position: 100% 50%; }
-//   100% { background-position: 0% 50%; }
-// }
-// .animated-gradient {
-//   background-size: 200% 200%; /* Or 400% 400% for smoother/slower */
-//   animation: gradient-animation 18s ease infinite;
-// }
-
-// --- Animation Variants (Mostly unchanged from provided) ---
-const pageTransitionVariants = {
+// --- Animation Variants (FIXED with explicit 'Variants' type) ---
+const pageTransitionVariants: Variants = {
   initial: { opacity: 0 },
   animate: { opacity: 1, transition: { duration: 0.5, ease: "anticipate" } },
   exit: { opacity: 0, transition: { duration: 0.3, ease: "easeIn" } }
 };
-const panelVariants = { 
-    initial: { opacity: 0, y: 50, scale: 0.95, filter: "blur(4px)" }, // Enhanced initial state
+
+const panelVariants: Variants = { 
+    initial: { opacity: 0, y: 50, scale: 0.95, filter: "blur(4px)" },
     animate: { 
         opacity: 1, y: 0, scale: 1, filter: "blur(0px)", 
         transition: { type: "spring", stiffness: 200, damping: 25, delay: 0.15 } 
     },
     exit: { opacity: 0, y: 30, scale: 0.97, filter: "blur(2px)", transition: { duration: 0.3 } }
 };
-const itemVariantsStagger = { 
+
+const itemVariantsStagger: Variants = { 
     initial: { opacity: 0, y: 15 },
     animate: { 
         opacity: 1, y: 0, 
@@ -65,29 +54,29 @@ const itemVariantsStagger = {
         } 
     },
 };
-const itemVariants = { 
+
+const itemVariants: Variants = { 
     initial: { opacity: 0, y: 15 },
     animate: { opacity: 1, y: 0, transition: { type: "spring", stiffness: 150, damping: 18 } },
 };
-const iconPulseVariants = { 
+
+const iconPulseVariants: Variants = { 
     pulse: { scale: [1, 1.15, 1], transition: { duration: 1.5, repeat: Infinity, ease: "easeInOut" } }
 };
 
-
-// --- Decorative Orb Component (NEW for impressive UI) ---
 const Orb: React.FC<{ size: string, initialX: string, initialY: string, colorFrom: string, colorTo: string, delay?: number, className?: string }> = 
 React.memo(({ size, initialX, initialY, colorFrom, colorTo, delay = 0, className }) => (
   <motion.div
-    className={`absolute ${size} rounded-full opacity-0 blur-2xl pointer-events-none ${className}`} // opacity starts at 0, controlled by animate
-    style={{ background: `radial-gradient(circle, ${colorFrom} 0%, ${colorTo} 70%)`, zIndex: 0 }} // zIndex to be behind panel
+    className={`absolute ${size} rounded-full opacity-0 blur-2xl pointer-events-none ${className}`}
+    style={{ background: `radial-gradient(circle, ${colorFrom} 0%, ${colorTo} 70%)`, zIndex: 0 }}
     initial={{ x: initialX, y: initialY, scale: 0.7 }}
     animate={{ 
-      x: [`calc(${initialX} - 15px)`, `calc(${initialX} + 15px)`, `calc(${initialX} - 15px)`], // Subtle movement
+      x: [`calc(${initialX} - 15px)`, `calc(${initialX} + 15px)`, `calc(${initialX} - 15px)`],
       y: [`calc(${initialY} + 10px)`, `calc(${initialY} - 10px)`, `calc(${initialY} + 10px)`],
       scale: [0.7, 1, 0.7],
-      opacity: [0, 0.4, 0.4, 0.3, 0], // Dark mode opacity for orbs; 0.4 for light mode, .25 for dark
+      opacity: [0, 0.4, 0.4, 0.3, 0],
       transition: { 
-        duration: 25, // Longer duration for slower, more ambient effect
+        duration: 25, 
         repeat: Infinity, 
         ease: "easeInOut", 
         delay: delay 
@@ -97,8 +86,6 @@ React.memo(({ size, initialX, initialY, colorFrom, colorTo, delay = 0, className
 ));
 Orb.displayName = "Orb";
 
-
-// --- OnboardingProgressBarInternal (Internalized) ---
 interface OnboardingProgressBarInternalProps {
   currentStep: number; 
   totalSteps: number;
@@ -123,7 +110,6 @@ const OnboardingProgressBarInternal: React.FC<OnboardingProgressBarInternalProps
 });
 OnboardingProgressBarInternal.displayName = "OnboardingProgressBarInternal";
 
-// --- OnboardingNavigationInternal (Internalized & UPDATED for consistency) ---
 interface OnboardingNavigationInternalProps {
   onNext: () => void;
   onPrev: () => void;
@@ -133,10 +119,9 @@ interface OnboardingNavigationInternalProps {
 }
 const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> = React.memo(({ onNext, onPrev, currentStep, totalSteps, isLoading }) => {
   const isFirstStep = currentStep === 0;
-  // This definition means ReviewStep is the last functional step *before* completion
   const isLastFunctionalStep = currentStep === totalSteps - 1; 
 
-  const buttonVariants = {
+  const buttonVariants: Variants = {
     hover: { scale: 1.03, transition: { type: "spring", stiffness: 400, damping: 15 } },
     tap: { scale: 0.97 }
   };
@@ -154,8 +139,6 @@ const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> 
           <ArrowLeft className="h-4 w-4 mr-1.5 sm:mr-2" /> Previous
         </Button>
       </motion.div>
-      {/* Conditionally render Next/Finish button. For WelcomeStep (isFirstStep), its own buttons are primary. */}
-      {/* This ensures "Next" doesn't appear for WelcomeStep which has its own CTAs like "Start New Config" */}
       {!isFirstStep && (
         <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
           <Button
@@ -175,7 +158,6 @@ const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> 
 });
 OnboardingNavigationInternal.displayName = "OnboardingNavigationInternal";
 
-// --- NEW COMPONENT: SuccessRedirector ---
 interface SuccessRedirectorProps {
   currentUser: User | null; 
   redirectDelay?: number;
@@ -198,27 +180,22 @@ const SuccessRedirector: React.FC<SuccessRedirectorProps> = React.memo(({ curren
 });
 SuccessRedirector.displayName = "SuccessRedirector";
 
-// --- OnboardingPanelInternalContent ---
 const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     const context = useOnboarding();
     if (!context) throw new Error("useOnboarding must be used within OnboardingProvider");
     const { currentStep, completeOnboarding, nextStep, prevStep, isLoading } = context as Required<OnboardingContextType>;
     
     const [direction, setDirection] = useState(1);
-
-    // This config drives the steps.
+    
     const stepsConfig = [
-        { component: <WelcomeStep key="welcome" />, name: "Welcome" }, // Uses imported WelcomeStep
+        { component: <WelcomeStep key="welcome" />, name: "Welcome" },
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
-        // { component: <OpcuaTestStep key="opcua" />, name: "OPC UA Test" },
-        // GeminiKeyConfigStep was here
-        { component: <DatapointDiscoveryStep key="datapoint_discovery_merged" />, name: "Datapoint Management" }, // Renamed and now merged
-        // { component: <DataPointConfigStep key="datapoints_manual" />, name: "Manual Data Points" }, // Removed step
+        { component: <DatapointDiscoveryStep key="datapoint_discovery_merged" />, name: "Datapoint Management" },
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
-    const totalSteps = stepsConfig.length; // This will now be 5 (or 4 if OPCUA/Gemini are also commented out)
+    const totalSteps = stepsConfig.length;
 
-    const stepSlideVariants = {
+    const stepSlideVariants: Variants = {
         hidden: (dir: number) => ({ opacity: 0, x: dir > 0 ? "30px" : "-30px", scale: 0.99, filter: "blur(2px)" }),
         visible: { opacity: 1, x: "0px", scale: 1, filter: "blur(0px)", transition: { type: "spring", stiffness: 260, damping: 28 } },
         exit: (dir: number) => ({ opacity: 0, x: dir < 0 ? "30px" : "-30px", scale: 0.99, filter: "blur(2px)", transition: { type: "tween", duration: 0.15, ease:"easeIn" } }),
@@ -226,7 +203,7 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
 
     const handleNext = useCallback(async () => {
         setDirection(1);
-        if (currentStep === totalSteps - 1) { // If on the last step (e.g., Review)
+        if (currentStep === totalSteps - 1) {
             await completeOnboarding();
         } else if (nextStep) {
             nextStep();
@@ -239,7 +216,6 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
             prevStep();
         }
     }, [prevStep]);
-
 
     return (
         <>
@@ -255,7 +231,6 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
                 </div>
             </CardHeader>
 
-            {/* Progress bar is shown for all steps including WelcomeStep, as it's part of the process */}
             {currentStep < totalSteps && (
                 <CardContent className="p-0 border-b">
                    <div className="px-4 sm:px-6 py-3">
@@ -265,7 +240,6 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
             )}
 
             <CardContent className="flex-grow overflow-y-auto p-0 sm:p-0 relative min-h-[380px] sm:min-h-[480px]">
-                {/* p-0 for CardContent as WelcomeStep has its own padding */}
                 <AnimatePresence initial={false} custom={direction} mode="wait">
                     <motion.div
                         key={currentStep} 
@@ -274,14 +248,13 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
                         initial="hidden"
                         animate="visible"
                         exit="exit"
-                        className="w-full h-full" // WelcomeStep and other steps will use this height
+                        className="w-full h-full"
                     >
                         {stepsConfig[currentStep]?.component}
                     </motion.div>
                 </AnimatePresence>
             </CardContent>
 
-            {/* Navigation is shown for all steps, but "Next" is hidden on first step (WelcomeStep) */}
             {currentStep < totalSteps && (
                  <CardFooter className="p-4 sm:p-5 border-t sticky bottom-0 z-10 bg-card/80 dark:bg-card/70 backdrop-blur-sm rounded-b-xl">
                     <OnboardingNavigationInternal 
@@ -298,8 +271,6 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
 });
 OnboardingPanelInternalContent.displayName = 'OnboardingPanelInternalContent';
 
-
-// --- Main OnboardingPageContentInternal ---
 const OnboardingPageContentInternal: React.FC = () => {
     const context = useOnboarding();
     if (!context) throw new Error("OnboardingPageContentInternal must be used within OnboardingProvider");
@@ -315,17 +286,13 @@ const OnboardingPageContentInternal: React.FC = () => {
     const [pageState, setPageState] = useState<'loading' | 'auth_required' | 'admin_setup_pending' | 'onboarding_active' | 'finalizing' | 'error_state'>('loading');
     const [hasSyncedUrlToContext, setHasSyncedUrlToContext] = useState(false);
 
-    // CRITICAL: This MUST match the actual number of steps defined in OnboardingPanelInternalContent's stepsConfig
-    // Welcome, Plant, DatapointManagement, Review = 4 steps (if OPCUA and Gemini commented out)
-    // If OPCUA and Gemini were active, it would be 6.
-    // Current config: Welcome, Plant, Datapoint Management, Review. So, 4 functional steps.
     const stepsConfig = [
         { component: <WelcomeStep key="welcome" />, name: "Welcome" },
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
         { component: <DatapointDiscoveryStep key="datapoint_discovery_merged" />, name: "Datapoint Management" },
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];
-    const totalFunctionalSteps = stepsConfig.length; // Dynamically set based on active stepsConfig
+    const totalFunctionalSteps = stepsConfig.length;
 
     useEffect(() => {
         if (!storeHasHydrated) {
@@ -341,7 +308,6 @@ const OnboardingPageContentInternal: React.FC = () => {
             try {
                 const idbOnboardingCompleted = await isOnboardingComplete();
                 if (!isMounted) return;
-
                 const user = currentUserFromStore;
                 const wantsReset = searchParams.get('reset') === 'true';
 
@@ -356,13 +322,12 @@ const OnboardingPageContentInternal: React.FC = () => {
                     if (wantsReset) {
                         if (idbOnboardingCompleted) await clearIdbOnboardingDataOnly();
                         if (!isMounted) return;
-                        await resetOnboardingData(); // This should reset context.currentStep to 0
+                        await resetOnboardingData();
                         const newParams = new URLSearchParams(searchParams.toString());
                         newParams.delete('reset');
-                        newParams.delete('step'); // Also clear step from URL on reset
+                        newParams.delete('step');
                         router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
                         setPageState('onboarding_active');
-                        // No need to setHasSyncedUrlToContext(true) here, let the step sync logic handle it if needed for step 0 (or no step param)
                     } else if (!idbOnboardingCompleted) {
                         setPageState('onboarding_active');
                     } else {
@@ -388,38 +353,28 @@ const OnboardingPageContentInternal: React.FC = () => {
         return () => { isMounted = false; };
     }, [storeHasHydrated, currentUserFromStore, router, resetOnboardingData, searchParams, pathname]); 
 
-    // URL to Context Sync & Context to URL Sync
     useEffect(() => {
         if (pageState !== 'onboarding_active' && pageState !== 'finalizing') return;
         if (!goToStep) return; 
 
         const stepFromUrlStr = searchParams.get('step');
         const stepFromUrl = stepFromUrlStr ? parseInt(stepFromUrlStr, 10) : null;
-
-        // Sync URL to Context (once, primarily on load or if URL driven externally)
+        
         if (stepFromUrl !== null && stepFromUrl >= 1 && stepFromUrl <= totalFunctionalSteps && !hasSyncedUrlToContext) {
             const contextEquivalentStep = (stepFromUrl - 1) as OnboardingStep;
             if (currentStep !== contextEquivalentStep) {
-                console.log(`[SYNC URL->CTX] URL step ${stepFromUrl} to Context step ${contextEquivalentStep}. Current context: ${currentStep}`);
                 goToStep(contextEquivalentStep);
             }
-            setHasSyncedUrlToContext(true); // Mark that initial URL sync attempt has occurred
-        } else if (stepFromUrl === null && currentStep !== 0 && !hasSyncedUrlToContext) {
-            // If no step in URL, and context isn't at step 0, sync context to step 0
-            // Or, more commonly, if no step in URL, the currentStep (default 0) is fine.
-            // This part might need refinement based on desired behavior for missing 'step' param.
-            // For now, let's assume if 'step' is missing, it implies step 1 (index 0).
-             setHasSyncedUrlToContext(true); // Treat as synced if no step param and currentStep is 0
+            setHasSyncedUrlToContext(true);
+        } else if (stepFromUrl === null && !hasSyncedUrlToContext) {
+             setHasSyncedUrlToContext(true);
         }
 
-        // Sync Context to URL (continuously, as user navigates with internal buttons)
         if (hasSyncedUrlToContext && currentStep < totalFunctionalSteps) {
-            const contextStepForUrl = currentStep + 1; // 1-indexed for URL
-            if (contextStepForUrl !== stepFromUrl) { // Only update if different
-                console.log(`[SYNC CTX->URL] Context step ${currentStep} to URL step ${contextStepForUrl}. Current URL step: ${stepFromUrl}`);
+            const contextStepForUrl = currentStep + 1;
+            if (contextStepForUrl !== stepFromUrl) {
                 const newParams = new URLSearchParams(searchParams.toString());
                 newParams.set('step', contextStepForUrl.toString());
-                // Avoid replacing if only the hash changes or if it's identical
                 if (window.location.search !== `?${newParams.toString()}`) {
                      router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
                 }
@@ -428,10 +383,9 @@ const OnboardingPageContentInternal: React.FC = () => {
     }, [pageState, currentStep, searchParams, pathname, router, goToStep, totalFunctionalSteps, hasSyncedUrlToContext]);
 
     useEffect(() => {
-        if (pageState === 'onboarding_active' && currentStep >= totalFunctionalSteps) { // e.g. 6 steps (0-5), currentStep becomes 6
+        if (pageState === 'onboarding_active' && currentStep >= totalFunctionalSteps) {
             setPageState('finalizing');
         } else if (pageState === 'finalizing' && currentStep < totalFunctionalSteps) {
-            // If user goes back from finalizing state (e.g. error, review)
             setPageState('onboarding_active');
         }
     }, [currentStep, pageState, totalFunctionalSteps]);
@@ -490,17 +444,16 @@ const OnboardingPageContentInternal: React.FC = () => {
             {pageState === 'onboarding_active' && ( 
                 <motion.div 
                     key="onboarding_active" 
-                    className="fixed inset-0 bg-gradient-to-br from-slate-100 via-gray-50 to-sky-100 dark:from-neutral-950 dark:via-zinc-900 dark:to-sky-950 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden z-40 animated-gradient" // Added animated-gradient & overflow-hidden
-                    initial="initial" animate="animate" exit="exit" // Use pageTransitionVariants or define new ones if needed for this full screen container
+                    className="fixed inset-0 bg-gradient-to-br from-slate-100 via-gray-50 to-sky-100 dark:from-neutral-950 dark:via-zinc-900 dark:to-sky-950 flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-hidden z-40 animated-gradient"
+                    initial="initial" animate="animate" exit="exit"
                 >
-                    {/* Decorative Orbs - ensure your primary and accent colors are defined via CSS vars if using hsla(var(--primary)) */}
                     <Orb size="w-60 h-60 md:w-[450px] md:h-[450px]" initialX="-25%" initialY="-15%" colorFrom="hsla(var(--primary)/0.3)" colorTo="hsla(var(--primary)/0.03)" delay={0} className="opacity-60 dark:opacity-30" />
                     <Orb size="w-56 h-56 md:w-[400px] md:h-[400px]" initialX="65%" initialY="55%" colorFrom="hsla(210, 80%, 70%, 0.35)" colorTo="hsla(210, 80%, 50%, 0.03)" delay={1.5} className="opacity-60 dark:opacity-30"/>
                     
                     <motion.div
-                        variants={panelVariants} initial="initial" animate="animate" exit="exit" // Panel animation
+                        variants={panelVariants} initial="initial" animate="animate" exit="exit"
                         className="relative z-10 bg-card/80 dark:bg-neutral-800/85 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-2xl md:max-w-3xl max-h-[95vh] flex flex-col overflow-hidden border border-border/50 dark:border-neutral-700/50"
-                    > {/* Increased blur, adjusted opacity */}
+                    >
                         <OnboardingPanelInternalContent />
                          <TooltipProvider delayDuration={100}>
                             <Tooltip>
@@ -509,11 +462,9 @@ const OnboardingPageContentInternal: React.FC = () => {
                                         variant="ghost" size="icon"
                                         onClick={async () => { 
                                             if (window.confirm("Are you sure you want to reset and start over? Current progress will be lost.")) { 
-                                                // Before resetting, clear the step URL param to ensure fresh start at step 1
                                                 const newParams = new URLSearchParams(window.location.search);
                                                 newParams.delete('step');
                                                 router.replace(`${pathname}?${newParams.toString()}`, { scroll: false });
-                                                // Then reset onboarding data, which should set context.currentStep to 0
                                                 await resetOnboardingData(); 
                                             } 
                                         }}
@@ -543,15 +494,8 @@ const OnboardingPageContentInternal: React.FC = () => {
 };
 OnboardingPageContentInternal.displayName = 'OnboardingPageContentInternal';
 
-
-// Main export for the page route (app/onboarding/page.tsx)
 export default function OnboardingRoutePage() {
   return (
-    // Wrap with Suspense at a higher level if useSearchParams directly triggers it.
-    // However, Suspense is usually for components that `React.lazy` load or data fetching hooks that suspend.
-    // `useSearchParams` in Next.js 13+ App Router doesn't typically require Suspense at this direct level 
-    // unless a parent component up the tree is already expecting it.
-    // For now, retaining the Suspense wrapper around the content.
     <Suspense fallback={
         <div className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-neutral-900 text-slate-200 z-[200]">
             <Loader2 className="h-16 w-16 text-primary animate-spin mb-6" />

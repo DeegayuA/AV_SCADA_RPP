@@ -99,7 +99,7 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
       spinning: { rotate: 360 },
       still: { rotate: 0 },
     };
-    const transition = isSpinning ? { loop: Infinity, ease: "linear", duration: 2 } : { duration: 0.5 };
+    const transition = isSpinning ? { repeat: Infinity, ease: "linear" as const, duration: 2 } : { duration: 0.5 };
 
     return (
       <motion.svg
@@ -121,10 +121,16 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
     [processedStatus]
   );
 
-  const componentStyle: React.CSSProperties = {
-    borderColor: derivedNodeStyles.borderColor || undefined,
-    opacity: derivedNodeStyles.opacity || undefined,
-  };
+  const componentStyle = useMemo(() => {
+    const style: React.CSSProperties = {};
+    if (derivedNodeStyles.borderColor) {
+      style.borderColor = derivedNodeStyles.borderColor;
+    }
+    if (derivedNodeStyles.opacity !== undefined) {
+      style.opacity = derivedNodeStyles.opacity;
+    }
+    return style;
+  }, [derivedNodeStyles.borderColor, derivedNodeStyles.opacity]);
 
   const contentBgColor = derivedNodeStyles.backgroundColor || statusClasses.split(' ')[1];
   const contentTextColor = derivedNodeStyles.color || statusClasses.split(' ')[2];
@@ -152,7 +158,7 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
   return (
     <motion.div
       className={mainDivClasses}
-      style={componentStyle}
+      style={componentStyle as any}
       initial="initial"
       transition={{ type: 'spring', stiffness: 300, damping: 12 }}
     >

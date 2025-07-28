@@ -884,7 +884,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                                             <div className="flex flex-1 justify-between leading-none">
                                                                 <span className="text-muted-foreground">{baseChartConfig.netPower.label}</span>
                                                                 <span className="font-bold" style={{color: netColor}}>
-                                                                    {netPower.toFixed(valuePrecision)} <span className="ml-1 font-normal text-muted-foreground">{displayUnitLabel}</span>
+                                                                   {netPower.toFixed(valuePrecision)} <span className="ml-1 font-normal text-muted-foreground">{displayUnitLabel}</span>
                                                                 </span>
                                                             </div>
                                                         </div>

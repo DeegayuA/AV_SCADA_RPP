@@ -3,8 +3,9 @@
 
 import { useState } from 'react';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles, Upload, RotateCw, ShieldCheck, Sun, Zap } from 'lucide-react';
+// FIX: Import the 'Variants' type
+import { motion, AnimatePresence, Variants } from 'framer-motion';
+import { Sparkles, Upload, RotateCw, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
@@ -15,34 +16,20 @@ import { useCurrentUser, useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
 
-// For the animated gradient background, you'd ideally define this in your tailwind.config.js
-// and global.css. For brevity here, it's implied or would need manual CSS setup.
-// globals.css:
-/*
-@keyframes gradient-animation {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-.animated-gradient {
-  background-size: 200% 200%;
-  animation: gradient-animation 15s ease infinite;
-}
-*/
 
 const AppLogo = ({ className }: { className?: string }) => (
   <Image
     src={APP_LOGO}
     alt={`${APP_NAME} Logo`}
-    className={className || "h-16 w-auto"} // Adjusted default
-    width={128} // Provide actual base width
-    height={128} // Provide actual base height
+    className={className || "h-16 w-auto"}
+    width={128}
+    height={128}
     priority
   />
 );
 
-// Animation variants
-const containerVariants = {
+// FIX: Add explicit 'Variants' types
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -51,7 +38,7 @@ const containerVariants = {
   exit: { opacity: 0, y: -20, transition: { duration: 0.3 } }
 };
 
-const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 4) => ({
+const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 4): Variants => ({
   hidden: { opacity: 0, y: yOffset, filter: `blur(${blurAmount}px)` },
   visible: {
     opacity: 1,
@@ -65,8 +52,8 @@ const buttonMotionProps = (delay: number) => ({
   variants: itemVariants(delay, 15, 2),
   whileHover: {
     scale: 1.03,
-    boxShadow: "0px 8px 25px hsla(var(--primary)/0.3)", // Enhanced shadow
-    transition: { type: "spring", stiffness: 300, damping: 10 }
+    boxShadow: "0px 8px 25px hsla(var(--primary)/0.3)",
+    transition: { type: "spring" as const, stiffness: 300, damping: 10 }
   },
   whileTap: { scale: 0.97 }
 });
@@ -98,9 +85,8 @@ export default function WelcomeStep() {
     <div className="relative h-full w-full flex flex-col items-center justify-center overflow-hidden 
                    bg-gradient-to-br from-slate-100 via-sky-100 to-indigo-100 
                    dark:from-neutral-900 dark:via-sky-950 dark:to-indigo-950 
-                   animated-gradient p-4 rounded-lg"> {/* Ensure animated-gradient CSS is defined */}
+                   animated-gradient p-4 rounded-lg">
 
-      {/* Decorative Orbs */}
       <Orb size="w-64 h-64 md:w-96 md:h-96" initialX="-20%" initialY="10%" colorFrom="hsla(var(--primary)/0.5)" colorTo="hsla(var(--primary)/0.1)" />
       <Orb size="w-48 h-48 md:w-80 md:h-80" initialX="70%" initialY="60%" colorFrom="hsla(220, 90%, 60%, 0.4)" colorTo="hsla(220, 90%, 60%, 0.05)" />
       <motion.div
@@ -124,7 +110,7 @@ export default function WelcomeStep() {
             className="text-transparent bg-clip-text 
                        bg-gradient-to-r from-primary via-primary-dark to-primary-focus 
                        dark:from-primary-light dark:via-primary dark:to-primary-focus
-                       inline-block drop-shadow-sm" // primary-dark, primary-light assumed conceptual based on your theme
+                       inline-block drop-shadow-sm"
           >
             {APP_NAME}!
           </span>
@@ -138,7 +124,6 @@ export default function WelcomeStep() {
           variants={itemVariants(0.3, 20, 3)}
           className="flex items-start gap-2 text-sm sm:text-base text-amber-900 dark:text-amber-200 max-w-md sm:max-w-lg mb-8 sm:mb-10 leading-relaxed p-4 rounded-md border border-amber-500/30 bg-amber-50 dark:bg-amber-900/20 shadow-md"
         >
-          {/* Warning icon for context */}
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -153,18 +138,12 @@ export default function WelcomeStep() {
             <line x1="12" y1="16" x2="12" y2="12" />
             <line x1="12" y1="8" x2="12" y2="8" />
           </svg>
-
           <span>
             <strong>This is a beta version.</strong> Changes made here are not permanent as there’s no database connected.
             <br />
             Please <strong>do not edit anything</strong> you’d like to keep.
-            {/* Optional learn more link */}
             <br />
-            <a
-              href="#learn-more"
-              className="ml-1 text-amber-600 dark:text-amber-400 underline font-semibold">
-              Learn more →
-            </a>
+            <a href="#learn-more" className="ml-1 text-amber-600 dark:text-amber-400 underline font-semibold">Learn more →</a>
           </span>
         </motion.p>
 
@@ -173,14 +152,7 @@ export default function WelcomeStep() {
             <Button
               size="lg"
               onClick={nextStep}
-              className="w-full px-8 py-3.5 h-auto text-base font-semibold rounded-xl group shadow-lg 
-             bg-gradient-to-r from-primary to-primary-focus hover:from-primary-focus hover:to-primary-dark
-             text-primary-foreground focus-visible:ring-primary/60 
-             transition-all duration-300 ease-out transform
-
-             text-onbackground dark:text-onbackground-dark
-             dark:from-primary-dark dark:to-primary-focus-dark dark:hover:from-primary-focus dark:hover:to-primary
-             dark:focus-visible:ring-primary-light/60"
+              className="w-full px-8 py-3.5 h-auto text-base font-semibold rounded-xl group shadow-lg bg-gradient-to-r from-primary to-primary-focus hover:from-primary-focus hover:to-primary-dark text-primary-foreground focus-visible:ring-primary/60 transition-all duration-300 ease-out transform dark:from-primary-dark dark:to-primary-focus-dark dark:hover:from-primary-focus dark:hover:to-primary dark:focus-visible:ring-primary-light/60"
             >
               <Sparkles className="mr-2.5 h-5 w-5 text-yellow-300 transition-transform duration-300 group-hover:scale-125 group-hover:rotate-[25deg] rounded-lg" />
               Start New Setup
@@ -190,15 +162,10 @@ export default function WelcomeStep() {
           {isAdmin && (
             <motion.div {...buttonMotionProps(0.5)} className="w-full">
               <Button
-                size="lg" // Consistent sizing
+                size="lg"
                 variant="outline"
                 onClick={() => setIsImportDialogOpen(true)}
-                className="w-full px-8 py-3.5 h-auto text-base font-semibold rounded-xl group shadow-lg 
-                             border-sky-500/70 text-sky-600 dark:text-sky-400 dark:border-sky-500/60
-                             hover:border-sky-500 dark:hover:border-sky-400 
-                             hover:bg-sky-500/10 dark:hover:bg-sky-500/15
-                             focus-visible:ring-sky-500/50
-                             transition-all duration-300 ease-out transform"
+                className="w-full px-8 py-3.5 h-auto text-base font-semibold rounded-xl group shadow-lg border-sky-500/70 text-sky-600 dark:text-sky-400 dark:border-sky-500/60 hover:border-sky-500 dark:hover:border-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/15 focus-visible:ring-sky-500/50 transition-all duration-300 ease-out transform"
               >
                 <Upload className="mr-2.5 h-5 w-5 transition-transform duration-300 group-hover:translate-y-[-2px] group-hover:text-sky-500 dark:group-hover:text-sky-300" />
                 Import from Backup

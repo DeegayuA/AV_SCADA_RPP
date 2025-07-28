@@ -1,14 +1,12 @@
-// src/components/dashboard/Dashboard.tsx
+// app/DashboardData/page.tsx
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
-import { HardHat, Wrench, Cog, BarChart3 } from 'lucide-react'; // Using construction/tool related icons
+import { motion, Variants } from 'framer-motion'; // Import Variants
+import { HardHat, Wrench, Cog, BarChart3 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-
-// Assuming these exist from your project structure
 import { PLANT_NAME, VERSION } from '@/config/constants';
-import ThemeToggle from './ThemeToggle'; // Assuming this is a small, self-contained component
+import ThemeToggle from './ThemeToggle';
 
 const PlaceholderHeader: React.FC = () => {
     const headerTitle = `${PLANT_NAME || 'Project'} - Page Under Construction`;
@@ -37,7 +35,7 @@ const ConstructionAnimation: React.FC = () => {
     const { resolvedTheme } = useTheme();
     const isDark = resolvedTheme === 'dark';
 
-    const iconContainerVariants = {
+    const iconContainerVariants: Variants = { // Corrected: Added Variants type
         initial: {},
         animate: {
             transition: {
@@ -46,24 +44,24 @@ const ConstructionAnimation: React.FC = () => {
         },
     };
     
-    const floatingIconVariants = {
+    const floatingIconVariants: Variants = { // Corrected: Added Variants type
         initial: { opacity: 0, y: 20, scale: 0.8 },
         animate: (i: number) => ({
-            opacity: [0, 0.7, 0.7, 0], // Fade in, stay, fade out
-            y: [20, -20, -20, 20],    // Float up and then down
+            opacity: [0, 0.7, 0.7, 0],
+            y: [20, -20, -20, 20],
             scale: [0.8, 1.1, 1.1, 0.8],
-            rotate: Math.random() * 720 - 360, // Random rotation
+            rotate: Math.random() * 720 - 360,
             transition: {
-                duration: 5 + Math.random() * 3, // Varied duration
+                duration: 5 + Math.random() * 3,
                 repeat: Infinity,
                 repeatDelay: 2 + Math.random() * 2,
-                delay: i * 0.5 + Math.random() * 1, // Staggered start + random offset
+                delay: i * 0.5 + Math.random() * 1,
                 ease: "easeInOut",
             },
         }),
     };
 
-    const mainCogVariants = {
+    const mainCogVariants: Variants = { // Corrected: Added Variants type
         animate: {
             rotate: 360,
             transition: {
@@ -74,7 +72,7 @@ const ConstructionAnimation: React.FC = () => {
         },
     };
 
-    const textBlockVariants = {
+    const textBlockVariants: Variants = { // Corrected: Added Variants type
         hidden: { opacity: 0, y: 20 },
         visible: {
             opacity: 1,
@@ -87,7 +85,7 @@ const ConstructionAnimation: React.FC = () => {
         }
     };
     
-    const textLineVariants = {
+    const textLineVariants: Variants = { // Corrected: Added Variants type
       hidden: { opacity: 0, y: 10 },
       visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }
     };
@@ -104,7 +102,6 @@ const ConstructionAnimation: React.FC = () => {
             animate="visible"
             variants={textBlockVariants}
         >
-            {/* Animated Background Elements */}
             <motion.div 
                 className="absolute inset-0 opacity-50"
                 variants={iconContainerVariants}
@@ -129,7 +126,6 @@ const ConstructionAnimation: React.FC = () => {
                 })}
             </motion.div>
 
-            {/* Main Content */}
             <div className="relative z-10 flex flex-col items-center">
                  <motion.div
                     className="mb-8 text-primary"
@@ -165,7 +161,6 @@ const ConstructionAnimation: React.FC = () => {
                 </motion.div>
             </div>
 
-            {/* Subtle ground line/effect */}
             <motion.div 
                 className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-primary/30 to-transparent"
                 initial={{ scaleX: 0 }}
@@ -179,7 +174,6 @@ const ConstructionAnimation: React.FC = () => {
 const Dashboard: React.FC = () => {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground pt-20 sm:pt-24 pb-8 px-2 sm:px-4">
-            {/* pt value should roughly match header height + some margin */}
             <PlaceholderHeader />
             <main className="flex-grow flex items-center justify-center w-full">
                 <ConstructionAnimation />
@@ -187,6 +181,6 @@ const Dashboard: React.FC = () => {
         </div>
     );
 };
-Dashboard.displayName = 'DashboardPlaceholder'; // Renamed for clarity if needed
+Dashboard.displayName = 'DashboardPlaceholder';
 
 export default Dashboard;

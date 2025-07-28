@@ -1,6 +1,6 @@
 // src/components/DashboardData/DashboardSection.tsx
 import React from 'react';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { XCircle } from 'lucide-react';
 import { DataPoint } from '@/config/dataPoints'; // This is for individual items
@@ -48,20 +48,12 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
     onRemoveItem,
     allPossibleDataPoints,
 }) => {
-    // ... (rest of your DashboardSection.tsx component code from previous correct version)
-    // The logic inside to differentiate item types should now work correctly:
-    // if ('nodeId' in item) { // This is a DataPoint }
-    // else if ('groupKey' in item) { // This is a ThreePhaseGroupInfo }
-    // ...
-// (Make sure the item type check `if ('nodeId' in item)` still correctly identifies DataPoint
-// vs `else if ('groupKey' in item && 'points' in item)` for ThreePhaseGroupInfo.
-// `nodeId` is specific to `DataPoint`, and `groupKey` is specific to `ThreePhaseGroupInfo`)
 
     if (!items || items.length === 0) {
         return null;
     }
 
-    const itemVariantsMotion = { // Renamed to avoid conflict with itemVariants from animationVariants if it was global
+    const itemVariantsMotion: Variants = { // Corrected: Added Variants type annotation
         hidden: { opacity: 0, y: 20 },
         visible: (i: number) => ({
             opacity: 1,
@@ -80,8 +72,6 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                 animate="visible"
             >
                 {items.map((item, index) => {
-                    // Key needs to be derived carefully if groupKey is not unique across all possible sections
-                    // but given the processing in Dashboard.tsx, items should be distinct in this 'items' array.
                     const key = ('nodeId' in item ? item.id : item.groupKey) || `item-${index}`;
 
                     // Check for individual DataPoint first
@@ -98,7 +88,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                 playNotificationSound={playNotificationSound}
                                 lastToastTimestamps={lastToastTimestamps}
                                 isEditMode={isEditMode}
-                                onRemoveItem={onRemoveItem} // Make sure DataPointCard has this prop
+                                onRemoveItem={onRemoveItem}
                             />
                         );
                     }
@@ -111,7 +101,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                 className="relative bg-card p-3 sm:p-4 rounded-lg shadow-sm border border-border transition-shadow duration-200"
                                 variants={itemVariantsMotion}
                                 custom={index}
-                                whileHover={!isEditMode ? currentHoverEffect : {}} // Group container hover (optional)
+                                whileHover={!isEditMode ? currentHoverEffect : {}}
                             >
                                 {isEditMode && (
                                     <div className="absolute top-1 right-1 z-10 flex flex-col items-end space-y-0.5 p-0.5 bg-background/50 rounded">
@@ -142,7 +132,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                 )}
                                 <h4 className="text-sm font-semibold text-center mb-2 text-card-foreground">{groupInfoItem.title}</h4>
                                 <div className="space-y-1.5">
-                                    {(['a', 'b', 'c'] as const).map((phaseKey) => { // Renamed 'phase' to 'phaseKey' for clarity in this context
+                                    {(['a', 'b', 'c'] as const).map((phaseKey) => {
                                         const phaseConfig = groupInfoItem.points[phaseKey];
                                         if (!phaseConfig) return null;
                                         return (

@@ -1,7 +1,8 @@
 // components/onboarding/DataPointConfigStep.tsx
 'use client';
-import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useCallback, useRef, DragEvent, useEffect } from 'react';
+// FIX: Import the 'Variants' type
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +13,7 @@ import { DataPointConfig, IconComponentType } from '@/config/dataPoints';
 import { useOnboarding } from './OnboardingContext';
 import {
     Sigma, Loader2, ListChecks, Database, RefreshCw, RotateCcw,
-    FileJson, Wand2, Maximize, Save, Download, UploadCloud, FileSpreadsheet, Trash2, Merge, CloudUpload, PlusCircle, XCircle, CheckCircle, AlertTriangle, Info, MessageSquare, Send, User, Bot, AlertCircle, CheckCircle2, InfoIcon, Loader as LoaderIcon
+    FileJson, Wand2, Maximize, Save, Download, UploadCloud, FileSpreadsheet, Trash2, Merge, CloudUpload, PlusCircle, XCircle, CheckCircle, AlertTriangle, Info, MessageSquare, Send, User, Bot, AlertCircle as AlertCircleIcon, CheckCircle2, InfoIcon, Loader as LoaderIcon
 } from 'lucide-react';
 import * as lucideIcons from 'lucide-react';
 import Papa from 'papaparse';
@@ -130,19 +131,20 @@ const UI_TYPE_OPTIONS_EXTENDED = [ // Combined and de-duplicated
 ] as const;
 
 
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 }, }, };
-const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 3) => ({ hidden: { opacity: 0, y: yOffset, filter: `blur(${blurAmount}px)` }, visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { type: 'spring', stiffness: 110, damping: 16, delay, mass: 0.9 } }, exit: { opacity: 0, y: -(yOffset / 2), filter: `blur(${blurAmount}px)`, transition: { duration: 0.25 } } });
-const contentAppearVariants = { hidden: { opacity: 0, height: 0, y: 15, scale: 0.97 }, visible: { opacity: 1, height: 'auto', y: 0, scale: 1, transition: { duration: 0.45, ease: 'circOut' } }, exit: { opacity: 0, height: 0, y: -15, scale: 0.97, transition: { duration: 0.35, ease: 'circIn' } } };
-const buttonMotionProps = (delay: number = 0, primary: boolean = false) => ({ // From DataPointConfigStep
+// FIX: Explicitly typed all variant objects with 'Variants'
+const containerVariants: Variants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1, delayChildren: 0.1 }, }, };
+const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 3): Variants => ({ hidden: { opacity: 0, y: yOffset, filter: `blur(${blurAmount}px)` }, visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { type: 'spring', stiffness: 110, damping: 16, delay, mass: 0.9 } }, exit: { opacity: 0, y: -(yOffset / 2), filter: `blur(${blurAmount}px)`, transition: { duration: 0.25 } } });
+const contentAppearVariants: Variants = { hidden: { opacity: 0, height: 0, y: 15, scale: 0.97 }, visible: { opacity: 1, height: 'auto', y: 0, scale: 1, transition: { duration: 0.45, ease: [0.25, 0.46, 0.45, 0.94] } }, exit: { opacity: 0, height: 0, y: -15, scale: 0.97, transition: { duration: 0.35, ease: [0.55, 0.055, 0.675, 0.19] } } };
+const buttonMotionProps = (delay: number = 0, primary: boolean = false) => ({
     variants: itemVariants(delay, 15, 2),
     whileHover: {
         scale: 1.03,
         boxShadow: primary ? "0px 7px 22px hsla(var(--primary)/0.3)" : "0px 5px 18px hsla(var(--foreground)/0.12)",
-        transition: { type: "spring", stiffness: 350, damping: 12 }
+        transition: { type: "spring" as const, stiffness: 350, damping: 12 }
     },
-    whileTap: { scale: 0.97, transition: { type: "spring", stiffness: 400, damping: 15 } }
+    whileTap: { scale: 0.97, transition: { type: "spring" as const, stiffness: 400, damping: 15 } }
 });
-const dropzoneVariants = { // From DataPointConfigStep
+const dropzoneVariants: Variants = {
     idle: { scale: 1, backgroundColor: "hsla(var(--muted)/0.3)", borderColor: "hsla(var(--border))" },
     dragging: { scale: 1.03, backgroundColor: "hsla(var(--primary)/0.05)", borderColor: "hsla(var(--primary)/0.7)" },
 };
@@ -184,7 +186,7 @@ const ChatMessageBubble: React.FC<{ message: ChatMessage }> = ({ message }) => {
     
     const IconComponent = () => {
         switch (message.type) {
-            case 'error': return <AlertCircle className="h-5 w-5 mr-2 shrink-0" />;
+            case 'error': return <AlertCircleIcon className="h-5 w-5 mr-2 shrink-0" />;
             case 'success': return <CheckCircle2 className="h-5 w-5 mr-2 shrink-0" />;
             case 'progress': return <LoaderIcon className="h-5 w-5 mr-2 shrink-0 animate-spin" />;
             case 'info': return <InfoIcon className="h-5 w-5 mr-2 shrink-0" />;
@@ -603,9 +605,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
 
         try {
             const response = await fetch('/api/opcua/discover', { method: 'POST' });
-            const backendDurationSeconds = discoveryStartTimeRef.current ? ((Date.now() - discoveryStartTimeRef.current) / 1000).toFixed(1) : 'N/A';
             const result = await response.json();
-            const specificSuccessMessage = "datapoints discovered and saved successfully";
 
             if (response.ok && result.success) {
                 const nodesToProcess: DiscoveredRawDataPoint[] = Array.isArray(result.nodes) ? result.nodes : [];
@@ -665,115 +665,68 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 setAiEnhancedPoints(baseConfiguredPoints);
 
             } else {
-                // Failure path
                 let errorMessage = "An unknown error occurred during discovery.";
-                if (result && result.message) {
-                    errorMessage = result.message;
-                } else if (!response.ok) {
-                    errorMessage = `Discovery request failed: ${response.statusText} (${response.status})`;
-                }
+                if (result && result.message) { errorMessage = result.message; } else if (!response.ok) { errorMessage = `Discovery request failed: ${response.statusText} (${response.status})`; }
                 throw new Error(errorMessage);
             }
         } catch (error: any) {
             console.error("Discovery process error:", error);
-            // setDiscoveryProgress(0); // Polling might set this, or set to error state
-            const errorMsgForDisplay = `Discovery Error: ${error.message}`;
-            // setDiscoveryStatusMessage(errorMsgForDisplay); // Let polling handle or set final here
-            addLogEntry('error', 'OPC UA Discovery Failed', error.message); // Enhanced log
+            addLogEntry('error', 'OPC UA Discovery Failed', error.message);
             toast.error("Discovery Failed", { description: error.message.length > 100 ? error.message.substring(0, 97) + "..." : error.message });
         } finally {
-            stopDiscoveryProgressPolling(); // Ensure polling is stopped
-            // Optionally, fetch one last time to get the absolute final status
+            stopDiscoveryProgressPolling();
             await fetchDiscoveryProgress();
             setIsDiscovering(false);
             discoveryStartTimeRef.current = null;
-            // setEstimatedDiscoveryTime(0); // Removed
         }
     };
 
     const handleStartAiEnhancement = async () => {
-        // Clear previous task state if any
         if (aiTaskPollIntervalId) clearInterval(aiTaskPollIntervalId);
-        setAiTaskPollIntervalId(null);
-        setCurrentAiTaskId(null);
-        setShowContinueAiButton(false);
-        setAiProgress(0);
-
+        setAiTaskPollIntervalId(null); setCurrentAiTaskId(null); setShowContinueAiButton(false); setAiProgress(0);
         if (!aiConsentGiven) {
             toast.error("Consent Required for AI Enhancement", { description: "Please check the consent box to proceed." });
-            addChatMessage({ sender: 'ai', text: "I need your consent to proceed with AI enhancement. Please check the consent box above.", type: 'warning' });
-            addLogEntry('warning', "AI Enhancement Aborted: User consent not provided.");
-            return;
+            addChatMessage({ sender: 'ai', text: "I need your consent to proceed. Please check the consent box.", type: 'warning' });
+            addLogEntry('warning', "AI Enhancement Aborted: User consent not provided."); return;
         }
-        addChatMessage({ sender: 'ai', text: "Thanks for providing consent! I'm getting ready to start.", type: 'info' });
+        addChatMessage({ sender: 'ai', text: "Thanks for providing consent! Getting ready...", type: 'info' });
         addLogEntry('info', "User consent granted for AI enhancement.");
-
         const storedKey = typeof window !== "undefined" ? localStorage.getItem("geminiApiKey") : null;
         const apiKeyIsAvailable = GEMINI_API_KEY_EXISTS_CLIENT || userProvidedGeminiKey.trim() || storedKey;
-
         if (!apiKeyIsAvailable) {
             toast.error("Gemini API Key Missing", { description: "Please provide your Gemini API Key." });
-            addChatMessage({ sender: 'ai', text: "I need a Gemini API Key to proceed. Please enter it in the field below or ensure it's set in your environment variables.", type: 'error' });
-            addLogEntry('error', "AI Enhancement Aborted: Gemini API Key not available.");
-            setShowGeminiKeyInput(true);
-            return;
+            addChatMessage({ sender: 'ai', text: "I need a Gemini API Key to proceed. Please enter it below.", type: 'error' });
+            addLogEntry('error', "AI Enhancement Aborted: Gemini API Key not available."); setShowGeminiKeyInput(true); return;
         }
-        addLogEntry('info', `API Key available (User provided: ${!!userProvidedGeminiKey.trim()}, Stored: ${!!storedKey}, System: ${GEMINI_API_KEY_EXISTS_CLIENT})`);
-
-
+        addLogEntry('info', `API Key available (User: ${!!userProvidedGeminiKey.trim()}, Stored: ${!!storedKey}, System: ${GEMINI_API_KEY_EXISTS_CLIENT})`);
         const pointsToProcess = currentPointsToDisplay.filter(p => p.source === 'discovered' || p.source === 'imported' || p.source === 'manual');
-        if (pointsToProcess.length === 0 && !discoveredDataFilePath) { // Check if there are any points from any source if no discovery file
+        if (pointsToProcess.length === 0 && !discoveredDataFilePath) {
             toast.error("No Data for AI", { description: "Please discover, upload, or add data points first." });
-            addChatMessage({ sender: 'ai', text: "It looks like there's no data for me to process. Please discover, upload, or add some data points first.", type: 'warning' });
-            addLogEntry('warning', "AI Enhancement Aborted: No data available for processing.");
-            return;
+            addChatMessage({ sender: 'ai', text: "No data to process. Please discover or import data first.", type: 'warning' });
+            addLogEntry('warning', "AI Enhancement Aborted: No data available for processing."); return;
         }
-
-        const numPointsForAI = discoveredDataFilePath ? 'data from file' : `${pointsToProcess.length} data points`; // Use discoveredDataFilePath if available
-
-        setIsAiProcessing(true);
-        setAiProgress(0); // Reset progress
+        const numPointsForAI = discoveredDataFilePath ? 'data from file' : `${pointsToProcess.length} data points`;
+        setIsAiProcessing(true); setAiProgress(0);
         addChatMessage({ sender: 'ai', text: `Requesting AI enhancement for ${numPointsForAI}. Initializing...`, type: 'progress' });
         addLogEntry('ai', `Requesting AI enhancement for ${numPointsForAI}.`);
-        aiStartTimeRef.current = Date.now(); // For estimated time, though backend drives actual progress
-
+        aiStartTimeRef.current = Date.now();
         try {
-            const requestBody: { filePath?: string; geminiApiKey?: string } = {
-                filePath: discoveredDataFilePath || undefined, // Send file path if available
-                // We no longer send raw points from client. Backend will use filePath.
-            };
-            if (userProvidedGeminiKey.trim()) {
-                requestBody.geminiApiKey = userProvidedGeminiKey.trim();
-            } else if (storedKey) {
-                requestBody.geminiApiKey = storedKey;
-            }
-            // If only system key, don't send it, backend will use its own env var.
-
-            const response = await fetch('/api/ai/generate-datapoints', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(requestBody),
-            });
-
+            const requestBody: { filePath?: string; geminiApiKey?: string } = { filePath: discoveredDataFilePath || undefined };
+            if (userProvidedGeminiKey.trim()) { requestBody.geminiApiKey = userProvidedGeminiKey.trim(); } else if (storedKey) { requestBody.geminiApiKey = storedKey; }
+            const response = await fetch('/api/ai/generate-datapoints', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(requestBody) });
             if (!response.ok) {
-                const errorResult = await response.json().catch(() => ({ message: "Failed to start AI task. API returned an error."}));
+                const errorResult = await response.json().catch(() => ({ message: "Failed to start AI task." }));
                 throw new Error(errorResult.message || `Failed to start AI task. Status: ${response.status}`);
             }
-
             const result = await response.json();
             if (result.taskId) {
                 setCurrentAiTaskId(result.taskId);
                 addChatMessage({ sender: 'ai', type: 'info', text: `AI processing task started (ID: ${result.taskId}). I will update you on the progress.` });
                 addLogEntry('ai', `AI Task started with ID: ${result.taskId}`);
-
-                // Start polling
-                pollAiTaskStatus(result.taskId); // Initial immediate poll
-                const intervalId = setInterval(() => pollAiTaskStatus(result.taskId), 5000); // Poll every 5 seconds
+                pollAiTaskStatus(result.taskId);
+                const intervalId = setInterval(() => pollAiTaskStatus(result.taskId), 5000);
                 setAiTaskPollIntervalId(intervalId);
-            } else {
-                throw new Error("Backend did not return a task ID.");
-            }
-
+            } else { throw new Error("Backend did not return a task ID."); }
         } catch (error: any) {
             console.error("AI Enhancement initiation error:", error);
             addChatMessage({ sender: 'ai', type: 'error', text: `Failed to start AI enhancement: ${error.message}` });
@@ -781,7 +734,8 @@ export default function DatapointDiscoveryStep() { // Renamed component
             setIsAiProcessing(false);
         }
     };
-
+    
+    // ... all other functions remain exactly the same as in your provided code ...
     const handleContinueAiProcessing = () => {
         if (currentAiTaskId) {
             addChatMessage({ sender: 'ai', type: 'info', text: 'Attempting to continue AI processing...' });
@@ -1197,7 +1151,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
             }
         });
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentPointsToDisplay, setPlantDetails, onboardingData, addLogEntry]);
+    }, [currentPointsToDisplay, setPlantDetails, addLogEntry]);
 
 
     const handleUploadAndProcess = useCallback(async () => {
@@ -1213,7 +1167,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
             if (aiEnhancedPoints.length > 0 || configuredDataPoints.length === 0) {
                 setAiEnhancedPoints(processedDataPoints);
             } else {
-                setConfiguredDataPoints(processedDataPoints);
+                setConfiguredDataPoints(processedDataPoints as DataPointConfig[]);
             }
             // Logging of summary, errors, and no new data is handled within parseAndProcessFile
         } catch (error) { // This catch is for errors in the promise chain not handled inside parseAndProcessFile
@@ -1309,7 +1263,7 @@ export default function DatapointDiscoveryStep() { // Renamed component
         if (aiEnhancedPoints.length > 0 || configuredDataPoints.length === 0) {
             setAiEnhancedPoints(prev => [...prev, newPoint]);
         } else {
-            setConfiguredDataPoints(prev => [...prev, newPoint]);
+            setConfiguredDataPoints(prev => [...(prev as ExtendedDataPointConfig[]), newPoint]);
         }
         addLogEntry('info', `Manually added data point: '${newPoint.name}' (ID: ${newPoint.id}).`); // Requirement 3.1
         toast.success(`Data point "${newPoint.name}" added successfully!`);
@@ -1393,15 +1347,8 @@ export default function DatapointDiscoveryStep() { // Renamed component
         setEditingPoint(null);
     };
 
-    // currentPointsToDisplay now primarily uses aiEnhancedPoints as it aggregates all sources
-    // configuredDataPoints from context is loaded initially, but operations merge into aiEnhancedPoints
-
-
-    // Effect to load configuredDataPoints from context into aiEnhancedPoints on initial mount
-    // This ensures that any existing configuration is available for editing and merging.
     useEffect(() => {
         if (configuredDataPoints.length > 0 && aiEnhancedPoints.length === 0) {
-            // Map to ExtendedDataPointConfig and assign a default 'imported' source if not present
             const mappedContextPoints = configuredDataPoints.map(dp => ({
                 ...dp,
                 iconName: (dp.icon as any)?.displayName?.replace("Icon", "") || Object.keys(lucideIcons).find(key => lucideIcons[key as keyof typeof lucideIcons] === dp.icon) || "Sigma",
@@ -1410,22 +1357,20 @@ export default function DatapointDiscoveryStep() { // Renamed component
             setAiEnhancedPoints(mappedContextPoints);
             addLogEntry('system', `Loaded ${mappedContextPoints.length} points from existing configuration context.`);
         }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [configuredDataPoints]); // Only run when configuredDataPoints from context changes (e.g., initial load)
+    }, [configuredDataPoints, aiEnhancedPoints.length, addLogEntry]);
 
 
     return (
         <motion.div
-            key="datapoint-discovery-step-merged" // Updated key
+            key="datapoint-discovery-step-merged"
             variants={containerVariants} initial="hidden" animate="visible" exit="exit"
             className="space-y-6 p-4 sm:p-6 bg-background text-foreground"
         >
-            {/* Header Card - Updated to reflect merged functionality */}
             <motion.div variants={itemVariants(0)}>
                 <Card className="shadow-xl dark:shadow-black/30 border-border/60 bg-gradient-to-br from-card via-card to-card/90 dark:from-neutral-800 dark:via-neutral-800 dark:to-neutral-800/90 backdrop-blur-lg">
                     <CardHeader className="border-b border-border/50 dark:border-neutral-700/50 pb-4">
                         <div className="flex items-center space-x-3.5">
-                            <Merge className="h-8 w-8 text-primary shrink-0" /> {/* Changed Icon */}
+                            <Merge className="h-8 w-8 text-primary shrink-0" />
                             <CardTitle className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
                                 Comprehensive Datapoint Management
                             </CardTitle>
@@ -1445,7 +1390,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-            {/* OPC UA Discovery Section - Remains largely the same */}
             <motion.div variants={itemVariants(0.05)}>
                 <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg border-border">
                     <CardHeader>
@@ -1507,7 +1451,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                                                                 if (!response.ok) throw new Error('Failed to load file');
                                                                 const fileContent = await response.text();
                                                                 
-                                                                // Create a dialog to show the JSON content
                                                                 const dialog = document.createElement('dialog');
                                                                 dialog.className = 'p-6 rounded-lg border border-border bg-card text-foreground max-w-4xl max-h-[80vh] overflow-hidden flex flex-col';
                                                                 dialog.innerHTML = `
@@ -1534,7 +1477,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                                                                 document.body.appendChild(dialog);
                                                                 dialog.showModal();
                                                                 
-                                                                // Clean up when dialog is closed
                                                                 dialog.addEventListener('close', () => {
                                                                     document.body.removeChild(dialog);
                                                                 });
@@ -1558,7 +1500,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-            {/* AI Enhancement Control Section */}
             <AnimatePresence>
                 {((discoveredRawPoints.length > 0 || aiEnhancedPoints.some(p => p.source === 'discovered' || p.source === 'imported' || p.source === 'manual') || discoveredDataFilePath) && !isDiscovering && !isFileProcessingLoading) && (
                     <React.Fragment>
@@ -1595,7 +1536,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                                             </div>
                                         </div>
 
-                                        {/* Gemini API Key Input - shown if no env key and no stored/session key */}
                                         {(showGeminiKeyInput || (!GEMINI_API_KEY_EXISTS_CLIENT && !userProvidedGeminiKey && (typeof window !== "undefined" && !localStorage.getItem("geminiApiKey")))) && (
                                             <div className="mt-4 p-3 border border-border rounded-md bg-muted/20 dark:bg-neutral-800/30 space-y-2">
                                                 <Label htmlFor="gemini-key-input" className="text-sm font-medium">Enter Your Gemini API Key (Optional if already set):</Label>
@@ -1604,7 +1544,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                                                     <Button size="sm" variant="secondary" onClick={() => {
                                                         if (userProvidedGeminiKey.trim()) {
                                                             toast.success("Gemini API Key set for this session.");
-                                                            // setShowGeminiKeyInput(false); // Keep input visible for changes, or hide:
                                                             addLogEntry('system', 'User provided Gemini API key for session.');
                                                         } else {
                                                             toast.error("Please enter a valid API Key.");
@@ -1756,8 +1695,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 )}
             </AnimatePresence>
 
-
-            {/* --- Download Templates Section (from DataPointConfigStep) --- */}
             <motion.div variants={itemVariants(0.1)}>
                 <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                     <CardHeader>
@@ -1771,37 +1708,14 @@ export default function DatapointDiscoveryStep() { // Renamed component
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <motion.div {...buttonMotionProps(0, false)}>
-                            <Button
-                                variant="outline"
-                                onClick={() => downloadTemplate('csv')}
-                                className="w-full group text-base py-6 
-               border-green-500/50 
-               hover:border-green-500 hover:bg-green-500/5 
-               dark:border-green-400/40 
-               dark:hover:border-green-400 dark:hover:bg-green-400/10"
-                            >
-                                <FileSpreadsheet className="h-5 w-5 mr-3 
-                               text-green-600 dark:text-green-400 
-                               transition-transform duration-200 
-                               group-hover:rotate-[-5deg] group-hover:scale-110" />
+                            <Button variant="outline" onClick={() => downloadTemplate('csv')} className="w-full group text-base py-6 border-green-500/50 hover:border-green-500 hover:bg-green-500/5 dark:border-green-400/40 dark:hover:border-green-400 dark:hover:bg-green-400/10">
+                                <FileSpreadsheet className="h-5 w-5 mr-3 text-green-600 dark:text-green-400 transition-transform duration-200 group-hover:rotate-[-5deg] group-hover:scale-110" />
                                 Data Points (CSV)
                             </Button>
                         </motion.div>
-
                         <motion.div {...buttonMotionProps(0.05, false)}>
-                            <Button
-                                variant="outline"
-                                onClick={() => downloadTemplate('json')}
-                                className="w-full group text-base py-6 
-               border-purple-500/50 
-               hover:border-purple-500 hover:bg-purple-500/5 
-               dark:border-purple-400/40 
-               dark:hover:border-purple-400 dark:hover:bg-purple-400/10"
-                            >
-                                <FileJson className="h-5 w-5 mr-3 
-                        text-purple-600 dark:text-purple-400 
-                        transition-transform duration-200 
-                        group-hover:rotate-[5deg] group-hover:scale-110" />
+                            <Button variant="outline" onClick={() => downloadTemplate('json')} className="w-full group text-base py-6 border-purple-500/50 hover:border-purple-500 hover:bg-purple-500/5 dark:border-purple-400/40 dark:hover:border-purple-400 dark:hover:bg-purple-400/10">
+                                <FileJson className="h-5 w-5 mr-3 text-purple-600 dark:text-purple-400 transition-transform duration-200 group-hover:rotate-[5deg] group-hover:scale-110" />
                                 Full Config (JSON)
                             </Button>
                         </motion.div>
@@ -1814,7 +1728,6 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-            {/* --- Upload File Section (from DataPointConfigStep) --- */}
             <motion.div variants={itemVariants(0.15)}>
                 <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                     <CardHeader>
@@ -1828,19 +1741,11 @@ export default function DatapointDiscoveryStep() { // Renamed component
                             variants={dropzoneVariants}
                             animate={isDraggingOver ? "dragging" : "idle"}
                             transition={{ type: 'spring', stiffness: 200, damping: 20 }}
-                            className={cn(
-                                "flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ease-out",
-                                { "ring-2 ring-primary ring-offset-2 ring-offset-background": isDraggingOver }
-                            )}
+                            className={cn("flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 ease-out", { "ring-2 ring-primary ring-offset-2 ring-offset-background": isDraggingOver })}
                             onClick={() => fileInputRef.current?.click()}
-                            onDragOver={handleDragOver}
-                            onDragLeave={handleDragLeave}
-                            onDrop={handleDrop}
+                            onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
                         >
-                            <motion.div
-                                animate={{ y: isDraggingOver ? -5 : 0 }}
-                                transition={{ type: "spring", stiffness: 300, damping: 10 }}
-                            >
+                            <motion.div animate={{ y: isDraggingOver ? -5 : 0 }} transition={{ type: "spring", stiffness: 300, damping: 10 }}>
                                 <UploadCloud className={cn("h-12 w-12 mb-3 transition-colors", isDraggingOver ? "text-primary" : "text-gray-400 dark:text-gray-500")} />
                             </motion.div>
                             <p className={cn("text-base font-medium transition-colors", isDraggingOver ? "text-primary" : "text-gray-700 dark:text-gray-200")}>
@@ -1849,39 +1754,19 @@ export default function DatapointDiscoveryStep() { // Renamed component
                             <p className={cn("text-xs transition-colors mt-1.5", isDraggingOver ? "text-primary/80" : "text-muted-foreground")}>
                                 Supports: CSV, JSON, XLSX
                             </p>
-                            <Input
-                                ref={fileInputRef}
-                                id="file-upload-dnd"
-                                type="file"
-                                className="hidden"
-                                onChange={handleFileChange}
-                                accept=".csv, .json, application/json, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, .xlsx"
-                            />
+                            <Input ref={fileInputRef} id="file-upload-dnd" type="file" className="hidden" onChange={handleFileChange} accept=".csv, .json, application/json, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, .xlsx" />
                         </motion.div>
                         <AnimatePresence>
                             {file && (
-                                <motion.div
-                                    layout
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }}
-                                    transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
-                                    className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3"
-                                >
+                                <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10, transition: { duration: 0.2 } }} transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }} className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3">
                                     <motion.div {...buttonMotionProps(0, true)} className="w-full sm:flex-grow">
                                         <Button onClick={handleUploadAndProcess} disabled={isFileProcessingLoading || !file || isDiscovering || isAiProcessing} size="lg" className="w-full group text-base py-3">
-                                            {isFileProcessingLoading ? (
-                                                <Loader2 className="h-5 w-5 mr-2.5 animate-spin" />
-                                            ) : (
-                                                <ListChecks className="h-5 w-5 mr-2.5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" />
-                                            )}
+                                            {isFileProcessingLoading ? <Loader2 className="h-5 w-5 mr-2.5 animate-spin" /> : <ListChecks className="h-5 w-5 mr-2.5 transition-transform duration-300 group-hover:scale-110 group-hover:rotate-3" />}
                                             {isFileProcessingLoading ? "Processing..." : `Process: ${file.name.length > 25 ? file.name.substring(0, 22) + '...' : file.name}`}
                                         </Button>
                                     </motion.div>
                                     <motion.div {...buttonMotionProps(0.05)} className="w-full sm:w-auto">
-                                        <Button variant="outline" size="lg" onClick={clearFileSelection} className="w-full group text-base py-3 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground">
-                                            <Trash2 className="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" /> Clear File
-                                        </Button>
+                                        <Button variant="outline" size="lg" onClick={clearFileSelection} className="w-full group text-base py-3 border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"><Trash2 className="h-5 w-5 mr-2 transition-transform duration-300 group-hover:scale-110" /> Clear File</Button>
                                     </motion.div>
                                 </motion.div>
                             )}
@@ -1890,87 +1775,39 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-            {/* --- Loading Indicator for file processing (from DataPointConfigStep) --- */}
             <AnimatePresence>
                 {isFileProcessingLoading && !fileProcessingSummary && (
-                    <motion.div
-                        key="loading-indicator-file" // Unique key
-                        variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit"
-                        className="flex flex-col items-center justify-center p-8 space-y-3.5 bg-card/50 dark:bg-neutral-800/40 rounded-lg shadow-inner"
-                    >
-                        <Loader2 className="h-10 w-10 text-primary animate-spin" />
-                        <p className="text-lg font-medium text-muted-foreground">Crunching File Data...</p>
-                        <p className="text-sm text-muted-foreground/80">Hold tight, we're processing your uploaded file.</p>
+                    <motion.div key="loading-indicator-file" variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="flex flex-col items-center justify-center p-8 space-y-3.5 bg-card/50 dark:bg-neutral-800/40 rounded-lg shadow-inner">
+                        <Loader2 className="h-10 w-10 text-primary animate-spin" /><p className="text-lg font-medium text-muted-foreground">Crunching File Data...</p><p className="text-sm text-muted-foreground/80">Hold tight, we're processing your uploaded file.</p>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* --- Processing Summary for file upload (from DataPointConfigStep) --- */}
             <AnimatePresence>
                 {fileProcessingSummary && (
-                    <motion.div
-                        key="file-processing-summary-card" // Unique key
-                        variants={contentAppearVariants}
-                        initial="hidden" animate="visible" exit="exit"
-                        className="mt-6" // Adjusted margin
-                    >
-                        <Card className={cn(
-                            "shadow-xl dark:shadow-black/25 overflow-hidden",
-                            fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0
-                                ? 'border-orange-500/70 dark:border-orange-600/70 bg-orange-50/30 dark:bg-orange-900/10'
-                                : 'border-green-500/70 dark:border-green-600/70 bg-green-50/30 dark:bg-green-900/10'
-                        )}>
-                            <CardHeader className={cn(
-                                "border-b pb-3",
-                                fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0
-                                    ? 'border-orange-500/30 dark:border-orange-600/30 bg-orange-500/5 dark:bg-orange-800/10'
-                                    : 'border-green-500/30 dark:border-green-600/30 bg-green-500/5 dark:bg-green-800/10'
-                            )}>
+                    <motion.div key="file-processing-summary-card" variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit" className="mt-6">
+                        <Card className={cn("shadow-xl dark:shadow-black/25 overflow-hidden", fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0 ? 'border-orange-500/70 dark:border-orange-600/70 bg-orange-50/30 dark:bg-orange-900/10' : 'border-green-500/70 dark:border-green-600/70 bg-green-50/30 dark:bg-green-900/10')}>
+                            <CardHeader className={cn("border-b pb-3", fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0 ? 'border-orange-500/30 dark:border-orange-600/30 bg-orange-500/5 dark:bg-orange-800/10' : 'border-green-500/30 dark:border-green-600/30 bg-green-500/5 dark:bg-green-800/10')}>
                                 <div className="flex items-center space-x-3.5">
-                                    {fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0 ? (
-                                        <AlertTriangle className="h-7 w-7 text-orange-500 shrink-0" />
-                                    ) : (
-                                        <CheckCircle className="h-7 w-7 text-green-500 shrink-0" />
-                                    )}
-                                    <CardTitle className={cn(
-                                        "text-xl sm:text-2xl",
-                                        fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-green-700 dark:text-green-300'
-                                    )}>
-                                        File Processing Complete
-                                    </CardTitle>
+                                    {fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0 ? <AlertTriangle className="h-7 w-7 text-orange-500 shrink-0" /> : <CheckCircle className="h-7 w-7 text-green-500 shrink-0" />}
+                                    <CardTitle className={cn("text-xl sm:text-2xl", fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-green-700 dark:text-green-300')}>File Processing Complete</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent className="p-5 sm:p-6 space-y-4 text-sm">
-                                {fileProcessingSummary.plantDetailsUpdated && (
-                                    <motion.div variants={itemVariants(0.05)} className="flex items-start p-3 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300">
-                                        <Info className="h-5 w-5 mr-3 mt-0.5 shrink-0" />
-                                        <p>Plant-level configuration details from your JSON file were successfully applied where new values were provided.</p>
-                                    </motion.div>
-                                )}
+                                {fileProcessingSummary.plantDetailsUpdated && ( <motion.div variants={itemVariants(0.05)} className="flex items-start p-3 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300"><Info className="h-5 w-5 mr-3 mt-0.5 shrink-0" /><p>Plant-level configuration details from your JSON file were successfully applied where new values were provided.</p></motion.div> )}
                                 <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-base">
                                     <li className="flex justify-between"><span>Entries Processed:</span> <span className="font-semibold">{fileProcessingSummary.processed}</span></li>
                                     <li className="flex justify-between text-sky-700 dark:text-sky-300"><span>Points Updated:</span> <span className="font-semibold">{fileProcessingSummary.updated}</span></li>
                                     <li className="flex justify-between text-emerald-700 dark:text-emerald-300"><span>Points Added:</span> <span className="font-semibold">{fileProcessingSummary.added}</span></li>
-
-                                    {fileProcessingSummary.skipped > 0 && (
-                                        <li className="flex justify-between text-amber-700 dark:text-amber-400"><span>Entries Skipped:</span> <span className="font-semibold">{fileProcessingSummary.skipped}</span></li>
-                                    )}
-                                    <li className={cn("flex justify-between", fileProcessingSummary.errors > 0 ? 'text-red-700 dark:text-red-400' : 'text-gray-600 dark:text-gray-300')}>
-                                        <span>Field-Level Errors:</span> <span className="font-semibold">{fileProcessingSummary.errors}</span>
-                                    </li>
+                                    {fileProcessingSummary.skipped > 0 && ( <li className="flex justify-between text-amber-700 dark:text-amber-400"><span>Entries Skipped:</span> <span className="font-semibold">{fileProcessingSummary.skipped}</span></li> )}
+                                    <li className={cn("flex justify-between", fileProcessingSummary.errors > 0 ? 'text-red-700 dark:text-red-400' : 'text-gray-600 dark:text-gray-300')}><span>Field-Level Errors:</span> <span className="font-semibold">{fileProcessingSummary.errors}</span></li>
                                 </ul>
-
                                 {(fileProcessingSummary.errors > 0 || fileProcessingSummary.skipped > 0) && fileProcessingSummary.errorDetails.length > 0 && (
                                     <motion.div variants={itemVariants(0.1)} className="pt-3">
                                         <p className="text-base font-medium text-gray-700 dark:text-gray-200 mb-1.5">Detailed Issues:</p>
                                         <ScrollArea className="max-h-52 rounded-lg border bg-background/70 dark:bg-neutral-800/50 p-3 shadow-inner">
                                             <ul className="space-y-1.5 text-xs">
-                                                {fileProcessingSummary.errorDetails.map((err, i) => (
-                                                    <li key={i} className="flex items-start text-muted-foreground">
-                                                        <AlertTriangle className="h-4 w-4 mr-2 mt-px text-orange-500/80 shrink-0" />
-                                                        <span>{err}</span>
-                                                    </li>
-                                                ))}
+                                                {fileProcessingSummary.errorDetails.map((err, i) => ( <li key={i} className="flex items-start text-muted-foreground"><AlertTriangle className="h-4 w-4 mr-2 mt-px text-orange-500/80 shrink-0" /><span>{err}</span></li> ))}
                                             </ul>
                                         </ScrollArea>
                                     </motion.div>
@@ -1981,133 +1818,46 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 )}
             </AnimatePresence>
 
-            {/* --- Manual Data Point Entry Section (from DataPointConfigStep) --- */}
             <motion.div variants={itemVariants(0.2)}>
                 <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                     <CardHeader>
                         <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                                <PlusCircle className="h-6 w-6 text-teal-500 dark:text-teal-400 shrink-0" />
-                                <CardTitle className="text-lg sm:text-xl font-medium">Add Data Point Manually</CardTitle>
-                            </div>
+                            <div className="flex items-center space-x-3"><PlusCircle className="h-6 w-6 text-teal-500 dark:text-teal-400 shrink-0" /><CardTitle className="text-lg sm:text-xl font-medium">Add Data Point Manually</CardTitle></div>
                             {!showManualForm && (
                                 <motion.div {...buttonMotionProps(0, false)}>
-                                    <Button onClick={() => setShowManualForm(true)} variant="outline" size="sm" className="group" disabled={isDiscovering || isAiProcessing || isFileProcessingLoading}>
-                                        <PlusCircle className="h-4 w-4 mr-2 group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors" />
-                                        Add New
-                                    </Button>
+                                    <Button onClick={() => setShowManualForm(true)} variant="outline" size="sm" className="group" disabled={isDiscovering || isAiProcessing || isFileProcessingLoading}><PlusCircle className="h-4 w-4 mr-2 group-hover:text-teal-600 dark:group-hover:text-teal-300 transition-colors" />Add New</Button>
                                 </motion.div>
                             )}
                         </div>
                         <AnimatePresence>
-                            {showManualForm && (
-                                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                                    <CardDescription className="text-xs sm:text-sm text-muted-foreground pt-2">
-                                        Fill in the details for the new data point. Fields marked * are required. Ensure ID is unique.
-                                    </CardDescription>
-                                </motion.div>
-                            )}
+                            {showManualForm && ( <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}><CardDescription className="text-xs sm:text-sm text-muted-foreground pt-2">Fill in the details for the new data point. Fields marked * are required. Ensure ID is unique.</CardDescription></motion.div> )}
                         </AnimatePresence>
                     </CardHeader>
-
                     <AnimatePresence>
                         {showManualForm && (
-                            <motion.div
-                                key="manual-form-content"
-                                variants={contentAppearVariants}
-                                initial="hidden"
-                                animate="visible"
-                                exit="exit"
-                            >
+                            <motion.div key="manual-form-content" variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit">
                                 <CardContent className="space-y-5 pt-4">
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-id">ID *</Label>
-                                            <Input id="manual-id" name="id" value={manualDataPoint.id ?? ''} onChange={handleManualInputChange} placeholder="Unique identifier" />
-                                            {manualFormErrors.id && <p className="text-xs text-red-500 pt-1">{manualFormErrors.id}</p>}
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-name">Name *</Label>
-                                            <Input id="manual-name" name="name" value={manualDataPoint.name ?? ''} onChange={handleManualInputChange} placeholder="Descriptive name" />
-                                            {manualFormErrors.name && <p className="text-xs text-red-500 pt-1">{manualFormErrors.name}</p>}
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-nodeId">OPC UA Node ID *</Label>
-                                            <Input id="manual-nodeId" name="nodeId" value={manualDataPoint.nodeId ?? ''} onChange={handleManualInputChange} placeholder="e.g., ns=2;s=Device.Boiler.Temp1" />
-                                            {manualFormErrors.nodeId && <p className="text-xs text-red-500 pt-1">{manualFormErrors.nodeId}</p>}
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-label">Label (UI Display)</Label>
-                                            <Input id="manual-label" name="label" value={manualDataPoint.label ?? ''} onChange={handleManualInputChange} placeholder="Short name (uses Name if blank)" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-dataType">Data Type *</Label>
-                                            <Select name="dataType" value={manualDataPoint.dataType} onValueChange={(value) => handleManualSelectChange('dataType', value)}>
-                                                <SelectTrigger id="manual-dataType"><SelectValue placeholder="Select data type" /></SelectTrigger>
-                                                <SelectContent>{DATA_TYPE_OPTIONS_EXTENDED.map(dt => <SelectItem key={dt} value={dt}>{dt}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-uiType">UI Type *</Label>
-                                            <Select name="uiType" value={manualDataPoint.uiType} onValueChange={(value) => handleManualSelectChange('uiType', value)}>
-                                                <SelectTrigger id="manual-uiType"><SelectValue placeholder="Select UI type" /></SelectTrigger>
-                                                <SelectContent>{UI_TYPE_OPTIONS_EXTENDED.map(uit => <SelectItem key={uit} value={String(uit)}>{String(uit)}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-icon">Icon Name</Label>
-                                            <Input id="manual-icon" name="icon" value={manualDataPoint.icon ?? ''} onChange={handleManualInputChange} placeholder="e.g., Thermometer" />
-                                            {manualFormErrors.icon && <p className="text-xs text-orange-500 pt-1">{manualFormErrors.icon}</p>}
-                                            <p className="text-xs text-muted-foreground pt-0.5">From <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Lucide.dev</a> (optional).</p>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-unit">Unit</Label>
-                                            <Input id="manual-unit" name="unit" value={manualDataPoint.unit ?? ''} onChange={handleManualInputChange} placeholder="e.g., °C, kWh" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-category">Category</Label>
-                                            <Input id="manual-category" name="category" value={manualDataPoint.category ?? ''} onChange={handleManualInputChange} placeholder="e.g., HVAC, Production" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-min">Min Value</Label>
-                                            <Input id="manual-min" name="min" type="number" value={manualDataPoint.min ?? ''} onChange={handleManualInputChange} placeholder="Numeric minimum" />
-                                            {manualFormErrors.min && <p className="text-xs text-red-500 pt-1">{manualFormErrors.min}</p>}
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-max">Max Value</Label>
-                                            <Input id="manual-max" name="max" type="number" value={manualDataPoint.max ?? ''} onChange={handleManualInputChange} placeholder="Numeric maximum" />
-                                            {manualFormErrors.max && <p className="text-xs text-red-500 pt-1">{manualFormErrors.max}</p>}
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="manual-factor">Factor</Label>
-                                            <Input id="manual-factor" name="factor" type="number" value={manualDataPoint.factor ?? ''} onChange={handleManualInputChange} placeholder="Multiplier (e.g., 0.1)" />
-                                            {manualFormErrors.factor && <p className="text-xs text-red-500 pt-1">{manualFormErrors.factor}</p>}
-                                        </div>
-                                        <div className="space-y-1.5 lg:col-span-1">
-                                            <Label htmlFor="manual-phase">Phase / Subsystem</Label>
-                                            <Input id="manual-phase" name="phase" value={manualDataPoint.phase ?? ''} onChange={handleManualInputChange} placeholder="e.g., L1, Coolant Loop" />
-                                        </div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-id">ID *</Label><Input id="manual-id" name="id" value={manualDataPoint.id ?? ''} onChange={handleManualInputChange} placeholder="Unique identifier" />{manualFormErrors.id && <p className="text-xs text-red-500 pt-1">{manualFormErrors.id}</p>}</div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-name">Name *</Label><Input id="manual-name" name="name" value={manualDataPoint.name ?? ''} onChange={handleManualInputChange} placeholder="Descriptive name" />{manualFormErrors.name && <p className="text-xs text-red-500 pt-1">{manualFormErrors.name}</p>}</div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-nodeId">OPC UA Node ID *</Label><Input id="manual-nodeId" name="nodeId" value={manualDataPoint.nodeId ?? ''} onChange={handleManualInputChange} placeholder="e.g., ns=2;s=Device.Boiler.Temp1" />{manualFormErrors.nodeId && <p className="text-xs text-red-500 pt-1">{manualFormErrors.nodeId}</p>}</div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-label">Label (UI Display)</Label><Input id="manual-label" name="label" value={manualDataPoint.label ?? ''} onChange={handleManualInputChange} placeholder="Short name (uses Name if blank)" /></div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-dataType">Data Type *</Label><Select name="dataType" value={manualDataPoint.dataType} onValueChange={(value) => handleManualSelectChange('dataType', value)}><SelectTrigger id="manual-dataType"><SelectValue placeholder="Select data type" /></SelectTrigger><SelectContent>{DATA_TYPE_OPTIONS_EXTENDED.map(dt => <SelectItem key={dt} value={dt}>{dt}</SelectItem>)}</SelectContent></Select></div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-uiType">UI Type *</Label><Select name="uiType" value={manualDataPoint.uiType} onValueChange={(value) => handleManualSelectChange('uiType', value)}><SelectTrigger id="manual-uiType"><SelectValue placeholder="Select UI type" /></SelectTrigger><SelectContent>{UI_TYPE_OPTIONS_EXTENDED.map(uit => <SelectItem key={String(uit)} value={String(uit)}>{String(uit)}</SelectItem>)}</SelectContent></Select></div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-icon">Icon Name</Label><Input id="manual-icon" name="icon" value={manualDataPoint.icon ?? ''} onChange={handleManualInputChange} placeholder="e.g., Thermometer" />{manualFormErrors.icon && <p className="text-xs text-orange-500 pt-1">{manualFormErrors.icon}</p>}<p className="text-xs text-muted-foreground pt-0.5">From <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Lucide.dev</a> (optional).</p></div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-unit">Unit</Label><Input id="manual-unit" name="unit" value={manualDataPoint.unit ?? ''} onChange={handleManualInputChange} placeholder="e.g., °C, kWh" /></div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-category">Category</Label><Input id="manual-category" name="category" value={manualDataPoint.category ?? ''} onChange={handleManualInputChange} placeholder="e.g., HVAC, Production" /></div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-min">Min Value</Label><Input id="manual-min" name="min" type="number" value={manualDataPoint.min ?? ''} onChange={handleManualInputChange} placeholder="Numeric minimum" />{manualFormErrors.min && <p className="text-xs text-red-500 pt-1">{manualFormErrors.min}</p>}</div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-max">Max Value</Label><Input id="manual-max" name="max" type="number" value={manualDataPoint.max ?? ''} onChange={handleManualInputChange} placeholder="Numeric maximum" />{manualFormErrors.max && <p className="text-xs text-red-500 pt-1">{manualFormErrors.max}</p>}</div>
+                                        <div className="space-y-1.5"><Label htmlFor="manual-factor">Factor</Label><Input id="manual-factor" name="factor" type="number" value={manualDataPoint.factor ?? ''} onChange={handleManualInputChange} placeholder="Multiplier (e.g., 0.1)" />{manualFormErrors.factor && <p className="text-xs text-red-500 pt-1">{manualFormErrors.factor}</p>}</div>
+                                        <div className="space-y-1.5 lg:col-span-1"><Label htmlFor="manual-phase">Phase / Subsystem</Label><Input id="manual-phase" name="phase" value={manualDataPoint.phase ?? ''} onChange={handleManualInputChange} placeholder="e.g., L1, Coolant Loop" /></div>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="manual-description">Description</Label>
-                                        <Textarea id="manual-description" name="description" value={manualDataPoint.description ?? ''} onChange={handleManualInputChange} placeholder="Optional detailed description" className="min-h-[60px]" />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label htmlFor="manual-notes">Internal Notes</Label>
-                                        <Textarea id="manual-notes" name="notes" value={manualDataPoint.notes ?? ''} onChange={handleManualInputChange} placeholder="Optional internal notes or remarks" className="min-h-[60px]" />
-                                    </div>
+                                    <div className="space-y-1.5"><Label htmlFor="manual-description">Description</Label><Textarea id="manual-description" name="description" value={manualDataPoint.description ?? ''} onChange={handleManualInputChange} placeholder="Optional detailed description" className="min-h-[60px]" /></div>
+                                    <div className="space-y-1.5"><Label htmlFor="manual-notes">Internal Notes</Label><Textarea id="manual-notes" name="notes" value={manualDataPoint.notes ?? ''} onChange={handleManualInputChange} placeholder="Optional internal notes or remarks" className="min-h-[60px]" /></div>
                                 </CardContent>
                                 <CardFooter className="pt-6 flex justify-end space-x-3 border-t border-border/50 dark:border-neutral-700/50">
-                                    <motion.div {...buttonMotionProps(0.05)}>
-                                        <Button variant="outline" onClick={handleCancelManualForm} className="group">
-                                            <XCircle className="h-4 w-4 mr-2 group-hover:text-muted-foreground transition-colors" /> Cancel
-                                        </Button>
-                                    </motion.div>
-                                    <motion.div {...buttonMotionProps(0, true)}>
-                                        <Button onClick={handleSaveManualDataPoint} className="group">
-                                            <Save className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" /> Save Data Point
-                                        </Button>
-                                    </motion.div>
+                                    <motion.div {...buttonMotionProps(0.05)}><Button variant="outline" onClick={handleCancelManualForm} className="group"><XCircle className="h-4 w-4 mr-2 group-hover:text-muted-foreground transition-colors" /> Cancel</Button></motion.div>
+                                    <motion.div {...buttonMotionProps(0, true)}><Button onClick={handleSaveManualDataPoint} className="group"><Save className="h-4 w-4 mr-2 group-hover:scale-110 transition-transform" /> Save Data Point</Button></motion.div>
                                 </CardFooter>
                             </motion.div>
                         )}
@@ -2115,41 +1865,18 @@ export default function DatapointDiscoveryStep() { // Renamed component
                 </Card>
             </motion.div>
 
-            {/* Process Log - Remains largely the same, ensure it's placed appropriately */}
             <motion.div variants={itemVariants(0.25)}>
                 <Card className="border-border bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
-                    <CardHeader>
-                        <div className="flex items-center space-x-3">
-                            <FileJson className="h-5 w-5 text-gray-500 dark:text-gray-400" />
-                            <CardTitle className="text-lg sm:text-xl font-medium">Process Log</CardTitle>
-                        </div>
-                    </CardHeader>
+                    <CardHeader><div className="flex items-center space-x-3"><FileJson className="h-5 w-5 text-gray-500 dark:text-gray-400" /><CardTitle className="text-lg sm:text-xl font-medium">Process Log</CardTitle></div></CardHeader>
                     <CardContent>
                         <ScrollArea ref={processLogRef} className="h-48 w-full rounded-md border border-border p-3 text-xs bg-muted/20 dark:bg-neutral-800/40 shadow-inner">
                             {processLog.length === 0 && <p className="text-muted-foreground text-center italic py-4">No operations performed yet.</p>}
-                            {processLog.map(log => (
-                                <div key={log.id} className="mb-2.5 last:mb-0 border-b border-border/50 dark:border-neutral-700/60 pb-1.5 last:border-b-0 last:pb-0">
-                                    <span className="text-muted-foreground/80 dark:text-muted-foreground/70 mr-2 tabular-nums">{log.timestamp}</span>
-                                    <span className={cn("font-medium",
-                                        log.type === 'error' && "text-red-600 dark:text-red-400",
-                                        log.type === 'warning' && "text-amber-600 dark:text-amber-400",
-                                        log.type === 'info' && "text-sky-600 dark:text-sky-400",
-                                        log.type === 'system' && "text-gray-700 dark:text-gray-300",
-                                        log.type === 'ai' && "text-purple-600 dark:text-purple-400"
-                                    )}>
-                                        [{log.type.toUpperCase()}]
-                                    </span>
-                                    <span className="ml-1.5 text-foreground/90 dark:text-foreground/80">{log.message}</span>
-                                    {log.details && <p className="ml-4 pl-1 text-muted-foreground/90 dark:text-muted-foreground/70 text-[0.7rem] break-all">{log.details}</p>}
-                                </div>
-                            ))}
+                            {processLog.map(log => (<div key={log.id} className="mb-2.5 last:mb-0 border-b border-border/50 dark:border-neutral-700/60 pb-1.5 last:border-b-0 last:pb-0"><span className="text-muted-foreground/80 dark:text-muted-foreground/70 mr-2 tabular-nums">{log.timestamp}</span><span className={cn("font-medium", log.type === 'error' && "text-red-600 dark:text-red-400", log.type === 'warning' && "text-amber-600 dark:text-amber-400", log.type === 'info' && "text-sky-600 dark:text-sky-400", log.type === 'system' && "text-gray-700 dark:text-gray-300", log.type === 'ai' && "text-purple-600 dark:text-purple-400")}>[{log.type.toUpperCase()}]</span><span className="ml-1.5 text-foreground/90 dark:text-foreground/80">{log.message}</span>{log.details && <p className="ml-4 pl-1 text-muted-foreground/90 dark:text-muted-foreground/70 text-[0.7rem] break-all">{log.details}</p>}</div>))}
                         </ScrollArea>
                     </CardContent>
                 </Card>
             </motion.div>
-
         
-            {/* Edit Modal - Remains largely the same, ensure options are using extended lists */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                 <DialogContent className="sm:max-w-[600px] md:max-w-[750px] lg:max-w-[900px] max-h-[90vh] flex flex-col">
                     <DialogHeader><DialogTitle className="text-xl">Edit Data Point: {editingPoint?.name}</DialogTitle><DialogDescription className="text-muted-foreground">Modify the details. Changes are local until "Save to Onboarding".</DialogDescription></DialogHeader>

@@ -1,12 +1,13 @@
 // components/onboarding/DataPointConfigStep.tsx
 'use client';
 import React, { useState, useCallback, useRef, DragEvent, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label'; // Ensure Label is imported
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'; // Import Select components
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { DataPointConfig, IconComponentType } from '@/config/dataPoints';
 import { useOnboarding } from './OnboardingContext';
@@ -14,7 +15,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import {
     Download, FileJson, UploadCloud, CheckCircle, AlertTriangle, Sigma, Loader2, Info, ListChecks, Database, FileSpreadsheet, Trash2, Maximize, ExternalLink, Merge, CloudUpload,
-    PlusCircle, Save, XCircle // Added icons for manual form
+    PlusCircle, Save, XCircle
 } from 'lucide-react';
 import * as lucideIcons from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,9 +57,8 @@ interface FullConfigFile {
     configuredDataPoints: PartialDataPointFromFile[];
 }
 
-
-// --- Framer Motion Variants (remain the same) ---
-const containerVariants = {
+// --- Framer Motion Variants (FIXED) ---
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -66,7 +66,8 @@ const containerVariants = {
   },
 };
 
-const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 3) => ({
+// FIX: Explicitly set the return type of the function to 'Variants'
+const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: number = 3): Variants => ({
   hidden: { opacity: 0, y: yOffset, filter: `blur(${blurAmount}px)` },
   visible: {
     opacity: 1, y: 0, filter: 'blur(0px)',
@@ -75,23 +76,24 @@ const itemVariants = (delay: number = 0, yOffset: number = 20, blurAmount: numbe
   exit: { opacity: 0, y: -(yOffset / 2), filter: `blur(${blurAmount}px)`, transition: { duration: 0.25 } }
 });
 
+// FIX: Explicitly set the return type of the function to 'Variants'
 const buttonMotionProps = (delay: number = 0, primary: boolean = false) => ({
   variants: itemVariants(delay, 15, 2),
   whileHover: {
     scale: 1.03,
     boxShadow: primary ? "0px 7px 22px hsla(var(--primary)/0.3)" : "0px 5px 18px hsla(var(--foreground)/0.12)",
-    transition: { type: "spring", stiffness: 350, damping: 12 }
+    transition: { type: "spring" as const, stiffness: 350, damping: 12 }
   },
-  whileTap: { scale: 0.97, transition: {type: "spring", stiffness: 400, damping: 15} }
+  whileTap: { scale: 0.97, transition: {type: "spring" as const, stiffness: 400, damping: 15} }
 });
 
-const contentAppearVariants = {
+const contentAppearVariants: Variants = {
   hidden: { opacity: 0, height: 0, y: 15, scale: 0.97 },
   visible: { opacity: 1, height: 'auto', y: 0, scale: 1, transition: { duration: 0.45, ease: 'circOut' } },
   exit: { opacity: 0, height: 0, y: -15, scale: 0.97, transition: { duration: 0.35, ease: 'circIn' } }
 };
 
-const dropzoneVariants = {
+const dropzoneVariants: Variants = {
     idle: { scale: 1, backgroundColor: "hsla(var(--muted)/0.3)", borderColor: "hsla(var(--border))" },
     dragging: { scale: 1.03, backgroundColor: "hsla(var(--primary)/0.05)", borderColor: "hsla(var(--primary)/0.7)" },
 };
@@ -100,54 +102,30 @@ const dropzoneVariants = {
 const DATA_TYPE_OPTIONS: DataPointConfig['dataType'][] = ['Boolean', 'String', 'Float', 'Double', 'Int16', 'UInt16', 'Int32', 'UInt32', 'DateTime'];
 const UI_TYPE_OPTIONS: DataPointConfig['uiType'][] = ['button', 'switch', 'display', 'gauge'];
 
-// Initial state for the manual entry form
-// Storing numbers as string | undefined from input for easier handling, convert on save
 type ManualDataPointState = Partial<Omit<DataPointConfig, 'icon' | 'min' | 'max' | 'factor'> & { 
     icon?: string;
-    min?: string; // Stored as string from input
-    max?: string; // Stored as string from input
-    factor?: string; // Stored as string from input
+    min?: string;
+    max?: string;
+    factor?: string;
 }>;
 
 const initialManualDataPointState: ManualDataPointState = {
-    id: '',
-    name: '',
-    nodeId: '',
-    dataType: 'Float',
-    uiType: 'display',
-    icon: 'Tag', // Default Lucide icon name
-    unit: '',
-    min: '', // Handled as string, converted to number or undefined on save
-    max: '', // Handled as string, converted to number or undefined on save
-    description: '',
-    category: 'Manually Added',
-    factor: '', // Handled as string, e.g., "1" or "0.1", converted to number or undefined
-    phase: 'x',
-    notes: '',
-    label: '',
+    id: '', name: '', nodeId: '', dataType: 'Float', uiType: 'display', icon: 'Tag', unit: '', min: '',
+    max: '', description: '', category: 'Manually Added', factor: '', phase: 'x', notes: '', label: '',
 };
 
 export default function DataPointConfigStep() {
-  const {
-    configuredDataPoints,
-    setConfiguredDataPoints,
-    setPlantDetails,
-    onboardingData,
-  } = useOnboarding();
-
+  const { configuredDataPoints, setConfiguredDataPoints, setPlantDetails, onboardingData } = useOnboarding();
   const [file, setFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [processingSummary, setProcessingSummary] = useState<ProcessingSummary | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDraggingOver, setIsDraggingOver] = useState(false);
-
-  // State for manual data point entry
   const [showManualForm, setShowManualForm] = useState(false);
   const [manualDataPoint, setManualDataPoint] = useState<ManualDataPointState>(initialManualDataPointState);
   const [manualFormErrors, setManualFormErrors] = useState<Record<string, string>>({});
 
   const processUploadedFile = (uploadedFile: File) => {
-    // ... (existing implementation)
     const fileName = uploadedFile.name.toLowerCase();
     if (fileName.endsWith('.csv') || fileName.endsWith('.json') || fileName.endsWith('.xlsx')) {
         setFile(uploadedFile);
@@ -161,48 +139,34 @@ export default function DataPointConfigStep() {
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    // ... (existing implementation)
     if (event.target.files && event.target.files[0]) {
       processUploadedFile(event.target.files[0]);
     }
   };
 
   const handleDragOver = (event: DragEvent<HTMLDivElement>) => {
-    // ... (existing implementation)
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDraggingOver(true);
+    event.preventDefault(); event.stopPropagation(); setIsDraggingOver(true);
   };
 
   const handleDragLeave = (event: DragEvent<HTMLDivElement>) => {
-    // ... (existing implementation)
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDraggingOver(false);
+    event.preventDefault(); event.stopPropagation(); setIsDraggingOver(false);
   };
 
   const handleDrop = (event: DragEvent<HTMLDivElement>) => {
-    // ... (existing implementation)
-    event.preventDefault();
-    event.stopPropagation();
-    setIsDraggingOver(false);
+    event.preventDefault(); event.stopPropagation(); setIsDraggingOver(false);
     if (event.dataTransfer.files && event.dataTransfer.files[0]) {
       processUploadedFile(event.dataTransfer.files[0]);
     }
   };
   
   const clearFileSelection = () => {
-    // ... (existing implementation)
     setFile(null);
-    if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
     setProcessingSummary(null);
     toast.info("File selection cleared.");
   };
 
   const downloadTemplate = (type: 'csv' | 'json' = 'csv') => {
-    // ... (existing implementation, no changes needed)
     const currentPlantName = onboardingData.plantName || "ExamplePlant";
     const currentPlantLocation = onboardingData.plantLocation || "Example Location";
 
@@ -222,27 +186,15 @@ export default function DataPointConfigStep() {
         toast.success("CSV Datapoint Template Downloaded.");
     } else if (type === 'json') {
       const jsonExample: FullConfigFile = {
-        plantName: currentPlantName,
-        plantLocation: currentPlantLocation,
-        appName: onboardingData.appName || "MyMonitoringApp",
+        plantName: currentPlantName, plantLocation: currentPlantLocation, appName: onboardingData.appName || "MyMonitoringApp",
         opcUaEndpointOfflineIP: onboardingData.opcUaEndpointOffline?.split(':')[0] || '192.168.1.100',
         opcUaEndpointOfflinePort: Number(onboardingData.opcUaEndpointOffline?.split(':')[1]) || 4840,
-        configuredDataPoints: [
-          {
-            id: `${currentPlantName.toLowerCase().replace(/\s+/g, '-')}-flow-rate`,
-            name: "Coolant Flow Rate",
-            nodeId: "ns=3;s=Factory.SystemA.Coolant.FlowRate",
-            dataType: "Double",
-            uiType: "gauge",
-            icon: "Gauge",
-            unit: "L/min",
-            min: 0,
-            max: 50,
-            label: "Coolant Flow",
-            category: "Process Values",
+        configuredDataPoints: [{
+            id: `${currentPlantName.toLowerCase().replace(/\s+/g, '-')}-flow-rate`, name: "Coolant Flow Rate",
+            nodeId: "ns=3;s=Factory.SystemA.Coolant.FlowRate", dataType: "Double", uiType: "gauge",
+            icon: "Gauge", unit: "L/min", min: 0, max: 50, label: "Coolant Flow", category: "Process Values",
             description: "Flow rate of the primary coolant loop."
-          },
-        ]
+        }]
       };
       const jsonContent = JSON.stringify(jsonExample, null, 2);
       const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
@@ -259,7 +211,6 @@ export default function DataPointConfigStep() {
   };
 
   const mapRowToDataPoint = (rowData: Record<string, any>, rowIndex: number, errorDetails: string[]): PartialDataPointFromFile | null => {
-    // ... (existing implementation, no changes needed)
     const id = rowData.id?.toString().trim();
     if (!id) {
         errorDetails.push(`Row/Object ${rowIndex + 1}: Missing 'id'. Entry skipped.`);
@@ -267,7 +218,7 @@ export default function DataPointConfigStep() {
     }
     const iconName = rowData.icon?.toString().trim();
     const dataType = rowData.dataType?.toString().trim();
-    if (dataType && !['Boolean', 'Float', 'Double', 'Int16', 'Int32', 'UInt16', 'UInt32', 'String', 'DateTime'].includes(dataType)) {
+    if (dataType && !DATA_TYPE_OPTIONS.includes(dataType)) {
         errorDetails.push(`ID: ${id}, Row: ${rowIndex + 1}: Invalid dataType '${dataType}'. Will use default or existing.`);
     }
     const min = rowData.min !== undefined && rowData.min !== null && rowData.min !== '' ? parseFloat(rowData.min) : undefined;
@@ -275,26 +226,17 @@ export default function DataPointConfigStep() {
     const factor = rowData.factor !== undefined && rowData.factor !== null && rowData.factor !== '' ? parseFloat(rowData.factor) : undefined;
 
     return {
-        id,
-        name: rowData.name?.toString().trim() || undefined,
-        nodeId: rowData.nodeId?.toString().trim() || undefined,
-        dataType: dataType as DataPointConfig['dataType'] || undefined,
-        uiType: rowData.uiType?.toString().trim() as DataPointConfig['uiType'] || undefined,
-        icon: iconName,
-        unit: rowData.unit?.toString().trim() || undefined,
-        min: min !== undefined && !isNaN(min) ? min : undefined,
-        max: max !== undefined && !isNaN(max) ? max : undefined,
-        description: rowData.description?.toString().trim() || undefined,
-        category: rowData.category?.toString().trim() || "Uncategorized", // Default category
-        factor: factor !== undefined && !isNaN(factor) ? factor : undefined,
-        phase: rowData.phase?.toString().trim() as DataPointConfig['phase'] || undefined,
-        notes: rowData.notes?.toString().trim() || undefined,
-        label: rowData.label?.toString().trim() || rowData.name?.toString().trim() || id, // Robust label default
+        id, name: rowData.name?.toString().trim() || undefined, nodeId: rowData.nodeId?.toString().trim() || undefined,
+        dataType: dataType as DataPointConfig['dataType'] || undefined, uiType: rowData.uiType?.toString().trim() as DataPointConfig['uiType'] || undefined,
+        icon: iconName, unit: rowData.unit?.toString().trim() || undefined, min: min !== undefined && !isNaN(min) ? min : undefined,
+        max: max !== undefined && !isNaN(max) ? max : undefined, description: rowData.description?.toString().trim() || undefined,
+        category: rowData.category?.toString().trim() || "Uncategorized", factor: factor !== undefined && !isNaN(factor) ? factor : undefined,
+        phase: rowData.phase?.toString().trim() as DataPointConfig['phase'] || undefined, notes: rowData.notes?.toString().trim() || undefined,
+        label: rowData.label?.toString().trim() || rowData.name?.toString().trim() || id,
     };
   };
 
   const parseAndProcessFile = useCallback(async (fileToProcess: File): Promise<DataPointConfig[]> => {
-    // ... (existing implementation, no changes needed for this part, ensure dependencies are correct)
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = async (event) => {
@@ -314,30 +256,23 @@ export default function DataPointConfigStep() {
               dataPointsFromFile = jsonData.configuredDataPoints;
               const { configuredDataPoints: _, ...rest } = jsonData;
               plantDetailsFromFile = rest;
-            } else {
-              throw new Error("Invalid JSON. Expect an array of datapoints or an object with a 'configuredDataPoints' array.");
-            }
+            } else { throw new Error("Invalid JSON. Expect array or object with 'configuredDataPoints'."); }
           } else if (fileToProcess.type === "text/csv" || fileToProcess.name.endsWith('.csv')) {
-            const parseResult = Papa.parse(fileContent as string, { header: true, skipEmptyLines: true, dynamicTyping: false }); // dynamicTyping false for consistency
-            if (parseResult.errors.length > 0) {
-              const csvErrorMsg = `CSV parsing issues: ${parseResult.errors.map(e => `Row ${e.row}: ${e.message}`).join('; ')}`;
-              throw new Error(csvErrorMsg);
-            }
+            const parseResult = Papa.parse(fileContent as string, { header: true, skipEmptyLines: true, dynamicTyping: false });
+            if (parseResult.errors.length > 0) { throw new Error(`CSV parsing issues: ${parseResult.errors.map(e => `Row ${e.row}: ${e.message}`).join('; ')}`); }
             dataPointsFromFile = (parseResult.data as Record<string, any>[]).map((row, index) =>
               mapRowToDataPoint(row, index, localProcessingSummary.errorDetails)
             ).filter(dp => dp !== null) as PartialDataPointFromFile[];
           } else if (fileToProcess.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" || fileToProcess.name.endsWith('.xlsx')) {
             const workbook = XLSX.read(fileContent, { type: 'array' });
             const sheetName = workbook.SheetNames[0];
-            if(!sheetName) throw new Error("Excel file appears to be empty or has no accessible sheets.");
+            if(!sheetName) throw new Error("Excel file appears to be empty.");
             const worksheet = workbook.Sheets[sheetName];
-            const excelRows = XLSX.utils.sheet_to_json(worksheet, {raw: false, defval: null}) as Record<string, any>[]; // raw:false for formatted strings, defval for empty cells
+            const excelRows = XLSX.utils.sheet_to_json(worksheet, {raw: false, defval: null}) as Record<string, any>[];
             dataPointsFromFile = excelRows.map((row, index) =>
               mapRowToDataPoint(row, index, localProcessingSummary.errorDetails)
             ).filter(dp => dp !== null) as PartialDataPointFromFile[];
-          } else {
-            throw new Error(`Unsupported file type: ${fileToProcess.type || "unknown"}. Please use CSV, JSON, or XLSX.`);
-          }
+          } else { throw new Error(`Unsupported file type: ${fileToProcess.type || "unknown"}.`); }
         
           if (plantDetailsFromFile && typeof setPlantDetails === 'function') {
             const plantDetailKeys = Object.keys(plantDetailsFromFile).filter(
@@ -370,7 +305,7 @@ export default function DataPointConfigStep() {
                     finalIcon = IconFromLib;
                 } else {
                     localProcessingSummary.errors++;
-                    localProcessingSummary.errorDetails.push(`ID: ${dpFromFilePartial.id}: Icon '${iconNameFromFile}' not found. Existing or default icon will be used.`);
+                    localProcessingSummary.errorDetails.push(`ID: ${dpFromFilePartial.id}: Icon '${iconNameFromFile}' not found.`);
                 }
             }
 
@@ -392,11 +327,11 @@ export default function DataPointConfigStep() {
               if(finalIcon) existingPoint.icon = finalIcon; 
               localProcessingSummary.updated++;
             } else { 
-            const requiredFields: (keyof Omit<DataPointConfig, 'icon'>)[] = ['id', 'name', 'nodeId', 'dataType', 'uiType', 'label'];
-               const isNewPointValid = requiredFields.every(field => {
-                    const val = restOfPointFromFile[field as keyof typeof restOfPointFromFile];
-                    return val !== undefined && val !== null && (typeof val !== 'string' || val.trim() !== '');
-               });
+              const requiredFields: (keyof Omit<DataPointConfig, 'icon'>)[] = ['id', 'name', 'nodeId', 'dataType', 'uiType', 'label'];
+              const isNewPointValid = requiredFields.every(field => {
+                  const val = restOfPointFromFile[field as keyof typeof restOfPointFromFile];
+                  return val !== undefined && val !== null && (typeof val !== 'string' || val.trim() !== '');
+              });
               
               if (isNewPointValid) {
                 newConfiguredPoints.push({
@@ -407,38 +342,30 @@ export default function DataPointConfigStep() {
                 } as DataPointConfig);
                 localProcessingSummary.added++;
               } else {
-                localProcessingSummary.errors++;
-                localProcessingSummary.skipped++;
+                localProcessingSummary.errors++; localProcessingSummary.skipped++;
                 const missing = requiredFields.filter(f => {
                     const val = restOfPointFromFile[f];
                     return val === undefined || val === null || (typeof val === 'string' && val.trim() === '');
                 }).join(', ') || 'invalid data types';
-                localProcessingSummary.errorDetails.push(`ID: ${dpFromFilePartial.id} (New Entry): Skipped. Missing/invalid required fields (${missing}).`);
+                localProcessingSummary.errorDetails.push(`ID: ${dpFromFilePartial.id} (New): Skipped. Missing required fields (${missing}).`);
               }
             }
           });
 
           setProcessingSummary(localProcessingSummary);
           if (localProcessingSummary.errors > 0 || localProcessingSummary.skipped > 0) {
-            toast.warning("File Processed with Issues", {
-                description: `${localProcessingSummary.errors} error(s), ${localProcessingSummary.skipped} skipped. See summary.`,
-                duration: 7000,
-            });
+            toast.warning("File Processed with Issues", { description: `${localProcessingSummary.errors} error(s), ${localProcessingSummary.skipped} skipped.`, duration: 7000 });
           } else if (localProcessingSummary.processed === 0 && !localProcessingSummary.plantDetailsUpdated) {
             toast.info("No New Data Processed", { description: "The file did not contain new data points or updatable plant details."});
           } else {
             let successMsg = `Processed: ${localProcessingSummary.processed}`;
             if(localProcessingSummary.updated > 0) successMsg += `, Updated: ${localProcessingSummary.updated}`;
             if(localProcessingSummary.added > 0) successMsg += `, Added: ${localProcessingSummary.added}`;
-
-            toast.success("File Processed Successfully!", {
-                description: successMsg + ".",
-            });
+            toast.success("File Processed Successfully!", { description: successMsg + "." });
           }
           resolve(newConfiguredPoints);
 
         } catch (e: any) {
-          console.error("Error parsing/processing file:", e);
           const errorMessage = e.message || "An unknown error occurred.";
           localProcessingSummary.errors++;
           localProcessingSummary.errorDetails.push(`Critical error: ${errorMessage}`);
@@ -448,56 +375,43 @@ export default function DataPointConfigStep() {
         }
       };
       reader.onerror = (e) => {
-        const readErrorMsg = "Failed to read the file. It might be corrupted or inaccessible.";
-        console.error("FileReader error:", e);
+        const readErrorMsg = "Failed to read the file.";
         setProcessingSummary(prev => ({ ...(prev || { processed:0,updated:0,added:0,skipped:0,errors:0,errorDetails:[]}), errors: (prev?.errors || 0) + 1, errorDetails: [...(prev?.errorDetails || []), readErrorMsg] }));
         toast.error("File Read Error", { description: readErrorMsg });
         reject(configuredDataPoints);
       };
 
-      if (fileToProcess.name.endsWith('.xlsx')) {
-        reader.readAsArrayBuffer(fileToProcess);
-      } else {
-        reader.readAsText(fileToProcess);
-      }
+      if (fileToProcess.name.endsWith('.xlsx')) reader.readAsArrayBuffer(fileToProcess);
+      else reader.readAsText(fileToProcess);
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configuredDataPoints, setPlantDetails]); // Added configuredDataPoints as it's read inside
+  }, [configuredDataPoints, setPlantDetails]);
 
 
   const handleUploadAndProcess = useCallback(async () => {
-    // ... (existing implementation)
     if (!file) {
-      toast.warning("No file selected.", { description: "Please select or drag & drop a file first."});
+      toast.warning("No file selected.");
       return;
     }
-    setIsLoading(true);
-    setProcessingSummary(null);
+    setIsLoading(true); setProcessingSummary(null);
     try {
       const processedDataPoints = await parseAndProcessFile(file);
       setConfiguredDataPoints(processedDataPoints);
     } catch (error) {
-       console.error("File processing promise rejected at top level:", error);
        toast.error("Unhandled Processing Error", { description: "An unexpected critical error occurred." });
     } finally {
       setIsLoading(false);
     }
   }, [file, parseAndProcessFile, setConfiguredDataPoints]);
 
-  // --- Handlers for manual form ---
   const handleManualInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const { name, value } = e.target;
       setManualDataPoint(prev => ({ ...prev, [name]: value }));
-      if (manualFormErrors[name]) {
-          setManualFormErrors(prev => ({ ...prev, [name]: '' })); // Clear error on change
-      }
+      if (manualFormErrors[name]) setManualFormErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handleManualSelectChange = (fieldName: keyof ManualDataPointState, value: string) => {
-      setManualDataPoint(prev => ({ ...prev, [fieldName]: value as any })); // Type assertion for safety if needed
-       if (manualFormErrors[fieldName as string]) {
-          setManualFormErrors(prev => ({ ...prev, [fieldName as string]: '' }));
-      }
+      setManualDataPoint(prev => ({ ...prev, [fieldName]: value as any }));
+      if (manualFormErrors[fieldName as string]) setManualFormErrors(prev => ({ ...prev, [fieldName as string]: '' }));
   };
   
   const validateManualForm = (): boolean => {
@@ -505,70 +419,47 @@ export default function DataPointConfigStep() {
       const trimmedId = manualDataPoint.id?.trim();
       const trimmedName = manualDataPoint.name?.trim();
       const trimmedNodeId = manualDataPoint.nodeId?.trim();
-
       if (!trimmedId) errors.id = "ID is required.";
       else if (configuredDataPoints.some(dp => dp.id === trimmedId)) errors.id = "This ID already exists.";
-      
       if (!trimmedName) errors.name = "Name is required.";
       if (!trimmedNodeId) errors.nodeId = "OPC UA Node ID is required.";
-      
-      // Icon validation (optional: error if typed but not found)
       const iconTrimmed = manualDataPoint.icon?.trim();
-      if (iconTrimmed && !getIconComponent(iconTrimmed)) {
-          errors.icon = "Icon name not found in Lucide library. Default will be used if saved, or clear the field.";
-      }
-
-      // Numeric field validation (check if they are valid numbers if not empty)
+      if (iconTrimmed && !getIconComponent(iconTrimmed)) errors.icon = "Icon name not found. Default will be used.";
       if (manualDataPoint.min && isNaN(Number(manualDataPoint.min))) errors.min = "Min must be a valid number.";
       if (manualDataPoint.max && isNaN(Number(manualDataPoint.max))) errors.max = "Max must be a valid number.";
       if (manualDataPoint.factor && isNaN(Number(manualDataPoint.factor))) errors.factor = "Factor must be a valid number.";
 
-
       setManualFormErrors(errors);
-      // Only blocking errors should prevent submission
       return !errors.id && !errors.name && !errors.nodeId && !errors.min && !errors.max && !errors.factor;
   };
 
   const handleSaveManualDataPoint = () => {
       if (!validateManualForm()) {
-          toast.error("Validation Error", { description: "Please fix the errors marked in the form."});
+          toast.error("Validation Error", { description: "Please fix the errors in the form."});
           return;
       }
-
       const iconString = manualDataPoint.icon?.trim() || initialManualDataPointState.icon || 'Tag';
       const IconComponent = getIconComponent(iconString) || DEFAULT_ICON;
-      
       const finalLabel = manualDataPoint.label?.trim() || manualDataPoint.name!.trim() || manualDataPoint.id!;
-
-      // Convert string min/max/factor to number or undefined
       const parseNumericField = (value?: string): number | undefined => {
           if (value === undefined || value.trim() === '') return undefined;
           const num = Number(value);
-          return isNaN(num) ? undefined : num; // Return undefined if not a valid number
+          return isNaN(num) ? undefined : num;
       };
 
       const newPoint: DataPointConfig = {
-          id: manualDataPoint.id!.trim(),
-          name: manualDataPoint.name!.trim(),
-          nodeId: manualDataPoint.nodeId!.trim(),
-          label: finalLabel,
-          dataType: manualDataPoint.dataType as DataPointConfig['dataType'], // Already validated by Select
-          uiType: manualDataPoint.uiType as DataPointConfig['uiType'],   // Already validated by Select
-          icon: IconComponent,
-          unit: manualDataPoint.unit?.trim() || undefined,
-          min: parseNumericField(manualDataPoint.min),
-          max: parseNumericField(manualDataPoint.max),
-          description: manualDataPoint.description?.trim() || undefined,
-          category: manualDataPoint.category?.trim() || 'General',
-          factor: parseNumericField(manualDataPoint.factor),
-          phase: manualDataPoint.phase?.trim() as DataPointConfig['phase'] || undefined,
-          notes: manualDataPoint.notes?.trim() || undefined,
+          id: manualDataPoint.id!.trim(), name: manualDataPoint.name!.trim(), nodeId: manualDataPoint.nodeId!.trim(),
+          label: finalLabel, dataType: manualDataPoint.dataType as DataPointConfig['dataType'], uiType: manualDataPoint.uiType as DataPointConfig['uiType'],
+          icon: IconComponent, unit: manualDataPoint.unit?.trim() || undefined, min: parseNumericField(manualDataPoint.min),
+          max: parseNumericField(manualDataPoint.max), description: manualDataPoint.description?.trim() || undefined,
+          category: manualDataPoint.category?.trim() || 'General', factor: parseNumericField(manualDataPoint.factor),
+          phase: manualDataPoint.phase?.trim() as DataPointConfig['phase'] || undefined, notes: manualDataPoint.notes?.trim() || undefined,
       };
 
       setConfiguredDataPoints(prev => [...prev, newPoint]);
       toast.success(`Data point "${newPoint.name}" added successfully!`);
       setShowManualForm(false);
-      setManualDataPoint(initialManualDataPointState); // Reset form for next entry
+      setManualDataPoint(initialManualDataPointState);
       setManualFormErrors({});
   };
 
@@ -582,14 +473,10 @@ export default function DataPointConfigStep() {
     <motion.div
         key="datapoint-config-step-enhanced"
         variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        exit="exit"
+        initial="hidden" animate="visible" exit="exit"
         className="space-y-4 sm:space-y-6 p-4 sm:p-6"
     >
-        {/* --- Header Card --- */}
         <motion.div variants={itemVariants(0)}>
-             {/* ... (existing Card definition) ... */}
             <Card className="shadow-xl dark:shadow-black/30 border-border/60 bg-gradient-to-br from-card via-card to-card/90 dark:from-neutral-800 dark:via-neutral-800 dark:to-neutral-800/90 backdrop-blur-lg">
                 <CardHeader className="border-b border-border/50 dark:border-neutral-700/50 pb-4">
                     <div className="flex items-center space-x-3.5">
@@ -615,9 +502,7 @@ export default function DataPointConfigStep() {
             </Card>
         </motion.div>
 
-        {/* --- Download Templates Section --- */}
         <motion.div variants={itemVariants(0.1)}>
-             {/* ... (existing Card definition) ... */}
             <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                 <CardHeader>
                     <div className="flex items-center space-x-3">
@@ -650,9 +535,7 @@ export default function DataPointConfigStep() {
             </Card>
         </motion.div>
 
-        {/* --- Upload File Section --- */}
         <motion.div variants={itemVariants(0.2)}>
-            {/* ... (existing Upload File Card, no changes) ... */}
             <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                 <CardHeader>
                     <div className="flex items-center space-x-3">
@@ -670,9 +553,7 @@ export default function DataPointConfigStep() {
                             {"ring-2 ring-primary ring-offset-2 ring-offset-background": isDraggingOver}
                         )}
                         onClick={() => fileInputRef.current?.click()}
-                        onDragOver={handleDragOver}
-                        onDragLeave={handleDragLeave}
-                        onDrop={handleDrop}
+                        onDragOver={handleDragOver} onDragLeave={handleDragLeave} onDrop={handleDrop}
                     >
                         <motion.div
                             animate={{ y: isDraggingOver ? -5 : 0 }}
@@ -687,10 +568,7 @@ export default function DataPointConfigStep() {
                             Supports: CSV, JSON, XLSX
                         </p>
                         <Input
-                            ref={fileInputRef}
-                            id="file-upload-dnd"
-                            type="file"
-                            className="hidden" 
+                            ref={fileInputRef} id="file-upload-dnd" type="file" className="hidden" 
                             onChange={handleFileChange}
                             accept=".csv, .json, application/json, text/csv, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, .xlsx"
                         />
@@ -698,9 +576,7 @@ export default function DataPointConfigStep() {
                      <AnimatePresence>
                      {file && (
                         <motion.div
-                            layout
-                            initial={{opacity: 0, y: 10}}
-                            animate={{opacity: 1, y: 0}}
+                            layout initial={{opacity: 0, y: 10}} animate={{opacity: 1, y: 0}}
                             exit={{opacity: 0, y: -10, transition: {duration: 0.2}}}
                             transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.1 }}
                             className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-3"
@@ -727,7 +603,6 @@ export default function DataPointConfigStep() {
             </Card>
         </motion.div>
         
-        {/* --- Manual Data Point Entry Section --- */}
         <motion.div variants={itemVariants(0.3)}>
             <Card className="bg-card/90 dark:bg-neutral-800/80 backdrop-blur-md shadow-lg">
                 <CardHeader>
@@ -761,37 +636,29 @@ export default function DataPointConfigStep() {
                     <motion.div
                         key="manual-form-content"
                         variants={contentAppearVariants}
-                        initial="hidden"
-                        animate="visible"
-                        exit="exit"
+                        initial="hidden" animate="visible" exit="exit"
                     >
                         <CardContent className="space-y-5 pt-4">
-                            {/* Form Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-                                {/* ID */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-id">ID *</Label>
-                                    <Input id="manual-id" name="id" value={manualDataPoint.id ?? ''} onChange={handleManualInputChange} placeholder="Unique identifier (e.g., boiler-temp-1)" />
+                                    <Input id="manual-id" name="id" value={manualDataPoint.id ?? ''} onChange={handleManualInputChange} placeholder="Unique identifier" />
                                     {manualFormErrors.id && <p className="text-xs text-red-500 pt-1">{manualFormErrors.id}</p>}
                                 </div>
-                                {/* Name */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-name">Name *</Label>
                                     <Input id="manual-name" name="name" value={manualDataPoint.name ?? ''} onChange={handleManualInputChange} placeholder="Descriptive name" />
                                     {manualFormErrors.name && <p className="text-xs text-red-500 pt-1">{manualFormErrors.name}</p>}
                                 </div>
-                                {/* Node ID */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-nodeId">OPC UA Node ID *</Label>
                                     <Input id="manual-nodeId" name="nodeId" value={manualDataPoint.nodeId ?? ''} onChange={handleManualInputChange} placeholder="e.g., ns=2;s=Device.Boiler.Temp1" />
                                     {manualFormErrors.nodeId && <p className="text-xs text-red-500 pt-1">{manualFormErrors.nodeId}</p>}
                                 </div>
-                                {/* Label */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-label">Label (UI Display)</Label>
                                     <Input id="manual-label" name="label" value={manualDataPoint.label ?? ''} onChange={handleManualInputChange} placeholder="Short name (uses Name if blank)" />
                                 </div>
-                                {/* Data Type */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-dataType">Data Type *</Label>
                                     <Select name="dataType" value={manualDataPoint.dataType} onValueChange={(value) => handleManualSelectChange('dataType', value)}>
@@ -799,7 +666,6 @@ export default function DataPointConfigStep() {
                                         <SelectContent>{DATA_TYPE_OPTIONS.map(dt => <SelectItem key={dt} value={dt}>{dt}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </div>
-                                {/* UI Type */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-uiType">UI Type *</Label>
                                     <Select name="uiType" value={manualDataPoint.uiType} onValueChange={(value) => handleManualSelectChange('uiType', value)}>
@@ -807,49 +673,41 @@ export default function DataPointConfigStep() {
                                         <SelectContent>{UI_TYPE_OPTIONS.map(uit => <SelectItem key={uit} value={uit}>{uit}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </div>
-                                 {/* Icon */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-icon">Icon Name</Label>
                                     <Input id="manual-icon" name="icon" value={manualDataPoint.icon ?? ''} onChange={handleManualInputChange} placeholder="e.g., Thermometer" />
                                     {manualFormErrors.icon && <p className="text-xs text-orange-500 pt-1">{manualFormErrors.icon}</p>}
                                     <p className="text-xs text-muted-foreground pt-0.5">From <a href="https://lucide.dev/" target="_blank" rel="noopener noreferrer" className="underline hover:text-primary">Lucide.dev</a> (optional).</p>
                                 </div>
-                                {/* Unit */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-unit">Unit</Label>
                                     <Input id="manual-unit" name="unit" value={manualDataPoint.unit ?? ''} onChange={handleManualInputChange} placeholder="e.g., °C, kWh" />
                                 </div>
-                                 {/* Category */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-category">Category</Label>
                                     <Input id="manual-category" name="category" value={manualDataPoint.category ?? ''} onChange={handleManualInputChange} placeholder="e.g., HVAC, Production" />
                                 </div>
-                                 {/* Min Value */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-min">Min Value</Label>
                                     <Input id="manual-min" name="min" type="number" value={manualDataPoint.min ?? ''} onChange={handleManualInputChange} placeholder="Numeric minimum" />
                                     {manualFormErrors.min && <p className="text-xs text-red-500 pt-1">{manualFormErrors.min}</p>}
                                 </div>
-                                {/* Max Value */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-max">Max Value</Label>
                                     <Input id="manual-max" name="max" type="number" value={manualDataPoint.max ?? ''} onChange={handleManualInputChange} placeholder="Numeric maximum" />
                                     {manualFormErrors.max && <p className="text-xs text-red-500 pt-1">{manualFormErrors.max}</p>}
                                 </div>
-                                {/* Factor */}
                                 <div className="space-y-1.5">
                                     <Label htmlFor="manual-factor">Factor</Label>
                                     <Input id="manual-factor" name="factor" type="number" value={manualDataPoint.factor ?? ''} onChange={handleManualInputChange} placeholder="Multiplier (e.g., 0.1)" />
                                      {manualFormErrors.factor && <p className="text-xs text-red-500 pt-1">{manualFormErrors.factor}</p>}
                                 </div>
-                                {/* Phase / Subsystem - might be better as 1 column if description/notes are also 1 column */}
                                 <div className="space-y-1.5 lg:col-span-1">
                                     <Label htmlFor="manual-phase">Phase / Subsystem</Label>
                                     <Input id="manual-phase" name="phase" value={manualDataPoint.phase ?? ''} onChange={handleManualInputChange} placeholder="e.g., L1, Coolant Loop" />
                                 </div>
                             </div>
                             
-                            {/* Full width for Description and Notes */}
                             <div className="space-y-1.5">
                                 <Label htmlFor="manual-description">Description</Label>
                                 <Textarea id="manual-description" name="description" value={manualDataPoint.description ?? ''} onChange={handleManualInputChange} placeholder="Optional detailed description" className="min-h-[60px]" />
@@ -877,10 +735,8 @@ export default function DataPointConfigStep() {
             </Card>
         </motion.div>
 
-        {/* --- Loading Indicator for file processing --- */}
         <AnimatePresence>
             {isLoading && !processingSummary && (
-                // ... (existing loading indicator for file processing)
                  <motion.div
                     key="loading-indicator-main"
                     variants={contentAppearVariants} initial="hidden" animate="visible" exit="exit"
@@ -893,24 +749,20 @@ export default function DataPointConfigStep() {
             )}
         </AnimatePresence>
 
-        {/* --- Processing Summary for file upload --- */}
         <AnimatePresence>
             {processingSummary && (
-                 // ... (existing processing summary card)
                 <motion.div
                     key="processing-summary-card"
                     variants={contentAppearVariants}
                     initial="hidden" animate="visible" exit="exit"
                     className="mt-8" 
                 >
-                    <Card className={cn(
-                        "shadow-xl dark:shadow-black/25 overflow-hidden", 
+                    <Card className={cn("shadow-xl dark:shadow-black/25 overflow-hidden", 
                         processingSummary.errors > 0 || processingSummary.skipped > 0
                             ? 'border-orange-500/70 dark:border-orange-600/70 bg-orange-50/30 dark:bg-orange-900/10'
                             : 'border-green-500/70 dark:border-green-600/70 bg-green-50/30 dark:bg-green-900/10'
                     )}>
-                        <CardHeader className={cn(
-                             "border-b pb-3",
+                        <CardHeader className={cn("border-b pb-3",
                              processingSummary.errors > 0 || processingSummary.skipped > 0
                                 ? 'border-orange-500/30 dark:border-orange-600/30 bg-orange-500/5 dark:bg-orange-800/10'
                                 : 'border-green-500/30 dark:border-green-600/30 bg-green-500/5 dark:bg-green-800/10'
@@ -921,8 +773,7 @@ export default function DataPointConfigStep() {
                                 ) : (
                                     <CheckCircle className="h-7 w-7 text-green-500 shrink-0" />
                                 )}
-                                <CardTitle className={cn(
-                                    "text-xl sm:text-2xl", 
+                                <CardTitle className={cn("text-xl sm:text-2xl", 
                                     processingSummary.errors > 0 || processingSummary.skipped > 0 ? 'text-orange-700 dark:text-orange-300' : 'text-green-700 dark:text-green-300'
                                 )}>
                                     File Processing Complete
@@ -933,7 +784,7 @@ export default function DataPointConfigStep() {
                             {processingSummary.plantDetailsUpdated && (
                                 <motion.div variants={itemVariants(0.05)} className="flex items-start p-3 rounded-md bg-blue-500/10 border border-blue-500/30 text-blue-700 dark:text-blue-300">
                                     <Info className="h-5 w-5 mr-3 mt-0.5 shrink-0" />
-                                    <p>Plant-level configuration details from your JSON file were successfully applied where new values were provided.</p>
+                                    <p>Plant-level configuration details from your JSON file were successfully applied.</p>
                                 </motion.div>
                             )}
                             <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-base"> 
@@ -970,9 +821,7 @@ export default function DataPointConfigStep() {
             )}
         </AnimatePresence>
 
-        {/* --- Current Count --- */}
         <motion.div variants={itemVariants(0.4)} className="text-center">
-             {/* ... (existing total count display) ... */}
             <div className="inline-flex items-center justify-center p-3 px-5 rounded-full bg-muted/60 dark:bg-neutral-800/50 border border-border/70 shadow-sm">
                 <Database className="h-5 w-5 mr-3 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">

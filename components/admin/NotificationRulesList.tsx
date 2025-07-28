@@ -1,7 +1,9 @@
+// components/admin/NotificationRulesList.tsx
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { motion, Variants } from 'framer-motion';
 import { NotificationRule } from '@/types/notifications';
 import {
   Table,
@@ -14,18 +16,18 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit3, Trash2, FlaskConical, CheckCircle, XCircle, AlertTriangle, InfoIcon, ShieldAlert } from 'lucide-react'; // More specific icons
+import { Edit3, Trash2, FlaskConical, CheckCircle, XCircle, AlertTriangle, InfoIcon, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NotificationRulesListProps {
   rules: NotificationRule[];
   onEdit: (rule: NotificationRule) => void;
-  onDelete: (ruleId: string) => void; // Parent handles async and toast
-  onTestRule?: (rule: NotificationRule) => void; // Optional, only in dev
-  // isDevelopment?: boolean; // Can be inferred if onTestRule is present
+  onDelete: (ruleId: string) => void;
+  onTestRule?: (rule: NotificationRule) => void;
 }
 
-const rowVariants = {
+// FIX: Add explicit 'Variants' type
+const rowVariants: Variants = {
   initial: { opacity: 0, y: 10 },
   animate: (i: number) => ({ 
     opacity: 1, 
@@ -64,11 +66,7 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
   onDelete,
   onTestRule,
 }) => {
-  // Empty state and loading state are handled by the parent modal for a more integrated feel.
-  // This component now focuses solely on rendering the list of rules.
   if (rules.length === 0) {
-    // This typically won't be hit if parent handles empty state,
-    // but good as a fallback.
     return (
       <div className="text-center text-muted-foreground py-10">
         <p>No notification rules found or match current filters.</p>
@@ -76,19 +74,17 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
     );
   }
 
-  const isDevelopment = !!onTestRule; // Inferring dev mode from the presence of onTestRule
+  const isDevelopment = !!onTestRule;
 
   return (
     <TooltipProvider delayDuration={100}>
       <div className="border rounded-lg overflow-hidden dark:border-slate-700 shadow-sm">
-        <Table className="min-w-full"> {/* Ensures table scrolls horizontally if needed */}
+        <Table className="min-w-full">
           <TableHeader className="bg-slate-50 dark:bg-slate-700/50">
             <TableRow className="border-b dark:border-slate-600/70">
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300 w-[25%]">Name & Message</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Data Point</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Condition</TableHead>
-              {/* Threshold combined with Condition often or separated */}
-              {/* <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Threshold</TableHead> */}
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Severity</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300 text-center">Status</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300 text-right w-[150px] sm:w-[180px]">Actions</TableHead>
@@ -104,8 +100,8 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
                   initial="initial"
                   animate="animate"
                   exit="exit"
-                  custom={index} // For staggered animation
-                  layout // Smooth layout changes (e.g., on delete)
+                  custom={index}
+                  layout
                   className="border-b dark:border-slate-700/50 hover:bg-slate-50/50 dark:hover:bg-slate-700/40 transition-colors duration-150"
                 >
                 <TableCell className="py-3 px-4 align-top">
@@ -120,7 +116,6 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
                     {rule.condition} {String(rule.thresholdValue)}
                   </Badge>
                 </TableCell>
-                {/* <TableCell className="py-3 px-4 align-top text-sm">{String(rule.thresholdValue)}</TableCell> */}
                 <TableCell className="py-3 px-4 align-top">
                   <Badge variant="outline" className={cn("text-xs flex items-center w-fit", getSeverityStyles(rule.severity))}>
                     {getSeverityIcon(rule.severity)}

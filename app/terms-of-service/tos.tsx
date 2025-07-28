@@ -2,24 +2,26 @@
 'use client';
 
 import React from 'react';
-import { motion } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { motion, Variants } from 'framer-motion';
 import { ShieldCheck, FileText, AlertTriangle, UserCheck, ExternalLink, Users, Server, Settings, RotateCcw, XCircle, Scale, CheckCircle, Zap, Info, Mail, Home } from 'lucide-react';
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { useTheme } from 'next-themes';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 
-const pageVariants = {
+// FIX: Add explicit 'Variants' types
+const pageVariants: Variants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "circOut" } },
 };
 
-const sectionVariants = {
+const sectionVariants: Variants = {
   initial: { opacity: 0, y: 20 },
-  animate: (i: number) => ({ 
-    opacity: 1, 
-    y: 0, 
-    transition: { delay: i * 0.1 + 0.3, duration: 0.5, ease: "easeOut" } 
+  animate: (i: number) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.1 + 0.3, duration: 0.5, ease: "easeOut" }
   }),
 };
 
@@ -33,13 +35,13 @@ interface LegalSectionProps {
 
 const LegalSection: React.FC<LegalSectionProps> = ({ title, icon: Icon, children, customDelayIndex, id }) => {
   return (
-    <motion.section 
+    <motion.section
       id={id}
-      custom={customDelayIndex} 
-      variants={sectionVariants} 
-      initial="initial" 
+      custom={customDelayIndex}
+      variants={sectionVariants}
+      initial="initial"
       animate="animate"
-      className="mb-10 scroll-mt-20" // scroll-mt for sticky ToC offset
+      className="mb-10 scroll-mt-20"
     >
       <div className="flex items-center mb-4">
         <Icon className="h-7 w-7 mr-3 text-sky-600 dark:text-sky-500 flex-shrink-0" />
@@ -57,7 +59,6 @@ const LegalSection: React.FC<LegalSectionProps> = ({ title, icon: Icon, children
     </motion.section>
   );
 };
-
 
 export default function TermsOfServicePage() {
   const { theme } = useTheme();
@@ -78,15 +79,15 @@ export default function TermsOfServicePage() {
 
   return (
     <div className={`min-h-screen transition-colors duration-500 ${
-      theme === 'dark' 
-      ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-800' 
+      theme === 'dark'
+      ? 'bg-gradient-to-b from-slate-950 via-slate-900 to-slate-800'
       : 'bg-gradient-to-b from-slate-50 via-gray-100 to-slate-200'
     }`}>
       <motion.div
         variants={pageVariants} initial="initial" animate="animate"
         className="container mx-auto max-w-4xl px-4 sm:px-6 py-12 md:py-20"
       >
-        <motion.header 
+        <motion.header
           initial={{ opacity: 0, y: -30 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.1, duration: 0.5, ease: "circOut" } }}
           className="mb-12 text-center"
         >
@@ -99,9 +100,8 @@ export default function TermsOfServicePage() {
           </p>
         </motion.header>
 
-        {/* Sticky Table of Contents - Surprise Element */}
-        <motion.aside 
-            initial={{ opacity: 0, x: -20 }} 
+        <motion.aside
+            initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0, transition: { delay: 0.4, duration: 0.5 } }}
             className="sticky top-20 hidden lg:block float-left -ml-52 w-48 pr-4 text-sm"
         >
@@ -110,8 +110,8 @@ export default function TermsOfServicePage() {
                 <ul className="space-y-1.5">
                     {sections.map(section => (
                         <li key={section.id}>
-                            <a 
-                                href={`#${section.id}`} 
+                            <a
+                                href={`#${section.id}`}
                                 className="block text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-500 hover:translate-x-1 transition-all duration-150"
                             >
                                 {section.title}
@@ -122,8 +122,7 @@ export default function TermsOfServicePage() {
             </nav>
         </motion.aside>
 
-
-        <div className="lg:pl-4"> {/* Margin for sticky ToC space */}
+        <div className="lg:pl-4">
             <LegalSection id="introduction" title="1. Introduction & Acceptance of Terms" icon={FileText} customDelayIndex={0}>
               <p>Welcome to {APP_NAME}! These Terms of Service ("Terms") govern your access to and use of the {APP_NAME} platform, including any content, functionality, and services offered on or through {APP_NAME} (the "Service"), provided by {APP_AUTHOR} ("we," "us," or "our").</p>
               <p>Please read these Terms carefully before you start to use the Service. <strong>By using the Service, you accept and agree to be bound and abide by these Terms and our <Link href="/pp" className="text-sky-600 dark:text-sky-500 hover:underline">Privacy Policy</Link>, incorporated herein by reference.</strong> If you do not want to agree to these Terms or the Privacy Policy, you must not access or use the Service.</p>
@@ -158,8 +157,6 @@ export default function TermsOfServicePage() {
               <p>These Terms permit you to use the Service for your internal business use only. You must not reproduce, distribute, modify, create derivative works of, publicly display, publicly perform, republish, download, store, or transmit any of the material on our Service, except as incidentally necessary to use the service.</p>
             </LegalSection>
             
-            {/* ... Add more detailed sections with placeholder legal text ... */}
-
             <LegalSection id="data-privacy" title="6. Data & Privacy" icon={ShieldCheck} customDelayIndex={5}>
               <p>Your use of the Service is also governed by our <Link href="/pp" className="text-sky-600 dark:text-sky-500 hover:underline">Privacy Policy</Link>. By using the Service, you consent to all actions taken by us with respect to your information in compliance with the Privacy Policy. You are responsible for any data you input into the system and must ensure you have the necessary rights and consents for such data.</p>
             </LegalSection>

@@ -22,7 +22,7 @@ import {
   Loader2, Compass, Search, Clock3, Users, BarChart3, AirVent, Cloudy, CloudHail, Tornado, Briefcase
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription, DialogClose } from '@/components/ui/dialog';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Transition, TargetAndTransition, MotionProps } from 'framer-motion';
 import { useAppStore } from '@/stores/appStore';
 import { DataPoint } from '@/config/dataPoints';
 import { NodeData } from '@/app/DashboardData/dashboardInterfaces';
@@ -142,30 +142,44 @@ DynamicWeatherIcon.displayName = 'DynamicWeatherIcon';
 // Base Particle for Rain/Snow
 const Particle: React.FC<{char?: string, className?: string, initialY?: number, duration?: number, delay?: number, sizeClass?: string, xOffset?: string, sway?: boolean }> = React.memo(
   ({ char = "❄️", className = "text-white/70", initialY = -20, duration = 5, delay = 0, sizeClass="text-lg", xOffset = "0px", sway = false }) => {
-    const swayVariants = sway ? {
-        animate: {
-            x: [xOffset, `calc(${xOffset} + 10px)`, `calc(${xOffset} - 10px)`, xOffset],
-            transition: { duration: 4, repeat: Infinity, ease: "easeInOut" }
+    
+    const animateProps: TargetAndTransition = {
+        y: "105%", // Animate slightly past the bottom edge
+        opacity: [0, 0.8, 0.8, 0],
+    };
+    
+    const transitionProps: Transition = {
+        y: {
+            duration,
+            delay,
+            repeat: Infinity,
+            ease: 'linear',
+        },
+        opacity: {
+            duration,
+            delay,
+            repeat: Infinity,
+            ease: 'linear',
+            times: [0, 0.1, 0.9, 1]
         }
-    } : {};
+    };
+
+    if (sway) {
+        animateProps.x = [xOffset, `calc(${xOffset} + 10px)`, `calc(${xOffset} - 10px)`, xOffset];
+        transitionProps.x = {
+            duration: 4,
+            repeat: Infinity,
+            ease: "easeInOut"
+        };
+    }
 
     return (
         <motion.div
             className={cn("absolute", sizeClass, className)}
             style={{ x: xOffset, y: initialY }}
             initial={{ opacity: 0, y: initialY }}
-            animate={{ 
-                y: "105%", // Animate slightly past the bottom edge
-                opacity: [0, 0.8, 0.8, 0],
-                ...swayVariants.animate
-            }}
-            transition={{
-                duration: duration,
-                delay: delay,
-                repeat: Infinity,
-                ease: "linear",
-                opacity: { times: [0, 0.1, 0.9, 1], duration: duration, repeat: Infinity, ease: "linear" }
-            }}
+            animate={animateProps}
+            transition={transitionProps}
         >
             {char}
         </motion.div>
@@ -1014,7 +1028,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
 };
 
 // --- Animation Props ---
-const contentFadeProps = { initial: { opacity: 0, y: 5 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -5 }, transition: { duration: 0.25, ease: "easeInOut" } };
+const contentFadeProps: MotionProps = { initial: { opacity: 0, y: 5 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -5 }, transition: { duration: 0.25, ease: "easeInOut" } };
 
 // --- Config Storage ---
 export const loadWeatherCardConfigFromStorage = (): WeatherCardConfig => {

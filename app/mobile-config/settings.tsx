@@ -1,9 +1,11 @@
+// app/mobile-config/settings.tsx
 'use client';
 import React, { useState, useEffect } from 'react';
 import { Preferences } from '@capacitor/preferences';
-import { motion, AnimatePresence } from 'framer-motion';
+// FIX: Import the 'Variants' type
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { toast } from 'sonner';
-import { Save, Loader2, LinkIcon, CheckCircle, AlertCircle, ServerCog, Info, RotateCcw, Trash2, X, Undo2 } from 'lucide-react'; // Added Undo2
+import { Save, Loader2, LinkIcon, CheckCircle, AlertCircle, ServerCog, Info, RotateCcw, Trash2, X, Undo2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,13 +28,15 @@ import { APP_AUTHOR } from '@/config/constants';
 // MOCK CONSTANT if not available
 const APP_COPYRIGHT = "© 2024 Your Solar Company. All rights reserved.";
 
-const pageVariants = {
+// FIX: Explicitly type the variant objects with 'Variants'
+const pageVariants: Variants = {
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeInOut" } },
   exit: { opacity: 0, y: -20, transition: { duration: 0.3, ease: "easeInOut" } },
 };
 
-const itemVariants = (delay: number = 0.1) => ({
+// FIX: Explicitly set the return type of the function to 'Variants'
+const itemVariants = (delay: number = 0.1): Variants => ({
   initial: { opacity: 0, y: 15 },
   animate: (i: number) => ({
     opacity: 1,
@@ -41,13 +45,13 @@ const itemVariants = (delay: number = 0.1) => ({
   }),
 });
 
-const buttonGroupVariants = {
+const buttonGroupVariants: Variants = {
     initial: { opacity: 0, x: -10 },
     animate: { opacity: 1, x: 0, transition: { staggerChildren: 0.07, delayChildren: 0.5, duration: 0.3 } },
     exit: { opacity: 0, x: 10 }
 }
 
-const iconButtonVariant = {
+const iconButtonVariant: Variants = {
     initial: { opacity: 0, scale: 0.5 },
     animate: { opacity: 1, scale: 1 },
     exit: { opacity: 0, scale: 0.5 }

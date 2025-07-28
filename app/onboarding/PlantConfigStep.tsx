@@ -4,7 +4,8 @@
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { motion, AnimatePresence } from 'framer-motion';
+// FIX: Import 'Variants'
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import {
   Building2, MapPin, Tag, Bolt, Globe, Settings2, Share2, Server, WifiOff, FileText,
   Loader2, CheckCircle2, XCircle, RefreshCw, AlertCircle, ShieldQuestion,
@@ -19,8 +20,8 @@ import { useOnboarding } from './OnboardingContext';
 import { APP_NAME, PLANT_CAPACITY, PLANT_LOCATION, PLANT_NAME, PLANT_TYPE } from '@/config/constants';
 import { cn } from '@/lib/utils';
 
-// --- Framer Motion Variants ---
-const staggeredContainerVariants = {
+// --- Framer Motion Variants (FIXED with explicit 'Variants' type) ---
+const staggeredContainerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -32,7 +33,7 @@ const staggeredContainerVariants = {
   exit: { opacity: 0, transition: { duration: 0.2 } }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { opacity: 0, y: 15, filter: 'blur(3px)' },
   visible: { 
     opacity: 1, y: 0, filter: 'blur(0px)', 
@@ -40,7 +41,7 @@ const itemVariants = {
   },
 };
 
-const sectionTitleVariants = {
+const sectionTitleVariants: Variants = {
   hidden: { opacity: 0, y: 10, scale: 0.98 },
   visible: { 
     opacity: 1, y: 0, scale: 1,
@@ -48,13 +49,13 @@ const sectionTitleVariants = {
   },
 };
 
-const statusIconVariants = {
+const statusIconVariants: Variants = {
   initial: { scale: 0.5, opacity: 0, rotate: -45 },
   animate: { scale: 1, opacity: 1, rotate: 0, transition: { type: 'spring', stiffness: 200, damping: 12 } },
   exit: { scale: 0.5, opacity: 0, rotate: 45, transition: { duration: 0.2 } }
 };
 
-const resultMessageVariants = {
+const resultMessageVariants: Variants = {
   initial: { opacity: 0, y: 5 },
   animate: { opacity: 1, y: 0, transition: { duration: 0.3, ease:'circOut', delay: 0.1 } },
   exit: { opacity: 0, y: -5, transition: { duration: 0.2, ease: 'circIn' } }
@@ -84,7 +85,7 @@ export default function PlantConfigStep() {
       opcUaEndpointOfflineIP: onboardingData.opcUaEndpointOffline?.split(':')[0] || '192.168.1.10',
       opcUaEndpointOfflinePort: Number(onboardingData.opcUaEndpointOffline?.split(':')[1]) || 4840,
       opcUaEndpointOnlineIP: onboardingData.opcUaEndpointOnline?.split(':')[0] || '',
-      opcUaEndpointOnlinePort: Number(onboardingData.opcUaEndpointOnline?.split(':')[1]) || undefined,
+      opcUaEndpointOnlinePort: onboardingData.opcUaEndpointOnline ? Number(onboardingData.opcUaEndpointOnline?.split(':')[1]) : undefined,
       appName: onboardingData.appName || APP_NAME,
     },
   });
@@ -366,7 +367,7 @@ export default function PlantConfigStep() {
                     </AnimatePresence>
                     <AnimatePresence mode="wait">
                          <motion.p
-                            key={`offline-msg-${testStates.offline.resultMessage?.substring(0,30)}`} // Use a bit more of the message for the key
+                            key={`offline-msg-${testStates.offline.resultMessage?.substring(0,30)}`}
                             variants={resultMessageVariants}
                             initial="initial" animate="animate" exit="exit"
                             className={cn(
