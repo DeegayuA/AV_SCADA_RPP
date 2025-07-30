@@ -59,7 +59,7 @@ export const sldLayouts: Record<string, SLDLayout> = {
             { dataPointId: 'work-mode-status', targetProperty: 'status' },
             { dataPointId: 'input-power-pv1', targetProperty: 'powerOutput' },
           ],
-        } as GeneratorNodeData,
+        } as unknown as GeneratorNodeData,
       },
       {
         id: 'wind-inverter-1',
@@ -80,7 +80,7 @@ export const sldLayouts: Record<string, SLDLayout> = {
             { dataPointId: 'pac-l-inverter-power', targetProperty: 'powerOutput' },
             { dataPointId: 'inverter-internal-temperature', targetProperty: 'temperature' },
           ],
-        } as InverterNodeData,
+        } as unknown as InverterNodeData,
       },
       // Existing grid components
       {
