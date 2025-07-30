@@ -1,23 +1,24 @@
-// components/sld/nodes/WindTurbineNode.tsx
 import React, { memo, useMemo, useState, useEffect, useRef } from 'react';
 import { NodeProps, Handle, Position, Node } from 'reactflow';
 import { motion } from 'framer-motion';
-import { GeneratorNodeData, CustomNodeType, DataPoint } from '@/types/sld';
-import { useAppStore } from '@/stores/appStore';
-import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedStyle } from './nodeUtils';
-import { WindIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon } from 'lucide-react';
+import { GeneratorNodeData, CustomNodeType, DataPoint, SLDElementType } from '@/types/sld';
+import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
+import { applyValueMapping, formatDisplayValue, getNodeAppearanceFromState } from './nodeUtils';
+import { WindIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon, ActivityIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-// --- START: UPDATED WindTurbineGraphic ---
-// Redesigned SVG graphic with 3 symmetrical, correctly centered blades.
-const WindTurbineGraphic = ({ className, isSpinning }: { className?: string; isSpinning?: boolean }) => {
+type StandardNodeState = 'ENERGIZED' | 'STANDBY' | 'OFFLINE' | 'FAULT' | 'WARNING' | 'UNKNOWN' | 'NOMINAL';
+
+const WindTurbineGraphic = ({ className, powerRatio }: { className?: string; powerRatio: number }) => {
+  const isSpinning = powerRatio > 0;
+  const duration = isSpinning ? Math.max(0.5, 4 - (powerRatio * 3.5)) : 0;
+
   const variants = {
     spinning: { rotate: 360 },
     still: { rotate: 0 },
   };
-  const transition = isSpinning ? { repeat: Infinity, ease: 'linear' as const, duration: 4 } : { duration: 0.5 };
+  const transition = isSpinning ? { repeat: Infinity, ease: 'linear' as const, duration } : { duration: 0.5 };
 
-  // A single, clean, symmetrical path for a blade, starting from the center hub.
   const bladePath = "M 12 10.5 C 10 9, 10 3, 12 2 C 14 3, 14 9, 12 10.5 Z";
 
   return (
@@ -32,218 +33,212 @@ const WindTurbineGraphic = ({ className, isSpinning }: { className?: string; isS
       width="32"
       height="32"
     >
-      {/* Static tower (remains stroked) */}
       <path d="M12 10.5V22" />
       <path d="M9 22h6" />
-
-      {/* Rotating blades group */}
       <motion.g
         style={{ transformOrigin: '12px 10.5px' }}
         variants={variants}
         animate={isSpinning ? "spinning" : "still"}
         transition={transition}
       >
-        {/* Use the same blade path, but rotate it for the other two blades */}
-        {/* The paths are filled to look solid and have an inherited stroke for definition */}
         <path d={bladePath} fill="currentColor" />
         <path d={bladePath} fill="currentColor" transform="rotate(120, 12, 10.5)" />
         <path d={bladePath} fill="currentColor" transform="rotate(240, 12, 10.5)" />
       </motion.g>
-
-       {/* Central hub (drawn on top of blades) */}
       <circle cx="12" cy="10.5" r="1.5" fill="currentColor" />
     </motion.svg>
   );
 };
-// --- END: UPDATED WindTurbineGraphic ---
-
 
 const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<GeneratorNodeData>, 'position' | 'width' | 'height' | 'dragging' | 'zIndex'>> = (props) => {
   const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props;
   const safePosition = position ?? { x: 0, y: 0 };
-  const xPos = safePosition.x;
-  const yPos = safePosition.y;
-  const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
+  const { isEditMode, currentUser, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
     setSelectedElementForDetails: state.setSelectedElementForDetails,
-    opcUaNodeValues: state.opcUaNodeValues,
     dataPoints: state.dataPoints,
   }));
 
-  const isNodeEditable = useMemo(() =>
-    isEditMode && (currentUser?.role === 'admin'),
-    [isEditMode, currentUser]
-  );
+  const isNodeEditable = useMemo(() => isEditMode && (currentUser?.role === 'admin'), [isEditMode, currentUser]);
 
-  const processedStatus = useMemo(() => {
-    const statusLink = data.dataPointLinks?.find(link => link.targetProperty === 'status');
-    if (statusLink && dataPoints && dataPoints[statusLink.dataPointId] && opcUaNodeValues) {
-      const rawValue = getDataPointValue(statusLink.dataPointId, dataPoints, opcUaNodeValues);
-      return applyValueMapping(rawValue, statusLink);
+  const statusLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'status'), [data.dataPointLinks]);
+  const statusDpConfig = useMemo(() => statusLink ? dataPoints[statusLink.dataPointId] : undefined, [statusLink, dataPoints]);
+  const statusOpcUaNodeId = useMemo(() => statusDpConfig?.nodeId, [statusDpConfig]);
+  const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
+
+  const powerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput' || link.targetProperty === 'activePower'), [data.dataPointLinks]);
+  const powerDpConfig = useMemo(() => powerLink ? dataPoints[powerLink.dataPointId] : undefined, [powerLink, dataPoints]);
+  const powerOpcUaNodeId = useMemo(() => powerDpConfig?.nodeId, [powerDpConfig]);
+  const reactivePowerValue = useOpcUaNodeValue(powerOpcUaNodeId);
+
+  const processedStatus = useMemo<string>(() => {
+    if (statusLink && statusDpConfig && reactiveStatusValue !== undefined) {
+      return String(applyValueMapping(reactiveStatusValue, statusLink)).toLowerCase();
     }
-    return data.status || 'offline';
-  }, [data.dataPointLinks, data.status, opcUaNodeValues, dataPoints]);
+    return String(data.status || 'offline').toLowerCase();
+  }, [statusLink, statusDpConfig, reactiveStatusValue, data.status]);
 
-  const powerOutput = useMemo(() => {
-    const powerLink = data.dataPointLinks?.find(
-      link => link.targetProperty === 'powerOutput' || link.targetProperty === 'activePower'
-    );
-    if (powerLink && dataPoints && dataPoints[powerLink.dataPointId] && opcUaNodeValues) {
-      const dpMeta = dataPoints[powerLink.dataPointId];
-      const rawValue = getDataPointValue(powerLink.dataPointId, dataPoints, opcUaNodeValues);
-      const mappedValue = applyValueMapping(rawValue, powerLink);
-      return formatDisplayValue(mappedValue, powerLink.format, dpMeta?.dataType);
+  const currentNumericPower = useMemo<number | undefined>(() => {
+    if (powerLink && powerDpConfig && reactivePowerValue !== undefined) {
+      let valueToProcess: any = reactivePowerValue;
+      if (typeof valueToProcess === 'number' && typeof powerDpConfig.factor === 'number') {
+        valueToProcess *= powerDpConfig.factor;
+      }
+      const mapped = applyValueMapping(valueToProcess, powerLink);
+      if (typeof mapped === 'number') return mapped;
+      if (typeof mapped === 'string') {
+        const p = parseFloat(mapped.replace(/[^\d.-]/g, ''));
+        return isNaN(p) ? undefined : p;
+      }
     }
-    return data.config?.ratingKVA ? `${data.config.ratingKVA} kVA (rated)` : 'N/A';
-  }, [data.dataPointLinks, data.config?.ratingKVA, opcUaNodeValues, dataPoints]);
+    return undefined;
+  }, [powerLink, powerDpConfig, reactivePowerValue]);
 
-  interface StatusInfo {
-    StatusIcon: React.ElementType;
-    statusText: string;
-    statusClasses: string;
-    animationClass: string;
-  }
-
-  const { StatusIcon, statusText, statusClasses, animationClass } = useMemo<StatusInfo>((): StatusInfo => {
-    let icon = CogIcon;
-    let text = String(processedStatus).toUpperCase();
-    let sClasses = 'border-neutral-400 dark:border-neutral-600 bg-muted/20 text-muted-foreground';
-    let animationClass = '';
-
-    switch (String(processedStatus).toLowerCase()) {
-      case 'fault': case 'alarm':
-        icon = XCircleIcon; text = 'FAULT';
-        sClasses = 'border-destructive bg-destructive/10 text-destructive'; break;
-      case 'warning':
-        icon = AlertTriangleIcon; text = 'WARNING';
-        sClasses = 'border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'; break;
-      case 'running': case 'producing': case 'online':
-        icon = CheckCircleIcon; text = (processedStatus === 'producing' || processedStatus === 'online') ? "PROD" : "RUN";
-        sClasses = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400';
-        animationClass = 'animate-pulse'; break;
-      case 'starting':
-        icon = CogIcon; text = 'STARTING';
-        sClasses = 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400';
-        animationClass = 'animate-spin'; break;
-      case 'stopping':
-        icon = CogIcon; text = 'STOPPING';
-        sClasses = 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400';
-        animationClass = 'animate-spin animation-direction-reverse'; break;
-      case 'offline': case 'standby':
-        icon = PowerIcon; text = String(processedStatus).toUpperCase();
-        sClasses = 'border-neutral-500 bg-neutral-500/10 text-neutral-500 opacity-80'; break;
-      default:
-        icon = WindIcon; text = text || 'UNKNOWN';
-        sClasses = 'border-gray-400 bg-gray-400/10 text-gray-500'; break;
+  const ratedPowerInWatts = useMemo(() => {
+    const ratedInKVA = data.config?.ratingKVA;
+    if (typeof ratedInKVA === 'number') {
+        // Assuming power factor of 0.9 for KVA to KW conversion, then to W
+        return ratedInKVA * 0.9 * 1000;
     }
-    return { StatusIcon: icon, statusText: text, statusClasses: sClasses, animationClass };
+    return undefined;
+  }, [data.config?.ratingKVA]);
+
+  const isDeviceActive = useMemo<boolean>(() => {
+      const activeStatuses = ['running', 'producing', 'online', 'active', 'energized', 'nominal'];
+      return activeStatuses.includes(processedStatus);
   }, [processedStatus]);
 
-  const derivedNodeStyles = useMemo(() =>
-    getDerivedStyle(data, dataPoints, opcUaNodeValues),
-    [data, opcUaNodeValues, dataPoints]
-  );
+  const standardNodeState = useMemo<StandardNodeState>(() => {
+      if (processedStatus.includes('fault') || processedStatus.includes('alarm')) return 'FAULT';
+      if (processedStatus.includes('warning')) return 'WARNING';
+      if (processedStatus.includes('offline') || processedStatus === 'off') return 'OFFLINE';
+      if (processedStatus.includes('standby') || processedStatus.includes('idle')) return 'STANDBY';
+      if (isDeviceActive) return 'ENERGIZED';
+      return 'UNKNOWN';
+  }, [processedStatus, isDeviceActive]);
 
-  const isTurbineRunning = useMemo(() =>
-    ['running', 'producing', 'online'].includes(String(processedStatus).toLowerCase()),
-    [processedStatus]
-  );
+  const appearance = useMemo(() => getNodeAppearanceFromState(standardNodeState, SLDElementType.Generator), [standardNodeState]);
 
-  const componentStyle = useMemo(() => {
-    const style: React.CSSProperties = {};
-    if (derivedNodeStyles.borderColor) {
-      style.borderColor = derivedNodeStyles.borderColor;
+  const powerRatio = useMemo<number>(() => {
+    if (ratedPowerInWatts && ratedPowerInWatts > 0 && currentNumericPower !== undefined && currentNumericPower >= 0) {
+        return Math.min(1, Math.max(0, currentNumericPower / ratedPowerInWatts));
     }
-    if (derivedNodeStyles.opacity !== undefined) {
-      style.opacity = derivedNodeStyles.opacity;
+    return isDeviceActive ? 0.1 : 0; // Default to a low ratio if active but no power data
+  }, [currentNumericPower, ratedPowerInWatts, isDeviceActive]);
+
+  const formattedPowerOutput = useMemo<string>(() => {
+    if (currentNumericPower === undefined) {
+        return ratedPowerInWatts ? `${(ratedPowerInWatts / 1000).toFixed(0)} kW (Rated)` : 'N/A';
     }
-    return style;
-  }, [derivedNodeStyles.borderColor, derivedNodeStyles.opacity]);
+    const formatOptions = { type: 'number' as const, precision: 1, suffix: ' kW' };
+    return formatDisplayValue(currentNumericPower / 1000, formatOptions, powerDpConfig?.dataType);
+  }, [currentNumericPower, ratedPowerInWatts, powerDpConfig?.dataType]);
 
-  const contentBgColor = derivedNodeStyles.backgroundColor || statusClasses.split(' ')[1];
-  const contentTextColor = derivedNodeStyles.color || statusClasses.split(' ')[2];
+  const { StatusIcon, statusText } = useMemo(() => {
+    let icon: React.ElementType = CogIcon;
+    let text = standardNodeState.charAt(0) + standardNodeState.slice(1).toLowerCase();
 
-  const mainDivClasses = `
-    sld-node wind-turbine-node group custom-node-hover w-[85px] h-[90px] rounded-lg shadow-lg
-    flex flex-col items-center justify-between
-    border-2 ${derivedNodeStyles.borderColor ? '' : statusClasses.split(' ')[0]}
-    ${isNodeEditable ? 'cursor-grab' : 'cursor-default'}
-    ${animationClass && !isTurbineRunning ? animationClass : ''}
-  `;
+    switch (standardNodeState) {
+        case 'FAULT': icon = XCircleIcon; text = 'Fault'; break;
+        case 'WARNING': icon = AlertTriangleIcon; text = 'Warning'; break;
+        case 'ENERGIZED': icon = CheckCircleIcon; text = 'Producing'; break;
+        case 'STANDBY': icon = PowerIcon; text = 'Standby'; break;
+        case 'OFFLINE': icon = PowerIcon; text = 'Offline'; break;
+        default: icon = WindIcon; text = 'Unknown'; break;
+    }
+    return { StatusIcon: icon, statusText: text };
+  }, [standardNodeState]);
 
   const [isRecentStatusChange, setIsRecentStatusChange] = useState(false);
-  const prevStatusRef = useRef(processedStatus);
+  const prevStatusRef = useRef(standardNodeState);
 
   useEffect(() => {
-    if (prevStatusRef.current !== processedStatus) {
+    if (prevStatusRef.current !== standardNodeState) {
       setIsRecentStatusChange(true);
-      const timer = setTimeout(() => setIsRecentStatusChange(false), 700);
-      prevStatusRef.current = processedStatus;
+      const timer = setTimeout(() => setIsRecentStatusChange(false), 1300);
+      prevStatusRef.current = standardNodeState;
       return () => clearTimeout(timer);
     }
-  }, [processedStatus]);
+  }, [standardNodeState]);
+
+  const sldAccentVar = 'var(--sld-color-accent)';
+
+  const nodeMainStyle = useMemo((): React.CSSProperties => {
+      let currentBoxShadow = `0 0.5px 1px rgba(0,0,0,0.02), 0 0.25px 0.5px rgba(0,0,0,0.01)`;
+      let borderColorActual = selected ? sldAccentVar : appearance.borderColorVar;
+
+      if (isRecentStatusChange && appearance.glowColorVar && appearance.glowColorVar !== 'transparent') {
+          currentBoxShadow = `0 0 8px 2px ${appearance.glowColorVar.replace(')', ', 0.45)').replace('var(', 'rgba(')}`;
+      }
+      if (selected) {
+          borderColorActual = sldAccentVar;
+          currentBoxShadow = `0 0 0 1.5px ${borderColorActual}, 0 0 8px 1px ${borderColorActual.replace(')', ', 0.4)').replace('var(', 'rgba(')}, ${currentBoxShadow}`;
+      }
+
+      return {
+          borderColor: borderColorActual,
+          borderWidth: '1.5px',
+          boxShadow: currentBoxShadow,
+          width: width ? `${width}px` : '85px',
+          height: height ? `${height}px` : '90px',
+      };
+  }, [appearance, selected, isRecentStatusChange, sldAccentVar, width, height]);
+
+  const fullNodeObjectForDetails = useMemo((): CustomNodeType => ({
+      id, type: type || SLDElementType.Generator,
+      position: safePosition,
+      data, selected: selected || false, dragging: dragging || false, zIndex: zIndex || 0,
+      width: width || 85, height: height || 90,
+      connectable: isConnectable || false,
+  }), [id, type, safePosition, data, selected, dragging, zIndex, width, height, isConnectable]);
 
   return (
     <motion.div
-      className={mainDivClasses}
-      style={componentStyle as any}
-      initial="initial"
-      transition={{ type: 'spring', stiffness: 300, damping: 12 }}
+      className={`sld-node wind-turbine-node group custom-node-hover rounded-lg flex flex-col items-center justify-between transition-all duration-300`}
+      style={{ ...nodeMainStyle, background: `var(--sld-color-node-bg)` }}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
     >
       {!isEditMode && (
         <Button
-          variant="ghost"
-          size="icon"
+          variant="ghost" size="icon"
           className="absolute top-0.5 right-0.5 h-5 w-5 rounded-full z-20 bg-background/60 hover:bg-secondary/80 p-0"
-          onClick={(e) => {
-            e.stopPropagation();
-            const fullNodeObject: CustomNodeType = {
-                id, type,
-                position: { x: xPos, y: yPos },
-                data, selected, dragging, zIndex,
-                width: width === null ? undefined : width,
-                height: height === null ? undefined : height,
-                connectable: isConnectable,
-            };
-            setSelectedElementForDetails(fullNodeObject);
-          }}
+          onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}
           title="View Details"
         >
           <InfoIcon className="h-3 w-3 text-primary/80" />
         </Button>
       )}
 
-      <Handle type="source" position={Position.Bottom} id="bottom_out" isConnectable={isConnectable} className="sld-handle-style" title="Output"/>
-      <Handle type="target" position={Position.Top} id="top_control_in" isConnectable={isConnectable} className="sld-handle-style" title="Control"/>
+      <Handle type="source" position={Position.Bottom} id="output" isConnectable={isConnectable} className="sld-handle-style" title="DC Output" />
+      <Handle type="target" position={Position.Top} id="control" isConnectable={isConnectable} className="sld-handle-style" title="Control Input"/>
 
       <div
-        className={`node-content-wrapper flex flex-col items-center justify-between p-2 w-full h-full rounded-md
-                    ${contentBgColor} ${contentTextColor}
-                    bg-card dark:bg-neutral-800
-                    ${isRecentStatusChange ? 'animate-status-highlight' : ''}`}
-        style={{
-          backgroundColor: derivedNodeStyles.backgroundColor || undefined,
-          color: derivedNodeStyles.color || undefined,
-        }}
+        className={`flex flex-col items-center justify-between p-1 w-full h-full rounded-md transition-colors duration-300`}
+        style={{ color: appearance.textColorVar }}
       >
         <p className="text-[9px] font-semibold text-center truncate w-full" title={data.label}>
           {data.label}
         </p>
 
         <div className="my-0.5 pointer-events-none flex items-center justify-center">
-          <WindTurbineGraphic className="transition-colors" isSpinning={isTurbineRunning} />
+          <WindTurbineGraphic className="transition-colors" powerRatio={powerRatio} />
         </div>
 
-        <div className="flex items-center justify-center gap-1 mt-0.5">
-          <StatusIcon size={10} className={`${animationClass && (StatusIcon === CogIcon || StatusIcon === XCircleIcon || StatusIcon === AlertTriangleIcon || StatusIcon === PowerIcon) ? animationClass : ''}`} />
-          <p className="text-[9px] font-medium text-center truncate leading-tight">
-            {statusText}
-          </p>
+        <div className="flex flex-col items-center justify-center gap-0 mt-0.5 w-full">
+            <div className="flex items-center gap-1" style={{ color: appearance.statusTextColorVar }}>
+              <StatusIcon size={10} />
+              <p className="text-[9px] font-medium text-center truncate leading-tight">
+                {statusText}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] font-semibold" title={`Power: ${formattedPowerOutput}`}>
+                <ActivityIcon size={8} className="opacity-80"/>
+                <p>{formattedPowerOutput}</p>
+            </div>
         </div>
-        <p className="text-[9px] leading-none" title={`Power: ${powerOutput}`}>
-            {powerOutput}
-        </p>
       </div>
     </motion.div>
   );

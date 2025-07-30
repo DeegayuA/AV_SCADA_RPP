@@ -30,9 +30,9 @@ import {
     TextLabelNodeData, TextNodeStyleConfig, ContactorNodeData, InverterNodeData, InverterType, PanelNodeData, BreakerNodeData,
     MeterNodeData, BatteryNodeData, GridNodeData, LoadNodeData, BusbarNodeData, TransformerNodeData,
     GeneratorNodeData, PLCNodeData, SensorNodeData, GenericDeviceNodeData, IsolatorNodeData, ATSNodeData,
-    JunctionBoxNodeData, FuseNodeData, GaugeNodeData, BaseNodeData, SwitchNodeData, SwitchNodeConfig, // Added SwitchNodeConfig
-    DataLabelNodeData, // Added DataLabelNodeData
-    AnimationFlowConfig as EdgeAnimationFlowConfig, GlobalSLDAnimationSettings // Kept EdgeAnimationFlowConfig
+    JunctionBoxNodeData, FuseNodeData, GaugeNodeData, BaseNodeData, SwitchNodeData, SwitchNodeConfig, WindTurbineNodeData, WindInverterNodeData,
+    DataLabelNodeData,
+    AnimationFlowConfig as EdgeAnimationFlowConfig, GlobalSLDAnimationSettings
 } from '@/types/sld';
 import { useAppStore } from '@/stores/appStore';
 import { ComboboxOption, SearchableSelect } from './SearchableSelect';
@@ -58,6 +58,15 @@ const nodeSpecificTargetProperties: Partial<Record<SLDElementType, TargetPropert
         { value: 'inverter.powerOutput', label: 'Inverter Power Output', description: 'Active power output (numeric, typically kW).', inputHint: "e.g., 5.2 (for 5.2 kW)", valueType: 'number'}, 
         { value: 'temperature', label: 'Inverter Temperature', description: 'Internal temperature (numeric, typically °C).', inputHint: "e.g., 45", valueType: 'number'},
     ], 
+    [SLDElementType.WindInverter]: [
+        { value: 'windInverter.powerOutput', label: 'Wind Inverter Power Output', description: 'Active power output from wind inverter (numeric, typically kW).', inputHint: "e.g., 3.5 (for 3.5 kW)", valueType: 'number' },
+        { value: 'temperature', label: 'Wind Inverter Temperature', description: 'Internal temperature (numeric, typically °C).', inputHint: "e.g., 40", valueType: 'number' },
+    ],
+    [SLDElementType.WindTurbine]: [
+        { value: 'windTurbine.powerOutput', label: 'Wind Turbine Power Output', description: 'Active power output from wind turbine (numeric, typically kW).', inputHint: "e.g., 1500", valueType: 'number' },
+        { value: 'windTurbine.windSpeed', label: 'Wind Speed', description: 'Current wind speed at turbine location (numeric, typically m/s).', inputHint: "e.g., 7.5", valueType: 'number' },
+        { value: 'windTurbine.status', label: 'Turbine Status', description: 'Status string for turbine (e.g., "Running", "Fault", "Idle").', inputHint: "e.g., Running", valueType: 'string' },
+    ],
     [SLDElementType.Breaker]: [ { value: 'breaker.isOpen', label: 'Breaker Open State', description: 'Boolean: true if breaker is open/tripped, false if closed.', inputHint: "true (open) or false (closed)", valueType: 'boolean'}, ], 
     [SLDElementType.Contactor]: [ { value: 'contactor.isClosed', label: 'Contactor Closed State', description: 'Boolean: true if contactor is closed/energized, false if open/de-energized.', inputHint: "true (closed) or false (open)", valueType: 'boolean'}, ], 
     [SLDElementType.Battery]: [
@@ -105,17 +114,30 @@ const getElementTypeName = (element: CustomNodeType | CustomFlowEdge | null): st
     if (isNode(element) && element.data) {
         const elementType = element.data.elementType;
         const nameMap: Partial<Record<SLDElementType, string>> = {
-            [SLDElementType.TextLabel]: 'Text Label', [SLDElementType.DataLabel]: 'Data Label',
-            [SLDElementType.Contactor]: 'Contactor', [SLDElementType.Inverter]: 'Inverter',
-            [SLDElementType.Panel]: 'PV Panel Array', [SLDElementType.Breaker]: 'Breaker/Switch',
-            [SLDElementType.Meter]: 'Meter', [SLDElementType.Battery]: 'Battery System',
-            [SLDElementType.Grid]: 'Grid Connection', [SLDElementType.Load]: 'Electrical Load',
-            [SLDElementType.Busbar]: 'Busbar', [SLDElementType.Transformer]: 'Transformer',
-            [SLDElementType.Generator]: 'Generator', [SLDElementType.PLC]: 'PLC',
-            [SLDElementType.Sensor]: 'Sensor', [SLDElementType.GenericDevice]: 'Generic Device',
-            [SLDElementType.Isolator]: 'Isolator', [SLDElementType.ATS]: 'ATS',
-            [SLDElementType.JunctionBox]: 'Junction Box', [SLDElementType.Fuse]: 'Fuse',
-            [SLDElementType.Gauge]: 'Gauge Display', [SLDElementType.Switch]: 'Switch'
+            [SLDElementType.TextLabel]: 'Text Label',
+            [SLDElementType.DataLabel]: 'Data Label',
+            [SLDElementType.Contactor]: 'Contactor',
+            [SLDElementType.Inverter]: 'Inverter',
+            [SLDElementType.Panel]: 'PV Panel Array',
+            [SLDElementType.Breaker]: 'Breaker/Switch',
+            [SLDElementType.Meter]: 'Meter',
+            [SLDElementType.Battery]: 'Battery System',
+            [SLDElementType.Grid]: 'Grid Connection',
+            [SLDElementType.Load]: 'Electrical Load',
+            [SLDElementType.Busbar]: 'Busbar',
+            [SLDElementType.Transformer]: 'Transformer',
+            [SLDElementType.Generator]: 'Generator',
+            [SLDElementType.PLC]: 'PLC',
+            [SLDElementType.Sensor]: 'Sensor',
+            [SLDElementType.GenericDevice]: 'Generic Device',
+            [SLDElementType.Isolator]: 'Isolator',
+            [SLDElementType.ATS]: 'ATS',
+            [SLDElementType.JunctionBox]: 'Junction Box',
+            [SLDElementType.Fuse]: 'Fuse',
+            [SLDElementType.Gauge]: 'Gauge Display',
+            [SLDElementType.Switch]: 'Switch',
+            [SLDElementType.WindInverter]: 'Wind Inverter',
+            [SLDElementType.WindTurbine]: 'Wind Turbine'
         };
         if (elementType && nameMap[elementType]) { return nameMap[elementType]!; }
         const typeName = String(elementType || 'Unknown Node');
@@ -784,7 +806,7 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                         </ConfigCard> 
                                     )}
 
-                                    {isNode(selectedElement) && currentElementNodeSLDType === SLDElementType.Inverter && (
+                                    {isNode(selectedElement) && (currentElementNodeSLDType === SLDElementType.Inverter || currentElementNodeSLDType === SLDElementType.WindInverter) && (
                                         <ConfigCard title="Inverter Configuration" icon={SquareFunction}>
                                             <GridSection cols={2}>
                                                 <FieldInput type="number" id="config.ratedPower" name="config.ratedPower" label="Rated Power (kW)" value={(formData.config as InverterNodeData['config'])?.ratedPower ?? ''} onChange={handleInputChange} placeholder="e.g., 5" step="0.1" min="0" info="Nominal rated power of the inverter in kilowatts."/>
@@ -885,6 +907,14 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                                 <div className="space-y-1"> <Label htmlFor="config.fuelType" className="text-xs">Fuel Type</Label> <Select value={(formData.config as GeneratorNodeData['config'])?.fuelType || ''} onValueChange={(val) => handleSelectChange("config.fuelType", val === '_none_' ? undefined : val)}> <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select fuel type..." /></SelectTrigger> <SelectContent><SelectItem value="_none_" className="text-xs text-muted-foreground italic">Other/Not Specified</SelectItem><SelectItem value="Diesel" className="text-xs">Diesel</SelectItem><SelectItem value="Gas" className="text-xs">Natural Gas</SelectItem><SelectItem value="Biogas" className="text-xs">Biogas</SelectItem><SelectItem value="Hydro" className="text-xs">Hydro Turbine</SelectItem><SelectItem value="Wind" className="text-xs">Wind Turbine</SelectItem><SelectItem value="SolarPV" className="text-xs">Solar PV (as source, distinct from Panel array component)</SelectItem></SelectContent> </Select> </div>
                                                 <FieldInput id="config.ratingKVA" name="config.ratingKVA" label="Rating (kVA/kW)" value={(formData.config as GeneratorNodeData['config'])?.ratingKVA ?? ''} onChange={handleInputChange} placeholder="e.g., 500 kVA"/>
                                                 <FieldInput id="config.outputVoltage" name="config.outputVoltage" label="Output Voltage" value={(formData.config as GeneratorNodeData['config'])?.outputVoltage ?? ''} onChange={handleInputChange} placeholder="e.g., 400V"/>
+                                            </GridSection>
+                                        </ConfigCard>
+                                    )}
+
+                                    {isNode(selectedElement) && currentElementNodeSLDType === SLDElementType.WindTurbine && (
+                                        <ConfigCard title="Wind Turbine Configuration" icon={Wind}>
+                                            <GridSection cols={2}>
+                                                <FieldInput type="number" id="config.ratingKVA" name="config.ratingKVA" label="Rating (kVA)" value={(formData.config as WindTurbineNodeData['config'])?.ratingKVA ?? ''} onChange={handleInputChange} placeholder="e.g., 1500" min="0" info="Nominal power rating of the wind turbine in kilovolt-amperes."/>
                                             </GridSection>
                                         </ConfigCard>
                                     )}
