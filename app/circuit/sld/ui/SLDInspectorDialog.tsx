@@ -58,6 +58,15 @@ const nodeSpecificTargetProperties: Partial<Record<SLDElementType, TargetPropert
         { value: 'inverter.powerOutput', label: 'Inverter Power Output', description: 'Active power output (numeric, typically kW).', inputHint: "e.g., 5.2 (for 5.2 kW)", valueType: 'number'}, 
         { value: 'temperature', label: 'Inverter Temperature', description: 'Internal temperature (numeric, typically °C).', inputHint: "e.g., 45", valueType: 'number'},
     ], 
+    [SLDElementType.WindInverter]: [
+        { value: 'windInverter.powerOutput', label: 'Wind Inverter Power Output', description: 'Active power output from wind inverter (numeric, typically kW).', inputHint: "e.g., 3.5 (for 3.5 kW)", valueType: 'number' },
+        { value: 'temperature', label: 'Wind Inverter Temperature', description: 'Internal temperature (numeric, typically °C).', inputHint: "e.g., 40", valueType: 'number' },
+    ],
+    [SLDElementType.WindTurbine]: [
+        { value: 'windTurbine.powerOutput', label: 'Wind Turbine Power Output', description: 'Active power output from wind turbine (numeric, typically kW).', inputHint: "e.g., 1500", valueType: 'number' },
+        { value: 'windTurbine.windSpeed', label: 'Wind Speed', description: 'Current wind speed at turbine location (numeric, typically m/s).', inputHint: "e.g., 7.5", valueType: 'number' },
+        { value: 'windTurbine.status', label: 'Turbine Status', description: 'Status string for turbine (e.g., "Running", "Fault", "Idle").', inputHint: "e.g., Running", valueType: 'string' },
+    ],
     [SLDElementType.Breaker]: [ { value: 'breaker.isOpen', label: 'Breaker Open State', description: 'Boolean: true if breaker is open/tripped, false if closed.', inputHint: "true (open) or false (closed)", valueType: 'boolean'}, ], 
     [SLDElementType.Contactor]: [ { value: 'contactor.isClosed', label: 'Contactor Closed State', description: 'Boolean: true if contactor is closed/energized, false if open/de-energized.', inputHint: "true (closed) or false (open)", valueType: 'boolean'}, ], 
     [SLDElementType.Battery]: [
@@ -105,17 +114,30 @@ const getElementTypeName = (element: CustomNodeType | CustomFlowEdge | null): st
     if (isNode(element) && element.data) {
         const elementType = element.data.elementType;
         const nameMap: Partial<Record<SLDElementType, string>> = {
-            [SLDElementType.TextLabel]: 'Text Label', [SLDElementType.DataLabel]: 'Data Label',
-            [SLDElementType.Contactor]: 'Contactor', [SLDElementType.Inverter]: 'Inverter',
-            [SLDElementType.Panel]: 'PV Panel Array', [SLDElementType.Breaker]: 'Breaker/Switch',
-            [SLDElementType.Meter]: 'Meter', [SLDElementType.Battery]: 'Battery System',
-            [SLDElementType.Grid]: 'Grid Connection', [SLDElementType.Load]: 'Electrical Load',
-            [SLDElementType.Busbar]: 'Busbar', [SLDElementType.Transformer]: 'Transformer',
-            [SLDElementType.Generator]: 'Generator', [SLDElementType.PLC]: 'PLC',
-            [SLDElementType.Sensor]: 'Sensor', [SLDElementType.GenericDevice]: 'Generic Device',
-            [SLDElementType.Isolator]: 'Isolator', [SLDElementType.ATS]: 'ATS',
-            [SLDElementType.JunctionBox]: 'Junction Box', [SLDElementType.Fuse]: 'Fuse',
-            [SLDElementType.Gauge]: 'Gauge Display', [SLDElementType.Switch]: 'Switch'
+            [SLDElementType.TextLabel]: 'Text Label',
+            [SLDElementType.DataLabel]: 'Data Label',
+            [SLDElementType.Contactor]: 'Contactor',
+            [SLDElementType.Inverter]: 'Inverter',
+            [SLDElementType.Panel]: 'PV Panel Array',
+            [SLDElementType.Breaker]: 'Breaker/Switch',
+            [SLDElementType.Meter]: 'Meter',
+            [SLDElementType.Battery]: 'Battery System',
+            [SLDElementType.Grid]: 'Grid Connection',
+            [SLDElementType.Load]: 'Electrical Load',
+            [SLDElementType.Busbar]: 'Busbar',
+            [SLDElementType.Transformer]: 'Transformer',
+            [SLDElementType.Generator]: 'Generator',
+            [SLDElementType.PLC]: 'PLC',
+            [SLDElementType.Sensor]: 'Sensor',
+            [SLDElementType.GenericDevice]: 'Generic Device',
+            [SLDElementType.Isolator]: 'Isolator',
+            [SLDElementType.ATS]: 'ATS',
+            [SLDElementType.JunctionBox]: 'Junction Box',
+            [SLDElementType.Fuse]: 'Fuse',
+            [SLDElementType.Gauge]: 'Gauge Display',
+            [SLDElementType.Switch]: 'Switch',
+            [SLDElementType.WindInverter]: 'Wind Inverter',
+            [SLDElementType.WindTurbine]: 'Wind Turbine'
         };
         if (elementType && nameMap[elementType]) { return nameMap[elementType]!; }
         const typeName = String(elementType || 'Unknown Node');
