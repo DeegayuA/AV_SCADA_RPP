@@ -914,7 +914,50 @@ const SLDInspectorDialog: React.FC<SLDInspectorDialogProps> = ({
                                     {isNode(selectedElement) && currentElementNodeSLDType === SLDElementType.WindTurbine && (
                                         <ConfigCard title="Wind Turbine Configuration" icon={Wind}>
                                             <GridSection cols={2}>
-                                                <FieldInput type="number" id="config.ratingKVA" name="config.ratingKVA" label="Rating (kVA)" value={(formData.config as WindTurbineNodeData['config'])?.ratingKVA ?? ''} onChange={handleInputChange} placeholder="e.g., 1500" min="0" info="Nominal power rating of the wind turbine in kilovolt-amperes."/>
+                                                <FieldInput
+                                                    type="number"
+                                                    id="config.ratingKVA"
+                                                    name="config.ratingKVA"
+                                                    label="Rating (kVA)"
+                                                    value={(formData.config as WindTurbineNodeData['config'])?.ratingKVA ?? ''}
+                                                    onChange={handleInputChange}
+                                                    placeholder="e.g., 1500"
+                                                    min="0"
+                                                    info="Nominal power rating of the wind turbine in kilovolt-amperes."
+                                                />
+                                                <FieldInput
+                                                    type="number"
+                                                    id="config.ratedPower"
+                                                    name="config.ratedPower"
+                                                    label="Rated Power (kW)"
+                                                    value={(formData.config as WindTurbineNodeData['config'])?.ratedPower ?? ''}
+                                                    onChange={handleInputChange}
+                                                    placeholder="e.g., 1500"
+                                                    min="0"
+                                                    info="Rated power output of the wind turbine in kilowatts."
+                                                />
+                                                <FieldInput
+                                                    type="number"
+                                                    id="config.rotorDiameter"
+                                                    name="config.rotorDiameter"
+                                                    label="Rotor Diameter (m)"
+                                                    value={(formData.config as WindTurbineNodeData['config'])?.rotorDiameter ?? ''}
+                                                    onChange={handleInputChange}
+                                                    placeholder="e.g., 50"
+                                                    min="0"
+                                                    info="Diameter of the wind turbine rotor in meters."
+                                                />
+                                                <FieldInput
+                                                    type="number"
+                                                    id="config.hubHeight"
+                                                    name="config.hubHeight"
+                                                    label="Hub Height (m)"
+                                                    value={(formData.config as WindTurbineNodeData['config'])?.hubHeight ?? ''}
+                                                    onChange={handleInputChange}
+                                                    placeholder="e.g., 80"
+                                                    min="0"
+                                                    info="Height of the turbine hub above ground level in meters."
+                                                />
                                             </GridSection>
                                         </ConfigCard>
                                     )}
