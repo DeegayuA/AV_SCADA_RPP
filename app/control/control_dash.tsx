@@ -47,7 +47,7 @@ interface ExtendedDataPoint extends DataPoint {
   phase?: string;
   icon?: any; 
 }
-import { getWebSocketUrl, VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX } from '@/config/constants';
+import { VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX, WEBSOCKET_CUSTOM_URL_KEY as CUSTOM_WEBSOCKET_URL_KEY } from '@/config/constants';
 import { containerVariants, itemVariants as _itemVariants } from '@/config/animationVariants';
 const itemVariants: Variants = _itemVariants as Variants;
 import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound } from '@/lib/utils';
@@ -65,9 +65,10 @@ import { SLDLayout } from '@/types/sld';
 import { useDynamicDefaultDataPointIds } from '@/app/utils/defaultDataPoints';
 import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph';
 import PowerTimelineGraphConfigurator from './PowerTimelineGraphConfigurator';
-import { useAppStore, useCurrentUser } from '@/stores/appStore';
+import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appStore';
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
+import { useWebSocket } from '@/hooks/useWebSocketListener';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
@@ -306,7 +307,6 @@ const RenderingComponent: React.FC<RenderingComponentProps> = ({ sections, isEdi
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const DEFAULT_SLD_LAYOUT_ID_KEY = `userSldLayoutId_${PLANT_NAME.replace(/\s+/g, '_')}`;
-const CUSTOM_WEBSOCKET_URL_KEY = `customWebSocketUrl_${PLANT_NAME.replace(/\s+/g, '_')}`;
 const CUSTOM_DATA_POINTS_KEY = `${LOCAL_STORAGE_KEY_PREFIX}_customDataPoints_v1`;
 
 const PAGE_SLUG = 'control_dashboard';
@@ -334,22 +334,25 @@ const UnifiedDashboardPage: React.FC = () => {
   const { resolvedTheme } = useTheme();
   const currentUser = useCurrentUser();
   
-  // ==================== THE FIX IS HERE ====================
-  // Select state individually to prevent re-renders from new object references.
+  // Global state management
   const isGlobalEditMode = useAppStore(state => state.isEditMode);
   const toggleEditModeAction = useAppStore(state => state.toggleEditMode);
-  // ========================================================
-  
+  const nodeValues = useAppStore(state => state.opcUaNodeValues);
+
+  // WebSocket connection via dedicated hook
+  const { sendJsonMessage, changeWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
+
   const currentUserRole = currentUser?.role;
 
+  // Local UI state
   const [authCheckComplete, setAuthCheckComplete] = useState(false);
-  const [nodeValues, setNodeValues] = useState<NodeData>({});
-  const [isConnected, setIsConnected] = useState(false);
+  const [opcuaApiStatus, setOpcuaApiStatus] = useState<any>(null);
+  const [opcuaConnectionStatus, setOpcuaConnectionStatus] = useState<any>(null);
+  const [isStatusLoading, setIsStatusLoading] = useState<boolean>(false);
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
-  const [webSocketUrl, setWebSocketUrl] = useState<string>('');
   const [isWsConfigModalOpen, setIsWsConfigModalOpen] = useState(false);
   const [tempWsUrl, setTempWsUrl] = useState<string>('');
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
@@ -371,11 +374,8 @@ const UnifiedDashboardPage: React.FC = () => {
   const [weatherCardConfig, setWeatherCardConfig] = useState<WeatherCardConfig | null>(null);
 
   const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as ExtendedDataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
-  const ws = useRef<WebSocket | null>(null);
   const lastToastTimestamps = useRef<Record<string, number>>({});
-  const reconnectInterval = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 10;
+  
   const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
   const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch' || p.uiType === 'input'), [individualPoints]);
   const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
@@ -398,39 +398,58 @@ const UnifiedDashboardPage: React.FC = () => {
     const cIds = ['grid-total-active-power-side-to-side', 'inverter-output-total-power', 'load-total-power', 'battery-capacity', 'battery-output-power', 'input-power-pv1', 'active-power-adjust', 'pf-reactive-power-adjust', 'export-power-percentage'].filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (cIds.length > 0) return cIds; return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
   }, [allPossibleDataPoints]);
   const getSmartDefaults = useDynamicDefaultDataPointIds(allPossibleDataPoints);
+  
   const processControlActionQueue = useCallback(async () => {
-    if (!ws.current || ws.current.readyState !== WebSocket.OPEN) { return; } const qA = await getControlQueue(); if (qA.length === 0) return; console.log(`Processing ${qA.length} actions...`); toast.info("Processing Queued Actions", { description: `Found ${qA.length} pending command(s).` }); let allOk = true; for (const a of qA) { try { ws.current.send(JSON.stringify({ [a.nodeId]: a.value })); } catch (e) { allOk = false; console.error(`Fail queue ${a.nodeId}:`, e); toast.error("Queue Fail", { description: `Cmd ${a.nodeId || '??'} fail.` }); } } await clearControlQueue(); if (allOk) toast.success("Queue OK", { description: "All sent." }); else toast.warning("Queue Incomplete");
-  }, []);
-  const connectWebSocket = useCallback(async (urlOverride?: string) => {
-    const targetUrl = urlOverride || webSocketUrl;
-    if (!authCheckComplete || !targetUrl) return;
-    if (ws.current && (ws.current.readyState === WebSocket.OPEN || ws.current.readyState === WebSocket.CONNECTING)) return;
-    setIsConnected(false); const delayMs = Math.min(1000 + 2000 * Math.pow(1.5, reconnectAttempts.current), 30000);
-    if (reconnectInterval.current) clearTimeout(reconnectInterval.current);
-    console.log(`Attempting to connect to WebSocket at: ${targetUrl}`); toast.info('Connecting...', { id: 'ws-conn', description: `Attempting connection to backend...` });
-    reconnectInterval.current = setTimeout(() => {
-      if (typeof window === 'undefined' || !targetUrl) return;
-      try { ws.current = new WebSocket(targetUrl); } catch (e: any) { console.error("WebSocket instantiation error:", e.message); toast.error('Connection Failed', { id: 'ws-conn', description: 'Invalid WebSocket URL format.', duration: 5000 }); if (reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); } return; }
-      ws.current.onopen = () => { setIsConnected(true); setLastUpdateTime(Date.now()); reconnectAttempts.current = 0; if (reconnectInterval.current) clearTimeout(reconnectInterval.current); toast.success('WS Connected', { id: 'ws-conn', description: 'Real-time link established.', duration: 3000 }); playSuccessSound(); processControlActionQueue(); };
-      ws.current.onmessage = (e) => { try { const d = JSON.parse(e.data as string); if (typeof d === 'object' && d !== null) { setNodeValues(p => ({ ...p, ...d })); setLastUpdateTime(Date.now()); } else console.warn("WS:non-obj", d); } catch (err) { console.error("WS parse err", err, e.data); playErrorSound(); } };
-      ws.current.onerror = (ev) => { console.error("WebSocket connection error:", ev); setIsConnected(false); if (reconnectAttempts.current === 0) { toast.error('Connection Error', { id: 'ws-conn', description: 'Could not connect to the backend server.', duration: 5000 }); } };
-      ws.current.onclose = (ev) => { setIsConnected(false); if (ev.code !== 1000 && ev.code !== 1001 && reconnectAttempts.current < maxReconnectAttempts) { reconnectAttempts.current++; connectWebSocket(); } else if (reconnectAttempts.current >= maxReconnectAttempts) { toast.error('Connection Failed', { id: 'ws-conn-final', description: 'Max reconnects reached. Please check the URL or server status.', duration: 10000 }); playErrorSound(); } };
-    }, delayMs);
-  }, [authCheckComplete, processControlActionQueue, webSocketUrl, maxReconnectAttempts]);
+    if (!isConnected) { return; }
+    const queuedActions = await getControlQueue();
+    if (queuedActions.length === 0) return;
+    console.log(`Processing ${queuedActions.length} queued control actions...`);
+    toast.info("Processing Queued Actions", { description: `Found ${queuedActions.length} pending command(s).` });
+    let allSentSuccessfully = true;
+    for (const action of queuedActions) {
+      try {
+        sendJsonMessage({ type: 'controlWrite', payload: { [action.nodeId]: action.value } });
+      } catch (e) {
+        allSentSuccessfully = false;
+        console.error(`Failed to send queued action for node ${action.nodeId}:`, e);
+        toast.error("Queue Send Failed", { description: `Command for ${action.nodeId || '??'} failed.` });
+      }
+    }
+    await clearControlQueue();
+    if (allSentSuccessfully) toast.success("Queue Processed", { description: "All queued actions have been sent." });
+    else toast.warning("Queue Processing Incomplete", { description: "Some actions could not be sent." });
+  }, [isConnected, sendJsonMessage]);
+
   const sendDataToWebSocket = useCallback(async (nodeId: string, value: boolean | number | string) => {
-    if (currentUserRole === UserRole.VIEWER) { toast.warning("Restricted Action", { description: "Viewers cannot send commands." }); playWarningSound(); return; } const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId); let processedValue: any = value; let queueValue: any = undefined;
+    if (currentUserRole === UserRole.VIEWER) { toast.warning("Restricted Action", { description: "Viewers cannot send commands." }); playWarningSound(); return; }
+    const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId); let processedValue: any = value; let queueValue: any = undefined;
     if (pointConfig?.dataType.includes('Int')) { let pN: number; if (typeof value === 'boolean') pN = value ? 1 : 0; else if (typeof value === 'string') pN = parseInt(value, 10); else pN = value as number; if (isNaN(pN)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; } processedValue = pN; queueValue = pN; }
     else if (pointConfig?.dataType === 'Boolean') { let pB: boolean; if (typeof value === 'number') pB = value !== 0; else if (typeof value === 'string') pB = value.toLowerCase() === 'true' || value === '1'; else pB = value as boolean; processedValue = pB; queueValue = pB; }
     else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') { let pF: number; if (typeof value === 'string') pF = parseFloat(value); else pF = value as number; if (isNaN(pF)) { toast.error('Send Error', { description: 'Invalid numeric value.' }); return; } processedValue = pF; queueValue = pF; }
     if (typeof processedValue === 'number' && !isFinite(processedValue)) { toast.error('Send Error', { description: 'Numeric value is not finite (Infinity or NaN).' }); playErrorSound(); return; }
+    
     logActivity('DATA_POINT_CHANGE', { nodeId: nodeId, newValue: processedValue, dataPointName: pointConfig?.name || 'Unknown DataPoint', dataType: pointConfig?.dataType || 'Unknown Type' }, currentPath);
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      try { const payload = JSON.stringify({ [nodeId]: processedValue }); ws.current.send(payload); toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` }); playInfoSound(); } catch (error) { console.error("WebSocket send error:", error); toast.error('Send Error', { description: 'Failed to send command. Queuing.' }); playErrorSound(); if (queueValue !== undefined) await queueControlAction(nodeId, queueValue); else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` }); }
+    
+    if (isConnected) {
+      try {
+        sendJsonMessage({ type: 'controlWrite', payload: { [pointConfig?.id || nodeId]: processedValue }});
+        toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` });
+        playInfoSound();
+      } catch (error) {
+        console.error("WebSocket send error:", error);
+        toast.error('Send Error', { description: 'Failed to send command. Queuing.' });
+        playErrorSound();
+        if (queueValue !== undefined) await queueControlAction(nodeId, queueValue);
+        else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
+      }
     } else {
-      toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` }); playWarningSound(); if (queueValue !== undefined) await queueControlAction(nodeId, queueValue); else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
-      if (!isConnected && authCheckComplete && webSocketUrl) connectWebSocket();
+      toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` });
+      playWarningSound();
+      if (queueValue !== undefined) await queueControlAction(nodeId, queueValue);
+      else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
     }
-  }, [currentUserRole, allPossibleDataPoints, isConnected, authCheckComplete, connectWebSocket, currentPath, webSocketUrl]);
+  }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
+
   const checkPlcConnection = useCallback(async () => {
     if (!authCheckComplete) return; try { const r = await fetch('/api/opcua/status'); if (!r.ok) throw new Error(`API Err:${r.status}`); const d = await r.json(); const nS = d.connectionStatus; if (nS && ['online', 'offline', 'disconnected'].includes(nS)) setPlcStatus(nS); else { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (e) { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); }
   }, [plcStatus, authCheckComplete]);
@@ -511,11 +530,13 @@ const UnifiedDashboardPage: React.FC = () => {
       const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants]; combinedLayouts.sort((a, b) => a.name.localeCompare(b.name)); setAvailableSldLayoutsForPage(combinedLayouts);
     }
   }, []);
+  
   const handleSaveWsUrl = useCallback(() => {
-    setWebSocketUrl(tempWsUrl); localStorage.setItem(CUSTOM_WEBSOCKET_URL_KEY, tempWsUrl); setIsWsConfigModalOpen(false); toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}`, });
-    if (ws.current) { ws.current.onclose = null; ws.current.close(1000, 'Configuration changed'); }
-    reconnectAttempts.current = 0; if (reconnectInterval.current) clearTimeout(reconnectInterval.current); connectWebSocket(tempWsUrl);
-  }, [tempWsUrl, connectWebSocket]);
+    changeWebSocketUrl(tempWsUrl);
+    setIsWsConfigModalOpen(false);
+    toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}` });
+  }, [tempWsUrl, changeWebSocketUrl]);
+
   const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
   const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
 
@@ -544,35 +565,62 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [authCheckComplete]);
   
   useEffect(() => {
-    if (!authCheckComplete) return; const fetchInitialUrl = async () => {
-      const customUrl = localStorage.getItem(CUSTOM_WEBSOCKET_URL_KEY);
-      if (customUrl) { setWebSocketUrl(customUrl); console.log(`Using custom WebSocket URL from localStorage: ${customUrl}`); return; }
-      try {
-        const response = await fetch('/api/opcua');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.webSocketUrl) { setWebSocketUrl(data.webSocketUrl); console.log(`Using dynamically determined WebSocket URL from API: ${data.webSocketUrl}`); }
-          else { throw new Error("API response did not contain webSocketUrl"); }
-        } else { throw new Error(`API fetch failed with status: ${response.status}`); }
-      } catch (error) {
-        console.error("Failed to fetch dynamic WebSocket URL from API, using fallback:", error);
-        const fallbackUrl = await getWebSocketUrl();
-        setWebSocketUrl(fallbackUrl);
-        toast.error("Network Discovery Failed", { description: "Using fallback connection URL. May not work remotely.", duration: 8000 });
-      }
-    }; fetchInitialUrl();
-  }, [authCheckComplete]);
+    if (isConnected) {
+      processControlActionQueue();
+    }
+  }, [isConnected, processControlActionQueue]);
+  
+  useEffect(() => {
+    if (Object.keys(nodeValues).length > 0) {
+      setLastUpdateTime(Date.now());
+    }
+  }, [nodeValues]);
+
   useEffect(() => { fetchAndUpdatePageLayouts(); const handleStorageChange = (event: StorageEvent) => { if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) { fetchAndUpdatePageLayouts(); } else if (event.key === null) { fetchAndUpdatePageLayouts(); } }; window.addEventListener('storage', handleStorageChange); return () => { window.removeEventListener('storage', handleStorageChange); }; }, [fetchAndUpdatePageLayouts]);
   useEffect(() => { if (availableSldLayoutsForPage.length > 0 && authCheckComplete) { const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY); if (currentStoredId && availableSldLayoutsForPage.some(l => l.id === currentStoredId)) { if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId); } else if (availableSldLayoutsForPage.some(l => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'))) { const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'; if (sldLayoutId !== defaultId) setSldLayoutId(defaultId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId); } else { const firstAvailableId = availableSldLayoutsForPage[0].id; if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId); } } }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && allPossibleDataPoints.length > 0 && authCheckComplete) { const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY); if (s) { try { const p = JSON.parse(s) as string[]; const v = p.filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (v.length > 0) { setDisplayedDataPointIds(v); return; } else if (p.length > 0) localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } catch (e) { console.error("Parse err", e); localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } } const sm = getSmartDefaults(); setDisplayedDataPointIds(sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()); } }, [allPossibleDataPoints, getSmartDefaults, getHardcodedDefaultDataPointIds, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { if (displayedDataPointIds.length > 0) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify(displayedDataPointIds)); else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY)) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([])); } }, [displayedDataPointIds, authCheckComplete]);
   useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
-  useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).Closing WS.`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); if (ws.current) ws.current.close(1011, "Crit Lag"); return; } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 15000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete]);
+  useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); connectWebSocket(); } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 15000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
   useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphWindDpIds(JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_WIND_KEY, JSON.stringify(powerGraphWindDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphWindDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      if (isWsConfigModalOpen) {
+        setIsStatusLoading(true);
+        try {
+          const [apiRes, statusRes] = await Promise.all([
+            fetch('/api/opcua'),
+            fetch('/api/opcua/status')
+          ]);
+
+          if (!apiRes.ok || !statusRes.ok) {
+            throw new Error('One or more API requests failed');
+          }
+
+          const apiData = await apiRes.json();
+          const statusData = await statusRes.json();
+
+          setOpcuaApiStatus(apiData);
+          setOpcuaConnectionStatus(statusData);
+
+        } catch (error) {
+          console.error("Failed to fetch OPC-UA status:", error);
+          toast.error("Failed to fetch status", { description: "Could not retrieve connection details from the server." });
+          setOpcuaApiStatus(null);
+          setOpcuaConnectionStatus(null);
+        } finally {
+          setIsStatusLoading(false);
+        }
+      }
+    };
+
+    fetchStatus();
+  }, [isWsConfigModalOpen]);
 
   const storeHasHydrated = useAppStore.persist.hasHydrated();
   if (!storeHasHydrated || !authCheckComplete || weatherCardConfig === null) {
@@ -773,29 +821,77 @@ const UnifiedDashboardPage: React.FC = () => {
       <Dialog open={isWsConfigModalOpen} onOpenChange={setIsWsConfigModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeaderComponentInternal>
-            <DialogTitleComponentInternal>Configure WebSocket URL</DialogTitleComponentInternal>
+            <DialogTitleComponentInternal>Connection Status & Configuration</DialogTitleComponentInternal>
             <DialogDescription>
-              Enter the WebSocket URL for real-time data connection.
+              View live status information and manually override the WebSocket URL if needed.
             </DialogDescription>
           </DialogHeaderComponentInternal>
           <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
+            <div className="p-4 border rounded-lg bg-muted/50 max-h-[250px] overflow-y-auto">
+              <h4 className="font-semibold mb-2 text-sm">Live Status</h4>
+              {isStatusLoading ? (
+                <div className="flex items-center justify-center p-4">
+                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
+                  <span>Loading connection details...</span>
+                </div>
+              ) : (
+                <div className="space-y-3 text-xs">
+                  {opcuaApiStatus ? (
+                    <div className="p-2 border-l-2 pl-3 rounded-r-md bg-background">
+                      <p><strong>Service Status:</strong> <span className={cn(opcuaApiStatus.status?.includes("Connected") ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400")}>{opcuaApiStatus.status || 'N/A'}</span></p>
+                      <p className="text-muted-foreground">{opcuaApiStatus.message || 'No message.'}</p>
+                    </div>
+                  ) : <p>Could not load API service status.</p>}
+
+                  {opcuaConnectionStatus ? (
+                    <div className="p-2 border-l-2 pl-3 rounded-r-md bg-background">
+                      <p>
+                        <strong>OPC-UA Client: </strong>
+                        <span
+                          className={cn(
+                            opcuaConnectionStatus.connectionStatus === "online"
+                              ? "text-green-600 dark:text-green-400"
+                              : opcuaConnectionStatus.connectionStatus === "offline"
+                              ? "text-yellow-600 dark:text-yellow-400"
+                              : "text-red-600 dark:text-red-400"
+                          )}
+                        >
+                          {opcuaConnectionStatus.connectionStatus === "online"
+                            ? "Connected Remotely"
+                            : opcuaConnectionStatus.connectionStatus === "offline"
+                            ? "Connected Locally"
+                            : opcuaConnectionStatus.connectionStatus || "N/A"}
+                        </span>
+                      </p>
+                       {opcuaConnectionStatus.testedEndpoint && <p><strong>Target Endpoint:</strong> <code className="text-muted-foreground">{opcuaConnectionStatus.testedEndpoint}</code></p>}
+                       {opcuaConnectionStatus.errorDetail && opcuaConnectionStatus.errorDetail.trim() !== '' && <p><strong>Details:</strong> <span className="text-destructive">{opcuaConnectionStatus.errorDetail}</span></p>}
+                       {!opcuaConnectionStatus.errorDetail && opcuaConnectionStatus.message && <p className="text-muted-foreground">{opcuaConnectionStatus.message}</p>}
+                    </div>
+                  ) : <p>Could not load OPC-UA connection details.</p>}
+                </div>
+              )}
+            </div>
+            <div className="grid gap-2 pt-2">
               <label htmlFor="wsUrl" className="text-sm font-medium">
-                WebSocket URL
+                WebSocket URL Override
               </label>
               <Input
                 id="wsUrl"
                 value={tempWsUrl}
                 onChange={(e) => setTempWsUrl(e.target.value)}
-                placeholder="ws://localhost:4000"
+                placeholder="ws://localhost:2001"
+                aria-label="WebSocket URL Input"
               />
+               <p className="text-xs text-muted-foreground pt-1">
+                The WebSocket URL is usually detected automatically. Only change this if you need to connect to a different server.
+              </p>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)}>
-              Cancel
+              Close
             </Button>
-            <Button onClick={handleSaveWsUrl}>Save</Button>
+            <Button onClick={handleSaveWsUrl}>Save & Reconnect</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -221,6 +221,7 @@ export const useWebSocket = () => {
         lastJsonMessage, 
         isConnected: useAppStore((state) => state.isWebSocketConnected), 
         changeWebSocketUrl, 
-        connect 
+        connect,
+        activeUrl: wsUrl
     };
 };

@@ -8,10 +8,61 @@ import { getDataPointValue, applyValueMapping, formatDisplayValue, getDerivedSty
 import { WindIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
+// --- START: UPDATED WindTurbineGraphic ---
+// Redesigned SVG graphic with 3 symmetrical, correctly centered blades.
+const WindTurbineGraphic = ({ className, isSpinning }: { className?: string; isSpinning?: boolean }) => {
+  const variants = {
+    spinning: { rotate: 360 },
+    still: { rotate: 0 },
+  };
+  const transition = isSpinning ? { repeat: Infinity, ease: 'linear' as const, duration: 4 } : { duration: 0.5 };
+
+  // A single, clean, symmetrical path for a blade, starting from the center hub.
+  const bladePath = "M 12 10.5 C 10 9, 10 3, 12 2 C 14 3, 14 9, 12 10.5 Z";
+
+  return (
+    <motion.svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+      width="32"
+      height="32"
+    >
+      {/* Static tower (remains stroked) */}
+      <path d="M12 10.5V22" />
+      <path d="M9 22h6" />
+
+      {/* Rotating blades group */}
+      <motion.g
+        style={{ transformOrigin: '12px 10.5px' }}
+        variants={variants}
+        animate={isSpinning ? "spinning" : "still"}
+        transition={transition}
+      >
+        {/* Use the same blade path, but rotate it for the other two blades */}
+        {/* The paths are filled to look solid and have an inherited stroke for definition */}
+        <path d={bladePath} fill="currentColor" />
+        <path d={bladePath} fill="currentColor" transform="rotate(120, 12, 10.5)" />
+        <path d={bladePath} fill="currentColor" transform="rotate(240, 12, 10.5)" />
+      </motion.g>
+
+       {/* Central hub (drawn on top of blades) */}
+      <circle cx="12" cy="10.5" r="1.5" fill="currentColor" />
+    </motion.svg>
+  );
+};
+// --- END: UPDATED WindTurbineGraphic ---
+
+
 const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<GeneratorNodeData>, 'position' | 'width' | 'height' | 'dragging' | 'zIndex'>> = (props) => {
   const { data, selected, isConnectable, id, type, position, zIndex, dragging, width, height } = props;
-  const xPos = position.x;
-  const yPos = position.y;
+  const safePosition = position ?? { x: 0, y: 0 };
+  const xPos = safePosition.x;
+  const yPos = safePosition.y;
   const { isEditMode, currentUser, opcUaNodeValues, dataPoints, setSelectedElementForDetails } = useAppStore(state => ({
     isEditMode: state.isEditMode,
     currentUser: state.currentUser,
@@ -48,7 +99,7 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
   }, [data.dataPointLinks, data.config?.ratingKVA, opcUaNodeValues, dataPoints]);
 
   interface StatusInfo {
-    StatusIcon: typeof CogIcon;
+    StatusIcon: React.ElementType;
     statusText: string;
     statusClasses: string;
     animationClass: string;
@@ -58,7 +109,7 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
     let icon = CogIcon;
     let text = String(processedStatus).toUpperCase();
     let sClasses = 'border-neutral-400 dark:border-neutral-600 bg-muted/20 text-muted-foreground';
-    let animClass = '';
+    let animationClass = '';
 
     switch (String(processedStatus).toLowerCase()) {
       case 'fault': case 'alarm':
@@ -70,15 +121,15 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
       case 'running': case 'producing': case 'online':
         icon = CheckCircleIcon; text = (processedStatus === 'producing' || processedStatus === 'online') ? "PROD" : "RUN";
         sClasses = 'border-green-500 bg-green-500/10 text-green-600 dark:text-green-400';
-        animClass = 'animate-pulse'; break;
+        animationClass = 'animate-pulse'; break;
       case 'starting':
         icon = CogIcon; text = 'STARTING';
         sClasses = 'border-sky-500 bg-sky-500/10 text-sky-600 dark:text-sky-400';
-        animClass = 'animate-spin'; break;
+        animationClass = 'animate-spin'; break;
       case 'stopping':
         icon = CogIcon; text = 'STOPPING';
         sClasses = 'border-amber-500 bg-amber-500/10 text-amber-600 dark:text-amber-400';
-        animClass = 'animate-spin animation-direction-reverse'; break;
+        animationClass = 'animate-spin animation-direction-reverse'; break;
       case 'offline': case 'standby':
         icon = PowerIcon; text = String(processedStatus).toUpperCase();
         sClasses = 'border-neutral-500 bg-neutral-500/10 text-neutral-500 opacity-80'; break;
@@ -93,28 +144,6 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
     getDerivedStyle(data, dataPoints, opcUaNodeValues),
     [data, opcUaNodeValues, dataPoints]
   );
-
-  const WindTurbineSymbolSVG = ({ className, isSpinning }: {className?: string, isSpinning?: boolean}) => {
-    const variants = {
-      spinning: { rotate: 360 },
-      still: { rotate: 0 },
-    };
-    const transition = isSpinning ? { repeat: Infinity, ease: "linear" as const, duration: 2 } : { duration: 0.5 };
-
-    return (
-      <motion.svg
-        viewBox="0 0 24 24"
-        width="32"
-        height="32"
-        className={className}
-        variants={variants}
-        animate={isSpinning ? "spinning" : "still"}
-        transition={transition}
-      >
-        <WindIcon />
-      </motion.svg>
-    );
-  };
 
   const isTurbineRunning = useMemo(() =>
     ['running', 'producing', 'online'].includes(String(processedStatus).toLowerCase()),
@@ -202,8 +231,8 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
           {data.label}
         </p>
 
-        <div className="my-0.5 pointer-events-none">
-          <WindTurbineSymbolSVG className="transition-colors" isSpinning={isTurbineRunning} />
+        <div className="my-0.5 pointer-events-none flex items-center justify-center">
+          <WindTurbineGraphic className="transition-colors" isSpinning={isTurbineRunning} />
         </div>
 
         <div className="flex items-center justify-center gap-1 mt-0.5">
