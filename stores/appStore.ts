@@ -21,9 +21,9 @@ import {
 import { WebSocketMessageToServer } from '@/hooks/useWebSocketListener';
 import { dataPoints as rawDataPoints } from '@/config/dataPoints';
 
-const dataPointsWithIcons = rawDataPoints.map((dp) => ({ 
-  ...dp, 
-  icon: typeof dp.icon === 'string' ? undefined : dp.icon 
+const dataPointsWithIcons = rawDataPoints.map((dp) => ({
+  ...dp,
+  icon: typeof dp.icon === 'string' ? undefined : dp.icon
 }));
 
 const defaultUser: User = {
@@ -100,22 +100,16 @@ const safeLocalStorage: StateStorage = typeof window !== 'undefined' ? localStor
 export const useAppStore = create<FullStoreState>()(
   persist(
     (set, get) => ({
-      // Spread all initial reactive state
       ...initialState,
 
-      // --- Define ALL properties required by FullStoreState ---
-
-      // This is the default transient function
       sendJsonMessage: (message: WebSocketMessageToServer) => {
         console.warn("WebSocket send function not yet initialized. Message ignored:", message);
       },
 
-      // This transient action now correctly calls `set`
-      setSendJsonMessage: (fn: (message: WebSocketMessageToServer) => void) => {
+      setSendJsonMessage: (fn) => {
         set({ sendJsonMessage: fn });
       },
-      
-      // All other reactive actions
+
       updateOpcUaNodeValues: (updates) =>
         set((state) => {
           if (typeof updates !== 'object' || updates === null) {
@@ -180,7 +174,7 @@ export const useAppStore = create<FullStoreState>()(
         isWebSocketConnected: isConnected,
         activeWebSocketUrl: url
       }),
-      
+
       addApiConfig: (newConfigPartial) => set((state) => {
         const newId = uuidv4();
         const fullConfig: ApiConfig = { id: newId, name: newConfigPartial.name, type: newConfigPartial.type, localApi: { url: newConfigPartial.localUrl, status: 'pending' }, onlineApi: { url: newConfigPartial.onlineUrl, status: 'pending' }, nodeId: newConfigPartial.nodeId, withFactor: newConfigPartial.withFactor, isEnabled: newConfigPartial.isEnabled !== undefined ? newConfigPartial.isEnabled : true, category: newConfigPartial.category, };
@@ -252,25 +246,43 @@ export const useAppStore = create<FullStoreState>()(
     {
       name: 'app-user-session-storage',
       storage: createJSONStorage(() => safeLocalStorage),
-      // `partialize` tells `persist` which parts of the state to save.
-      // We only want to save the `AppState`, not the actions or transient state.
+      // `partialize` tells `persist` what to save. This is the robust fix.
       partialize: (state: FullStoreState): AppState => {
-        // This picks only the keys from AppState and ignores all functions/transient state.
-        const persistedState: Partial<AppState> = {};
-        for (const key of Object.keys(initialState) as Array<keyof AppState>) {
-            const value = state[key];
-            if (value !== null && value !== undefined) {
-                persistedState[key] = value as AppState[typeof key];
-            }
-        }
-        return persistedState as AppState;
+        // This destructuring cleanly separates the persisted state from all functions.
+        const {
+            // Actions to explicitly ignore
+            updateOpcUaNodeValues,
+            setDataPoints,
+            toggleEditMode,
+            setCurrentUser,
+            logout,
+            setSelectedElementForDetails,
+            updateNodeConfig,
+            setSoundEnabled,
+            setActiveAlarms,
+            setWebSocketStatus,
+            addApiConfig,
+            updateApiConfig,
+            removeApiConfig,
+            setApiInstanceStatus,
+            recordApiDowntimeStart,
+            resolveApiDowntimeEvent,
+            loadApiConfigs,
+            loadApiDowntimes,
+            clearApiMonitoringData,
+            // Transient state to explicitly ignore
+            sendJsonMessage,
+            setSendJsonMessage,
+            // ...rest now contains only the AppState we want to save
+            ...rest
+        } = state;
+        return rest;
       },
     }
   )
 );
 
-
-// Convenience hooks
+// Convenience hooks (no changes needed)
 export const useIsEditMode = () => useAppStore((state) => state.isEditMode);
 export const useCurrentUser = () => useAppStore((state) => state.currentUser);
 export const useCurrentUserRole = () => useAppStore((state) => state.currentUser?.role);
