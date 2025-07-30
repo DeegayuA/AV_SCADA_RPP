@@ -4,6 +4,7 @@ import { getWebSocketUrl, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
 
+// --- Interfaces ---
 export interface WebSocketMessageToServer {
   type: string;
   payload?: any;
@@ -22,178 +23,204 @@ interface WebSocketMessageFromServer {
   payload: any;
 }
 
-// Global singleton instance of the WebSocket.
-// This ensures that even if the hook is called multiple times, we only have one WebSocket object.
+// --- Constants ---
+const MAX_RECONNECT_ATTEMPTS = 10;
+const MAX_RECONNECT_DELAY = 30000; // 30 seconds
+
+// --- Singleton WebSocket instance ---
 let globalWs: WebSocket | null = null;
 
+const connectionManager = {
+  reconnectTimeoutId: null as NodeJS.Timeout | null,
+  reconnectAttempts: 0,
+  instanceCounter: 0,
+};
+
+// A stable, globally-scoped function. The hook will register this with the store.
+const sendJsonMessage = (message: WebSocketMessageToServer) => {
+    if (globalWs?.readyState === WebSocket.OPEN) {
+        try {
+            globalWs.send(JSON.stringify(message));
+        } catch (error) {
+            console.error("WebSocket: Error sending message:", error);
+            toast.error("Message Send Error");
+        }
+    } else {
+        toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server."});
+    }
+};
+
 export const useWebSocket = () => {
-    const { setWebSocketStatus, updateOpcUaNodeValues, setSendJsonMessage } = useAppStore.getState();
-
-    const [isConnected, setIsConnected] = useState(false);
+    // State specific to this hook instance for a component to optionally consume
     const [lastJsonMessage, setLastJsonMessage] = useState<WebSocketMessageFromServer | null>(null);
-    const [wsUrl, setWsUrl] = useState<string>('');
-    const reconnectIntervalId = useRef<NodeJS.Timeout | null>(null);
-    const maxReconnectAttempts = useRef(10);
-    const currentReconnectAttempts = useRef(0);
-
-    useEffect(() => {
-        let isMounted = true;
-        const fetchWsUrl = async () => {
-            try {
-                const url = await getWebSocketUrl();
-                if (isMounted) {
-                    setWsUrl(url);
-                }
-            } catch (error) {
-                console.error("Error fetching WebSocket URL:", error);
-                toast.error("Network Error", { description: "Could not determine server address." });
-            }
-        };
-        fetchWsUrl();
-        return () => { isMounted = false; };
-    }, []);
+    // URL state to trigger connection/re-connection logic
+    const [wsUrl, setWsUrl] = useState('');
 
     const connect = useCallback(() => {
-        if (!wsUrl || wsUrl.trim() === '') return;
-        if (globalWs && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING)) {
-            if (globalWs.url === wsUrl) return; // Already connecting/connected to the correct URL
+        // Access store methods via getState() inside callbacks to avoid re-renders.
+        const { setWebSocketStatus, updateOpcUaNodeValues } = useAppStore.getState();
+        const url = wsUrl; 
+
+        if (!url) return;
+
+        if (globalWs && (wsUrl === globalWs.url && (globalWs.readyState === WebSocket.OPEN || globalWs.readyState === WebSocket.CONNECTING))) {
+            return;
         }
 
         if (globalWs) {
-            globalWs.onclose = null; // Prevent stale onclose handler from firing
+            globalWs.onclose = null;
             globalWs.close(1000, "Initiating new connection");
         }
+        if (connectionManager.reconnectTimeoutId) {
+            clearTimeout(connectionManager.reconnectTimeoutId);
+            connectionManager.reconnectTimeoutId = null;
+        }
 
-        console.log(`WebSocket: Attempting connection #${currentReconnectAttempts.current + 1} to ${wsUrl}...`);
-        globalWs = new WebSocket(wsUrl);
-
+        console.log(`WebSocket: Attempting to connect to ${url}...`);
+        try {
+            globalWs = new WebSocket(url);
+        } catch (e: any) {
+            console.error(`WebSocket: Failed to construct WebSocket for URL "${url}"`, e);
+            toast.error("Connection Failed", { description: `The provided URL is invalid.`, id: 'ws-invalid-url' });
+            return; // Abort connection attempt if URL is invalid
+        }
+        
         globalWs.onopen = () => {
-            console.log("WebSocket: Connection established with", wsUrl);
-            toast.dismiss("ws-reconnect-loader"); // Dismiss any lingering reconnect toast
+            console.log("WebSocket: Connection established with", url);
+            toast.dismiss("ws-reconnect-loader");
             toast.dismiss("ws-max-reconnect");
             toast.success("Real-time Sync Active", { id: "ws-connect", duration: 3000 });
-            
-            setIsConnected(true);
-            setWebSocketStatus(true, wsUrl);
-            currentReconnectAttempts.current = 0;
-            if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
+            setWebSocketStatus(true, url);
+            connectionManager.reconnectAttempts = 0;
         };
-
-        globalWs.onmessage = (event) => {
-            let messageDataString: string;
-            if (typeof event.data === 'string') {
-                messageDataString = event.data;
-            } else if (event.data instanceof ArrayBuffer) {
-                messageDataString = new TextDecoder("utf-8").decode(event.data);
-            } else {
-                console.warn("WebSocket: event.data is of an unsupported type:", typeof event.data);
-                toast.error("WebSocket Error", { description: "Received unexpected data type."});
-                return;
-            }
-            try {
-                const parsedJson = JSON.parse(messageDataString) as unknown;
-                if (typeof parsedJson === 'object' && parsedJson !== null) {
-                    const message = parsedJson as WebSocketMessageFromServer;
-                    setLastJsonMessage(message);
-
-                    const componentSpecificMessageTypes = new Set(['layout-data', 'layout-error', 'layout-saved-confirmation', 'layout-save-error']);
-                    if (message.type === 'toast') {
-                        const toastPayload = message.payload as ToastMessagePayload;
-                        switch (toastPayload.severity) {
-                            case 'success': toast.success(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
-                            case 'error': toast.error(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
-                            case 'warning': toast.warning(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
-                            case 'info': toast.info(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
-                            default: toast(toastPayload.message, { description: toastPayload.description, duration: toastPayload.duration, id: toastPayload.id }); break;
-                        }
-                    } else if (!componentSpecificMessageTypes.has(message.type)) {
-                        updateOpcUaNodeValues(message as Record<string, any>);
+        
+        const handleMessage = (jsonString: string) => {
+             try {
+                const message = JSON.parse(jsonString) as WebSocketMessageFromServer;
+                if (typeof message !== 'object' || message === null || !message.type) {
+                     console.warn("WebSocket: Received JSON is not a valid message object:", message);
+                    return;
+                }
+                setLastJsonMessage(message);
+                const componentSpecificMessageTypes = new Set(['layout-data', 'layout-error', 'layout-saved-confirmation', 'layout-save-error']);
+                
+                if (message.type === 'toast') {
+                    const { severity = 'default', ...toastOptions } = message.payload as ToastMessagePayload;
+                    if (severity === 'default') {
+                        toast(toastOptions.message, toastOptions);
+                    } else {
+                        // @ts-ignore - We know severity is a valid method on toast except 'default'
+                        toast[severity](toastOptions.message, toastOptions);
                     }
-                } else {
-                     console.warn("WebSocket: Received JSON data that is not an object:", parsedJson);
+                } else if (!componentSpecificMessageTypes.has(message.type)) {
+                    updateOpcUaNodeValues(message as Record<string, any>);
                 }
             } catch (e) {
-                console.error("WebSocket: Error parsing JSON string.", { raw: messageDataString, error: e });
+                console.error("WebSocket: Error parsing JSON.", { raw: jsonString, error: e });
                 toast.error("Data Error", { description: "Received malformed data from the server." });
             }
         };
 
-        globalWs.onerror = (errorEvent) => {
-            console.error("WebSocket: Error event occurred:", errorEvent);
+        globalWs.onmessage = (event) => {
+            if (typeof event.data === 'string') handleMessage(event.data);
+            else if (event.data instanceof Blob) event.data.text().then(handleMessage).catch(console.error);
+            else console.warn("WebSocket: Received unsupported data type:", typeof event.data);
         };
 
-        globalWs.onclose = (event) => {
-            const reason = event.reason || (event.code === 1000 ? "Normal closure" : `Code ${event.code}`);
-            console.log(`WebSocket: Connection closed. Reason: "${reason}", Clean: ${event.wasClean}`);
-            setIsConnected(false);
-            setWebSocketStatus(false, wsUrl);
+        globalWs.onerror = (error) => console.error("WebSocket: Error occurred:", error);
 
-            // Do not reconnect on normal closure (1000) or page navigation (1001)
+        globalWs.onclose = (event) => {
+            console.log(`WebSocket: Connection closed. Code: ${event.code}, Reason: "${event.reason}"`);
+            setWebSocketStatus(false, url);
             if (event.code === 1000 || event.code === 1001) {
-                if (event.wasClean) toast.info("Real-time Sync Disconnected", { id: "ws-disconnect-clean", duration: 3000 });
+                if(event.wasClean) toast.info("Real-time Sync Disconnected");
                 return;
             }
 
-            // Attempt to reconnect on abnormal closures
-            if (currentReconnectAttempts.current < maxReconnectAttempts.current) {
-                currentReconnectAttempts.current++;
-                const delay = Math.min(1000 * Math.pow(1.8, currentReconnectAttempts.current), 30000);
-                console.log(`WebSocket: Will attempt reconnect #${currentReconnectAttempts.current} in ${delay / 1000}s.`);
-                reconnectIntervalId.current = setTimeout(connect, delay);
-                
-                // Use a silent loading toast for a better UX than repeated warnings
-                const message = currentReconnectAttempts.current === 1 ? "Connection Lost. Retrying..." : "Reconnecting...";
-                toast.loading(message, { id: "ws-reconnect-loader", description: `Attempt #${currentReconnectAttempts.current}` });
+            if (connectionManager.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                connectionManager.reconnectAttempts++;
+                const delay = Math.min(1000 * Math.pow(1.8, connectionManager.reconnectAttempts), MAX_RECONNECT_DELAY);
+                console.log(`Will attempt reconnect #${connectionManager.reconnectAttempts} in ${delay / 1000}s.`);
+                connectionManager.reconnectTimeoutId = setTimeout(connect, delay);
+                const msg = connectionManager.reconnectAttempts === 1 ? "Connection Lost. Retrying..." : "Reconnecting...";
+                toast.loading(msg, { id: "ws-reconnect-loader", description: `Attempt #${connectionManager.reconnectAttempts}` });
             } else {
-                console.error("WebSocket: Maximum reconnect attempts reached.");
-                toast.error("Connection Failed", { id: "ws-max-reconnect", description: "Could not connect to the real-time server. Please check your network or refresh.", duration: Infinity });
+                toast.error("Connection Failed", { id: "ws-max-reconnect", description: "Could not connect. Please check your network and refresh.", duration: Infinity });
             }
         };
-    }, [wsUrl, setWebSocketStatus, updateOpcUaNodeValues]);
+    }, [wsUrl]);
     
-    const sendJsonMessage = useCallback((message: WebSocketMessageToServer) => {
-        if (globalWs && globalWs.readyState === WebSocket.OPEN) {
-            try { globalWs.send(JSON.stringify(message)); }
-            catch (error) { console.error("WebSocket: Error sending message:", error); toast.error("Message Send Error"); }
-        } else {
-            toast.warning("Cannot Send: Offline", { description: "Not connected to the real-time server."});
-            if (!useAppStore.getState().isWebSocketConnected && (!globalWs || globalWs.readyState === WebSocket.CLOSED)) {
-               connect();
+    // Main lifecycle effect for initialization and cleanup.
+    useEffect(() => {
+        // This effect runs only ONCE on mount.
+        useAppStore.getState().setSendJsonMessage(sendJsonMessage);
+        
+        let isMounted = true;
+        const fetchAndConnect = async () => {
+            try {
+                // Fulfills user request: "go to the /api/opcua to start the websocket initialy"
+                const response = await fetch('/api/opcua');
+                if (!response.ok) {
+                    throw new Error(`API call failed with status ${response.status}`);
+                }
+                const data = await response.json();
+                const url = data.webSocketUrl;
+
+                if (url && isMounted) {
+                    setWsUrl(url); // This will trigger the connection via the other useEffect
+                } else {
+                    throw new Error("WebSocket URL not found in API response");
+                }
+            } catch (error) {
+                console.error("Error fetching initial WebSocket URL:", error);
+                toast.error("Network Error", { description: "Could not get server address from API." });
             }
+        };
+        
+        if (connectionManager.instanceCounter === 0) {
+            fetchAndConnect();
         }
-    }, [connect]);
-
-    useEffect(() => {
-        setSendJsonMessage(sendJsonMessage);
-    }, [sendJsonMessage, setSendJsonMessage]);
-
-    useEffect(() => {
-        if (wsUrl) {
-            connect();
-        }
+        
+        connectionManager.instanceCounter++;
         return () => {
-            console.log("WebSocket: Cleaning up global connection in main hook unmount.");
-            if (reconnectIntervalId.current) clearTimeout(reconnectIntervalId.current);
-            if (globalWs) {
-                // IMPORTANT: Detach the onclose handler BEFORE closing the connection
-                // to prevent the reconnect logic from firing on a deliberate unmount.
-                globalWs.onclose = null;
-                if (globalWs.readyState === WebSocket.OPEN) {
-                    globalWs.close(1000, "Client component unmounting");
+            isMounted = false;
+            connectionManager.instanceCounter--;
+            if (connectionManager.instanceCounter === 0) {
+                console.log("WebSocket: Cleaning up global connection (last hook unmounted).");
+                if (connectionManager.reconnectTimeoutId) clearTimeout(connectionManager.reconnectTimeoutId);
+                if (globalWs) {
+                    globalWs.onclose = null;
+                    globalWs.close(1000, "Client unmounting");
+                    globalWs = null;
                 }
             }
         };
+    // The empty dependency array ensures this setup runs ONLY ONCE.
+    }, []);
+
+    // Effect that triggers connection whenever the URL changes.
+    useEffect(() => {
+        if(wsUrl) {
+            connect();
+        }
     }, [wsUrl, connect]);
     
     const changeWebSocketUrl = useCallback((newUrl: string) => {
         const trimmedUrl = newUrl.trim();
         if (trimmedUrl && trimmedUrl !== wsUrl) {
             console.log(`WebSocket: Setting new target URL: ${trimmedUrl}`);
-            toast.info("Updating Connection", { description: `Changing server URL...` });
+            toast.info("Updating Connection...", { description: `Changing server to ${trimmedUrl}` });
             localStorage.setItem(WEBSOCKET_CUSTOM_URL_KEY, trimmedUrl);
             setWsUrl(trimmedUrl);
         }
     }, [wsUrl]);
 
-    return { sendJsonMessage, lastJsonMessage, isConnected, changeWebSocketUrl, connect };
+    // Components get the globally stable send function and reactively subscribe to `isConnected`.
+    return { 
+        sendJsonMessage, 
+        lastJsonMessage, 
+        isConnected: useAppStore((state) => state.isWebSocketConnected), 
+        changeWebSocketUrl, 
+        connect 
+    };
 };

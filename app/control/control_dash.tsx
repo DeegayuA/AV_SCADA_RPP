@@ -1,4 +1,4 @@
-// app/control/control_dash.tsx (or whatever your filename is)
+// app/control/control_dash.tsx
 'use client';
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
@@ -333,10 +333,13 @@ const UnifiedDashboardPage: React.FC = () => {
   const currentPath = usePathname();
   const { resolvedTheme } = useTheme();
   const currentUser = useCurrentUser();
-  const { isEditMode: isGlobalEditMode, toggleEditMode: toggleEditModeAction } = useAppStore(state => ({
-    isEditMode: state.isEditMode,
-    toggleEditMode: state.toggleEditMode,
-  }));
+  
+  // ==================== THE FIX IS HERE ====================
+  // Select state individually to prevent re-renders from new object references.
+  const isGlobalEditMode = useAppStore(state => state.isEditMode);
+  const toggleEditModeAction = useAppStore(state => state.toggleEditMode);
+  // ========================================================
+  
   const currentUserRole = currentUser?.role;
 
   const [authCheckComplete, setAuthCheckComplete] = useState(false);
