@@ -1,7 +1,6 @@
 // components/sld/nodes/WindInverterNode.tsx
 import React, { memo, useMemo, useEffect, useRef, useState } from 'react';
 import { NodeProps, Handle, Position, XYPosition } from 'reactflow';
-// --- FIX: Import necessary types from framer-motion ---
 import { motion, AnimatePresence, Variants, Transition, MotionStyle } from 'framer-motion';
 import { InverterNodeData, CustomNodeType, SLDElementType, InverterType, DataPoint } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
@@ -293,7 +292,6 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     const baseMinNodeWidth = 95;
     const baseMinNodeHeight = 80;
 
-    // --- FIX: Change return type to MotionStyle ---
     const nodeMainStyle = useMemo((): MotionStyle => {
         let currentBoxShadow = `0 0.5px 1px rgba(0,0,0,0.02), 0 0.25px 0.5px rgba(0,0,0,0.01)`;
         let borderColorActual = selected ? sldAccentVar : appearance.borderColorVar;
@@ -402,7 +400,6 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     };
     const handleDetailsClick = (e: React.MouseEvent) => { setSelectedElementForDetails(fullNodeObjectForDetails); e.stopPropagation(); };
 
-    // --- FIX: Extract and type transitions ---
     const mainTransition: Transition = { opacity: { duration: 0.15, ease: "easeOut" }, scale: { type: "spring", stiffness: 250, damping: 22 }, y: { type: "spring", stiffness: 250, damping: 22 }, boxShadow: { duration: 1.4 + (1 - acPowerRatio) * 1.2, repeat: Infinity, ease: "easeInOut" } };
     const exitTransition: Transition = { duration: 0.08, ease: "easeOut" };
     const statusTextTransition: Transition = { duration: 0.1, ease: "circOut" };

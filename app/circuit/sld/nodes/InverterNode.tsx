@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
+import { Variants, Transition } from 'framer-motion';
+
 // --- DynamicInverterCoreVisualProps and Component (Unchanged, omitted for brevity) ---
 interface DynamicInverterCoreVisualProps {
     appearance: {
@@ -35,7 +37,6 @@ const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = Reac
     appearance,
     standardNodeState,
     acPowerRatio,
-    // inverterType, 
 }) => {
     const isActive = standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL';
 
@@ -51,21 +52,23 @@ const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = Reac
     const particleSizeAc = 1.0 + acPowerRatio * 0.9;
     const particleSizeDc = 0.8 + acPowerRatio * 0.7;
     const coreIconStrokeWidth = 1.5 + acPowerRatio * 0.3;
-    const coreAnimationVariants = {
+
+    const invertingTransition: Transition = {
+        x: { duration: 0.7 + (1 - acPowerRatio) * 0.6, repeat: Infinity, ease: "easeInOut" },
+        scale: { duration: 1.3 + (1 - acPowerRatio) * 1.1, repeat: Infinity, ease: "easeInOut" }
+    };
+
+    const coreAnimationVariants: Variants = {
         idle: { x: 0, scale: 1 },
         inverting: {
             x: [-0.4, 0.4, -0.4],
             scale: [1, 1.015 + acPowerRatio * 0.02, 1],
-            transition: {
-                x: { duration: 0.7 + (1 - acPowerRatio) * 0.6, repeat: Infinity, ease: "easeInOut" as const },
-                scale: { duration: 1.3 + (1 - acPowerRatio) * 1.1, repeat: Infinity, ease: "easeInOut" as const }
-            }
+            transition: invertingTransition
         },
         static: { x: 0, scale: 1 }
     };
 
-    const baseMinNodeWidth = 100;
-    const baseMinNodeHeight = 80;
+    const sharedTransition: Transition = { repeat: Infinity, ease: "linear" };
 
     return (
         <div className="relative w-full h-full flex items-center justify-center select-none overflow-visible">
@@ -98,12 +101,7 @@ const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = Reac
                     style={{ backgroundColor: appearance.iconColorVar, width: particleSizeAc, height: particleSizeAc }}
                     initial={{ y: 2, x: (Math.random() - 0.5) * 5, opacity: 0, scale: 0.35 }}
                     animate={{ y: -16, opacity: [0, 0.65 + acPowerRatio * 0.2, 0], scale: [0.35, 0.9 + acPowerRatio * 0.1, 0.35] }}
-                    transition={{
-                        duration: 1.0 + (1 - acPowerRatio) * 0.6 + Math.random() * 0.3,
-                        repeat: Infinity,
-                        delay: i * (1.0 / numAcParticles),
-                        ease: "linear"
-                    }}
+                    transition={{ ...sharedTransition, duration: 1.0 + (1 - acPowerRatio) * 0.6 + Math.random() * 0.3, delay: i * (1.0 / numAcParticles) }}
                 />
             ))}
 
@@ -114,12 +112,7 @@ const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = Reac
                     style={{ backgroundColor: 'var(--sld-color-dc-input, #fbbf24)', width: particleSizeDc, height: particleSizeDc }}
                     initial={{ y: -2, x: (Math.random() - 0.5) * 4, opacity: 0, scale: 0.3 }}
                     animate={{ y: 14, opacity: [0, 0.55, 0], scale: [0.3, 0.7, 0.3] }}
-                    transition={{
-                        duration: 1.2 + (1 - acPowerRatio) * 0.8 + Math.random() * 0.4,
-                        repeat: Infinity,
-                        delay: i * (1.2 / numDcParticles),
-                        ease: "linear"
-                    }}
+                    transition={{ ...sharedTransition, duration: 1.2 + (1 - acPowerRatio) * 0.8 + Math.random() * 0.4, delay: i * (1.2 / numDcParticles) }}
                 />
             ))}
 

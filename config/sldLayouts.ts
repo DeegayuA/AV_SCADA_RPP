@@ -49,27 +49,38 @@ export const sldLayouts: Record<string, SLDLayout> = {
         type: SLDElementType.WindTurbine,
         position: { x: -200, y: 50 },
         data: {
-          label: 'Wind Turbine 1',
+          label: 'WT-1',
           elementType: SLDElementType.WindTurbine,
-          status: 'nominal',
+          status: 'online',
+          config: {
+            ratingKVA: 1500, // 1.5 MW turbine
+          },
           dataPointLinks: [
-            { dataPointId: 'wind-turbine-1-speed', targetProperty: 'speed' },
-            { dataPointId: 'wind-turbine-1-power', targetProperty: 'power' },
+            { dataPointId: 'work-mode-status', targetProperty: 'status' },
+            { dataPointId: 'input-power-pv1', targetProperty: 'powerOutput' },
           ],
-        } as WindTurbineNodeData,
+        } as GeneratorNodeData,
       },
       {
         id: 'wind-inverter-1',
         type: SLDElementType.WindInverter,
         position: { x: -200, y: 200 },
         data: {
-          label: 'Wind Inverter 1',
+          label: 'Wind Inverter',
           elementType: SLDElementType.WindInverter,
-          status: 'nominal',
+          status: 'online',
+          config: {
+            inverterType: 'on-grid',
+            ratedPower: 1500, // Corresponds to 1.5 MW
+            warningTemperature: 60,
+            maxOperatingTemperature: 75,
+          },
           dataPointLinks: [
-            { dataPointId: 'wind-inverter-1-power', targetProperty: 'power' },
+            { dataPointId: 'work-mode-status', targetProperty: 'status' },
+            { dataPointId: 'pac-l-inverter-power', targetProperty: 'powerOutput' },
+            { dataPointId: 'inverter-internal-temperature', targetProperty: 'temperature' },
           ],
-        } as WindInverterNodeData,
+        } as InverterNodeData,
       },
       // Existing grid components
       {
