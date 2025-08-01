@@ -59,7 +59,7 @@ export const useWebSocket = () => {
     const connect = useCallback(() => {
         // Access store methods via getState() inside callbacks to avoid re-renders.
         const { setWebSocketStatus, updateOpcUaNodeValues } = useAppStore.getState();
-        const url = wsUrl; 
+        const url = wsUrl;
 
         if (!url) return;
 
@@ -96,25 +96,48 @@ export const useWebSocket = () => {
         
         const handleMessage = (jsonString: string) => {
              try {
-                const message = JSON.parse(jsonString) as WebSocketMessageFromServer;
-                if (typeof message !== 'object' || message === null || !message.type) {
-                     console.warn("WebSocket: Received JSON is not a valid message object:", message);
+                const message = JSON.parse(jsonString); // Parse without immediate casting
+
+                if (typeof message !== 'object' || message === null) {
+                    console.warn("WebSocket: Received non-object message:", message);
                     return;
                 }
-                setLastJsonMessage(message);
-                const componentSpecificMessageTypes = new Set(['layout-data', 'layout-error', 'layout-saved-confirmation', 'layout-save-error']);
                 
-                if (message.type === 'toast') {
-                    const { severity = 'default', ...toastOptions } = message.payload as ToastMessagePayload;
-                    if (severity === 'default') {
-                        toast(toastOptions.message, toastOptions);
-                    } else {
-                        // @ts-ignore - We know severity is a valid method on toast except 'default'
-                        toast[severity](toastOptions.message, toastOptions);
+                // --- FIX START ---
+                // Check if the message has a 'type' property to handle structured messages
+                if ('type' in message && typeof message.type === 'string') {
+                    const structuredMessage = message as WebSocketMessageFromServer;
+                    setLastJsonMessage(structuredMessage); // This message has a clear structure
+
+                    const componentSpecificMessageTypes = new Set(['layout-data', 'layout-error', 'layout-saved-confirmation', 'layout-save-error']);
+                    
+                    if (structuredMessage.type === 'toast') {
+                        const { severity = 'default', ...toastOptions } = structuredMessage.payload as ToastMessagePayload;
+                        if (severity === 'default') {
+                            toast(toastOptions.message, toastOptions);
+                        } else {
+                            // @ts-ignore - We know severity is a valid method on toast except 'default'
+                            toast[severity](toastOptions.message, toastOptions);
+                        }
+                    } else if (structuredMessage.type === 'opcua-data') {
+                        if (structuredMessage.payload && typeof structuredMessage.payload === 'object') {
+                            updateOpcUaNodeValues(structuredMessage.payload as Record<string, any>);
+                        } else {
+                            console.warn("WebSocket: 'opcua-data' message received without a valid payload object:", structuredMessage);
+                        }
+                    } else if (!componentSpecificMessageTypes.has(structuredMessage.type)) {
+                        console.warn("WebSocket: Received unhandled message type, passing full message to store for backward compatibility:", structuredMessage.type);
+                        updateOpcUaNodeValues(structuredMessage as Record<string, any>);
                     }
-                } else if (!componentSpecificMessageTypes.has(message.type)) {
+                }
+                // If there's no 'type' property, assume it's a raw OPC-UA data object
+                else {
+                    // This block now correctly handles the raw data object you received
+                    setLastJsonMessage({ type: 'opcua-data', payload: message }); // Create a consistent structure for lastJsonMessage
                     updateOpcUaNodeValues(message as Record<string, any>);
                 }
+                // --- FIX END ---
+
             } catch (e) {
                 console.error("WebSocket: Error parsing JSON.", { raw: jsonString, error: e });
                 toast.error("Data Error", { description: "Received malformed data from the server." });
