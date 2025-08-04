@@ -637,6 +637,11 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                         <SettingsIcon size={6} style={{ color: appearance.textColorVar }} className="opacity-40 group-hover/acdetails:opacity-70 transition-opacity duration-150" />
                     </motion.div>
                 )}
+                 {/* <div className="text-[6px] text-gray-400">
+                    <p>S: {String(reactiveStatusValue)}</p>
+                    <p>P: {String(reactivePowerValue)}</p>
+                    <p>T: {String(reactiveTempValue)}</p>
+                </div> */}
             </div>
         </motion.div>
     );

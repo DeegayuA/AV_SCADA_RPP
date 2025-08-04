@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { GeneratorNodeData, CustomNodeType, DataPoint, SLDElementType } from '@/types/sld';
 import { useAppStore, useOpcUaNodeValue } from '@/stores/appStore';
 import { applyValueMapping, formatDisplayValue, getNodeAppearanceFromState } from './nodeUtils';
-import { WindIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon, ActivityIcon } from 'lucide-react';
+import { WindIcon, CheckCircleIcon, AlertTriangleIcon, XCircleIcon, CogIcon, PowerIcon, InfoIcon, ActivityIcon, Gauge } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 type StandardNodeState = 'ENERGIZED' | 'STANDBY' | 'OFFLINE' | 'FAULT' | 'WARNING' | 'UNKNOWN' | 'NOMINAL';
@@ -72,6 +72,11 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
   const powerOpcUaNodeId = useMemo(() => powerDpConfig?.nodeId, [powerDpConfig]);
   const reactivePowerValue = useOpcUaNodeValue(powerOpcUaNodeId);
 
+  const windSpeedLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'windSpeed'), [data.dataPointLinks]);
+  const windSpeedDpConfig = useMemo(() => windSpeedLink ? dataPoints[windSpeedLink.dataPointId] : undefined, [windSpeedLink, dataPoints]);
+  const windSpeedOpcUaNodeId = useMemo(() => windSpeedDpConfig?.nodeId, [windSpeedDpConfig]);
+  const reactiveWindSpeedValue = useOpcUaNodeValue(windSpeedOpcUaNodeId);
+
   const processedStatus = useMemo<string>(() => {
     if (statusLink && statusDpConfig && reactiveStatusValue !== undefined) {
       return String(applyValueMapping(reactiveStatusValue, statusLink)).toLowerCase();
@@ -126,6 +131,14 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
     }
     return isDeviceActive ? 0.1 : 0; // Default to a low ratio if active but no power data
   }, [currentNumericPower, ratedPowerInWatts, isDeviceActive]);
+
+  const formattedWindSpeed = useMemo<string | null>(() => {
+    if (windSpeedLink && windSpeedDpConfig && reactiveWindSpeedValue !== undefined) {
+      const formatOptions = { type: 'number' as const, precision: 1, suffix: ` ${windSpeedDpConfig.unit || 'm/s'}` };
+      return formatDisplayValue(reactiveWindSpeedValue, formatOptions, windSpeedDpConfig.dataType);
+    }
+    return null;
+  }, [windSpeedLink, windSpeedDpConfig, reactiveWindSpeedValue]);
 
   const formattedPowerOutput = useMemo<string>(() => {
     if (currentNumericPower === undefined) {
@@ -238,6 +251,12 @@ const WindTurbineNode: React.FC<NodeProps<GeneratorNodeData> & Pick<Node<Generat
                 <ActivityIcon size={8} className="opacity-80"/>
                 <p>{formattedPowerOutput}</p>
             </div>
+            {formattedWindSpeed && (
+              <div className="flex items-center gap-1 text-[10px] font-semibold" title={`Wind Speed: ${formattedWindSpeed}`}>
+                  <WindIcon size={8} className="opacity-80"/>
+                  <p>{formattedWindSpeed}</p>
+              </div>
+            )}
         </div>
       </div>
     </motion.div>
