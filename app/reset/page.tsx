@@ -1,10 +1,9 @@
-// app/admin/reset-application/page.tsx
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { saveAs } from 'file-saver';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -44,28 +43,28 @@ const APP_LOCAL_STORAGE_KEYS_TO_PRESERVE_ON_RESET = ['theme'];
 
 
 // --- Animation Variants ---
-const pageVariants = {
+const pageVariants: Variants = {
   initial: { opacity: 0, y: 15 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.25, 1, 0.5, 1] } }, // Smooth ease
+  animate: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } }, // Smooth ease
   exit: { opacity: 0, y: -15, transition: { duration: 0.3, ease: "easeIn" } }
 };
-const cardContainerVariants = {
+const cardContainerVariants: Variants = {
   initial: {},
   animate: { transition: { staggerChildren: 0.1, delayChildren: 0.1 } },
 };
-const cardSectionVariants = {
+const cardSectionVariants: Variants = {
   initial: { opacity: 0, filter: 'blur(4px) saturate(0.5)', y: 25, scale: 0.97 },
   animate: { opacity: 1, filter: 'blur(0px) saturate(1)', y: 0, scale: 1, transition: { type: 'spring', stiffness: 200, damping: 25, mass: 0.8 } },
 };
-const buttonWrapperVariants = {
+const buttonWrapperVariants: Variants = {
   hover: { scale: 1.03, boxShadow: "0px 6px 18px hsla(var(--primary)/0.25)", transition: { type: "spring", stiffness: 350, damping: 10 } },
   tap: { scale: 0.97, boxShadow: "0px 2px 8px hsla(var(--primary)/0.2)", transition: { type: "spring", stiffness: 400, damping: 15 } },
 };
-const listItemVariants = (delayIncrement: number = 0.04) => ({
+const listItemVariants = (delayIncrement: number = 0.04): Variants => ({
   initial: { opacity: 0, x: -20 },
   animate: (i: number) => ({ opacity: 1, x: 0, transition: { delay: i * delayIncrement + 0.2, type: 'spring', stiffness: 180, damping: 12 }}),
 });
-const feedbackMessageVariants = {
+const feedbackMessageVariants: Variants = {
   initial: { opacity: 0, height: 0, marginTop: "0px", y: 10 },
   animate: { opacity: 1, height: 'auto', marginTop: '0.75rem', y: 0, transition: { duration: 0.35, ease: "circOut" } },
   exit: { opacity: 0, height: 0, marginTop: "0px", y: -10, transition: { duration: 0.25, ease: "circIn" } }
