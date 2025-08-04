@@ -56,8 +56,10 @@ export const sldLayouts: Record<string, SLDLayout> = {
             ratingKVA: 1500, // 1.5 MW turbine
           },
           dataPointLinks: [
-            { dataPointId: 'work-mode-status', targetProperty: 'status' },
-            { dataPointId: 'input-power-pv1', targetProperty: 'powerOutput' },
+            { dataPointId: 'wind-turbine-status', targetProperty: 'status' },
+            { dataPointId: 'wind-turbine-power-output', targetProperty: 'powerOutput' },
+            { dataPointId: 'wind-turbine-wind-speed', targetProperty: 'windSpeed' },
+            { dataPointId: 'wind-turbine-rpm', targetProperty: 'rpm' },
           ],
         } as unknown as GeneratorNodeData,
       },
@@ -76,9 +78,9 @@ export const sldLayouts: Record<string, SLDLayout> = {
             maxOperatingTemperature: 75,
           },
           dataPointLinks: [
-            { dataPointId: 'work-mode-status', targetProperty: 'status' },
-            { dataPointId: 'pac-l-inverter-power', targetProperty: 'powerOutput' },
-            { dataPointId: 'inverter-internal-temperature', targetProperty: 'temperature' },
+            { dataPointId: 'wind-inverter-status', targetProperty: 'status' },
+            { dataPointId: 'wind-inverter-power-output', targetProperty: 'powerOutput' },
+            { dataPointId: 'wind-inverter-temperature', targetProperty: 'temperature' },
           ],
         } as unknown as InverterNodeData,
       },
