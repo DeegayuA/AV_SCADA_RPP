@@ -15,11 +15,13 @@ type StandardNodeState = 'ENERGIZED' | 'STANDBY' | 'OFFLINE' | 'FAULT' | 'WARNIN
 import {
     InfoIcon, SettingsIcon, CombineIcon, GridIcon, WindIcon, PowerIcon,
     ActivityIcon, ThermometerIcon, ArrowUpRightIcon, SlidersHorizontalIcon,
+
     MinusIcon, PlusIcon, WavesIcon
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
-interface DynamicInverterCoreVisualProps {
+// ✅ UI UPDATE: New visual component specifically for the Wind Inverter
+interface DynamicWindInverterVisualProps {
     appearance: {
         iconColorVar: string;
         mainStatusColorVar: string;
@@ -27,15 +29,15 @@ interface DynamicInverterCoreVisualProps {
     };
     standardNodeState: StandardNodeState;
     acPowerRatio: number;
-    inverterType: InverterType;
 }
 
-const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = React.memo(({
+const DynamicWindInverterVisual: React.FC<DynamicWindInverterVisualProps> = React.memo(({
     appearance,
     standardNodeState,
     acPowerRatio,
 }) => {
     const isActive = standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL';
+    const numParticles = isActive ? Math.max(1, Math.floor(acPowerRatio * 10)) : 0;
 
     let coreColor = appearance.mainStatusColorVar;
     if (standardNodeState === 'FAULT') coreColor = 'var(--sld-color-fault)';
@@ -43,89 +45,74 @@ const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = Reac
     else if (standardNodeState === 'OFFLINE') coreColor = 'var(--sld-color-offline-icon, #a1a1aa)';
     else if (standardNodeState === 'STANDBY' || !isActive) coreColor = 'var(--sld-color-standby-icon, #71717a)';
 
-    const coreOpacity = isActive ? 0.95 + acPowerRatio * 0.05 : (standardNodeState === 'OFFLINE' ? 0.35 : 0.65);
-    const numAcParticles = isActive ? Math.max(1, Math.floor(acPowerRatio * 5)) : 0;
-    const numDcParticles = isActive ? Math.max(1, Math.floor(acPowerRatio * 3)) : 0;
-    const particleSizeAc = 1.0 + acPowerRatio * 0.9;
-    const particleSizeDc = 0.8 + acPowerRatio * 0.7;
-    const coreIconStrokeWidth = 1.5 + acPowerRatio * 0.3;
-
-    // --- FIX: Explicitly type variants and transitions ---
-    const invertingTransition: Transition = {
-        x: { duration: 0.7 + (1 - acPowerRatio) * 0.6, repeat: Infinity, ease: "easeInOut" },
-        scale: { duration: 1.3 + (1 - acPowerRatio) * 1.1, repeat: Infinity, ease: "easeInOut" }
+    const iconAnimationVariants: Variants = {
+        idle: { scale: 1 },
+        active: {
+            scale: [1, 1.05 + acPowerRatio * 0.1, 1],
+            transition: {
+                scale: { duration: 1.5 + (1 - acPowerRatio) * 1.5, repeat: Infinity, ease: "easeInOut" }
+            }
+        }
     };
-
-    const coreAnimationVariants: Variants = {
-        idle: { x: 0, scale: 1 },
-        inverting: {
-            x: [-0.4, 0.4, -0.4],
-            scale: [1, 1.015 + acPowerRatio * 0.02, 1],
-            transition: invertingTransition
-        },
-        static: { x: 0, scale: 1 }
-    };
-
-    const sharedTransition: Transition = { repeat: Infinity, ease: "linear" };
 
     return (
         <div className="relative w-full h-full flex items-center justify-center select-none overflow-visible">
+            {/* Swirling Wind Particles */}
+            {isActive && Array.from({ length: numParticles }).map((_, i) => {
+                const duration = 2 + Math.random() * 2;
+                const radius = 12 + Math.random() * 4;
+                const size = 1 + Math.random() * 1.5 + acPowerRatio;
+
+                return (
+                    <motion.div
+                        key={`wind-particle-${i}`}
+                        className="absolute rounded-full"
+                        style={{
+                            backgroundColor: 'var(--sld-color-wind-particle, #bae6fd)', // A light blue, themeable color
+                            width: size,
+                            height: size,
+                        }}
+                        initial={{ opacity: 0, scale: 0 }}
+                        animate={{
+                            opacity: [0, 0.5 + acPowerRatio * 0.4, 0],
+                            scale: [0.1, 1, 0.1],
+                            x: [0, radius, 0, -radius, 0],
+                            y: [radius, 0, -radius, 0, radius],
+                        }}
+                        transition={{
+                            repeat: Infinity,
+                            duration: duration,
+                            delay: Math.random() * duration,
+                            ease: 'easeInOut'
+                        }}
+                    />
+                );
+            })}
+
+            {/* Central Wind Icon */}
             <motion.div
-                key={`inverter-core-${standardNodeState}`}
+                key={`wind-inverter-icon-${standardNodeState}`}
                 className="relative z-10"
-                variants={coreAnimationVariants}
-                animate={isActive ? "inverting" : "static"}
-                style={{ opacity: coreOpacity }}
-                transition={{ opacity: { duration: 0.35 } }}
+                variants={iconAnimationVariants}
+                animate={isActive ? 'active' : 'idle'}
             >
-                <SlidersHorizontalIcon size={16} color={coreColor} strokeWidth={coreIconStrokeWidth} />
+                <WindIcon size={22} color={coreColor} strokeWidth={1.5} />
             </motion.div>
 
-            {isActive && (
-                <motion.div
-                    className="absolute z-0"
-                    initial={{ opacity: 0, scale: 0.6 }}
-                    animate={{ opacity: 0.15 + acPowerRatio * 0.25, scale: 0.8 + acPowerRatio * 0.1 }}
-                    transition={{ duration: 0.4, delay: 0.15 }}
-                >
-                    <WavesIcon size={22} color={appearance.iconColorVar} strokeWidth={1} />
-                </motion.div>
-            )}
-
-            {isActive && numAcParticles > 0 && Array.from({ length: numAcParticles }).map((_, i) => (
-                <motion.div
-                    key={`ac-particle-${i}`}
-                    className="absolute rounded-full z-[5]"
-                    style={{ backgroundColor: appearance.iconColorVar, width: particleSizeAc, height: particleSizeAc }}
-                    initial={{ y: 2, x: (Math.random() - 0.5) * 5, opacity: 0, scale: 0.35 }}
-                    animate={{ y: -16, opacity: [0, 0.65 + acPowerRatio * 0.2, 0], scale: [0.35, 0.9 + acPowerRatio * 0.1, 0.35] }}
-                    transition={{ ...sharedTransition, duration: 1.0 + (1 - acPowerRatio) * 0.6 + Math.random() * 0.3, delay: i * (1.0 / numAcParticles) }}
-                />
-            ))}
-
-            {isActive && numDcParticles > 0 && Array.from({ length: numDcParticles }).map((_, i) => (
-                <motion.div
-                    key={`dc-particle-${i}`}
-                    className="absolute rounded-full z-[5]"
-                    style={{ backgroundColor: 'var(--sld-color-dc-input, #fbbf24)', width: particleSizeDc, height: particleSizeDc }}
-                    initial={{ y: -2, x: (Math.random() - 0.5) * 4, opacity: 0, scale: 0.3 }}
-                    animate={{ y: 14, opacity: [0, 0.55, 0], scale: [0.3, 0.7, 0.3] }}
-                    transition={{ ...sharedTransition, duration: 1.2 + (1 - acPowerRatio) * 0.8 + Math.random() * 0.4, delay: i * (1.2 / numDcParticles) }}
-                />
-            ))}
-
+            {/* Background Glow */}
             {isActive && appearance.glowColorVar && appearance.glowColorVar !== 'transparent' && (
                 <motion.div
-                    className="absolute inset-[-2px] rounded-md opacity-40 blur-[3px]"
+                    className="absolute inset-[-2px] rounded-full opacity-40 blur-[4px]"
                     style={{ backgroundColor: appearance.glowColorVar }}
-                    animate={{ opacity: [0.03, 0.2 + acPowerRatio * 0.15, 0.03] }}
-                    transition={{ duration: 1.6 + (1 - acPowerRatio) * 1.0, repeat: Infinity, ease: "easeInOut" }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0.05, 0.2 + acPowerRatio * 0.2, 0.05] }}
+                    transition={{ duration: 1.8 + (1 - acPowerRatio) * 1.2, repeat: Infinity, ease: "easeInOut" }}
                 />
             )}
         </div>
     );
 });
-DynamicInverterCoreVisual.displayName = 'DynamicInverterCoreVisual';
+DynamicWindInverterVisual.displayName = 'DynamicWindInverterVisual';
 
 
 const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
@@ -144,7 +131,7 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     const statusOpcUaNodeId = useMemo(() => statusDataPointConfig?.nodeId, [statusDataPointConfig]);
     const reactiveStatusValue = useOpcUaNodeValue(statusOpcUaNodeId);
 
-    const powerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'powerOutput' || link.targetProperty === 'inverter.powerOutput'), [data.dataPointLinks]);
+    const powerLink = useMemo(() => data.dataPointLinks?.find(link => link.targetProperty === 'windInverter.powerOutput' || link.targetProperty === 'powerOutput' || link.targetProperty === 'inverter.powerOutput'), [data.dataPointLinks]);
     const powerDataPointConfig = useMemo<DataPoint | undefined>(() => powerLink ? dataPoints[powerLink.dataPointId] : undefined, [powerLink, dataPoints]);
     const powerOpcUaNodeId = useMemo(() => powerDataPointConfig?.nodeId, [powerDataPointConfig]);
     const reactivePowerValue = useOpcUaNodeValue(powerOpcUaNodeId);
@@ -173,7 +160,10 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                 valueToProcess *= powerDataPointConfig.factor;
             }
             const mapped = applyValueMapping(valueToProcess, powerLink);
-            if (typeof mapped === 'number') return mapped;
+            if (typeof mapped === 'number') {
+                // Assuming data is in kW from config, convert to W for internal consistency
+                return mapped * 1000;
+            }
             if (typeof mapped === 'string') {
                 const p = parseFloat(mapped.replace(/[^\d.-]/g, ''));
                 return isNaN(p) ? undefined : p;
@@ -237,7 +227,7 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
         if (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') {
             if (inverterType === 'off-grid' && (processedStatus.includes('offgrid') || processedStatus.includes('off-grid'))) return "Islanding";
             if (currentNumericAcPower !== undefined && Math.abs(currentNumericAcPower) < 0.01 && isDeviceActive) return "Idle";
-            return inverterType === 'off-grid' ? "Supplying" : "Inverting";
+            return "Inverting";
         }
         const readableStatus = String(processedStatus || standardNodeState).replace(/_/g, ' ');
         return readableStatus.charAt(0).toUpperCase() + readableStatus.slice(1);
@@ -290,7 +280,7 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
 
     const sldAccentVar = 'var(--sld-color-accent)';
     const baseMinNodeWidth = 95;
-    const baseMinNodeHeight = 80;
+    const baseMinNodeHeight = 105; // Increased height slightly for better spacing
 
     const nodeMainStyle = useMemo((): MotionStyle => {
         let currentBoxShadow = `0 0.5px 1px rgba(0,0,0,0.02), 0 0.25px 0.5px rgba(0,0,0,0.01)`;
@@ -315,44 +305,56 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
 
         return {
             borderColor: borderColorActual,
-            borderWidth: '1px',
+            borderWidth: '1.5px', // Make border thicker
             boxShadow: currentBoxShadow,
             color: appearance.textColorVar,
             width: nodeWidthFromData ? `${nodeWidthFromData}px` : `${baseMinNodeWidth}px`,
             height: nodeHeightFromData ? `${nodeHeightFromData}px` : `${baseMinNodeHeight}px`,
             minWidth: `${baseMinNodeWidth}px`,
             minHeight: `${baseMinNodeHeight}px`,
+            // borderRadius will be handled by className now
         };
     }, [appearance, selected, isRecentStatusChange, sldAccentVar, nodeWidthFromData, nodeHeightFromData, standardNodeState]);
 
     const fullNodeObjectForDetails = useMemo((): CustomNodeType => ({ id, type: type || SLDElementType.Inverter, position: nodePosition, data, selected: selected || false, dragging: dragging || false, zIndex: zIndex || 0, width: nodeWidthFromData || baseMinNodeWidth, height: nodeHeightFromData || baseMinNodeHeight, connectable: isConnectable || false }), [id, type, nodePosition, data, selected, dragging, zIndex, nodeWidthFromData, nodeHeightFromData, isConnectable]);
 
     const formattedAcPowerOutputWithContext = useMemo<string>(() => {
-        const powerValForDisplay = currentNumericAcPower;
+        const powerValForDisplay = currentNumericAcPower; // Assumed in Watts
         const ratedPowerInWatts = ratedPowerConfigInWatts;
+
         const formatSinglePowerValue = (value: number | undefined, isRatedValue: boolean): string => {
-            if (value === undefined) return "N/A";
+            if (value === undefined) {
+                return "N/A";
+            }
             let valueToFormat = value;
-            let displaySuffix = isRatedValue ? 'Wp' : 'W';
-            const absVal = Math.abs(value);
-            if (absVal >= 1_000_000_000) { valueToFormat /= 1_000_000_000; displaySuffix = isRatedValue ? 'GWp' : 'GW';
-            } else if (absVal >= 1_000_000) { valueToFormat /= 1_000_000; displaySuffix = isRatedValue ? 'MWp' : 'MW';
-            } else if (absVal >= 1000) { valueToFormat /= 1000; displaySuffix = isRatedValue ? 'kWp' : 'kW'; }
+            let displaySuffix = isRatedValue ? 'kWp' : 'kW';
+            if (value / 1000 >= 1000) {
+                valueToFormat = value / 1000000;
+                displaySuffix = isRatedValue ? 'MWp' : 'MW';
+            } else {
+                valueToFormat = value / 1000;
+            }
 
-            let calculatedPrecision: number;
-            const configuredPrecisionForActualW = (!isRatedValue && displaySuffix === 'W') ? (powerDataPointConfig?.decimalPlaces ?? powerLink?.format?.precision) : undefined;
-            if (configuredPrecisionForActualW !== undefined) { calculatedPrecision = configuredPrecisionForActualW;
-            } else { const absValueToFormat = Math.abs(valueToFormat); if (valueToFormat === 0) calculatedPrecision = 0; else if (absValueToFormat >= 100) calculatedPrecision = 0; else if (absValueToFormat >= 10) calculatedPrecision = 1; else if (absValueToFormat >= 1) calculatedPrecision = 2; else calculatedPrecision = 2; }
+            const absValueToFormat = Math.abs(valueToFormat);
+            let precision = 1;
+            if (absValueToFormat < 10) precision = 2;
+            if (absValueToFormat < 1) precision = 3;
+            if (absValueToFormat >= 100) precision = 0;
 
-            const displayFormatOptions = { type: 'number' as const, precision: calculatedPrecision, suffix: displaySuffix };
-            const dataTypeForFormat = !isRatedValue ? (powerDataPointConfig?.dataType || 'Float') : 'Float';
-            return formatDisplayValue(valueToFormat, displayFormatOptions, dataTypeForFormat);
+            return `${valueToFormat.toFixed(precision)} ${displaySuffix}`;
         };
 
-        const actualPowerStr = formatSinglePowerValue(powerValForDisplay, false);
-        const ratedPowerStr = ratedPowerInWatts !== undefined ? formatSinglePowerValue(ratedPowerInWatts, true) : undefined;
-        if (powerValForDisplay === undefined) return ratedPowerStr || "N/A";
-        if (ratedPowerStr) return `${actualPowerStr} / ${ratedPowerStr}`;
+        const actualPowerStr = formatDisplayValue(powerValForDisplay ? powerValForDisplay / 1000 : undefined, powerLink?.format || { type: 'number', precision: 1, suffix: ' kW' }, powerDataPointConfig?.dataType);
+        const ratedPowerStr = ratedPowerInWatts ? formatSinglePowerValue(ratedPowerInWatts, true) : undefined;
+
+        if (powerValForDisplay === undefined) {
+            return ratedPowerStr || "N/A";
+        }
+
+        if (ratedPowerStr) {
+            return `${actualPowerStr} / ${ratedPowerStr}`;
+        }
+
         return actualPowerStr;
     }, [currentNumericAcPower, powerLink, powerDataPointConfig, ratedPowerConfigInWatts]);
 
@@ -367,10 +369,10 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     const getHandleBaseStyle = (portType: 'source' | 'target', flowType: 'AC' | 'DC_PV' | 'DC_BATT' | 'DC_GENERIC') => {
         let baseColorVar = 'var(--sld-color-deenergized)';
         if (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') {
-            baseColorVar = flowType === 'AC' ? appearance.mainStatusColorVar : flowType === 'DC_PV' ? 'var(--sld-color-pv, #f59e0b)' : flowType === 'DC_BATT' ? 'var(--sld-color-battery, #22c55e)' : 'var(--sld-color-dc, #facc15)';
+            baseColorVar = flowType === 'AC' ? appearance.mainStatusColorVar : 'var(--sld-color-wind, #38bdf8)'; // Wind specific color for DC
         } else if (portType === 'target') {
             if (standardNodeState !== 'FAULT' && standardNodeState !== 'WARNING' && standardNodeState !== 'OFFLINE') {
-                baseColorVar = flowType === 'AC' ? 'var(--sld-color-grid-idle, #94a3b8)' : flowType === 'DC_PV' ? 'var(--sld-color-pv-idle, #ca8a04)' : flowType === 'DC_BATT' ? 'var(--sld-color-battery-idle, #16a34a)' : 'var(--sld-color-dc-idle, #eab308)';
+                baseColorVar = flowType === 'AC' ? 'var(--sld-color-grid-idle, #94a3b8)' : 'var(--sld-color-wind-idle, #0ea5e9)';
             }
         }
         return { background: baseColorVar, borderColor: 'var(--sld-color-handle-border)' };
@@ -379,17 +381,12 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     const portDefinitions = useMemo((): { id: string; type: 'source' | 'target'; position: Position; title: string; icon: React.ReactElement; flowType: 'AC' | 'DC_PV' | 'DC_BATT' | 'DC_GENERIC'; }[] => {
         const ports: { id: string; type: 'source' | 'target'; position: Position; title: string; icon: React.ReactElement; flowType: 'AC' | 'DC_PV' | 'DC_BATT' | 'DC_GENERIC'; }[] = [];
         const iconSize = 6; const iconStroke = 2.2;
-        ports.push({ id: 'ac_out', type: 'source', position: Position.Left, title: 'AC Output (Load/Grid)', icon: <ArrowUpRightIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'AC' });
+        ports.push({ id: 'ac_out', type: 'source', position: Position.Top, title: 'AC Output (Load/Grid)', icon: <ArrowUpRightIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'AC' });
         ports.push({ id: 'dc_in_wind_1', type: 'target', position: Position.Bottom, title: 'Wind/DC Input 1', icon: <WindIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'DC_PV' });
         if (data.config?.allowSecondSolarInput) { ports.push({ id: 'dc_in_wind_2', type: 'target', position: Position.Bottom, title: 'Wind/DC Input 2', icon: <WindIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'DC_PV' }); }
         if (inverterType === 'hybrid') {
             ports.push({ id: 'batt_in_hybrid', type: 'target', position: Position.Right, title: 'Battery Charge Input', icon: <PlusIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'DC_BATT' });
             ports.push({ id: 'batt_out_hybrid', type: 'source', position: Position.Right, title: 'Battery Discharge Output', icon: <MinusIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'DC_BATT' });
-            ports.push({ id: 'ac_grid_in_hybrid', type: 'target', position: Position.Top, title: 'AC Grid Input/Passthrough', icon: <GridIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'AC' });
-        } else if (inverterType === 'on-grid') { ports.push({ id: 'ac_grid_interface_on_grid', type: 'target', position: Position.Top, title: 'AC Grid (Sync/Export)', icon: <GridIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'AC' });
-        } else {
-            ports.push({ id: 'batt_in_offgrid', type: 'target', position: Position.Right, title: 'Battery Charge (Off-Grid)', icon: <PlusIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'DC_BATT' });
-            ports.push({ id: 'batt_out_offgrid', type: 'source', position: Position.Right, title: 'Battery Discharge (Off-Grid)', icon: <MinusIcon size={iconSize} strokeWidth={iconStroke} />, flowType: 'DC_BATT' });
         }
         return ports;
     }, [inverterType, data.config?.allowSecondSolarInput]);
@@ -400,81 +397,77 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     };
     const handleDetailsClick = (e: React.MouseEvent) => { setSelectedElementForDetails(fullNodeObjectForDetails); e.stopPropagation(); };
 
-    const mainTransition: Transition = { opacity: { duration: 0.15, ease: "easeOut" }, scale: { type: "spring", stiffness: 250, damping: 22 }, y: { type: "spring", stiffness: 250, damping: 22 }, boxShadow: { duration: 1.4 + (1 - acPowerRatio) * 1.2, repeat: Infinity, ease: "easeInOut" } };
-    const exitTransition: Transition = { duration: 0.08, ease: "easeOut" };
-    const statusTextTransition: Transition = { duration: 0.1, ease: "circOut" };
+    const mainTransition: Transition = { opacity: { duration: 0.25 }, scale: { type: "spring", stiffness: 300, damping: 20 }, y: { type: "spring", stiffness: 300, damping: 20 }, boxShadow: { duration: 1.4, ease: "easeInOut" } };
+    const exitTransition: Transition = { duration: 0.1, ease: "easeOut" };
 
     return (
         <motion.div
-            className={`inverter-node group sld-node relative flex flex-col transition-colors duration-100 ease-out overflow-visible border`}
+            // ✅ UI UPDATE: Added rounded-lg and thicker border
+            className={`inverter-node group sld-node custom-node-hover relative flex flex-col transition-colors duration-100 ease-out overflow-visible border-2 rounded-lg`}
             style={{ ...nodeMainStyle, background: `var(--sld-color-node-bg)` }}
             initial={{ opacity: 0, scale: 0.93, y: 3 }}
-            animate={{ opacity: 1, scale: 1, y: 0, boxShadow: (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') && !selected && !isRecentStatusChange && (appearance.glowColorVar && appearance.glowColorVar !== 'transparent') ? [ String(nodeMainStyle.boxShadow || `0 0.5px 1px rgba(0,0,0,0.02)`), `${String(nodeMainStyle.boxShadow || `0 0.5px 1px rgba(0,0,0,0.02)`)}, 0 0 2px 0.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', ', 0.18)').replace('var(', 'rgba(')}`, `${String(nodeMainStyle.boxShadow || `0 0.5px 1px rgba(0,0,0,0.02)`)}, 0 0 4px 1px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', ', 0.28)').replace('var(', 'rgba(')}`, `${String(nodeMainStyle.boxShadow || `0 0.5px 1px rgba(0,0,0,0.02)`)}, 0 0 2px 0.5px ${(appearance.glowColorVar || appearance.mainStatusColorVar).replace(')', ', 0.18)').replace('var(', 'rgba(')}`, String(nodeMainStyle.boxShadow || `0 0.5px 1px rgba(0,0,0,0.02)`) ] : String(nodeMainStyle.boxShadow || '') }}
+            animate={{ opacity: 1, scale: 1, y: 0, boxShadow: String(nodeMainStyle.boxShadow || '') }}
             exit={{ opacity: 0, scale: 0.92, y: 2, transition: exitTransition }}
             transition={mainTransition}
-            whileHover={{ scale: isNodeEditable ? 1.02 : ((hasAnyAcDetailLinks || !isEditMode) ? 1.015 : 1.008), borderColor: selected ? sldAccentVar : ( standardNodeState.includes('FAULT') ? 'var(--sld-color-fault)' : standardNodeState.includes('WARNING') ? 'var(--sld-color-warning)' : sldAccentVar ), boxShadow: selected || isRecentStatusChange || standardNodeState.includes('FAULT') || standardNodeState.includes('WARNING') ? String(nodeMainStyle.boxShadow || '0 0.5px 1px rgba(0,0,0,0.02)') : `${nodeMainStyle.boxShadow || '0 0.5px 1.5px rgba(0,0,0,0.03)'}, 0 0 6px 1px ${(appearance.glowColorVar || appearance.mainStatusColorVar || sldAccentVar).replace(')', ', 0.3)').replace('var(', 'rgba(')}` }}
-            onClick={isNodeEditable ? undefined : ((hasAnyAcDetailLinks || !isEditMode) ? handleDetailsClick : undefined)}
+            whileHover={{ scale: 1.02, borderColor: selected ? sldAccentVar : sldAccentVar, boxShadow: selected || isRecentStatusChange ? String(nodeMainStyle.boxShadow) : `${nodeMainStyle.boxShadow}, 0 0 8px 1px ${(appearance.glowColorVar || appearance.mainStatusColorVar || sldAccentVar).replace(')', ', 0.3)').replace('var(', 'rgba(')}` }}
+            onClick={isNodeEditable ? undefined : handleDetailsClick}
         >
             {portDefinitions.map((port) => {
                 const sidePorts = portDefinitions.filter(p => p.position === port.position);
                 const indexOnSide = sidePorts.findIndex(p => p.id === port.id);
                 const clonedIcon = React.cloneElement(port.icon as React.ReactElement<any>, { ...(port.icon.props || {}), className: `${(port.icon.props as any)?.className || ''} text-white/75 group-hover:text-white dark:text-black/60 dark:group-hover:text-black transition-colors duration-100` });
-                return ( <Handle key={port.id} type={port.type} position={port.position} id={port.id} className="!w-[9px] !h-[9px] !-m-[4px] sld-handle-style group !z-10" style={{ ...getHandleBaseStyle(port.type, port.flowType), ...getHandleStyle(port.position, indexOnSide, sidePorts.length) }} title={port.title}> <div className="flex items-center justify-center w-full h-full">{clonedIcon}</div> </Handle> );
+                return (<Handle key={port.id} type={port.type} position={port.position} id={port.id} className="!w-[9px] !h-[9px] !-m-[4.5px] sld-handle-style group !z-10" style={{ ...getHandleBaseStyle(port.type, port.flowType), ...getHandleStyle(port.position, indexOnSide, sidePorts.length) }} title={port.title}> <div className="flex items-center justify-center w-full h-full">{clonedIcon}</div> </Handle>);
             })}
 
-            <div className="absolute top-0.5 left-0.5 right-0.5 flex items-center justify-between z-20 h-5 pointer-events-none">
+            <div className="absolute top-1 left-1 right-1 flex items-center justify-between z-20 h-5 pointer-events-none">
                 <div title={`Type: ${inverterType.charAt(0).toUpperCase() + inverterType.slice(1).replace('-', ' ')}`} className="p-px px-0.5 bg-background/50 backdrop-blur-sm rounded-sm shadow-xs pointer-events-auto"> <InverterTypeDisplayIcon size={7.5} style={{ color: appearance.textColorVar }} className="opacity-70" /> </div>
-                {!isEditMode && ( <Button variant="ghost" size="icon" title="View Details" className="h-5 w-5 rounded-full group/infobtn pointer-events-auto bg-transparent hover:bg-black/[.04] dark:hover:bg-white/[.04] p-0" onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}> <InfoIcon className="h-3 w-3 text-gray-400 dark:text-gray-500 group-hover/infobtn:text-[var(--sld-color-accent)] transition-colors" /> </Button> )}
+                {!isEditMode && (<Button variant="ghost" size="icon" title="View Details" className="h-5 w-5 rounded-full group/infobtn pointer-events-auto bg-transparent hover:bg-black/[.04] dark:hover:bg-white/[.04] p-0" onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }}> <InfoIcon className="h-3 w-3 text-gray-400 dark:text-gray-500 group-hover/infobtn:text-[var(--sld-color-accent)] transition-colors" /> </Button>)}
             </div>
 
-            <div className="flex flex-col items-center justify-between w-full h-full px-0.5 pt-1.5 pb-0.5 pointer-events-none select-none">
-                <div className="w-[34px] h-[20px] my-px flex-shrink-0">
-                    <DynamicInverterCoreVisual appearance={appearance} standardNodeState={standardNodeState} acPowerRatio={acPowerRatio} inverterType={inverterType} />
+            <div className="flex flex-col items-center justify-between w-full h-full px-1 pt-1.5 pb-1 pointer-events-none select-none">
+                {/* ✅ UI UPDATE: Replaced the old visual with the new one */}
+                <div className="w-full h-[32px] my-1 flex-shrink-0">
+                    <DynamicWindInverterVisual
+                        appearance={appearance}
+                        standardNodeState={standardNodeState}
+                        acPowerRatio={acPowerRatio}
+                    />
                 </div>
-                <div className="flex flex-col items-center text-center w-full max-w-[calc(100%-6px)] mt-px space-y-0">
-                    <p className="text-[9px] font-semibold leading-normal w-full px-0.5 truncate" style={{ color: appearance.textColorVar }} title={data.label}>{data.label}</p>
-                    <div className="min-h-[9px] w-full">
-                        <AnimatePresence mode="wait">
-                            <motion.p key={`status-${displayStatusText}`} className="text-[10px] font-normal leading-normal tracking-tight w-full" style={{ color: appearance.statusTextColorVar }} title={`Status: ${displayStatusText}`} initial={{ opacity: 0, y: 1 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -1 }} transition={statusTextTransition}>
-                                {displayStatusText}
-                            </motion.p>
-                        </AnimatePresence>
+
+                <div className="flex flex-col items-center text-center w-full max-w-full mt-auto space-y-0">
+                    <p className="text-[9px] font-semibold leading-tight w-full px-0.5 truncate" style={{ color: appearance.textColorVar }} title={data.label}>
+                        {data.label}
+                    </p>
+                    <div className="min-h-[10px] w-full" style={{ color: appearance.statusTextColorVar }}>
+                        <p className="text-[10px] font-normal leading-tight tracking-tight w-full" title={`Status: ${displayStatusText}`}>
+                            {displayStatusText}
+                        </p>
                     </div>
-                </div>
-                <div className="flex flex-col items-center space-y-0 w-full font-medium flex-shrink-0 mt-auto">
-                    <div className="flex items-center justify-center space-x-0.5 text-[8px] font-semibold w-full leading-normal truncate" title={`AC Power: ${formattedAcPowerOutputWithContext.replace("N/A", "Not Available")}`}>
-                        <ActivityIcon size={7} style={{ color: appearance.statusTextColorVar }} className="flex-shrink-0 opacity-70" />
-                        <AnimatePresence mode="popLayout">
-                            <motion.span key={`acp-${formattedAcPowerOutputWithContext}`} className="text-[10px]" style={{ color: appearance.statusTextColorVar }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
-                                {formattedAcPowerOutputWithContext.split(" / ")[0]}
-                                {formattedAcPowerOutputWithContext.includes(" / ") && ( <span className="text-[7px] opacity-70"> / {formattedAcPowerOutputWithContext.split(" / ")[1]}</span> )}
-                            </motion.span>
-                        </AnimatePresence>
-                        {powerOpcUaNodeId && currentNumericAcPower !== undefined && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') && (<motion.div className="w-0.5 h-0.5 rounded-full ml-px flex-shrink-0" style={{ backgroundColor: appearance.statusTextColorVar }} animate={{ opacity: [0.2, 0.8, 0.2] }} transition={{ duration: 1.3, repeat: Infinity }} />)}
+
+                    <div className="flex items-center justify-center space-x-1 text-[8px] font-semibold w-full leading-normal truncate" title={`AC Power: ${formattedAcPowerOutputWithContext.replace("N/A", "Not Available")}`}>
+                        <ActivityIcon size={8} style={{ color: appearance.statusTextColorVar }} className="flex-shrink-0 opacity-70" />
+                        <span className="text-[11px]" style={{ color: appearance.statusTextColorVar }}>
+                            {formattedAcPowerOutputWithContext.split(" / ")[0]}
+                            {formattedAcPowerOutputWithContext.includes(" / ") && (
+                                <span className="text-[9px] opacity-70"> / {formattedAcPowerOutputWithContext.split(" / ")[1]}</span>
+                            )}
+                        </span>
+                        {powerOpcUaNodeId && currentNumericAcPower !== undefined && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') && (<motion.div className="w-0.5 h-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: appearance.statusTextColorVar }} animate={{ opacity: [0.2, 0.8, 0.2] }} transition={{ duration: 1.3, repeat: Infinity }} />)}
                     </div>
 
                     {formattedTemperature && (
-                        <div className="flex items-center justify-center space-x-px w-full truncate leading-normal text-[8px]" title={`Temperature: ${formattedTemperature}`}>
-                            <ThermometerIcon size={7} style={{ color: currentTempColorVar }} className="flex-shrink-0 opacity-70" />
-                            <AnimatePresence mode="popLayout">
-                                <motion.span key={`t-${formattedTemperature}`} className="text-[12px]" style={{ color: currentTempColorVar }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}>
-                                    {formattedTemperature}
-                                </motion.span>
-                            </AnimatePresence>
-                            {tempOpcUaNodeId && temperatureValue !== null && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL' || standardNodeState === 'WARNING' || standardNodeState === 'FAULT') && (<motion.div className="w-0.5 h-0.5 rounded-full ml-px flex-shrink-0" style={{ backgroundColor: currentTempColorVar }} animate={{ opacity: [0.2, 0.8, 0.2] }} transition={{ duration: 1.3, repeat: Infinity }} />)}
+                        <div className="flex items-center justify-center space-x-1 w-full truncate leading-normal text-[8px]" title={`Temperature: ${formattedTemperature}`}>
+                            <ThermometerIcon size={8} style={{ color: currentTempColorVar }} className="flex-shrink-0 opacity-70" />
+                            <span className="text-[11px]" style={{ color: currentTempColorVar }}>
+                                {formattedTemperature}
+                            </span>
+                            {tempOpcUaNodeId && temperatureValue !== null && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL' || standardNodeState === 'WARNING' || standardNodeState === 'FAULT') && (<motion.div className="w-0.5 h-0.5 rounded-full flex-shrink-0" style={{ backgroundColor: currentTempColorVar }} animate={{ opacity: [0.2, 0.8, 0.2] }} transition={{ duration: 1.3, repeat: Infinity }} />)}
                         </div>
                     )}
-                </div>
-
-                {hasAnyAcDetailLinks && !isEditMode && ( <motion.div key="ac-details-button" className={`w-[calc(100%+2px)] -mx-px -mb-px mt-px flex items-center justify-center border-t pointer-events-auto group/acdetails hover:bg-black/[.02] dark:hover:bg-white/[.02] cursor-pointer rounded-b-[0.25rem] flex-shrink-0 h-[10px]`} style={{ borderColor: 'var(--sld-color-border-ultra-subtle, color-mix(in srgb, var(--sld-color-border) 10%, transparent))' }} onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }} title="View Detailed AC Parameters"> <SettingsIcon size={6} style={{ color: appearance.textColorVar }} className="opacity-40 group-hover/acdetails:opacity-70 transition-opacity duration-150" /> </motion.div> )}
-                <div className="text-[6px] text-gray-400">
-                    <p>S: {String(reactiveStatusValue)}</p>
-                    <p>P: {String(reactivePowerValue)}</p>
-                    <p>T: {String(reactiveTempValue)}</p>
                 </div>
             </div>
         </motion.div>
     );
 };
 
-export default memo(WindInverterNode);
+export default memo(WindInverterNode); 

@@ -80,7 +80,7 @@ const DynamicInverterCoreVisual: React.FC<DynamicInverterCoreVisualProps> = Reac
                 style={{ opacity: coreOpacity }}
                 transition={{ opacity: { duration: 0.35 } }}
             >
-                <SlidersHorizontalIcon size={16} color={coreColor} strokeWidth={coreIconStrokeWidth} />
+                <SlidersHorizontalIcon size={22} color={coreColor} strokeWidth={coreIconStrokeWidth} />
             </motion.div>
 
             {isActive && (
@@ -297,7 +297,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
     const sldAccentVar = 'var(--sld-color-accent)';
 
     const baseMinNodeWidth = 95;
-    const baseMinNodeHeight = 80;
+    const baseMinNodeHeight = 95;
 
     const nodeMainStyle = useMemo((): React.CSSProperties => {
         let currentBoxShadow = `0 0.5px 1px rgba(0,0,0,0.02), 0 0.25px 0.5px rgba(0,0,0,0.01)`;
@@ -478,8 +478,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
 
     return (
         <motion.div
-            className={`inverter-node group sld-node relative flex flex-col 
-                  transition-colors duration-100 ease-out overflow-visible border`}
+            className={`inverter-node group sld-node custom-node-hover relative flex flex-col transition-colors duration-100 ease-out overflow-visible border-2 rounded-lg`}
             style={{ ...nodeMainStyle, background: `var(--sld-color-node-bg)` }}
             initial={{ opacity: 0, scale: 0.93, y: 3 }}
             animate={{
@@ -568,60 +567,62 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                     />
                 </div>
 
-                <div className="flex flex-col items-center text-center w-full max-w-[calc(100%-6px)] mt-px space-y-0">
-                    <p
-                        className="text-[9px] font-semibold leading-normal w-full px-0.5 truncate"
-                        style={{ color: appearance.textColorVar }} title={data.label}
-                    >
+                <div className="flex flex-col items-center text-center w-full max-w-full mt-auto space-y-0">
+                    <p className="text-[9px] font-semibold leading-tight w-full px-0.5 truncate" style={{ color: appearance.textColorVar }} title={data.label}>
                         {data.label}
                     </p>
-                    <div className="min-h-[9px] w-full">
-                        <AnimatePresence mode="wait">
-                            <motion.p
-                                key={`status-${displayStatusText}`}
-                                className="text-[10px] font-normal leading-normal tracking-tight w-full"
-                                style={{ color: appearance.statusTextColorVar }} title={`Status: ${displayStatusText}`}
-                                initial={{ opacity: 0, y: 1 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -1 }} transition={{ duration: 0.1, ease: "circOut" as const }}
-                            >
-                                {displayStatusText}
-                            </motion.p>
-                        </AnimatePresence>
+                    <div className="min-h-[10px] w-full" style={{ color: appearance.statusTextColorVar }}>
+                        <p className="text-[10px] font-normal leading-tight tracking-tight w-full" title={`Status: ${displayStatusText}`}>
+                            {displayStatusText}
+                        </p>
                     </div>
-                </div>
 
-                <div className="flex flex-col items-center space-y-0 w-full font-medium flex-shrink-0 mt-auto">
-                    <div className="flex items-center justify-center space-x-0.5 text-[8px] font-semibold w-full leading-normal truncate" title={`AC Power: ${formattedAcPowerOutputWithContext.replace("N/A", "Not Available")}`}>
-                        <ActivityIcon size={7} style={{ color: appearance.statusTextColorVar }} className="flex-shrink-0 opacity-70" />
+                    <div className="flex items-center justify-center space-x-1 text-[8px] font-semibold w-full leading-normal truncate" title={`AC Power: ${formattedAcPowerOutputWithContext.replace("N/A", "Not Available")}`}>
+                        <ActivityIcon size={8} color={appearance.statusTextColorVar} className="flex-shrink-0 opacity-70" />
                         <AnimatePresence mode="popLayout">
                             <motion.span
                                 key={`acp-${formattedAcPowerOutputWithContext}`}
-                                className="text-[10px]"
+                                className="text-[11px]"
                                 style={{ color: appearance.statusTextColorVar }}
                                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
                             >
                                 {formattedAcPowerOutputWithContext.split(" / ")[0]}
                                 {formattedAcPowerOutputWithContext.includes(" / ") && (
-                                    <span className="text-[7px] opacity-70"> / {formattedAcPowerOutputWithContext.split(" / ")[1]}</span>
+                                    <span className="text-[9px] opacity-70"> / {formattedAcPowerOutputWithContext.split(" / ")[1]}</span>
                                 )}
                             </motion.span>
                         </AnimatePresence>
-                        {powerOpcUaNodeId && currentNumericAcPower !== undefined && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') && (<motion.div className="w-0.5 h-0.5 rounded-full ml-px flex-shrink-0" style={{ backgroundColor: appearance.statusTextColorVar }} animate={{ opacity: [0.2, 0.8, 0.2] }} transition={{ duration: 1.3, repeat: Infinity }} />)}
+                        {powerOpcUaNodeId && currentNumericAcPower !== undefined && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL') && (
+                            <motion.div 
+                                className="w-0.5 h-0.5 rounded-full flex-shrink-0" 
+                                style={{ backgroundColor: appearance.statusTextColorVar }} 
+                                animate={{ opacity: [0.2, 0.8, 0.2] }} 
+                                transition={{ duration: 1.3, repeat: Infinity }} 
+                            />
+                        )}
                     </div>
 
                     {formattedTemperature && (
-                        <div className="flex items-center justify-center space-x-px w-full truncate leading-normal text-[8px]" title={`Temperature: ${formattedTemperature}`}>
-                            <ThermometerIcon size={7} style={{ color: currentTempColorVar }} className="flex-shrink-0 opacity-70" />
+                        <div className="flex items-center justify-center space-x-1 w-full truncate leading-normal text-[8px]" title={`Temperature: ${formattedTemperature}`}>
+                            <ThermometerIcon size={8} color={currentTempColorVar} className="flex-shrink-0 opacity-70" />
                             <AnimatePresence mode="popLayout">
                                 <motion.span
                                     key={`t-${formattedTemperature}`}
-                                    className="text-[12px]"
+                                    className="text-[11px]"
                                     style={{ color: currentTempColorVar }}
                                     initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.1 }}
                                 >
                                     {formattedTemperature}
                                 </motion.span>
                             </AnimatePresence>
-                            {tempOpcUaNodeId && temperatureValue !== null && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL' || standardNodeState === 'WARNING' || standardNodeState === 'FAULT') && (<motion.div className="w-0.5 h-0.5 rounded-full ml-px flex-shrink-0" style={{ backgroundColor: currentTempColorVar }} animate={{ opacity: [0.2, 0.8, 0.2] }} transition={{ duration: 1.3, repeat: Infinity }} />)}
+                            {tempOpcUaNodeId && temperatureValue !== null && (standardNodeState === 'ENERGIZED' || standardNodeState === 'NOMINAL' || standardNodeState === 'WARNING' || standardNodeState === 'FAULT') && (
+                                <motion.div 
+                                    className="w-0.5 h-0.5 rounded-full flex-shrink-0" 
+                                    style={{ backgroundColor: currentTempColorVar }} 
+                                    animate={{ opacity: [0.2, 0.8, 0.2] }} 
+                                    transition={{ duration: 1.3, repeat: Infinity }} 
+                                />
+                            )}
                         </div>
                     )}
                 </div>
@@ -637,7 +638,7 @@ const InverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                         <SettingsIcon size={6} style={{ color: appearance.textColorVar }} className="opacity-40 group-hover/acdetails:opacity-70 transition-opacity duration-150" />
                     </motion.div>
                 )}
-                 {/* <div className="text-[6px] text-gray-400">
+                {/* <div className="text-[6px] text-gray-400">
                     <p>S: {String(reactiveStatusValue)}</p>
                     <p>P: {String(reactivePowerValue)}</p>
                     <p>T: {String(reactiveTempValue)}</p>
