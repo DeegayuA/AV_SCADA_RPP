@@ -57,7 +57,8 @@ export const sldLayouts: Record<string, SLDLayout> = {
           },
           dataPointLinks: [
             { dataPointId: 'work-mode-status', targetProperty: 'status' },
-            { dataPointId: 'input-power-pv1', targetProperty: 'powerOutput' },
+            { dataPointId: '31-total-active-power-instantaneous', targetProperty: 'powerOutput' },
+            { dataPointId: 'weather-sensor-1-wind-speed', targetProperty: 'windSpeed' },
           ],
         } as unknown as GeneratorNodeData,
       },
