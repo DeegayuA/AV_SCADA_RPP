@@ -516,7 +516,14 @@ const UnifiedDashboardPage: React.FC = () => {
   const handleRemoveItem = useCallback((dpIdToRemove: string) => {
     if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove); let newDisplayedIds: string[]; if (pointToRemove?.threePhaseGroup) { const removedItemsList = allPossibleDataPoints.filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup).map(dp => dp.id); newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id)); setDisplayedDataPointIds(newDisplayedIds); toast.info(`${pointToRemove.threePhaseGroup} group removed.`); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedGroupId: pointToRemove.threePhaseGroup, removedItemIds: removedItemsList, isGroup: true, currentDashboardIds: newDisplayedIds }, currentPath); } else { newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove); setDisplayedDataPointIds(newDisplayedIds); toast.info("Data point removed."); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedId: dpIdToRemove, isGroup: false, currentDashboardIds: newDisplayedIds }, currentPath); }
   }, [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]);
-  const handleSldLayoutSelect = useCallback((newLayoutId: string) => { const oldLayout = sldLayoutId; setSldLayoutId(newLayoutId); if (isSldConfigOpen) setIsSldConfigOpen(false); if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false); logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath); }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]);
+  const handleSldLayoutSelect = useCallback((newLayoutId: string) => {
+    const oldLayout = sldLayoutId;
+    setSldLayoutId(newLayoutId);
+    // Close both dialogs. Calling a setter with the same value is a no-op so this is safe.
+    setIsSldConfigOpen(false);
+    setIsModalSldLayoutConfigOpen(false);
+    logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath);
+  }, [sldLayoutId, currentPath, setIsSldConfigOpen, setIsModalSldLayoutConfigOpen]);
   const fetchAndUpdatePageLayouts = useCallback(() => {
     if (typeof window !== 'undefined') {
       const layoutsFromStorage: { id: string; name: string }[] = [];
@@ -757,7 +764,7 @@ const UnifiedDashboardPage: React.FC = () => {
                       <DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal>
                     </DialogHeaderComponentInternal>
                     <div className="py-4">
-                      <Select onValueChange={(v) => { setSldLayoutId(v); setIsModalSldLayoutConfigOpen(false); }} value={sldLayoutId}>
+                      <Select onValueChange={handleSldLayoutSelect} value={sldLayoutId}>
                         <SelectTrigger className="w-full mb-2">
                           <SelectValue placeholder="Choose..." />
                         </SelectTrigger>
