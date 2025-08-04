@@ -182,17 +182,10 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
             {isAdmin && (
               <>
                 <motion.div variants={itemVariants}>
-                  <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant={isEditMode ? "secondary" : "ghost"} size="icon" onClick={toggleEditMode} title={isEditMode ? "Finalize Dashboard Edits" : "Enable Dashboard Layout Editing"}>
-                          {isEditMode ? <Check className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
-                          <span className="sr-only">{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</p></TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  <Button variant={isEditMode ? "secondary" : "ghost"} size="icon" onClick={toggleEditMode} title={isEditMode ? "Finalize Dashboard Edits" : "Enable Dashboard Layout Editing"}>
+                    {isEditMode ? <Check className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
+                    <span className="sr-only">{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</span>
+                  </Button>
                 </motion.div>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>

@@ -139,7 +139,7 @@ const createPlaceholderNode = (layoutName: string, currentThemeArg?: string): Cu
   position: { x: 300, y: 180 }, 
   data: {
     label: `Layout: ${layoutName.replace(/_/g, ' ')} (Placeholder)`,
-    text: `Layout: ${layoutName.replace(/_/g, ' ')}\n\n${ layoutName.toLowerCase().includes("empty") || layoutName.toLowerCase().includes("new") ? "This is an empty canvas." : "Drag elements from the palette or use 'Clear Canvas' to start designing."}`,
+    text: `This is a new SLD layout.\nDrag elements from the palette to start designing.`,
     elementType: SLDElementType.TextLabel,
     styleConfig: { 
       fontSize: '16px',
