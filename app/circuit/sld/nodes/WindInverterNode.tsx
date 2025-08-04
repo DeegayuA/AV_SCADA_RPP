@@ -467,6 +467,11 @@ const WindInverterNode: React.FC<NodeProps<InverterNodeData>> = (props) => {
                 </div>
 
                 {hasAnyAcDetailLinks && !isEditMode && ( <motion.div key="ac-details-button" className={`w-[calc(100%+2px)] -mx-px -mb-px mt-px flex items-center justify-center border-t pointer-events-auto group/acdetails hover:bg-black/[.02] dark:hover:bg-white/[.02] cursor-pointer rounded-b-[0.25rem] flex-shrink-0 h-[10px]`} style={{ borderColor: 'var(--sld-color-border-ultra-subtle, color-mix(in srgb, var(--sld-color-border) 10%, transparent))' }} onClick={(e) => { e.stopPropagation(); setSelectedElementForDetails(fullNodeObjectForDetails); }} title="View Detailed AC Parameters"> <SettingsIcon size={6} style={{ color: appearance.textColorVar }} className="opacity-40 group-hover/acdetails:opacity-70 transition-opacity duration-150" /> </motion.div> )}
+                <div className="text-[6px] text-gray-400">
+                    <p>S: {String(reactiveStatusValue)}</p>
+                    <p>P: {String(reactivePowerValue)}</p>
+                    <p>T: {String(reactiveTempValue)}</p>
+                </div>
             </div>
         </motion.div>
     );
