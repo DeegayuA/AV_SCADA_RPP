@@ -25,7 +25,6 @@ interface WebSocketMessageFromServer {
 
 // --- Constants ---
 const MAX_RECONNECT_ATTEMPTS = 10;
-const MAX_RECONNECT_DELAY = 30000; // 30 seconds
 
 // --- Singleton WebSocket instance ---
 let globalWs: WebSocket | null = null;
@@ -40,7 +39,9 @@ const connectionManager = {
 const sendJsonMessage = (message: WebSocketMessageToServer) => {
     if (globalWs?.readyState === WebSocket.OPEN) {
         try {
-            globalWs.send(JSON.stringify(message));
+            const messageString = JSON.stringify(message);
+            console.log("WebSocket: Sending message:", messageString);
+            globalWs.send(messageString);
         } catch (error) {
             console.error("WebSocket: Error sending message:", error);
             toast.error("Message Send Error");
@@ -131,6 +132,14 @@ export const useWebSocket = () => {
                     }
                 }
                 // If there's no 'type' property, assume it's a raw OPC-UA data object
+                else if ('status' in message && typeof message.status === 'string') {
+                    const statusMessage = message as { status: 'success' | 'error', nodeId: string, message?: string };
+                    if (statusMessage.status === 'success') {
+                        toast.success(statusMessage.message || "Operation successful");
+                    } else {
+                        toast.error(statusMessage.message || "Operation failed");
+                    }
+                }
                 else {
                     // This block now correctly handles the raw data object you received
                     setLastJsonMessage({ type: 'opcua-data', payload: message }); // Create a consistent structure for lastJsonMessage
@@ -162,11 +171,16 @@ export const useWebSocket = () => {
 
             if (connectionManager.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
                 connectionManager.reconnectAttempts++;
-                const delay = Math.min(1000 * Math.pow(1.8, connectionManager.reconnectAttempts), MAX_RECONNECT_DELAY);
-                console.log(`Will attempt reconnect #${connectionManager.reconnectAttempts} in ${delay / 1000}s.`);
+
+                const isRefreshPhase = connectionManager.reconnectAttempts <= 3;
+                const delay = isRefreshPhase ? 2000 : 5000;
+                const phase = isRefreshPhase ? "refresh" : "reconnect";
+
+                console.log(`Will attempt ${phase} #${connectionManager.reconnectAttempts} in ${delay / 1000}s.`);
                 connectionManager.reconnectTimeoutId = setTimeout(connect, delay);
+
                 const msg = connectionManager.reconnectAttempts === 1 ? "Connection Lost. Retrying..." : "Reconnecting...";
-                toast.loading(msg, { id: "ws-reconnect-loader", description: `Attempt #${connectionManager.reconnectAttempts}` });
+                toast.loading(msg, { id: "ws-reconnect-loader", description: `Attempt #${connectionManager.reconnectAttempts} (${phase})` });
             } else {
                 toast.error("Connection Failed", { id: "ws-max-reconnect", description: "Could not connect. Please check your network and refresh.", duration: Infinity });
             }
