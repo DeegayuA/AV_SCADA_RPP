@@ -47,8 +47,7 @@ let connectionAttempts = 0;
 const MAX_CONNECTION_ATTEMPTS = Infinity;
 let disconnectTimeout: NodeJS.Timeout | null = null;
 
-let localWsServer: WebSocketServer | null = null;
-let vercelWsServer: WebSocketServer | null = null;
+let wsServer: WebSocketServer | null = null;
 
 
 // Helper function to map DataType enum values to strings
@@ -298,8 +297,7 @@ async function discoverAndSaveDatapoints(session: ClientSession): Promise<{ succ
   }
 }
 
-let localPingIntervalId: NodeJS.Timeout | null = null;
-let vercelPingIntervalId: NodeJS.Timeout | null = null;
+let pingIntervalId: NodeJS.Timeout | null = null;
 
 const nodeIdsToMonitor = (): string[] => {
   const uniqueNodeIds = new Set<string>();
@@ -357,6 +355,7 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
 
         ws.on("message", async (message) => {
             const messageString = message.toString();
+            console.log("WebSocket: Received message:", messageString);
             let parsedMessage: any;
 
             try {
@@ -619,12 +618,11 @@ sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
         console.error("WebSocket Server instance error:", error);
     });
 
-    const activePingIntervalId = process.env.VERCEL === "1" ? vercelPingIntervalId : localPingIntervalId;
-    if (activePingIntervalId) {
-        clearInterval(activePingIntervalId);
+    if (pingIntervalId) {
+        clearInterval(pingIntervalId);
     }
 
-    const pingInterval = setInterval(() => {
+    pingIntervalId = setInterval(() => {
         serverInstance.clients.forEach(clientWs => {
             const wsClient = clientWs as WebSocket & { isAlive: boolean };
             if (wsClient.isAlive === false) {
@@ -635,31 +633,14 @@ sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
             wsClient.ping();
         });
     }, WEBSOCKET_HEARTBEAT_INTERVAL);
-
-    if (process.env.VERCEL === "1") {
-        vercelPingIntervalId = pingInterval;
-    } else {
-        localPingIntervalId = pingInterval;
-    }
 }
 
 
 async function ensureWebSocketServerInitialized() {
-    const isVercel = process.env.VERCEL === "1";
-    let serverToUse: WebSocketServer | null = isVercel ? vercelWsServer : localWsServer;
-
-    if (!serverToUse) {
-        if (isVercel) {
-            console.log("Initializing WebSocket server for Vercel (noServer: true)");
-            vercelWsServer = new WebSocketServer({ noServer: true });
-            initializeWebSocketEventHandlers(vercelWsServer);
-            serverToUse = vercelWsServer;
-        } else {
-            console.log(`Initializing WebSocket server locally on port ${WS_PORT}`);
-            localWsServer = new WebSocketServer({ port: WS_PORT });
-            initializeWebSocketEventHandlers(localWsServer);
-            serverToUse = localWsServer;
-        }
+    if (!wsServer) {
+        console.log(`Initializing WebSocket server on port ${WS_PORT}`);
+        wsServer = new WebSocketServer({ port: WS_PORT });
+        initializeWebSocketEventHandlers(wsServer);
     }
 
     if (KEEP_OPCUA_ALIVE && (!opcuaClient || !opcuaSession) && !isConnectingOpcua) {
@@ -880,10 +861,9 @@ function stopDataPolling() {
 }
 
 function broadcast(data: string) {
-    const serverToUse = process.env.VERCEL === "1" ? vercelWsServer : localWsServer;
-    if (!serverToUse) { return; }
-    if (serverToUse.clients.size === 0) { return; }
-    serverToUse.clients.forEach((client) => {
+    if (!wsServer) { return; }
+    if (wsServer.clients.size === 0) { return; }
+    wsServer.clients.forEach((client) => {
         if (client.readyState === WebSocket.OPEN) {
             try { client.send(data); }
             catch (err) { console.error("Error sending data to client during broadcast:", err); }
@@ -954,17 +934,16 @@ async function disconnectOPCUA() {
 export async function GET(req: NextRequest) {
     await ensureWebSocketServerInitialized();
     
-    const isVercel = process.env.VERCEL === "1";
     const upgradeHeader = req.headers.get('upgrade');
 
     if (upgradeHeader?.toLowerCase() === 'websocket') {
-        if (isVercel) {
-            console.log("Detected WebSocket upgrade request on Vercel. Allowing environment to handle it.");
-            return new NextResponse(null, { status: 101 });
-        } else {
-            console.warn(`WebSocket upgrade request received on main app port, but this is a non-Vercel environment. Clients must connect directly to the WebSocket port: ${WS_PORT}.`);
-            return new NextResponse("Misconfigured WebSocket upgrade. Connect directly to the dedicated WebSocket port.", { status: 426 });
-        }
+        // This is where the WebSocket upgrade would be handled by the server
+        // The 'ws' library handles this automatically when a server is created
+        // with a port. For `noServer` mode, manual handling is needed.
+        // Since we are now using a single server with a port, we can
+        // let 'ws' handle it. We can return a 426 to clients that try to
+        // upgrade on the wrong endpoint.
+        return new NextResponse("WebSocket upgrade must be initiated on the WebSocket port.", { status: 426 });
     }
 
     // --- Dynamic HTTP GET Request Handling ---
@@ -983,19 +962,9 @@ export async function GET(req: NextRequest) {
     }
 
     // 3. Construct the dynamic WebSocket URL based on the determined hostname.
-    const isSecure = req.headers.get("x-forwarded-proto") === "https" || req.nextUrl.protocol === "https:";
-    
-    let webSocketUrl;
+    const wsProtocol = "ws"; // Typically 'ws' for local dev, not 'wss'
+    const webSocketUrl = `${wsProtocol}://${hostname}:${WS_PORT}`;
 
-    if (isVercel) {
-        // This is already dynamic and correct for production on Vercel
-        const wsProtocol = isSecure ? "wss" : "ws";
-        webSocketUrl = `${wsProtocol}://${hostname}/api/opcua`;
-    } else {
-        // This now works for localhost AND any local network IP
-        const wsProtocol = "ws"; // Typically 'ws' for local dev, not 'wss'
-        webSocketUrl = `${wsProtocol}://${hostname}:${WS_PORT}`;
-    }
 
     console.log(`Responding with dynamically determined WebSocket URL: ${webSocketUrl}`);
 
@@ -1012,8 +981,7 @@ async function gracefulShutdown(signal: string) {
     console.log(`Received ${signal}. Initiating graceful shutdown (PID: ${process.pid})...`);
     if (disconnectTimeout) clearTimeout(disconnectTimeout);
 
-    if (localPingIntervalId) { clearInterval(localPingIntervalId); console.log("Cleared local WebSocket ping interval."); localPingIntervalId = null;}
-    if (vercelPingIntervalId) { clearInterval(vercelPingIntervalId); console.log("Cleared Vercel WebSocket ping interval."); vercelPingIntervalId = null;}
+    if (pingIntervalId) { clearInterval(pingIntervalId); console.log("Cleared WebSocket ping interval."); pingIntervalId = null;}
 
     const shutdownPromises: Promise<void>[] = [];
 
@@ -1044,8 +1012,7 @@ async function gracefulShutdown(signal: string) {
         });
     };
 
-    shutdownPromises.push(closeWebSocketServer(localWsServer, "Local"));
-    shutdownPromises.push(closeWebSocketServer(vercelWsServer, "Vercel"));
+    shutdownPromises.push(closeWebSocketServer(wsServer, "WebSocket"));
 
     try {
         await Promise.all(shutdownPromises);

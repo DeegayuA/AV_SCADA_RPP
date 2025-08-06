@@ -3,7 +3,7 @@
   "version": "1.6.0",
   "private": true,
   "main": "electron-main.js",
-   "scripts": {
+  "scripts": {
     "dev": "next dev --hostname 0.0.0.0",
     "build": "tsc",
     "start": "next start -H 0.0.0.0",
@@ -23,7 +23,7 @@
     "inject:default": "cp config/config.default.ts config/dataPoints.ts && cp config/config/config.default.constants.ts config/constants.ts",
     "inject": "npm run inject:RUSL && npm run inject:Ranna && npm run inject:Colombo && npm run inject:default",
     "generate:docs": "typedoc --ousld t docs/api --theme hierarchy --readme none --excludeExternals --excludePrivate --excludeProtected --hideGenerator --disableSources --tsconfig tsconfig.json --plugin typedoc-plugin-markdown --plugin typedoc-theme-hierarchy",
-    "vercel-build": "next build", 
+    "vercel-build": "next build",
     "merge:prod": "bash scripts/merge_to_production.sh"
   },
   "dependencies": {
@@ -67,6 +67,7 @@
     "@xyflow/react": "^12.6.0",
     "antd": "^5.25.3",
     "badge-maker": "^4.1.0",
+    "bufferutil": "^4.0.9",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -106,6 +107,7 @@
     "tailwindcss": "^4.1.0",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "5.8.2",
+    "utf-8-validate": "^6.0.5",
     "uuid": "^9.0.1",
     "vaul": "^1.1.2",
     "ws": "^8.18.1",
