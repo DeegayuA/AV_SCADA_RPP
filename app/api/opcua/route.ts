@@ -649,7 +649,7 @@ async function ensureWebSocketServerInitialized() {
             await connectOPCUA();
         }
     }
-    return serverToUse;
+    // No need to return serverToUse; function completes here.
 }
 
 
