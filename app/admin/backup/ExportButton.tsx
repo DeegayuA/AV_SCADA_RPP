@@ -7,9 +7,8 @@ import { useWebSocket } from "@/hooks/useWebSocketListener";
 import { useEffect, useState } from "react";
 import { SLDLayout } from "@/types/sld";
 import { WEATHER_CARD_CONFIG_KEY, WeatherCardConfig, loadWeatherCardConfigFromStorage } from "@/app/control/WeatherCard";
-import { APP_CONFIG } from "@/config/appConfig";
-import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY } from "@/config/constants";
-import { version } from '@/../package.json';
+import * as APP_CONFIG from "@/config/appConfig";
+import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION } from "@/config/constants";
 
 
 const EXPECTED_BACKUP_SCHEMA_VERSION = "2.0.0";
@@ -102,8 +101,8 @@ export default function ExportButton() {
           backupSchemaVersion: EXPECTED_BACKUP_SCHEMA_VERSION,
           createdAt: new Date().toISOString(),
           application: {
-            name: APP_CONFIG.appName,
-            version: version,
+            name: APP_NAME,
+            version: VERSION,
           },
           plant: {
             name: PLANT_NAME,

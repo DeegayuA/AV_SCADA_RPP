@@ -741,6 +741,36 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     }
   }, [canEdit, layoutId, availableLayouts]);
 
+  const handleExportAllLayouts = useCallback(() => {
+    if (!canEdit) {
+      toast.error("Export is only available in edit mode.");
+      return;
+    }
+
+    if (Object.keys(availableLayouts).length === 0) {
+      toast.info("No layouts available to export.");
+      return;
+    }
+
+    try {
+      const allLayoutsDataString = JSON.stringify(availableLayouts, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(allLayoutsDataString);
+      const exportFileDefaultName = `all_sld_layouts_${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      document.body.appendChild(linkElement);
+      linkElement.click();
+      document.body.removeChild(linkElement);
+      
+      toast.success(`Exported ${Object.keys(availableLayouts).length} layout(s) successfully.`);
+    } catch (error) {
+      console.error("SLDWidget: Error during all layouts export:", error);
+      toast.error("Failed to export all layouts.");
+    }
+  }, [canEdit, availableLayouts]);
+
 
   useEffect(() => {
     if (layoutId) {
@@ -1080,7 +1110,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
   if (showConnectingMessage) return (<div className="sld-loader-container text-muted-foreground"><svg className="sld-loader-svg" viewBox="0 0 50 50"><circle className="sld-loader-path" cx="25" cy="25" r="20" fill="none" strokeWidth="4"></circle></svg>Connecting...</div>);
   if (showInitialLoadingSpinner) return (<div className="sld-loader-container text-muted-foreground"><svg className="sld-loader-svg" viewBox="0 0 50 50"><circle className="sld-loader-path" cx="25" cy="25" r="20" fill="none" strokeWidth="4"></circle></svg>Loading Diagram{layoutId ? ` for ${layoutId.replace(/_/g, ' ')}...` : '...'}</div>);
-  if (showPromptToSelectLayout) return (<div className="sld-loader-container text-muted-foreground flex-col"> <LayoutList className="h-12 w-12 mb-4 opacity-50"/><p className="text-lg font-semibold mb-2">Select Layout</p><p className="text-sm mb-4">Choose a layout to get started.</p>{onLayoutIdChangeProp !== undefined && (<Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''}><SelectTrigger className="w-[280px] mb-2"><SelectValue placeholder="Select layout..." /></SelectTrigger><SelectContent>{dynamicAvailableLayouts.map(layout => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select>)}</div>);
+  if (showPromptToSelectLayout) return (<div className="sld-loader-container text-muted-foreground flex-col"> <LayoutList className="h-12 w-12 mb-4 opacity-50"/><p className="text-lg font-semibold mb-2">Select Layout</p><p className="text-sm mb-4">Choose a layout to get started.</p>{onLayoutIdChangeProp !== undefined && (<Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''}><SelectTrigger className="w-[280px] mb-2"><SelectValue placeholder="Select layout..." /></SelectTrigger><SelectContent>{Object.values(availableLayouts).map((layout) => <SelectItem key={layout.layoutId} value={layout.layoutId}>{layout.meta?.name || layout.layoutId}</SelectItem>)}</SelectContent></Select>)}</div>);
   if (showDisconnectedMessageForEdit) return (<div className="sld-loader-container text-muted-foreground flex-col"><AlertTriangle className="h-10 w-10 text-amber-500 mb-3"/><p className="my-2 font-semibold">Sync Disconnected</p><p className="text-xs mb-3">Edits local. Reconnect to sync.</p><Button onClick={() => { setIsLoading(true); connectWebSocket();}} variant="outline" size="sm">Reconnect</Button></div>);
   if (!layoutId && !canEdit) return (<div className="sld-loader-container text-muted-foreground">No diagram specified.</div>);
 

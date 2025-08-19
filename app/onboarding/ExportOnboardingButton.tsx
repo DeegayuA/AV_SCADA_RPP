@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Download } from "lucide-react";
 import { toast } from "sonner";
 import { useOnboarding } from "./OnboardingContext";
-import { APP_CONFIG } from "@/config/appConfig";
-import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY } from "@/config/constants";
-import { version } from '@/../package.json';
+import { APP_NAME } from "@/config/constants";
+import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, VERSION } from "@/config/constants";
 
 const EXPECTED_BACKUP_SCHEMA_VERSION = "2.0.0";
 
@@ -32,8 +31,8 @@ export default function ExportOnboardingButton() {
         backupSchemaVersion: EXPECTED_BACKUP_SCHEMA_VERSION,
         createdAt: new Date().toISOString(),
         application: {
-          name: APP_CONFIG.appName,
-          version: version,
+          name: APP_NAME,
+          version: VERSION,
         },
         plant: {
           name: PLANT_NAME,

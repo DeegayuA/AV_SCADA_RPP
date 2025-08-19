@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 // Import 'Variants'
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { Loader2, SkipForward, Server, Cloud, CheckCircle2, XCircle, Info, RefreshCw, RadioTower, AlertTriangle } from 'lucide-react';
+import { Loader2, SkipForward, Server, Cloud, CheckCircle2, XCircle, Info, RefreshCw, RadioTower, AlertTriangle, Upload } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils'; 
 import { useOnboarding, OnboardingProvider } from '../onboarding/OnboardingContext';
