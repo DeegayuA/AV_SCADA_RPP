@@ -104,11 +104,9 @@ export const useWebSocket = () => {
                     return;
                 }
                 
-                // --- FIX START ---
-                // Check if the message has a 'type' property to handle structured messages
                 if ('type' in message && typeof message.type === 'string') {
                     const structuredMessage = message as WebSocketMessageFromServer;
-                    setLastJsonMessage(structuredMessage); // This message has a clear structure
+                    setLastJsonMessage(structuredMessage);
 
                     const componentSpecificMessageTypes = new Set(['layout-data', 'layout-error', 'layout-saved-confirmation', 'layout-save-error']);
                     
@@ -117,8 +115,7 @@ export const useWebSocket = () => {
                         if (severity === 'default') {
                             toast(toastOptions.message, toastOptions);
                         } else {
-                            // @ts-ignore - We know severity is a valid method on toast except 'default'
-                            toast[severity](toastOptions.message, toastOptions);
+                            (toast as any)[severity](toastOptions.message, toastOptions);
                         }
                     } else if (structuredMessage.type === 'opcua-data') {
                         if (structuredMessage.payload && typeof structuredMessage.payload === 'object') {
@@ -131,7 +128,6 @@ export const useWebSocket = () => {
                         updateOpcUaNodeValues(structuredMessage as Record<string, any>);
                     }
                 }
-                // If there's no 'type' property, assume it's a raw OPC-UA data object
                 else if ('status' in message && typeof message.status === 'string') {
                     const statusMessage = message as { status: 'success' | 'error', nodeId: string, message?: string };
                     if (statusMessage.status === 'success') {
@@ -141,11 +137,9 @@ export const useWebSocket = () => {
                     }
                 }
                 else {
-                    // This block now correctly handles the raw data object you received
-                    setLastJsonMessage({ type: 'opcua-data', payload: message }); // Create a consistent structure for lastJsonMessage
+                    setLastJsonMessage({ type: 'opcua-data', payload: message });
                     updateOpcUaNodeValues(message as Record<string, any>);
                 }
-                // --- FIX END ---
 
             } catch (e) {
                 console.error("WebSocket: Error parsing JSON.", { raw: jsonString, error: e });
@@ -189,28 +183,35 @@ export const useWebSocket = () => {
     
     // Main lifecycle effect for initialization and cleanup.
     useEffect(() => {
-        // This effect runs only ONCE on mount.
         useAppStore.getState().setSendJsonMessage(sendJsonMessage);
         
         let isMounted = true;
         const fetchAndConnect = async () => {
             try {
-                // Fulfills user request: "go to the /api/opcua to start the websocket initialy"
                 const response = await fetch('/api/opcua');
                 if (!response.ok) {
-                    throw new Error(`API call failed with status ${response.status}`);
+                    throw new Error(`API returned status ${response.status}`);
                 }
                 const data = await response.json();
                 const url = data.webSocketUrl;
 
                 if (url && isMounted) {
-                    setWsUrl(url); // This will trigger the connection via the other useEffect
+                    setWsUrl(url); 
                 } else {
-                    throw new Error("WebSocket URL not found in API response");
+                    // FIX: Handle this case gracefully instead of throwing
+                    const errorMessage = "WebSocket URL not found in API response. Real-time sync is disabled.";
+                    console.error(errorMessage, data);
+                    toast.error("Connection Config Error", { 
+                        description: "Could not retrieve the WebSocket address from the server.",
+                        duration: 10000 
+                    });
                 }
             } catch (error) {
                 console.error("Error fetching initial WebSocket URL:", error);
-                toast.error("Network Error", { description: "Could not get server address from API." });
+                toast.error("Network Error", { 
+                    description: "Could not get server configuration. Check network and console.",
+                    duration: 10000
+                });
             }
         };
         
@@ -232,7 +233,6 @@ export const useWebSocket = () => {
                 }
             }
         };
-    // The empty dependency array ensures this setup runs ONLY ONCE.
     }, []);
 
     // Effect that triggers connection whenever the URL changes.
@@ -252,7 +252,6 @@ export const useWebSocket = () => {
         }
     }, [wsUrl]);
 
-    // Components get the globally stable send function and reactively subscribe to `isConnected`.
     return { 
         sendJsonMessage, 
         lastJsonMessage, 

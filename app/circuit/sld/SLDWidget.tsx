@@ -3,36 +3,36 @@
 
 import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect, ComponentType, KeyboardEvent as ReactKeyboardEvent } from 'react'; // Added ReactKeyboardEvent
 import ReactFlow, {
-  ReactFlowProvider,
-  Node, Edge, Connection, addEdge,
-  NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges,
-  SelectionMode, PanOnScrollMode, isNode, isEdge,
-  Controls, MiniMap, Background, NodeTypes, EdgeTypes, ReactFlowInstance,
-  FitViewOptions,
-  Panel,
-  BackgroundVariant,
-  ReactFlowJsonObject,
-  NodeProps,
-  Viewport,
-  ConnectionLineType, // Added ConnectionLineType
+ReactFlowProvider,
+Node, Edge, Connection, addEdge,
+NodeChange, EdgeChange, applyNodeChanges, applyEdgeChanges,
+SelectionMode, PanOnScrollMode, isNode, isEdge,
+Controls, MiniMap, Background, NodeTypes, EdgeTypes, ReactFlowInstance,
+FitViewOptions,
+Panel,
+BackgroundVariant,
+ReactFlowJsonObject,
+NodeProps,
+Viewport,
+ConnectionLineType, // Added ConnectionLineType
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import { cloneDeep, throttle } from 'lodash';
-import { ChevronDown, Save, AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react'; 
+import { ChevronDown, Save, AlertTriangle, Check, Download, LayoutList, ListChecks, Loader2, RotateCcw, X, Upload, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import { Textarea } from "@/components/ui/textarea";
 import {
-  SLDLayout, CustomNodeType, CustomFlowEdge, CustomNodeData,
-  SLDElementType, CustomFlowEdgeData, TextLabelNodeData, DataPoint, 
-  AnimationFlowConfig, // This is the base type from types/sld.ts
-  GlobalSLDAnimationSettings,
+SLDLayout, CustomNodeType, CustomFlowEdge, CustomNodeData,
+SLDElementType, CustomFlowEdgeData, TextLabelNodeData, DataPoint,
+AnimationFlowConfig, // This is the base type from types/sld.ts
+GlobalSLDAnimationSettings,
 } from '@/types/sld';
 import {
-  getThemeAwareColors, getNodeColor as getMiniMapNodeColor,
-  getNodeStrokeColor as getMiniMapNodeStrokeColor, ThemeAwarePalette,
+getThemeAwareColors, getNodeColor as getMiniMapNodeColor,
+getNodeStrokeColor as getMiniMapNodeStrokeColor, ThemeAwarePalette,
 } from './ui/sldThemeUtils';
 import { useWebSocket, WebSocketMessageToServer } from '@/hooks/useWebSocketListener';
 import { useAppStore, useSelectedElementForDetails } from '@/stores/appStore';
@@ -52,7 +52,7 @@ import DataLabelNode from './nodes/DataLabelNode';
 import TextLabelNode from './nodes/TextLabelNode';
 import InverterNode from './nodes/InverterNode';
 import PanelNode from './nodes/PanelNode';
-import BreakerNode from './nodes/BreakerNode'; 
+import BreakerNode from './nodes/BreakerNode';
 import MeterNode from './nodes/MeterNode';
 import BatteryNode from './nodes/BatteryNode';
 import ContactorNode from './nodes/ContactorNode';
@@ -78,10 +78,10 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import SLDDrillDownDialog from './ui/SLDDrillDownDialog';
 import SwitchNode from './nodes/SwitchNode';
-import AnimationFlowConfiguratorDialog, { 
-  AnimationFlowConfiguratorMode, 
-  DialogAnimationFlowConfig, 
-  DialogGlobalAnimationSettings 
+import AnimationFlowConfiguratorDialog, {
+  AnimationFlowConfiguratorMode,
+  DialogAnimationFlowConfig,
+  DialogGlobalAnimationSettings
 } from './ui/AnimationFlowConfiguratorDialog';
 
 import {
@@ -105,12 +105,12 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.Panel]: PanelNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Breaker]: BreakerNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Fuse]: FuseNode as unknown as ComponentType<NodeProps>,
-    [SLDElementType.Meter]: MeterNode as unknown as ComponentType<NodeProps>,    
-    [SLDElementType.Battery]: BatteryNode as unknown as ComponentType<NodeProps>, 
-    [SLDElementType.Contactor]: ContactorNode as unknown as ComponentType<NodeProps>, 
-    [SLDElementType.Grid]: GridNode as unknown as ComponentType<NodeProps>,       
-    [SLDElementType.Load]: LoadNode as unknown as ComponentType<NodeProps>,       
-    [SLDElementType.Busbar]: BusbarNode as unknown as ComponentType<NodeProps>,   
+    [SLDElementType.Meter]: MeterNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Battery]: BatteryNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Contactor]: ContactorNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Grid]: GridNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Load]: LoadNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Busbar]: BusbarNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.GenericDevice]: GenericDeviceNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Transformer]: TransformerNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Generator]: GeneratorNode as unknown as ComponentType<NodeProps>,
@@ -118,9 +118,9 @@ const nodeTypes: NodeTypes = {
     [SLDElementType.WindInverter]: WindInverterNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.PLC]: PLCNode as unknown as ComponentType<NodeProps>,
     [SLDElementType.Sensor]: SensorNode as unknown as ComponentType<NodeProps>,
-    [SLDElementType.Gauge]: GaugeNode as unknown as ComponentType<NodeProps>, 
-    [SLDElementType.Switch]: SwitchNode as unknown as ComponentType<NodeProps>, 
-    [SLDElementType.Relay]: RelayNode as unknown as ComponentType<NodeProps>, 
+    [SLDElementType.Gauge]: GaugeNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Switch]: SwitchNode as unknown as ComponentType<NodeProps>,
+    [SLDElementType.Relay]: RelayNode as unknown as ComponentType<NodeProps>,
 };
 const edgeTypes: EdgeTypes = { animatedFlow: AnimatedFlowEdge };
 const defaultEdgeOptions = { type: 'animatedFlow', style: { strokeWidth: 3 }, data: {} as CustomFlowEdgeData };
@@ -130,18 +130,18 @@ const LOCAL_STORAGE_KEY_PREFIX = 'sldLayout_';
 
 
 const placeholderTextColorGetter = (theme: string | undefined): string => {
-    return theme === 'dark' ? '#aaaaaa' : '#666666'; 
+    return theme === 'dark' ? '#aaaaaa' : '#666666';
 };
 
 const createPlaceholderNode = (layoutName: string, currentThemeArg?: string): CustomNodeType => ({
   id: PLACEHOLDER_NODE_ID,
   type: SLDElementType.TextLabel,
-  position: { x: 300, y: 180 }, 
+  position: { x: 300, y: 180 },
   data: {
     label: `Layout: ${layoutName.replace(/_/g, ' ')} (Placeholder)`,
     text: `Layout: ${layoutName.replace(/_/g, ' ')}\n\n${ layoutName.toLowerCase().includes("empty") || layoutName.toLowerCase().includes("new") ? "This is an empty canvas." : "Drag elements from the palette or use 'Clear Canvas' to start designing."}`,
     elementType: SLDElementType.TextLabel,
-    styleConfig: { 
+    styleConfig: {
       fontSize: '16px',
       color: placeholderTextColorGetter(currentThemeArg),
       textAlign: 'center',
@@ -192,7 +192,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const [importAllJsonString, setImportAllJsonString] = useState('');
   const [selectedAllFileName, setSelectedAllFileName] = useState<string | null>(null);
   const importAllFileInputRef = useRef<HTMLInputElement>(null);
-  
+
   // State for new AnimationFlowConfiguratorDialog
   const [animationConfiguratorTarget, setAnimationConfiguratorTarget] = useState<{
     mode: AnimationFlowConfiguratorMode,
@@ -200,10 +200,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   } | null>(null);
   // No longer need isBulkAnimationConfiguratorOpen; use animationConfiguratorTarget.mode
   const [selectedEdgesForBulkConfig, setSelectedEdgesForBulkConfig] = useState<CustomFlowEdge[]>([]); // Replaced by direct use of selectedEdges
-  
-  const [activeGlobalAnimationSettings, setActiveGlobalAnimationSettings] = 
+
+  const [activeGlobalAnimationSettings, setActiveGlobalAnimationSettings] =
     useState<GlobalSLDAnimationSettings | undefined>(undefined); // From types/sld.ts
-  
+
   const currentLayoutLoadedFromServerOrInitialized = useRef(false);
   const canEdit = useMemo(() => !!isEditModeFromProps, [isEditModeFromProps]);
   const initialFitViewDone = useRef(false);
@@ -214,7 +214,23 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const selectedEdgesFromReactFlow = useMemo(() => edges.filter(edge => edge.selected), [edges]);
   const clipboardNodesRef = useRef<CustomNodeType[]>([]);
 
-    const fetchAndSetAvailableLayouts = useCallback(() => {
+  // <<< FIX START >>>
+  // Create refs to hold the callbacks. This makes them stable across renders.
+  const onCodeChangeRef = useRef(onCodeChange);
+  const onLayoutIdChangePropRef = useRef(onLayoutIdChangeProp);
+
+  // Use effects to keep the refs updated with the latest functions from props.
+  useEffect(() => {
+    onCodeChangeRef.current = onCodeChange;
+  }, [onCodeChange]);
+  
+  useEffect(() => {
+    onLayoutIdChangePropRef.current = onLayoutIdChangeProp;
+  }, [onLayoutIdChangeProp]);
+  // <<< FIX END >>>
+
+
+  const fetchAndSetAvailableLayouts = useCallback(() => {
     if (typeof window !== 'undefined') {
       const layoutsFromStorage: { id: string; name: string }[] = [];
       for (let i = 0; i < localStorage.length; i++) {
@@ -304,8 +320,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
       fetchAndSetAvailableLayouts(); // Refresh the dropdown list
 
-      if (onLayoutIdChangeProp) {
-          onLayoutIdChangeProp(newLayout.layoutId);
+      if (onLayoutIdChangePropRef.current) {
+          onLayoutIdChangePropRef.current(newLayout.layoutId);
       } else {
            if (layoutId !== newLayout.layoutId) {
               setCurrentLayoutIdKey(`sld_${newLayout.layoutId}`);
@@ -329,8 +345,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       console.error("Error creating new layout:", error);
       toast.error("Failed to create new layout.");
     }
-  }, [newLayoutNameInput, dynamicAvailableLayouts, constantSldLayouts, currentThemeHookValue, fetchAndSetAvailableLayouts, onLayoutIdChangeProp, isWebSocketConnected, sendJsonMessage, layoutId]);
-  // Note: cloneDeep and createPlaceholderNode are assumed stable and not listed in deps here. Add if they are not.
+  }, [newLayoutNameInput, dynamicAvailableLayouts, currentThemeHookValue, fetchAndSetAvailableLayouts, isWebSocketConnected, sendJsonMessage, layoutId]);
 
 
   useEffect(() => {
@@ -384,16 +399,16 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     setNodes(prevNodes => removePlaceholderIfNeeded(prevNodes));
     setIsDirty(true);
   }, [canEdit, removePlaceholderIfNeeded]);
-  
-  const onNodeDragStop = useCallback(() => { 
-    if (canEdit) setIsDirty(true); 
+
+  const onNodeDragStop = useCallback(() => {
+    if (canEdit) setIsDirty(true);
   }, [canEdit]);
 
   const onDrop = useCallback((event: React.DragEvent) => {
-    event.preventDefault(); 
+    event.preventDefault();
     if (!canEdit || !reactFlowInstance || !reactFlowWrapper.current) return;
     const typeString = event.dataTransfer.getData('application/reactflow-palette-item');
-    const type = typeString as SLDElementType | undefined; 
+    const type = typeString as SLDElementType | undefined;
 
     if (!type || !Object.values(SLDElementType).includes(type)) {
         console.error("SLDWidget onDrop: Invalid SLDElementType from dataTransfer:", typeString);
@@ -424,10 +439,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   }, [canEdit, reactFlowInstance, removePlaceholderIfNeeded]);
 
   const onDragOver = useCallback((event: React.DragEvent) => {
-    event.preventDefault(); 
+    event.preventDefault();
     event.dataTransfer.dropEffect = canEdit ? 'move' : 'none';
   }, [canEdit]);
-  
+
   const handleElementClick = useCallback(
     (event: React.MouseEvent, element: Node | Edge) => {
       event.stopPropagation();
@@ -448,8 +463,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   );
 
   const onPaneClick = useCallback(() => {
-    setSelectedElement(null); 
-    setIsInspectorDialogOpen(false); 
+    setSelectedElement(null);
+    setIsInspectorDialogOpen(false);
     setIsControlPopupOpen(false);
   }, []);
 
@@ -463,38 +478,38 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const handleDeleteElement = useCallback((elementOrId: CustomNodeType | CustomFlowEdge | string): void => {
     if (!canEdit) return;
     const elementId = typeof elementOrId === 'string' ? elementOrId : elementOrId.id;
-    
+
     setNodes((nds) => nds.filter((node) => node.id !== elementId));
     setEdges((eds) => eds.filter((edge) => edge.id !== elementId && edge.source !== elementId && edge.target !== elementId));
-    setIsDirty(true); setSelectedElement(null); setIsInspectorDialogOpen(false); 
+    setIsDirty(true); setSelectedElement(null); setIsInspectorDialogOpen(false);
     initialFitViewDone.current = false;
   }, [canEdit]);
 
   const handleInternalLayoutSelect = useCallback((newLayoutId: string) => {
-    if (newLayoutId !== layoutId && onLayoutIdChangeProp) {
-      if (isDirty) toast("Unsaved Changes", { 
-          description: "Discard unsaved changes to switch layouts?", 
-          action: { label: "Discard & Switch", onClick: () => { setIsDirty(false); onLayoutIdChangeProp(newLayoutId); }}, 
+    if (newLayoutId !== layoutId && onLayoutIdChangePropRef.current) {
+      if (isDirty) toast("Unsaved Changes", {
+          description: "Discard unsaved changes to switch layouts?",
+          action: { label: "Discard & Switch", onClick: () => { setIsDirty(false); onLayoutIdChangePropRef.current!(newLayoutId); }},
           cancel: { label: "Stay", onClick: () => {} }, duration: Infinity });
-      else onLayoutIdChangeProp(newLayoutId);
+      else onLayoutIdChangePropRef.current(newLayoutId);
     }
-  }, [layoutId, onLayoutIdChangeProp, isDirty]);
+  }, [layoutId, isDirty]);
 
   const handleResetLayout = useCallback(() => {
     if (!canEdit || !layoutId) return;
     setNodes([createPlaceholderNode(layoutId, currentThemeHookValue)]);
-    setEdges([]); setIsDirty(true); 
+    setEdges([]); setIsDirty(true);
     setActiveGlobalAnimationSettings(undefined); // Also reset global animation settings for this layout
     toast.success("Layout Cleared", { description: "Canvas reset. Save to persist." });
     initialFitViewDone.current = false;
   }, [canEdit, layoutId, currentThemeHookValue]);
-  
+
   const persistLayout = useCallback((nodesToSave: CustomNodeType[], edgesToSave: CustomFlowEdge[], rfInstance: ReactFlowInstance | null, currentLayoutId: string, manualSave: boolean) => {
     if (!canEdit || !currentLayoutId) return false;
     const layoutKey = `${LOCAL_STORAGE_KEY_PREFIX}${currentLayoutId}`;
     const nodesForStorage = nodesToSave.filter(n => n.id !== PLACEHOLDER_NODE_ID);
     const viewport = rfInstance ? rfInstance.getViewport() : undefined;
-    
+
     let currentMeta: SLDLayout['meta'] = {}; // Default to empty meta
     // Attempt to load existing meta to preserve fields not managed here (e.g., version, author)
     try {
@@ -507,12 +522,12 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         console.warn(`Error parsing existing layout meta from localStorage for key ${layoutKey}:`, e);
     }
 
-    const layoutToPersist: SLDLayout = { 
-        layoutId: currentLayoutId, 
+    const layoutToPersist: SLDLayout = {
+        layoutId: currentLayoutId,
         nodes: nodesForStorage.map(n => ({ ...n, data: { ...n.data } })), // Deep copy data
         edges: edgesToSave.map(e => ({ ...e, data: { ...e.data } })),     // Deep copy data
         viewport,
-        meta: { 
+        meta: {
             ...currentMeta, // Preserve other existing meta fields
             globalAnimationSettings: activeGlobalAnimationSettings // Overwrite/set with current global settings
         },
@@ -527,39 +542,39 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         if (manualSave) toast.error("Local Save Failed");
     }
 
-    if (onCodeChange) {
-        onCodeChange(layoutJsonString, currentLayoutId);
+    if (onCodeChangeRef.current) {
+        onCodeChangeRef.current(layoutJsonString, currentLayoutId);
     }
 
     if (isWebSocketConnected && sendJsonMessage) {
         sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${currentLayoutId}`, layout: layoutToPersist } });
         if (manualSave) toast.info("Syncing to Server...", { id: `save-pending-${currentLayoutId}` });
-        return true; 
+        return true;
     } else {
         if (manualSave && isWebSocketConnected === false) toast.warning("Offline: Server Sync Skipped");
-        return true; 
+        return true;
     }
-  }, [canEdit, isWebSocketConnected, sendJsonMessage, onCodeChange, activeGlobalAnimationSettings]); 
+  }, [canEdit, isWebSocketConnected, sendJsonMessage, activeGlobalAnimationSettings]);
 
   const debouncedAutoSave = useMemo(
       () => throttle((currentNodes, currentEdges, rfInst, layoutID) => {
         if (!layoutID) return;
         const hasRealContent = currentNodes.some((n: CustomNodeType) => n.id !== PLACEHOLDER_NODE_ID) || currentEdges.length > 0;
-        if (isDirty || (hasRealContent && !currentLayoutLoadedFromServerOrInitialized.current) ) { 
+        if (isDirty || (hasRealContent && !currentLayoutLoadedFromServerOrInitialized.current) ) {
              persistLayout(currentNodes, currentEdges, rfInst, layoutID, false);
         }
       }, 5000, { leading: false, trailing: true }),
-      [persistLayout, isDirty] 
+      [persistLayout, isDirty]
   );
 
   const handleManualSaveLayout = useCallback(() => {
       if (!canEdit || !layoutId) return;
-      const hasContentOrIsDirtyPlaceholder = nodes.filter(n => n.id !== PLACEHOLDER_NODE_ID).length > 0 || 
-                                           edges.length > 0 || 
+      const hasContentOrIsDirtyPlaceholder = nodes.filter(n => n.id !== PLACEHOLDER_NODE_ID).length > 0 ||
+                                           edges.length > 0 ||
                                            (nodes.length === 1 && nodes[0].id === PLACEHOLDER_NODE_ID && isDirty);
 
       if (!isDirty && !hasContentOrIsDirtyPlaceholder && currentLayoutLoadedFromServerOrInitialized.current) {
-          toast.info("No Changes to Save"); 
+          toast.info("No Changes to Save");
           return;
       }
       persistLayout(nodes, edges, reactFlowInstance, layoutId, true);
@@ -587,12 +602,12 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         toast.error("Invalid SLDLayout Structure.", { description: "Missing required 'layoutId', 'nodes', or 'edges'." });
         return;
       }
-      
-      const isValidNodes = parsedLayout.nodes.every(n => 
-        typeof n.id === 'string' && 
-        typeof n.position === 'object' && n.position !== null && 
+
+      const isValidNodes = parsedLayout.nodes.every(n =>
+        typeof n.id === 'string' &&
+        typeof n.position === 'object' && n.position !== null &&
         typeof n.data === 'object' && n.data !== null &&
-        typeof n.type === 'string' 
+        typeof n.type === 'string'
       );
       const isValidEdges = parsedLayout.edges.every(e =>
         typeof e.id === 'string' &&
@@ -609,22 +624,22 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         toast.error("Invalid Edge Structure.", { description: "Edges missing id, source, or target." });
         return;
       }
-      
+
       if (parsedLayout.layoutId !== layoutId) {
         toast.info("Importing Content to Current Layout", {
           description: `Content from '${parsedLayout.layoutId.replace(/_/g, ' ')}' imported into '${layoutId.replace(/_/g, ' ')}'. Original layout ID ignored for saving.`,
           duration: 8000,
         });
       }
-      
-      const validatedNodes = parsedLayout.nodes.map(n => ({ 
-          ...n, 
-          selected: false, 
-          type: n.type || n.data?.elementType || SLDElementType.TextLabel, 
+
+      const validatedNodes = parsedLayout.nodes.map(n => ({
+          ...n,
+          selected: false,
+          type: n.type || n.data?.elementType || SLDElementType.TextLabel,
       }));
 
       setNodes(removePlaceholderIfNeeded(validatedNodes));
-      setEdges(parsedLayout.edges.map(e => ({ ...e, type: e.type || defaultEdgeOptions.type })) || []); 
+      setEdges(parsedLayout.edges.map(e => ({ ...e, type: e.type || defaultEdgeOptions.type })) || []);
       setActiveGlobalAnimationSettings(parsedLayout.meta?.globalAnimationSettings || undefined);
 
 
@@ -633,7 +648,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       } else if (reactFlowInstance) {
         reactFlowInstance.fitView(fitViewOptions);
       }
-      initialFitViewDone.current = true; 
+      initialFitViewDone.current = true;
 
       persistLayout(validatedNodes, parsedLayout.edges || [], reactFlowInstance, layoutId, true);
       setIsDirty(false);
@@ -674,13 +689,13 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         console.error("FileReader error for SLD import.");
         toast.error("File Read Error", { description: "An error occurred while reading the file." });
         setSelectedFileName(null);
-        setImportJsonString(''); 
+        setImportJsonString('');
       };
       reader.readAsText(file);
     } else {
       setSelectedFileName(null);
       // Optionally, clear importJsonString if you want 'cancel' in file dialog to clear text area
-      setImportJsonString(''); 
+      setImportJsonString('');
     }
     // Reset file input to allow re-uploading the same file
     if (fileInputRef.current) {
@@ -713,7 +728,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         console.error("FileReader error for all layouts SLD import.");
         toast.error("File Read Error", { description: "An error occurred while reading the file." });
         setSelectedAllFileName(null);
-        setImportAllJsonString(''); 
+        setImportAllJsonString('');
       };
       reader.readAsText(file);
     } else {
@@ -723,7 +738,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       importAllFileInputRef.current.value = '';
     }
   };
-  
+
   const handleImportAllLayouts = useCallback((jsonStringToImportAll: string) => {
     if (!canEdit) {
       toast.error("Import is only available in edit mode.");
@@ -759,7 +774,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
           typeof layoutData.layoutId === 'string' &&
           layoutData.layoutId === key && // Ensure the key matches the layoutId within the object
           Array.isArray(layoutData.nodes) &&
-          Array.isArray(layoutData.edges) 
+          Array.isArray(layoutData.edges)
           // Add more checks if necessary, e.g., for viewport, meta
         ) {
           try {
@@ -797,27 +812,15 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         action: {
             label: "Reload View",
             onClick: () => {
-                // A simple way to trigger re-evaluation of useEffect that loads layout
-                // This assumes onLayoutIdChangeProp can handle the current layoutId to force a reload
-                if (onLayoutIdChangeProp && layoutId) {
-                    onLayoutIdChangeProp(layoutId); 
-                } else {
-                    // Fallback if direct reload isn't available (e.g. if onLayoutIdChangeProp is not passed)
-                    // This is a bit of a heavy hammer.
-                    // window.location.reload(); 
-                    // Or, if you want to just clear and make user reselect from dropdown:
-                    // setNodes([createPlaceholderNode("Please re-select layout", currentThemeHookValue)]);
-                    // setEdges([]);
-                    // setActiveGlobalAnimationSettings(undefined);
-                    // setCurrentLayoutIdKey(''); // This would trigger re-fetch if layoutId is still the same
-                    // For now, just the toast is fine as per requirements.
+                if (onLayoutIdChangePropRef.current && layoutId) {
+                    onLayoutIdChangePropRef.current(layoutId);
                 }
             }
         }
       });
     }
     setIsImportAllDialogOpen(false); // This will trigger onOpenChange to clear states
-  }, [canEdit, layoutId, onLayoutIdChangeProp, currentThemeHookValue]);
+  }, [canEdit, layoutId, currentThemeHookValue]);
 
 
   const handleExportAllLayouts = useCallback(() => {
@@ -856,7 +859,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);
       linkElement.setAttribute('download', exportFileDefaultName);
-      document.body.appendChild(linkElement); 
+      document.body.appendChild(linkElement);
       linkElement.click();
       document.body.removeChild(linkElement);
       toast.success(`${layoutsFound} SLD layout(s) exported successfully.`);
@@ -908,32 +911,24 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     }
 
     try {
-      // Ensure viewport and globalAnimationSettings are included if missing and we are exporting the *active* layout from constants
-      // For localStorage, these should already be part of the stored SLDLayout object.
-      // For constantSldLayouts, they might be top-level in the definition but need to be in the SLDLayout object.
       if (loadedFrom === "predefined constants") {
         if (!layoutToExport.viewport && constantSldLayouts[layoutId]?.viewport) {
             layoutToExport.viewport = constantSldLayouts[layoutId]!.viewport;
         }
-        // Constant layouts don't store globalAnimationSettings within their main object usually,
-        // but if we had a mechanism to associate them, it would be here.
-        // For now, we assume constantSldLayouts are complete SLDLayout objects or their meta is handled elsewhere.
-        // If activeGlobalAnimationSettings are relevant for a constant layout being exported, this might need adjustment.
-        // However, the priority is "saved versions", so we export what's defined in constantSldLayouts.
       }
 
 
       layoutDataString = JSON.stringify(layoutToExport, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(layoutDataString);
       const exportFileDefaultName = `${layoutId}_sld_layout_${new Date().toISOString().split('T')[0]}.json`;
-      
+
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);
       linkElement.setAttribute('download', exportFileDefaultName);
       document.body.appendChild(linkElement);
       linkElement.click();
       document.body.removeChild(linkElement);
-      
+
       toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully from ${loadedFrom}.`);
     } catch (error) {
       console.error(`SLDWidget: Error during single layout export for ${layoutId}:`, error);
@@ -944,17 +939,17 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
   useEffect(() => {
     if (layoutId) {
-      const newKey = `sld_${layoutId}`; 
+      const newKey = `sld_${layoutId}`;
       if (newKey !== currentLayoutIdKey) {
         setCurrentLayoutIdKey(newKey);
-        currentLayoutLoadedFromServerOrInitialized.current = false; 
+        currentLayoutLoadedFromServerOrInitialized.current = false;
         initialFitViewDone.current = false;
         setNodes([]); setEdges([]); setIsDirty(false); setIsLoading(true);
         setActiveGlobalAnimationSettings(undefined); // Reset for new layout
         setSelectedElement(null); setIsInspectorDialogOpen(false); setIsControlPopupOpen(false);
       }
-    } else { 
-      setCurrentLayoutIdKey(''); setNodes([]); setEdges([]); setIsLoading(false); 
+    } else {
+      setCurrentLayoutIdKey(''); setNodes([]); setEdges([]); setIsLoading(false);
       currentLayoutLoadedFromServerOrInitialized.current = false; initialFitViewDone.current = false;
       setIsDirty(false); setActiveGlobalAnimationSettings(undefined);
       setSelectedElement(null); setIsInspectorDialogOpen(false); setIsControlPopupOpen(false);
@@ -964,7 +959,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   useEffect(() => {
     if (!layoutId || currentLayoutLoadedFromServerOrInitialized.current) {
       if (currentLayoutLoadedFromServerOrInitialized.current && !initialFitViewDone.current && reactFlowInstance && nodes.length > 0) {
-           setTimeout(() => { 
+           setTimeout(() => {
                 reactFlowInstance.fitView(fitViewOptions);
                 initialFitViewDone.current = true;
             }, 100);
@@ -972,15 +967,15 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       if (currentLayoutLoadedFromServerOrInitialized.current) setIsLoading(false);
       return;
     }
-    
+
     let loadedLayout: SLDLayout | null = null; let loadedFrom: string | null = null;
 
     // Try constant layouts first
     if (constantSldLayouts[layoutId]) {
-        loadedLayout = JSON.parse(JSON.stringify(constantSldLayouts[layoutId])); 
+        loadedLayout = JSON.parse(JSON.stringify(constantSldLayouts[layoutId]));
         loadedFrom = "constant definition";
     }
-    
+
     // Override with localStorage if an edited version exists
     const localData = localStorage.getItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`);
     if (localData) {
@@ -989,13 +984,13 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             if (localLayoutParsed && localLayoutParsed.layoutId === layoutId && Array.isArray(localLayoutParsed.nodes)) {
                 loadedLayout = localLayoutParsed; // Prioritize LS version
                 loadedFrom = "LocalStorage (override)";
-            } else { 
+            } else {
                 console.warn(`SLDWidget: Invalid layout data in LS for ${layoutId}. Clearing.`);
-                localStorage.removeItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`); 
+                localStorage.removeItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`);
             }
-        } catch (e) { 
+        } catch (e) {
             console.error(`SLDWidget: Error parsing LS for ${layoutId}. Clearing.`, e);
-            localStorage.removeItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`); 
+            localStorage.removeItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`);
         }
     }
 
@@ -1006,8 +1001,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       setActiveGlobalAnimationSettings(loadedLayout.meta?.globalAnimationSettings || undefined);
       setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true; setIsDirty(false);
       initialFitViewDone.current = false;
-      if (onCodeChange) {
-          onCodeChange(JSON.stringify(loadedLayout), layoutId);
+      if (onCodeChangeRef.current) {
+          onCodeChangeRef.current(JSON.stringify(loadedLayout), layoutId);
       }
       return;
     }
@@ -1019,16 +1014,16 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         setNodes(placeholderNodes); setEdges([]);
         setActiveGlobalAnimationSettings(undefined);
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true; setIsDirty(false);
-        initialFitViewDone.current = false; 
-        if (onCodeChange) { 
-            onCodeChange(JSON.stringify({ layoutId, nodes: [], edges: [], viewport: undefined, meta: { globalAnimationSettings: undefined } }), layoutId);
+        initialFitViewDone.current = false;
+        if (onCodeChangeRef.current) {
+            onCodeChangeRef.current(JSON.stringify({ layoutId, nodes: [], edges: [], viewport: undefined, meta: { globalAnimationSettings: undefined } }), layoutId);
         }
-    } else { 
+    } else {
         setNodes([createPlaceholderNode(layoutId + " (Connecting...)", currentThemeHookValue)]); setEdges([]);
-        setActiveGlobalAnimationSettings(undefined); 
-        setIsLoading(true); 
+        setActiveGlobalAnimationSettings(undefined);
+        setIsLoading(true);
     }
-  }, [layoutId, currentLayoutIdKey, isEditModeFromProps, isWebSocketConnected, sendJsonMessage, currentThemeHookValue, reactFlowInstance, onCodeChange]);
+  }, [layoutId, currentLayoutIdKey, isEditModeFromProps, isWebSocketConnected, sendJsonMessage, currentThemeHookValue, reactFlowInstance]);
 
 
   useLayoutEffect(() => {
@@ -1036,7 +1031,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         let viewportToSet: Viewport | undefined = undefined;
         const localData = localStorage.getItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId!}`);
         if (localData) {
-            try { 
+            try {
                 const parsed = JSON.parse(localData) as SLDLayout;
                 viewportToSet = parsed.viewport;
             } catch (e) { /* ignore */ }
@@ -1044,7 +1039,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         if (!viewportToSet && layoutId && constantSldLayouts[layoutId!]?.viewport) {
             viewportToSet = constantSldLayouts[layoutId!]!.viewport;
         }
-        
+
         if (viewportToSet) {
             console.log(`SLDWidget useLayoutEffect: Setting viewport for "${layoutId}" from loaded config.`);
             reactFlowInstance.setViewport(viewportToSet, { duration: fitViewOptions.duration });
@@ -1064,7 +1059,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     if (!lastJsonMessage || !currentLayoutIdKey) return;
     const message = lastJsonMessage as WebSocketMessageFromServer;
     if (message.payload?.key && message.payload.key !== currentLayoutIdKey && (message.type === 'layout-data' || message.type === 'layout-error')) return;
-    const localLayoutId = layoutId; 
+    const localLayoutId = layoutId;
     switch (message.type) {
       case 'layout-data':
         const serverLayout = message.payload.layout as SLDLayout | null;
@@ -1076,18 +1071,18 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             setEdges(serverLayout.edges || []);
             setActiveGlobalAnimationSettings(serverLayout.meta?.globalAnimationSettings || undefined);
             if (serverLayout.nodes.length === 0 && localLayoutId) setNodes(isEditModeFromProps ? [createPlaceholderNode(localLayoutId, currentThemeHookValue)] : []);
-            
+
             const serverLayoutString = JSON.stringify(serverLayout);
             localStorage.setItem(`${LOCAL_STORAGE_KEY_PREFIX}${serverLayout.layoutId}`, serverLayoutString);
-            if (onCodeChange) onCodeChange(serverLayoutString, serverLayout.layoutId);
+            if (onCodeChangeRef.current) onCodeChangeRef.current(serverLayoutString, serverLayout.layoutId);
 
-        } else { 
+        } else {
             const emptyLayoutNodes = isEditModeFromProps && localLayoutId ? [createPlaceholderNode(localLayoutId, currentThemeHookValue)] : (localLayoutId ? [createPlaceholderNode(localLayoutId + " (Not Found)", currentThemeHookValue)] : []);
             setNodes(emptyLayoutNodes);
             setEdges([]);
             setActiveGlobalAnimationSettings(undefined);
-            if (onCodeChange && localLayoutId) {
-                onCodeChange(JSON.stringify({layoutId: localLayoutId, nodes: [], edges:[], viewport: undefined, meta: {globalAnimationSettings: undefined} }), localLayoutId);
+            if (onCodeChangeRef.current && localLayoutId) {
+                onCodeChangeRef.current(JSON.stringify({layoutId: localLayoutId, nodes: [], edges:[], viewport: undefined, meta: {globalAnimationSettings: undefined} }), localLayoutId);
             }
         }
         setIsDirty(false); break;
@@ -1095,33 +1090,33 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true;
         initialFitViewDone.current = false;
         if (localLayoutId) setNodes([createPlaceholderNode(localLayoutId + " (Error)", currentThemeHookValue)]);
-        else setNodes([]); 
+        else setNodes([]);
         setEdges([]);
         setActiveGlobalAnimationSettings(undefined);
         toast.error("Server Load Error", { description: message.payload.error || "Failed." });
-        if (onCodeChange && localLayoutId) {
-            onCodeChange(JSON.stringify({layoutId: localLayoutId, nodes: [], edges:[], viewport: undefined, meta: {globalAnimationSettings: undefined} }), localLayoutId);
+        if (onCodeChangeRef.current && localLayoutId) {
+            onCodeChangeRef.current(JSON.stringify({layoutId: localLayoutId, nodes: [], edges:[], viewport: undefined, meta: {globalAnimationSettings: undefined} }), localLayoutId);
         }
         break;
-      case 'layout-saved-confirmation': 
-        if (message.payload?.key === currentLayoutIdKey) { 
-            toast.success("Synced to Server!", { id: `save-confirm-${currentLayoutIdKey}`}); 
-            setIsDirty(false); 
+      case 'layout-saved-confirmation':
+        if (message.payload?.key === currentLayoutIdKey) {
+            toast.success("Synced to Server!", { id: `save-confirm-${currentLayoutIdKey}`});
+            setIsDirty(false);
         } break;
-      case 'layout-save-error': 
-        if (message.payload?.key === currentLayoutIdKey) { 
-            toast.error("Server Sync Failed", { id: `save-error-${currentLayoutIdKey}`, description: message.payload.error || "Unknown." }); 
+      case 'layout-save-error':
+        if (message.payload?.key === currentLayoutIdKey) {
+            toast.error("Server Sync Failed", { id: `save-error-${currentLayoutIdKey}`, description: message.payload.error || "Unknown." });
         } break;
-      default: break; 
+      default: break;
     }
-  }, [lastJsonMessage, currentLayoutIdKey, isEditModeFromProps, layoutId, currentThemeHookValue, removePlaceholderIfNeeded, reactFlowInstance, onCodeChange]);
+  }, [lastJsonMessage, currentLayoutIdKey, isEditModeFromProps, layoutId, currentThemeHookValue, removePlaceholderIfNeeded, reactFlowInstance]);
 
   useEffect(() => {
     if (canEdit && isDirty && layoutId && (nodes.length > 0 || edges.length > 0)) {
         const isPlaceholderOnly = nodes.length === 1 && nodes[0].id === PLACEHOLDER_NODE_ID;
         const hasContent = nodes.filter(n => n.id !== PLACEHOLDER_NODE_ID).length > 0 || edges.length > 0;
 
-        if (hasContent || (isPlaceholderOnly && isDirty)) { 
+        if (hasContent || (isPlaceholderOnly && isDirty)) {
              debouncedAutoSave(nodes, edges, reactFlowInstance, layoutId);
         }
     }
@@ -1132,20 +1127,15 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     if (!canEdit) return;
     const selectedNodesToCopy = nodes.filter(node => node.selected && node.id !== PLACEHOLDER_NODE_ID);
     if (selectedNodesToCopy.length === 0) {
-      // toast.info("No nodes selected to copy."); // Optional: if you want feedback even when nothing is copied
       return;
     }
 
     clipboardNodesRef.current = selectedNodesToCopy.map(node => ({
-      // Essential properties for pasting. ID will be regenerated.
-      // Position is copied to use as a base for the new position.
-      ...node, // spread to get width, height, type etc.
-      data: cloneDeep(node.data), // Deep clone data
-      // Explicitly exclude problematic properties or ensure they are handled on paste
-      id: `original_${node.id}`, // Temporary ID, will be replaced on paste
-      selected: false, // Will be set to true for new nodes on paste
+      ...node,
+      data: cloneDeep(node.data),
+      id: `original_${node.id}`,
+      selected: false,
       dragging: false,
-      // position: { x: node.position.x, y: node.position.y }, // Already spread
     }));
     toast.info(`Copied ${selectedNodesToCopy.length} node(s) to clipboard.`);
   }, [canEdit, nodes]);
@@ -1162,7 +1152,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       const nodeType = copiedNode.type || SLDElementType.GenericDevice; // Fallback type
       const newId = `${nodeType}_${+new Date()}_${Math.random().toString(36).substring(2, 6)}_${index}`;
       const newPosition = {
-        x: copiedNode.position.x + 20 + (index * 10), // Offset each pasted node slightly
+        x: copiedNode.position.x + 20 + (index * 10),
         y: copiedNode.position.y + 20 + (index * 10),
       };
 
@@ -1171,10 +1161,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         id: newId,
         position: newPosition,
         selected: true,
-        dragging: false, // Ensure dragging is false
-        data: cloneDeep(copiedNode.data), // Ensure data is a fresh deep copy
-        // Remove any viewport-specific temporary states if they exist from the copied node
-        positionAbsolute: undefined, // React Flow might add this, ensure it's clean for new node
+        dragging: false,
+        data: cloneDeep(copiedNode.data),
+        positionAbsolute: undefined,
       };
     });
 
@@ -1185,56 +1174,41 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
     setIsDirty(true);
     toast.success(`Pasted ${newPastedNodes.length} node(s).`);
-    initialFitViewDone.current = false; // To trigger fitView or other adjustments if needed
-
-    // Optional: Clear clipboard after paste to prevent pasting same items multiple times by mistake
-    // clipboardNodesRef.current = []; 
-    // Reactivate selection for the newly pasted nodes
+    initialFitViewDone.current = false;
     setNodes(nds => nds.map(n => ({...n, selected: newPastedNodes.some(pn => pn.id === n.id) })));
 
-
-  }, [canEdit, removePlaceholderIfNeeded, setIsDirty, setNodes]);
+  }, [canEdit, removePlaceholderIfNeeded]);
 
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => { // Use global KeyboardEvent
+    const handleKeyDown = (event: KeyboardEvent) => {
       if (!canEdit || !reactFlowWrapper.current || !reactFlowWrapper.current.contains(document.activeElement)) {
-        // Only act if SLDWidget or its children have focus and in edit mode
-        // This helps prevent global capture if user is typing in a text field outside SLDWidget
-        // A more robust check might involve checking if document.activeElement is inside reactFlowWrapper.current
         return;
       }
 
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable) {
+        return;
+      }
+      
       const isCmdCtrl = event.ctrlKey || event.metaKey;
 
       if (isCmdCtrl && event.key.toLowerCase() === 'c') {
-        // Check if active element is an input field, if so, don't prevent default copy.
-        const activeElement = document.activeElement as HTMLElement;
-        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable) {
-            // Allow default copy behavior for text fields
-            return; 
-        }
         event.preventDefault();
         handleCopy();
       } else if (isCmdCtrl && event.key.toLowerCase() === 'v') {
-        const activeElement = document.activeElement as HTMLElement;
-        if (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA' || activeElement.isContentEditable) {
-            // Allow default paste behavior for text fields
-            return;
-        }
         event.preventDefault();
         handlePaste();
       }
     };
 
-    const wrapperElement = reactFlowWrapper.current; // Capture current value for cleanup
-    // Add listener to the wrapper, so it only triggers when SLDWidget is "active"
+    const wrapperElement = reactFlowWrapper.current;
     wrapperElement?.addEventListener('keydown', handleKeyDown);
 
     return () => {
       wrapperElement?.removeEventListener('keydown', handleKeyDown);
     };
-  }, [canEdit, handleCopy, handlePaste]); // reactFlowWrapper is a ref, doesn't need to be in deps
+  }, [canEdit, handleCopy, handlePaste]);
 
 
   useEffect(() => {
@@ -1247,9 +1221,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         setIsDrillDownOpen(true);
       }
     } else if (!storeSelectedElement && isControlPopupOpen) {
-      // Managed by onOpenChange
     }
-  }, [storeSelectedElement, canEdit, setIsControlPopupOpen, setDrillDownLayoutId, setDrillDownParentLabel, setIsDrillDownOpen, isControlPopupOpen]);
+  }, [storeSelectedElement, canEdit, isControlPopupOpen]);
 
   useEffect(() => {
     if (!isControlPopupOpen && storeSelectedElement) {
@@ -1265,8 +1238,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const colors: ThemeAwarePalette = getThemeAwareColors(currentThemeHookValue);
   const themedNodeColor = useCallback((node: Node) => getMiniMapNodeColor(node as CustomNodeType, colors), [colors]);
   const themedNodeStrokeColor = useCallback((node: Node) => getMiniMapNodeStrokeColor(node as CustomNodeType, colors), [colors]);
-    
-  //This function in SLDInspectorDialog is for global config - passed here
+
   const handleConfigureGlobalAnimationSettings = useCallback(() => {
     setAnimationConfiguratorTarget({ mode: 'global' });
   }, []);
@@ -1275,17 +1247,14 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     return edges.map(edge => {
       let resolvedAnimSettings = edge.data?.animationSettings; // Specific settings on edge
 
-      // If no specific settings or type is 'none', AND global settings are enabled & provide a type
       if (
         activeGlobalAnimationSettings?.isEnabled !== false && // Global is ON or undefined (assume ON)
         (!resolvedAnimSettings || resolvedAnimSettings.animationType === 'none') && // Edge is 'none' or no settings
         activeGlobalAnimationSettings?.animationType && // Global has a type
         activeGlobalAnimationSettings.animationType !== 'none' // Global type is not 'none'
       ) {
-        // Merge global into what the edge consumes. The edge doesn't need 'isEnabled' or the global master invert flag directly in its animationSettings.
-        // The global master invert flag `globallyInvertDefaultFlowForAllEdges` is handled inside AnimatedFlowEdge using the passed global context.
         resolvedAnimSettings = {
-          ...activeGlobalAnimationSettings, // take all DPs, speeds, local invert etc.
+          ...activeGlobalAnimationSettings,
         };
       }
 
@@ -1293,13 +1262,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         ...edge,
         data: {
           ...edge.data,
-          // Pass both resolved (merged) animationSettings for the edge AND the raw global context for AnimatedFlowEdge
-          animationSettings: resolvedAnimSettings, 
-          // This is passed to AnimatedFlowEdge so it knows about the MASTER global invert for dynamic flow.
-          // Its name in AnimatedFlowEdge is 'globallyInvertDefaultDynamicFlowLogic'
-          // The types/sld.ts name for GlobalSLDAnimationSettings is globallyInvertDefaultFlowForAllEdges
-          // Make sure AnimatedFlowEdge is using the correct property from types/sld
-          globallyInvertDefaultFlowForAllEdges: (activeGlobalAnimationSettings as any)?.globallyInvertDefaultFlowForAllEdges ?? false, 
+          animationSettings: resolvedAnimSettings,
+          globallyInvertDefaultFlowForAllEdges: (activeGlobalAnimationSettings as any)?.globallyInvertDefaultFlowForAllEdges ?? false,
         }
       };
     });
@@ -1307,13 +1271,13 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
 
   const showInitialLoadingSpinner = isLoading && !currentLayoutLoadedFromServerOrInitialized.current;
-  const showConnectingMessage = !isWebSocketConnected && layoutId && showInitialLoadingSpinner && !isEditModeFromProps; 
-  const showDisconnectedMessageForEdit = canEdit && layoutId && !isWebSocketConnected && currentLayoutLoadedFromServerOrInitialized.current; 
-  const showPromptToSelectLayout = !layoutId && canEdit && onLayoutIdChangeProp !== undefined; 
+  const showConnectingMessage = !isWebSocketConnected && layoutId && showInitialLoadingSpinner && !isEditModeFromProps;
+  const showDisconnectedMessageForEdit = canEdit && layoutId && !isWebSocketConnected && currentLayoutLoadedFromServerOrInitialized.current;
+  const showPromptToSelectLayout = !layoutId && canEdit && onLayoutIdChangePropRef.current !== undefined;
 
   if (showConnectingMessage) return (<div className="sld-loader-container text-muted-foreground"><svg className="sld-loader-svg" viewBox="0 0 50 50"><circle className="sld-loader-path" cx="25" cy="25" r="20" fill="none" strokeWidth="4"></circle></svg>Connecting...</div>);
   if (showInitialLoadingSpinner) return (<div className="sld-loader-container text-muted-foreground"><svg className="sld-loader-svg" viewBox="0 0 50 50"><circle className="sld-loader-path" cx="25" cy="25" r="20" fill="none" strokeWidth="4"></circle></svg>Loading Diagram{layoutId ? ` for ${layoutId.replace(/_/g, ' ')}...` : '...'}</div>);
-  if (showPromptToSelectLayout) return (<div className="sld-loader-container text-muted-foreground flex-col"> <LayoutList className="h-12 w-12 mb-4 opacity-50"/><p className="text-lg font-semibold mb-2">Select Layout</p><p className="text-sm mb-4">Choose a layout to get started.</p>{onLayoutIdChangeProp !== undefined && (<Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''}><SelectTrigger className="w-[280px] mb-2"><SelectValue placeholder="Select layout..." /></SelectTrigger><SelectContent>{dynamicAvailableLayouts.map(layout => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select>)}</div>);
+  if (showPromptToSelectLayout) return (<div className="sld-loader-container text-muted-foreground flex-col"> <LayoutList className="h-12 w-12 mb-4 opacity-50"/><p className="text-lg font-semibold mb-2">Select Layout</p><p className="text-sm mb-4">Choose a layout to get started.</p>{onLayoutIdChangePropRef.current !== undefined && (<Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''}><SelectTrigger className="w-[280px] mb-2"><SelectValue placeholder="Select layout..." /></SelectTrigger><SelectContent>{dynamicAvailableLayouts.map(layout => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select>)}</div>);
   if (showDisconnectedMessageForEdit) return (<div className="sld-loader-container text-muted-foreground flex-col"><AlertTriangle className="h-10 w-10 text-amber-500 mb-3"/><p className="my-2 font-semibold">Sync Disconnected</p><p className="text-xs mb-3">Edits local. Reconnect to sync.</p><Button onClick={() => { setIsLoading(true); connectWebSocket();}} variant="outline" size="sm">Reconnect</Button></div>);
   if (!layoutId && !canEdit) return (<div className="sld-loader-container text-muted-foreground">No diagram specified.</div>);
 
@@ -1340,9 +1304,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     if (selectedEdgesFromReactFlow.length > 0) {
       setAnimationConfiguratorTarget({
         mode: 'selected_edges',
-        // For bulk, we might pass the first selected edge if dialog needs one to prefill from, or null.
-        // The dialog `edge` prop is optional for 'selected_edges'.
-        edge: selectedEdgesFromReactFlow[0] 
+        edge: selectedEdgesFromReactFlow[0]
       });
     } else {
       toast.info("No edges selected for bulk configuration.");
@@ -1351,13 +1313,13 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
 
   return (
-    <motion.div 
-        className="h-full w-full flex relative bg-background" 
+    <motion.div
+        className="h-full w-full flex relative bg-background"
         ref={reactFlowWrapper}
         initial={{ opacity: 0 }} animate={{ opacity: 1 }}
         transition={{ duration: 0.2, ease: "circOut" }}
     >
-      {canEdit && onLayoutIdChangeProp && (
+      {canEdit && onLayoutIdChangePropRef.current && (
           <div className="absolute bottom-0 right-0 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2"> {/* Changed left-3 to left-64 */}
             <Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''} disabled={!layoutId && dynamicAvailableLayouts.length === 0}>
               <SelectTrigger className="h-9 text-xs min-w-[12rem]"> {/* Added min-w */}
@@ -1399,7 +1361,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       )}
       <div className="flex-grow h-full relative">
         <ReactFlow
-            nodes={nodes} 
+            nodes={nodes}
             edges={edgesWithGlobalAndSpecificSettings} // Use this prop which correctly merges settings
             onNodesChange={onNodesChange} onEdgesChange={onEdgesChange} onConnect={onConnect}
             onInit={(instance) => {
@@ -1407,7 +1369,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                 initialFitViewDone.current = false;
             }}
             nodeTypes={nodeTypes} edgeTypes={edgeTypes} defaultEdgeOptions={defaultEdgeOptions}
-            onDrop={onDrop} onDragOver={onDragOver} onNodeClick={handleElementClick}  onEdgeClick={handleElementClick} 
+            onDrop={onDrop} onDragOver={onDragOver} onNodeClick={handleElementClick}  onEdgeClick={handleElementClick}
             onNodeDragStop={onNodeDragStop} onPaneClick={onPaneClick}
             fitViewOptions={fitViewOptions}
             selectionMode={SelectionMode.Partial}
@@ -1421,20 +1383,20 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
           >
             <Controls showInteractive={canEdit} />
               <MiniMap pannable zoomable nodeColor={themedNodeColor} nodeStrokeColor={themedNodeStrokeColor} nodeStrokeWidth={3} nodeBorderRadius={4}
-                style={{ 
-                  backgroundColor: colors.miniMapBg, 
+                style={{
+                  backgroundColor: colors.miniMapBg,
                   border: `1px solid ${colors.miniMapBorder}`,
                   width: 120, // Reduced width
                   height: 90,  // Reduced height
-                }} 
+                }}
                 position="top-right"
-                maskColor={colors.maskBg} 
+                maskColor={colors.maskBg}
                 maskStrokeColor={colors.maskStroke}
                 />
               <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color={colors.backgroundDots} className="opacity-60" />
-            
+
             <Panel position="top-right" className="!m-0 !p-0">
-                {canEdit && layoutId && ( 
+                {canEdit && layoutId && (
                     <motion.div className="flex flex-wrap items-center gap-2 p-2.5 bg-background/80 backdrop-blur-sm border-border border rounded-bl-lg shadow-lg"
                         initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: "easeOut", delay: 0.2 }}>
                       {/* Dirty/Saving status indicators */}
@@ -1462,7 +1424,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                                     <Check className="h-3.5 w-3.5 mr-1.5 opacity-80" /> Local
                                 </span></TooltipTrigger><TooltipContent><p>Layout loaded from local storage. Offline.</p></TooltipContent></Tooltip></TooltipProvider>
                       )}
-                      
+
                       {/* Action Buttons */}
                       {/* Clear Button */}
                         <AlertDialog>
@@ -1500,7 +1462,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                                 <TooltipContent><p>Save Now & Sync</p></TooltipContent>
                             </Tooltip>
                         </TooltipProvider>
-                      
+
                       {/* Export Dropdown */}
                       <DropdownMenu>
                           <TooltipProvider delayDuration={100}>
@@ -1527,7 +1489,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                               </DropdownMenuItem>
                           </DropdownMenuContent>
                       </DropdownMenu>
-                       
+
                       {/* Import Dropdown */}
                       <DropdownMenu>
                           <TooltipProvider delayDuration={100}>
@@ -1559,9 +1521,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                       <TooltipProvider delayDuration={100}>
                           <Tooltip>
                               <TooltipTrigger asChild>
-                                  <Button 
-                                      size="sm" 
-                                      variant="outline" 
+                                  <Button
+                                      size="sm"
+                                      variant="outline"
                                       disabled={!canEdit || selectedEdgesFromReactFlow.length === 0}
                                       onClick={handleOpenBulkAnimationConfigurator}
                                       className="h-9"
@@ -1583,10 +1545,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             </Panel>
         </ReactFlow>
       </div>
-      
+
       {canEdit && layoutId && (
-        <AlertDialog 
-            open={isImportDialogOpen} 
+        <AlertDialog
+            open={isImportDialogOpen}
             onOpenChange={(open) => {
                 setIsImportDialogOpen(open);
                 if (!open) { // Reset states when dialog is closed
@@ -1615,19 +1577,19 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                         aria-label="SLD Layout JSON Input"
                     />
                     <div>
-                        <input 
-                            type="file" 
-                            accept=".json" 
-                            id="import-single-file-input" 
+                        <input
+                            type="file"
+                            accept=".json"
+                            id="import-single-file-input"
                             ref={fileInputRef}
                             onChange={handleFileSelectedForImport}
-                            className="sr-only" 
+                            className="sr-only"
                             aria-label="Upload JSON file for current layout"
                             title="Select a JSON file to import into current layout"
                         />
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
+                        <Button
+                            variant="outline"
+                            size="sm"
                             onClick={() => fileInputRef.current?.click()}
                             className="w-full sm:w-auto"
                         >
@@ -1654,7 +1616,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             </AlertDialogContent>
         </AlertDialog>
       )}
-      
+
       {/* Dialog for Importing ALL Layouts */}
       {canEdit && (
         <AlertDialog
@@ -1729,29 +1691,28 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
 
       {canEdit && selectedElement && (
-        <SLDInspectorDialog 
-            isOpen={isInspectorDialogOpen} 
-            onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}} 
-            selectedElement={selectedElement} 
-            onUpdateElement={handleUpdateElement} 
+        <SLDInspectorDialog
+            isOpen={isInspectorDialogOpen}
+            onOpenChange={(open) => { setIsInspectorDialogOpen(open); if (!open) setSelectedElement(null);}}
+            selectedElement={selectedElement}
+            onUpdateElement={handleUpdateElement}
             onDeleteElement={(element) => {
               if (typeof element === 'string') {
                 handleDeleteElement(element);
               } else if (element && typeof element === 'object' && 'id' in element) {
-                // The typeguard 'id' in element ensures element has an id property
                 handleDeleteElement((element as any).id);
               }
             }}
-            onSetGlobalAnimationSettings={handleConfigureGlobalAnimationSettings} // Changed to match expected prop name
-            onConfigureEdgeAnimation={(edgeToConfig) => { // New Prop
+            onSetGlobalAnimationSettings={handleConfigureGlobalAnimationSettings}
+            onConfigureEdgeAnimation={(edgeToConfig) => {
                 setAnimationConfiguratorTarget({ mode: 'single_edge', edge: edgeToConfig});
             }}
-            currentGlobalAnimationSettings={activeGlobalAnimationSettings} // New Prop
-        /> 
+            currentGlobalAnimationSettings={activeGlobalAnimationSettings}
+        />
       )}
       {!canEdit && selectedElement && (isNode(selectedElement) || isEdge(selectedElement)) && ( <SLDElementControlPopup element={selectedElement} isOpen={isControlPopupOpen} onOpenChange={handleControlPopupOpenChange} /> )}
       {isDrillDownOpen && drillDownLayoutId && ( <SLDDrillDownDialog isOpen={isDrillDownOpen} onOpenChange={handleDrillDownOpenChange} layoutId={drillDownLayoutId} parentLabel={drillDownParentLabel} /> )}
-      
+
 {animationConfiguratorTarget && canEdit && (
   <AnimationFlowConfiguratorDialog
     isOpen={!!animationConfiguratorTarget}
@@ -1772,9 +1733,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     mode={animationConfiguratorTarget.mode}
     initialGlobalSettings={activeGlobalAnimationSettings as DialogGlobalAnimationSettings | undefined}
     onConfigure={(
-      config: DialogAnimationFlowConfig, 
+      config: DialogAnimationFlowConfig,
       applyToMode: AnimationFlowConfiguratorMode,
-      setGlobalInvertFlag?: boolean 
+      setGlobalInvertFlag?: boolean
     ) => {
       if (applyToMode === 'global') {
         const newGlobalSettings: GlobalSLDAnimationSettings = {
@@ -1790,7 +1751,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
           constantFlowSpeed: config.constantFlowSpeed,
           constantFlowActivationDataPointId: config.constantFlowActivationDataPointId,
         };
-        
+
         // Add the global invert flag if the property exists in the type
         if (setGlobalInvertFlag !== undefined) {
           (newGlobalSettings as any).globallyInvertDefaultFlowForAllEdges = setGlobalInvertFlag;
@@ -1817,10 +1778,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                 constantFlowSpeed: config.constantFlowSpeed,
                 constantFlowActivationDataPointId: config.constantFlowActivationDataPointId,
             };
-            
+
             let edgeData: CustomFlowEdgeData = { ...(edge.data || {}) };
             edgeData.animationSettings = newEdgeSpecificSettings;
-            
+
             if (newEdgeSpecificSettings.animationType !== 'none') {
                 edgeData.dataPointLinks = (edgeData.dataPointLinks || []).filter(link =>
                     !['isEnergized', 'flowDirection', 'animationSpeedFactor'].includes(link.targetProperty)
@@ -1838,7 +1799,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         setEdges(currentEdges =>
           currentEdges.map(edge => {
             if (edge.id !== targetEdgeId) return edge;
-            
+
             const newEdgeSpecificSettings: AnimationFlowConfig = {
                 animationType: config.animationType,
                 generationDataPointId: config.generationDataPointId,
@@ -1867,7 +1828,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
        );
        setIsDirty(true);
       }
-      setAnimationConfiguratorTarget(null); 
+      setAnimationConfiguratorTarget(null);
     }}
   />
 )}
@@ -1912,11 +1873,11 @@ export interface SLDWidgetProps {
   layoutId: string | null;
   isEditMode?: boolean;
   onLayoutIdChange?: (newLayoutId: string) => void;
-  onCodeChange?: (code: string, layoutId: string) => void; 
+  onCodeChange?: (code: string, layoutId: string) => void;
 }
 
 const SLDWidget: React.FC<SLDWidgetProps> = (props) => {
-    if (!props.layoutId && !props.isEditMode) { 
+    if (!props.layoutId && !props.isEditMode) {
       return <div className="h-full w-full flex items-center justify-center text-muted-foreground bg-background p-4 text-center text-sm">Error: No SLD Layout ID specified for view mode.</div>;
     }
     return (<ReactFlowProvider><SLDWidgetCore {...props} onLayoutIdChangeProp={props.onLayoutIdChange} /></ReactFlowProvider>);
