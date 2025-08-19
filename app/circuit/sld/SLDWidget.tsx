@@ -45,7 +45,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants';
-import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
 import { dataPoints as appDataPoints } from '@/config/dataPoints';
 
 import DataLabelNode from './nodes/DataLabelNode';
@@ -169,7 +168,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<CustomNodeType[]>([]);
   const [edges, setEdges] = useState<CustomFlowEdge[]>([]);
-  const [dynamicAvailableLayouts, setDynamicAvailableLayouts] = useState<{ id: string; name: string }[]>([]);
+  const [availableLayouts, setAvailableLayouts] = useState<Record<string, SLDLayout>>({});
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [selectedElement, setSelectedElement] = useState<CustomNodeType | CustomFlowEdge | null>(null);
   const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
@@ -214,48 +213,11 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const selectedEdgesFromReactFlow = useMemo(() => edges.filter(edge => edge.selected), [edges]);
   const clipboardNodesRef = useRef<CustomNodeType[]>([]);
 
-    const fetchAndSetAvailableLayouts = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      const layoutsFromStorage: { id: string; name: string }[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
-          // Attempt to parse the layout to get a more descriptive name if available from meta, otherwise format the ID.
-          let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          try {
-              const layoutJson = localStorage.getItem(key);
-              if (layoutJson) {
-                  const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
-                  if (parsedLayout.meta?.name) {
-                      layoutName = parsedLayout.meta.name;
-                  } else if (parsedLayout.layoutId && parsedLayout.layoutId !== layoutIdKey) {
-                    // if meta.name is not present, but layoutId in content is different from key part
-                    layoutName = `${layoutName} (${parsedLayout.layoutId.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())})`;
-                  }
-              }
-          } catch (e) {
-              console.warn(`Could not parse layout ${layoutIdKey} from localStorage to get meta.name`, e);
-          }
-          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
-        }
-      }
-
-      const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
-      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS
-        .filter(id => !layoutIdsFromStorage.has(id)) // Add only if not already found in storage
-        .map(id => ({
-          id,
-          name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-        }));
-
-      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
-      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
-
-      setDynamicAvailableLayouts(combinedLayouts);
+  useEffect(() => {
+    if (isWebSocketConnected) {
+      sendJsonMessage({ type: 'get-all-sld-layouts' });
     }
-  }, []);
-
+  }, [isWebSocketConnected, sendJsonMessage]);
 
   const handleCreateNewLayout = useCallback(() => {
     if (!newLayoutNameInput.trim()) {
@@ -269,82 +231,36 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       return;
     }
 
-    // Check for uniqueness
-    const isNameTaken = dynamicAvailableLayouts.some(layout => layout.id === sanitizedLayoutId);
+    const isNameTaken = availableLayouts[sanitizedLayoutId];
     if (isNameTaken) {
       toast.error(`Layout ID "${sanitizedLayoutId}" is already taken. Please choose a different name.`);
       return;
     }
 
-    // Create new layout from empty_template
-    const emptyTemplate = constantSldLayouts['empty_template'];
-    if (!emptyTemplate) {
-      toast.error("Empty template layout not found. Cannot create new layout.");
-      return;
-    }
+    const newLayout: SLDLayout = {
+      layoutId: sanitizedLayoutId,
+      meta: {
+        name: newLayoutNameInput.trim(),
+        description: `User created layout: ${newLayoutNameInput.trim()}`
+      },
+      nodes: [createPlaceholderNode(newLayoutNameInput.trim(), currentThemeHookValue)],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    };
 
-    const newLayout: SLDLayout = cloneDeep(emptyTemplate);
-    newLayout.layoutId = sanitizedLayoutId;
-    if (newLayout.meta) {
-      newLayout.meta.name = newLayoutNameInput.trim(); // User-friendly name
-      newLayout.meta.description = `User created layout: ${newLayoutNameInput.trim()}`;
-    } else {
-      newLayout.meta = {
-          name: newLayoutNameInput.trim(),
-          description: `User created layout: ${newLayoutNameInput.trim()}`
-      };
-    }
-    newLayout.nodes = [createPlaceholderNode(newLayout.meta.name || sanitizedLayoutId, currentThemeHookValue)];
-    newLayout.edges = [];
-    newLayout.viewport = { x: 0, y: 0, zoom: 1 };
-
-    try {
-      localStorage.setItem(`${LOCAL_STORAGE_KEY_PREFIX}${newLayout.layoutId}`, JSON.stringify(newLayout));
-      toast.success(`Layout "${newLayout.meta.name || newLayout.layoutId}" created successfully.`);
-
-      fetchAndSetAvailableLayouts(); // Refresh the dropdown list
-
+    if (isWebSocketConnected && sendJsonMessage) {
+      sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${newLayout.layoutId}`, layout: newLayout } });
+      toast.info("Syncing new layout to server...");
       if (onLayoutIdChangeProp) {
-          onLayoutIdChangeProp(newLayout.layoutId);
-      } else {
-           if (layoutId !== newLayout.layoutId) {
-              setCurrentLayoutIdKey(`sld_${newLayout.layoutId}`);
-              setNodes(newLayout.nodes);
-              setEdges(newLayout.edges);
-              setActiveGlobalAnimationSettings(newLayout.meta?.globalAnimationSettings);
-              setIsDirty(false);
-              currentLayoutLoadedFromServerOrInitialized.current = true;
-              initialFitViewDone.current = false;
-           }
+        onLayoutIdChangeProp(newLayout.layoutId);
       }
-
-      if (isWebSocketConnected && sendJsonMessage) {
-        sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${newLayout.layoutId}`, layout: newLayout } });
-        toast.info("Syncing new layout to server...");
-      }
-
-      setIsAddNewLayoutDialogOpen(false);
-      setNewLayoutNameInput('');
-    } catch (error) {
-      console.error("Error creating new layout:", error);
-      toast.error("Failed to create new layout.");
+    } else {
+      toast.error("Cannot create layout: Not connected to server.");
     }
-  }, [newLayoutNameInput, dynamicAvailableLayouts, constantSldLayouts, currentThemeHookValue, fetchAndSetAvailableLayouts, onLayoutIdChangeProp, isWebSocketConnected, sendJsonMessage, layoutId]);
-  // Note: cloneDeep and createPlaceholderNode are assumed stable and not listed in deps here. Add if they are not.
 
-
-  useEffect(() => {
-    fetchAndSetAvailableLayouts();
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-        fetchAndSetAvailableLayouts();
-      }
-    };
-    window.addEventListener('storage', handleStorageChange);
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, [fetchAndSetAvailableLayouts]);
+    setIsAddNewLayoutDialogOpen(false);
+    setNewLayoutNameInput('');
+  }, [newLayoutNameInput, availableLayouts, currentThemeHookValue, onLayoutIdChangeProp, isWebSocketConnected, sendJsonMessage]);
 
   const removePlaceholderIfNeeded = useCallback((currentNodes: CustomNodeType[]) => {
     const hasPlaceholder = currentNodes.some(n => n.id === PLACEHOLDER_NODE_ID);
@@ -491,45 +407,18 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   
   const persistLayout = useCallback((nodesToSave: CustomNodeType[], edgesToSave: CustomFlowEdge[], rfInstance: ReactFlowInstance | null, currentLayoutId: string, manualSave: boolean) => {
     if (!canEdit || !currentLayoutId) return false;
-    const layoutKey = `${LOCAL_STORAGE_KEY_PREFIX}${currentLayoutId}`;
     const nodesForStorage = nodesToSave.filter(n => n.id !== PLACEHOLDER_NODE_ID);
     const viewport = rfInstance ? rfInstance.getViewport() : undefined;
     
-    let currentMeta: SLDLayout['meta'] = {}; // Default to empty meta
-    // Attempt to load existing meta to preserve fields not managed here (e.g., version, author)
-    try {
-        const existingLayoutString = localStorage.getItem(layoutKey);
-        if (existingLayoutString) {
-            const parsedExisting = JSON.parse(existingLayoutString) as SLDLayout;
-            currentMeta = parsedExisting.meta || {}; // Use existing meta if available
-        }
-    } catch (e) {
-        console.warn(`Error parsing existing layout meta from localStorage for key ${layoutKey}:`, e);
-    }
-
     const layoutToPersist: SLDLayout = { 
         layoutId: currentLayoutId, 
         nodes: nodesForStorage.map(n => ({ ...n, data: { ...n.data } })), // Deep copy data
         edges: edgesToSave.map(e => ({ ...e, data: { ...e.data } })),     // Deep copy data
         viewport,
         meta: { 
-            ...currentMeta, // Preserve other existing meta fields
-            globalAnimationSettings: activeGlobalAnimationSettings // Overwrite/set with current global settings
+            globalAnimationSettings: activeGlobalAnimationSettings
         },
     };
-    const layoutJsonString = JSON.stringify(layoutToPersist);
-
-    try {
-        localStorage.setItem(layoutKey, layoutJsonString);
-        if (manualSave) toast.success("Layout Saved Locally");
-    } catch (error) {
-        console.error(`PersistLayout: Error saving to LS:`, error);
-        if (manualSave) toast.error("Local Save Failed");
-    }
-
-    if (onCodeChange) {
-        onCodeChange(layoutJsonString, currentLayoutId);
-    }
 
     if (isWebSocketConnected && sendJsonMessage) {
         sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${currentLayoutId}`, layout: layoutToPersist } });
@@ -537,9 +426,9 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         return true; 
     } else {
         if (manualSave && isWebSocketConnected === false) toast.warning("Offline: Server Sync Skipped");
-        return true; 
+        return false;
     }
-  }, [canEdit, isWebSocketConnected, sendJsonMessage, onCodeChange, activeGlobalAnimationSettings]); 
+  }, [canEdit, isWebSocketConnected, sendJsonMessage, activeGlobalAnimationSettings]);
 
   const debouncedAutoSave = useMemo(
       () => throttle((currentNodes, currentEdges, rfInst, layoutID) => {
@@ -820,110 +709,21 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   }, [canEdit, layoutId, onLayoutIdChangeProp, currentThemeHookValue]);
 
 
-  const handleExportAllLayouts = useCallback(() => {
-    if (!canEdit) {
-      toast.error("Export is only available in edit mode.");
-      return;
-    }
-    const allLayoutsData: { [key: string]: SLDLayout } = {};
-    let layoutsFound = 0;
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-        const layoutIdFromKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
-        const layoutJSON = localStorage.getItem(key);
-        if (layoutJSON) {
-          try {
-            const layoutData = JSON.parse(layoutJSON) as SLDLayout;
-            if (layoutData && layoutData.layoutId === layoutIdFromKey && Array.isArray(layoutData.nodes)) {
-              allLayoutsData[layoutIdFromKey] = layoutData;
-              layoutsFound++;
-            } else {
-              console.warn(`SLDWidget: Invalid LS item ${key}.`);
-            }
-          } catch (e) { console.error(`SLDWidget: Error parsing LS item ${key}:`, e); }
-        }
-      }
-    }
-    if (layoutsFound === 0) {
-      toast.info("No SLD layouts found in local storage to export.");
-      return;
-    }
-    try {
-      const dataStr = JSON.stringify(allLayoutsData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-      const exportFileDefaultName = `all_sld_layouts_${new Date().toISOString().split('T')[0]}.json`;
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      document.body.appendChild(linkElement); 
-      linkElement.click();
-      document.body.removeChild(linkElement);
-      toast.success(`${layoutsFound} SLD layout(s) exported successfully.`);
-    } catch (error) {
-      console.error("SLDWidget: Error during export:", error);
-      toast.error("Failed to export layouts.");
-    }
-  }, [canEdit]);
-
   const handleExportSingleLayout = useCallback(() => {
     if (!canEdit || !layoutId) {
       toast.error("Export is only available in edit mode with a selected layout.");
       return;
     }
 
-    let layoutDataString: string | null = null;
-    let loadedFrom = "";
-    let layoutToExport: SLDLayout | null = null;
-
-    // 1. Try localStorage
-    const localStorageKey = `${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`;
-    const localData = localStorage.getItem(localStorageKey);
-
-    if (localData) {
-      try {
-        const parsed = JSON.parse(localData) as SLDLayout;
-        if (parsed && parsed.layoutId === layoutId && Array.isArray(parsed.nodes)) {
-          layoutToExport = parsed;
-          loadedFrom = "localStorage";
-        } else {
-          console.warn(`SLDWidget: Invalid layout data in LS for ${layoutId} during single export. Ignoring.`);
-        }
-      } catch (e) {
-        console.warn(`SLDWidget: Error parsing LS data for ${layoutId} during single export. Ignoring.`, e);
-      }
-    }
-
-    // 2. If not in localStorage, try constantSldLayouts
-    if (!layoutToExport && constantSldLayouts[layoutId]) {
-      layoutToExport = JSON.parse(JSON.stringify(constantSldLayouts[layoutId])); // Deep clone
-      loadedFrom = "predefined constants";
-    }
+    const layoutToExport = availableLayouts[layoutId];
 
     if (!layoutToExport) {
-      toast.info(`Layout '${layoutId.replace(/_/g, ' ')}' not found or is empty.`, {
-        description: "No saved data in localStorage or predefined constants for this layout ID.",
-      });
+      toast.info(`Layout '${layoutId.replace(/_/g, ' ')}' not found or is empty.`);
       return;
     }
 
     try {
-      // Ensure viewport and globalAnimationSettings are included if missing and we are exporting the *active* layout from constants
-      // For localStorage, these should already be part of the stored SLDLayout object.
-      // For constantSldLayouts, they might be top-level in the definition but need to be in the SLDLayout object.
-      if (loadedFrom === "predefined constants") {
-        if (!layoutToExport.viewport && constantSldLayouts[layoutId]?.viewport) {
-            layoutToExport.viewport = constantSldLayouts[layoutId]!.viewport;
-        }
-        // Constant layouts don't store globalAnimationSettings within their main object usually,
-        // but if we had a mechanism to associate them, it would be here.
-        // For now, we assume constantSldLayouts are complete SLDLayout objects or their meta is handled elsewhere.
-        // If activeGlobalAnimationSettings are relevant for a constant layout being exported, this might need adjustment.
-        // However, the priority is "saved versions", so we export what's defined in constantSldLayouts.
-      }
-
-
-      layoutDataString = JSON.stringify(layoutToExport, null, 2);
+      const layoutDataString = JSON.stringify(layoutToExport, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(layoutDataString);
       const exportFileDefaultName = `${layoutId}_sld_layout_${new Date().toISOString().split('T')[0]}.json`;
       
@@ -934,12 +734,12 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       linkElement.click();
       document.body.removeChild(linkElement);
       
-      toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully from ${loadedFrom}.`);
+      toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully.`);
     } catch (error) {
       console.error(`SLDWidget: Error during single layout export for ${layoutId}:`, error);
       toast.error("Failed to export layout.");
     }
-  }, [canEdit, layoutId]);
+  }, [canEdit, layoutId, availableLayouts]);
 
 
   useEffect(() => {
@@ -973,42 +773,15 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       return;
     }
     
-    let loadedLayout: SLDLayout | null = null; let loadedFrom: string | null = null;
+    let loadedLayout: SLDLayout | null = availableLayouts[layoutId] || null;
 
-    // Try constant layouts first
-    if (constantSldLayouts[layoutId]) {
-        loadedLayout = JSON.parse(JSON.stringify(constantSldLayouts[layoutId])); 
-        loadedFrom = "constant definition";
-    }
-    
-    // Override with localStorage if an edited version exists
-    const localData = localStorage.getItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`);
-    if (localData) {
-        try {
-            const localLayoutParsed = JSON.parse(localData) as SLDLayout;
-            if (localLayoutParsed && localLayoutParsed.layoutId === layoutId && Array.isArray(localLayoutParsed.nodes)) {
-                loadedLayout = localLayoutParsed; // Prioritize LS version
-                loadedFrom = "LocalStorage (override)";
-            } else { 
-                console.warn(`SLDWidget: Invalid layout data in LS for ${layoutId}. Clearing.`);
-                localStorage.removeItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`); 
-            }
-        } catch (e) { 
-            console.error(`SLDWidget: Error parsing LS for ${layoutId}. Clearing.`, e);
-            localStorage.removeItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`); 
-        }
-    }
-
-    if (loadedLayout) { // No need for loadedFrom check here
-      console.log(`SLDWidget: Layout "${layoutId}" loaded from ${loadedFrom || 'unknown source'}.`);
+    if (loadedLayout) {
+      console.log(`SLDWidget: Layout "${layoutId}" loaded from state.`);
       setNodes((loadedLayout.nodes || []).map(n => ({...n, selected: false})));
       setEdges(loadedLayout.edges || []);
       setActiveGlobalAnimationSettings(loadedLayout.meta?.globalAnimationSettings || undefined);
       setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true; setIsDirty(false);
       initialFitViewDone.current = false;
-      if (onCodeChange) {
-          onCodeChange(JSON.stringify(loadedLayout), layoutId);
-      }
       return;
     }
 
@@ -1020,29 +793,20 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         setActiveGlobalAnimationSettings(undefined);
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true; setIsDirty(false);
         initialFitViewDone.current = false; 
-        if (onCodeChange) { 
-            onCodeChange(JSON.stringify({ layoutId, nodes: [], edges: [], viewport: undefined, meta: { globalAnimationSettings: undefined } }), layoutId);
-        }
     } else { 
         setNodes([createPlaceholderNode(layoutId + " (Connecting...)", currentThemeHookValue)]); setEdges([]);
         setActiveGlobalAnimationSettings(undefined); 
         setIsLoading(true); 
     }
-  }, [layoutId, currentLayoutIdKey, isEditModeFromProps, isWebSocketConnected, sendJsonMessage, currentThemeHookValue, reactFlowInstance, onCodeChange]);
+  }, [layoutId, currentLayoutIdKey, isEditModeFromProps, isWebSocketConnected, sendJsonMessage, currentThemeHookValue, reactFlowInstance, availableLayouts]);
 
 
   useLayoutEffect(() => {
     if (reactFlowInstance && !isLoading && currentLayoutLoadedFromServerOrInitialized.current && !initialFitViewDone.current && (nodes.length > 0 || edges.length > 0)) {
         let viewportToSet: Viewport | undefined = undefined;
-        const localData = localStorage.getItem(`${LOCAL_STORAGE_KEY_PREFIX}${layoutId!}`);
-        if (localData) {
-            try { 
-                const parsed = JSON.parse(localData) as SLDLayout;
-                viewportToSet = parsed.viewport;
-            } catch (e) { /* ignore */ }
-        }
-        if (!viewportToSet && layoutId && constantSldLayouts[layoutId!]?.viewport) {
-            viewportToSet = constantSldLayouts[layoutId!]!.viewport;
+        const layout = availableLayouts[layoutId || ''];
+        if (layout) {
+            viewportToSet = layout.viewport;
         }
         
         if (viewportToSet) {
@@ -1058,15 +822,18 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         }
         initialFitViewDone.current = true;
     }
-  }, [nodes, edges, reactFlowInstance, isLoading, layoutId, fitViewOptions]);
+  }, [nodes, edges, reactFlowInstance, isLoading, layoutId, fitViewOptions, availableLayouts]);
 
   useEffect(() => {
-    if (!lastJsonMessage || !currentLayoutIdKey) return;
-    const message = lastJsonMessage as WebSocketMessageFromServer;
-    if (message.payload?.key && message.payload.key !== currentLayoutIdKey && (message.type === 'layout-data' || message.type === 'layout-error')) return;
-    const localLayoutId = layoutId; 
+    if (!lastJsonMessage) return;
+    const message = lastJsonMessage as any;
+
     switch (message.type) {
+      case 'all-sld-layouts':
+        setAvailableLayouts(message.payload);
+        break;
       case 'layout-data':
+        if (message.payload?.key !== currentLayoutIdKey) return;
         const serverLayout = message.payload.layout as SLDLayout | null;
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true;
         initialFitViewDone.current = false;
@@ -1075,46 +842,46 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
             setNodes(removePlaceholderIfNeeded(validatedNodes));
             setEdges(serverLayout.edges || []);
             setActiveGlobalAnimationSettings(serverLayout.meta?.globalAnimationSettings || undefined);
-            if (serverLayout.nodes.length === 0 && localLayoutId) setNodes(isEditModeFromProps ? [createPlaceholderNode(localLayoutId, currentThemeHookValue)] : []);
-            
-            const serverLayoutString = JSON.stringify(serverLayout);
-            localStorage.setItem(`${LOCAL_STORAGE_KEY_PREFIX}${serverLayout.layoutId}`, serverLayoutString);
-            if (onCodeChange) onCodeChange(serverLayoutString, serverLayout.layoutId);
-
+            if (serverLayout.nodes.length === 0 && layoutId) setNodes(isEditModeFromProps ? [createPlaceholderNode(layoutId, currentThemeHookValue)] : []);
         } else { 
-            const emptyLayoutNodes = isEditModeFromProps && localLayoutId ? [createPlaceholderNode(localLayoutId, currentThemeHookValue)] : (localLayoutId ? [createPlaceholderNode(localLayoutId + " (Not Found)", currentThemeHookValue)] : []);
+            const emptyLayoutNodes = isEditModeFromProps && layoutId ? [createPlaceholderNode(layoutId, currentThemeHookValue)] : (layoutId ? [createPlaceholderNode(layoutId + " (Not Found)", currentThemeHookValue)] : []);
             setNodes(emptyLayoutNodes);
             setEdges([]);
             setActiveGlobalAnimationSettings(undefined);
-            if (onCodeChange && localLayoutId) {
-                onCodeChange(JSON.stringify({layoutId: localLayoutId, nodes: [], edges:[], viewport: undefined, meta: {globalAnimationSettings: undefined} }), localLayoutId);
-            }
         }
         setIsDirty(false); break;
       case 'layout-error':
+        if (message.payload?.key !== currentLayoutIdKey) return;
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true;
         initialFitViewDone.current = false;
-        if (localLayoutId) setNodes([createPlaceholderNode(localLayoutId + " (Error)", currentThemeHookValue)]);
+        if (layoutId) setNodes([createPlaceholderNode(layoutId + " (Error)", currentThemeHookValue)]);
         else setNodes([]); 
         setEdges([]);
         setActiveGlobalAnimationSettings(undefined);
         toast.error("Server Load Error", { description: message.payload.error || "Failed." });
-        if (onCodeChange && localLayoutId) {
-            onCodeChange(JSON.stringify({layoutId: localLayoutId, nodes: [], edges:[], viewport: undefined, meta: {globalAnimationSettings: undefined} }), localLayoutId);
-        }
         break;
       case 'layout-saved-confirmation': 
         if (message.payload?.key === currentLayoutIdKey) { 
             toast.success("Synced to Server!", { id: `save-confirm-${currentLayoutIdKey}`}); 
             setIsDirty(false); 
-        } break;
+        }
+        // refetch all layouts to update the list
+        sendJsonMessage({ type: 'get-all-sld-layouts' });
+        break;
       case 'layout-save-error': 
         if (message.payload?.key === currentLayoutIdKey) { 
             toast.error("Server Sync Failed", { id: `save-error-${currentLayoutIdKey}`, description: message.payload.error || "Unknown." }); 
         } break;
+      case 'layout-deleted-confirmation':
+        toast.success(`Layout deleted successfully.`);
+        sendJsonMessage({ type: 'get-all-sld-layouts' });
+        if(onLayoutIdChangeProp){
+            onLayoutIdChangeProp('');
+        }
+        break;
       default: break; 
     }
-  }, [lastJsonMessage, currentLayoutIdKey, isEditModeFromProps, layoutId, currentThemeHookValue, removePlaceholderIfNeeded, reactFlowInstance, onCodeChange]);
+  }, [lastJsonMessage, currentLayoutIdKey, isEditModeFromProps, layoutId, currentThemeHookValue, removePlaceholderIfNeeded, reactFlowInstance, sendJsonMessage, onLayoutIdChangeProp]);
 
   useEffect(() => {
     if (canEdit && isDirty && layoutId && (nodes.length > 0 || edges.length > 0)) {
@@ -1358,15 +1125,15 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         transition={{ duration: 0.2, ease: "circOut" }}
     >
       {canEdit && onLayoutIdChangeProp && (
-          <div className="absolute bottom-0 right-0 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2"> {/* Changed left-3 to left-64 */}
-            <Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''} disabled={!layoutId && dynamicAvailableLayouts.length === 0}>
-              <SelectTrigger className="h-9 text-xs min-w-[12rem]"> {/* Added min-w */}
+          <div className="absolute bottom-0 right-0 z-20 bg-background/80 backdrop-blur-sm p-1.5 rounded-md shadow-md border flex items-center gap-2">
+            <Select onValueChange={handleInternalLayoutSelect} value={layoutId || ''} disabled={!layoutId && Object.keys(availableLayouts).length === 0}>
+              <SelectTrigger className="h-9 text-xs min-w-[12rem]">
                 <div className="flex items-center">
                   <LayoutList className="h-3.5 w-3.5 mr-1.5 opacity-70"/>
                   <SelectValue placeholder="Switch Layout..." />
                 </div>
               </SelectTrigger>
-              <SelectContent>{dynamicAvailableLayouts.map(layout => (<SelectItem key={layout.id} value={layout.id} className="text-xs">{layout.name}</SelectItem>))}</SelectContent>
+              <SelectContent>{Object.values(availableLayouts).map(layout => (<SelectItem key={layout.layoutId} value={layout.layoutId} className="text-xs">{layout.meta?.name || layout.layoutId}</SelectItem>))}</SelectContent>
             </Select>
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -1388,6 +1155,28 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+             <AlertDialog>
+                <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive" className="h-9" disabled={!layoutId}>
+                                    <X className="h-4 w-4"/>
+                                </Button>
+                            </AlertDialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Delete current layout</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                <AlertDialogContent>
+                    <AlertDialogHeader><AlertDialogTitle>Delete SLD Layout?</AlertDialogTitle>
+                    <AlertDialogDescription>Are you sure you want to delete the layout "{layoutId}"? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => sendJsonMessage({ type: 'delete-sld-layout', payload: { key: `sld_${layoutId}` } })} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
           </div>
       )}
 

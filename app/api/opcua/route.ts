@@ -374,14 +374,17 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
             if (parsedMessage.type === 'save-sld-widget-layout' && parsedMessage.payload) {
                 const { key, layout } = parsedMessage.payload;
                 console.log(`Received SLD layout save request for key: ${key}`);
+                const layoutsDir = path.join(process.cwd(), 'config', 'layouts');
+                const filePath = path.join(layoutsDir, `${key}.json`);
+
                 try {
-                    console.log(`Pretending to save SLD layout for key: ${key}`);
-                    await new Promise(resolve => setTimeout(resolve, 500)); 
+                    await fs.mkdir(layoutsDir, { recursive: true });
+                    await fs.writeFile(filePath, JSON.stringify(layout, null, 2));
                     ws.send(JSON.stringify({
                         type: 'layout-saved-confirmation',
                         payload: { key, message: 'SLD Layout saved successfully server-side.' }
                     }));
-                    sendToastToClient(ws, 'success', `Layout for '${key}' saved successfully.`);
+                    sendToastToClient(ws, 'success', `Layout for '${layout.layoutId}' saved successfully.`);
                 } catch (saveError: any) {
                     const errorMsg = `Failed to save SLD layout for '${key}': ${saveError.message}`;
                     console.error(errorMsg);
@@ -391,7 +394,76 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
                     }));
                     sendToastToClient(ws, 'error', errorMsg);
                 }
-                return; 
+                return;
+            } else if (parsedMessage.type === 'get-layout' && parsedMessage.payload) {
+                const { key } = parsedMessage.payload;
+                console.log(`Received request for SLD layout: ${key}`);
+                const layoutsDir = path.join(process.cwd(), 'config', 'layouts');
+                const filePath = path.join(layoutsDir, `${key}.json`);
+
+                try {
+                    const content = await fs.readFile(filePath, 'utf-8');
+                    const layout = JSON.parse(content);
+                    ws.send(JSON.stringify({
+                        type: 'layout-data',
+                        payload: { key, layout }
+                    }));
+                } catch (error: any) {
+                    console.error(`Failed to get SLD layout for key ${key}:`, error);
+                    ws.send(JSON.stringify({
+                        type: 'layout-error',
+                        payload: { key, error: `Layout not found.` }
+                    }));
+                }
+                return;
+            }
+            else if (parsedMessage.type === 'get-all-sld-layouts') {
+                console.log('Received request for all SLD layouts.');
+                const layoutsDir = path.join(process.cwd(), 'config', 'layouts');
+                try {
+                    await fs.mkdir(layoutsDir, { recursive: true });
+                    const files = await fs.readdir(layoutsDir);
+                    const layouts: Record<string, any> = {};
+                    for (const file of files) {
+                        if (path.extname(file) === '.json') {
+                            const filePath = path.join(layoutsDir, file);
+                            const content = await fs.readFile(filePath, 'utf-8');
+                            const layout = JSON.parse(content);
+                            layouts[layout.layoutId] = layout;
+                        }
+                    }
+                    ws.send(JSON.stringify({
+                        type: 'all-sld-layouts',
+                        payload: layouts
+                    }));
+                } catch (error: any) {
+                    console.error('Failed to get all SLD layouts:', error);
+                    sendToastToClient(ws, 'error', 'Failed to retrieve SLD layouts.');
+                }
+                return;
+            } else if (parsedMessage.type === 'delete-sld-layout' && parsedMessage.payload) {
+                const { key } = parsedMessage.payload;
+                console.log(`Received SLD layout delete request for key: ${key}`);
+                const layoutsDir = path.join(process.cwd(), 'config', 'layouts');
+                const filePath = path.join(layoutsDir, `${key}.json`);
+
+                try {
+                    await fs.unlink(filePath);
+                    ws.send(JSON.stringify({
+                        type: 'layout-deleted-confirmation',
+                        payload: { key, message: 'SLD Layout deleted successfully.' }
+                    }));
+                    sendToastToClient(ws, 'success', `Layout '${key.replace('sld_', '')}' deleted successfully.`);
+                } catch (deleteError: any) {
+                    const errorMsg = `Failed to delete SLD layout for '${key}': ${deleteError.message}`;
+                    console.error(errorMsg);
+                    ws.send(JSON.stringify({
+                        type: 'layout-delete-error',
+                        payload: { key, error: `Failed to delete SLD layout: ${deleteError.message}` }
+                    }));
+                    sendToastToClient(ws, 'error', errorMsg);
+                }
+                return;
             }
             else if (parsedMessage.type === 'controlWrite' && parsedMessage.payload && typeof parsedMessage.payload === 'object') {
                 const controlPayload = parsedMessage.payload;

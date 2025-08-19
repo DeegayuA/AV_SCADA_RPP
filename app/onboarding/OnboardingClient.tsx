@@ -117,6 +117,8 @@ interface OnboardingNavigationInternalProps {
   totalSteps: number;
   isLoading?: boolean;
 }
+import ExportOnboardingButton from "./ExportOnboardingButton";
+
 const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> = React.memo(({ onNext, onPrev, currentStep, totalSteps, isLoading }) => {
   const isFirstStep = currentStep === 0;
   const isLastFunctionalStep = currentStep === totalSteps - 1; 
@@ -139,6 +141,11 @@ const OnboardingNavigationInternal: React.FC<OnboardingNavigationInternalProps> 
           <ArrowLeft className="h-4 w-4 mr-1.5 sm:mr-2" /> Previous
         </Button>
       </motion.div>
+
+      {!isFirstStep && (
+        <ExportOnboardingButton />
+      )}
+
       {!isFirstStep && (
         <motion.div variants={buttonVariants} whileHover="hover" whileTap="tap">
           <Button

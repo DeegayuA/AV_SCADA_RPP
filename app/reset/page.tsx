@@ -317,10 +317,56 @@ function OpcuaTestStepInner() {
   );
 }
 
-export default function OpcuaTestStep() {
+import { ImportBackupDialogContent } from '../onboarding/import_all';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+
+function OpcuaTestStep() {
   return (
     <OnboardingProvider>
       <OpcuaTestStepInner />
     </OnboardingProvider>
+  );
+}
+
+export default function ResetPage() {
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Reset and Restore</h1>
+      <p className="mb-4">
+        Here you can reset the application to its initial state or restore it from a backup file.
+      </p>
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="border p-4 rounded-lg">
+          <h2 className="text-xl font-semibold mb-2">Restore from Backup</h2>
+          <p className="mb-4">
+            Upload a backup file to restore the application to a previous state. This will overwrite all current settings.
+          </p>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Upload className="mr-2 h-4 w-4" />
+                Restore from Backup
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl">
+              <DialogHeader>
+                <DialogTitle>Restore System from Backup</DialogTitle>
+              </DialogHeader>
+              <ImportBackupDialogContent />
+            </DialogContent>
+          </Dialog>
+        </div>
+        <div className="border p-4 rounded-lg">
+          <h2 className="text-xl font-semibold mb-2">Reset Application</h2>
+          <p className="mb-4">
+            This will reset the application to its initial state. All your settings will be lost.
+          </p>
+          <Button variant="destructive">
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Reset Application
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
