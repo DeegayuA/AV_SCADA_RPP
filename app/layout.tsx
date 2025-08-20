@@ -17,6 +17,7 @@ import { APP_AUTHOR, APP_NAME } from '@/config/constants';
 import NotificationSystemProvider from '@/components/NotificationSystemProvider';
 import ActiveAlarmsDisplay from '@/components/ActiveAlarmsDisplay';
 import { useWebSocket } from '@/hooks/useWebSocketListener'; // <-- IMPORTANT
+import { syncBackupToServer } from '@/lib/backup';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -36,6 +37,20 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     } else {
       sessionStorage.setItem('hasLoadedBefore', 'true');
     }
+
+    // Set up periodic backup sync
+    const backupInterval = setInterval(() => {
+      // We only want to run this if the user is likely an admin and has data.
+      // This is a simple check. A more robust solution might check the user's role.
+      if (localStorage.getItem('user-preferences')) {
+        console.log('Triggering periodic backup sync...');
+        syncBackupToServer();
+      }
+    }, 1000 * 60 * 60); // Every hour
+
+    return () => {
+      clearInterval(backupInterval);
+    };
   }, []);
 
   return (

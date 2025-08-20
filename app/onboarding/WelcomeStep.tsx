@@ -14,7 +14,17 @@ import { useOnboarding } from './OnboardingContext';
 import { APP_LOGO, APP_NAME } from '@/config/constants';
 import { useCurrentUser, useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
-import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
+import { ImportBackupDialogContent, restoreFromBackupContent, BackupFileContent } from '@/app/onboarding/import_all';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import React, { useEffect } from 'react';
+import { useWebSocket } from '@/hooks/useWebSocketListener';
+import { toast } from 'sonner';
 
 
 const AppLogo = ({ className }: { className?: string }) => (
@@ -76,10 +86,50 @@ const Orb = ({ className, size, initialX, initialY, colorFrom, colorTo }: { clas
 export default function WelcomeStep() {
   const { nextStep } = useOnboarding();
   const currentUser = useCurrentUser();
+  const { sendJsonMessage, lastJsonMessage, isConnected, connect: connectWebSocket } = useWebSocket();
+  const logoutUser = useAppStore((state) => state.logout);
+
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [backups, setBackups] = useState<{filename: string}[]>([]);
+  const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
 
   const storeHasHydrated = useAppStore.persist.hasHydrated();
   const isAdmin = storeHasHydrated && currentUser?.role === UserRole.ADMIN;
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetch('/api/backups')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) {
+            setBackups(data);
+          }
+        });
+    }
+  }, [isAdmin]);
+
+  const handleRestore = async () => {
+    if (!selectedBackup) return;
+    setIsRestoring(true);
+    try {
+      const response = await fetch(`/api/backups/${selectedBackup}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch backup file');
+      }
+      const backupData: BackupFileContent = await response.json();
+
+      await restoreFromBackupContent(
+        backupData,
+        { isConnected, connect: connectWebSocket, sendJsonMessage },
+        logoutUser
+      );
+      // The page will reload, so no need to set isRestoring to false
+    } catch (error) {
+      toast.error('Failed to restore backup', { description: (error as Error).message });
+      setIsRestoring(false);
+    }
+  }
 
   return (
     <div className="relative h-full w-full flex flex-col items-center justify-center overflow-hidden 
@@ -160,17 +210,43 @@ export default function WelcomeStep() {
           </motion.div>
 
           {isAdmin && (
-            <motion.div {...buttonMotionProps(0.5)} className="w-full">
-              <Button
-                size="lg"
-                variant="outline"
-                onClick={() => setIsImportDialogOpen(true)}
-                className="w-full px-8 py-3.5 h-auto text-base font-semibold rounded-xl group shadow-lg border-sky-500/70 text-sky-600 dark:text-sky-400 dark:border-sky-500/60 hover:border-sky-500 dark:hover:border-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/15 focus-visible:ring-sky-500/50 transition-all duration-300 ease-out transform"
-              >
-                <Upload className="mr-2.5 h-5 w-5 transition-transform duration-300 group-hover:translate-y-[-2px] group-hover:text-sky-500 dark:group-hover:text-sky-300" />
-                Import from Backup
-              </Button>
-            </motion.div>
+            <>
+              <motion.div {...buttonMotionProps(0.5)} className="w-full">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setIsImportDialogOpen(true)}
+                  className="w-full px-8 py-3.5 h-auto text-base font-semibold rounded-xl group shadow-lg border-sky-500/70 text-sky-600 dark:text-sky-400 dark:border-sky-500/60 hover:border-sky-500 dark:hover:border-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/15 focus-visible:ring-sky-500/50 transition-all duration-300 ease-out transform"
+                >
+                  <Upload className="mr-2.5 h-5 w-5 transition-transform duration-300 group-hover:translate-y-[-2px] group-hover:text-sky-500 dark:group-hover:text-sky-300" />
+                  Import from Backup File
+                </Button>
+              </motion.div>
+              {backups.length > 0 && (
+                <motion.div variants={itemVariants(0.6, 15, 2)} className="w-full space-y-2">
+                  <Select onValueChange={setSelectedBackup}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Or restore from a periodic backup" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {backups.map(backup => (
+                        <SelectItem key={backup.filename} value={backup.filename}>
+                          {backup.filename}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    onClick={handleRestore}
+                    disabled={!selectedBackup || isRestoring}
+                    className="w-full"
+                  >
+                    {isRestoring ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {isRestoring ? 'Restoring...' : 'Restore Selected Backup'}
+                  </Button>
+                </motion.div>
+              )}
+            </>
           )}
         </div>
 
