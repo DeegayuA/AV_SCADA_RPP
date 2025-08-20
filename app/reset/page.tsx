@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useAppStore, useCurrentUser } from '@/stores/appStore'; // Assuming useCurrentUser is a direct selector now
 import { UserRole } from '@/types/auth';
 import { toast } from 'sonner';
-import { Loader2, Download, AlertTriangle, ShieldAlert, Info, UploadCloud, RotateCw, ListChecks, AlertCircle, LockKeyhole } from 'lucide-react';
+import { Loader2, Download, AlertTriangle, ShieldAlert, Info, UploadCloud, RotateCw, ListChecks, AlertCircle, LockKeyhole, CheckCircle2 } from 'lucide-react';
 
 // Ensure this path points to your refactored modal component
 import { ImportBackupDialogContent } from '@/app/onboarding/import_all';

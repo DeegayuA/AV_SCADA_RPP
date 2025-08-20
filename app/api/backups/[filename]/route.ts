@@ -4,10 +4,10 @@ import path from 'path';
 
 export async function GET(
   request: Request,
-  { params }: { params: { filename: string } }
+  context: any
 ) {
+  const filename = context.params.filename;
   try {
-    const filename = params.filename;
     // Basic security check to prevent directory traversal
     if (filename.includes('..')) {
       return NextResponse.json({ message: 'Invalid filename' }, { status: 400 });
@@ -24,7 +24,7 @@ export async function GET(
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
       return NextResponse.json({ message: 'Backup not found' }, { status: 404 });
     }
-    console.error(`Failed to get backup ${params.filename}:`, error);
+    console.error(`Failed to get backup ${filename}:`, error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
     return NextResponse.json({ message: 'Failed to get backup', error: errorMessage }, { status: 500 });
   }

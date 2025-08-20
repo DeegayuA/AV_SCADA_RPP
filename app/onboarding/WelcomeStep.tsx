@@ -5,7 +5,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 // FIX: Import the 'Variants' type
 import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { Sparkles, Upload, RotateCw, ShieldCheck } from 'lucide-react';
+import { Sparkles, Upload, RotateCw, ShieldCheck, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
@@ -14,7 +14,8 @@ import { useOnboarding } from './OnboardingContext';
 import { APP_LOGO, APP_NAME } from '@/config/constants';
 import { useCurrentUser, useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
-import { ImportBackupDialogContent, restoreFromBackupContent, BackupFileContent } from '@/app/onboarding/import_all';
+import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
+import { restoreFromBackupContent, BackupFileContent } from '@/lib/restore';
 import {
   Select,
   SelectContent,
