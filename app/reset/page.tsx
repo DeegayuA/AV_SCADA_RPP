@@ -27,7 +27,7 @@ import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
 
 import { exportIdbData, clearOnboardingData } from '@/lib/idb-store';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
-import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION } from '@/config/constants';
+import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${PLANT_NAME || 'defaultPlant'}`;
 
@@ -38,6 +38,7 @@ const APP_LOCAL_STORAGE_KEYS = [
   'last-session',
   'theme',
   WEATHER_CARD_CONFIG_KEY,
+  WEBSOCKET_CUSTOM_URL_KEY,
   // Add any other localStorage keys you want to include in the backup
 ];
 

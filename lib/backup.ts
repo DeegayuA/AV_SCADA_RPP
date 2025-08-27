@@ -1,6 +1,6 @@
 import { exportIdbData } from '@/lib/idb-store';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
-import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION } from '@/config/constants';
+import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
 import { SLDLayout } from '@/types/sld';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 import { toast } from 'sonner';
@@ -14,6 +14,7 @@ const APP_LOCAL_STORAGE_KEYS = [
   'last-session',
   'theme',
   WEATHER_CARD_CONFIG_KEY,
+  WEBSOCKET_CUSTOM_URL_KEY,
 ];
 
 const SLD_LAYOUT_IDS_TO_BACKUP: string[] = ['main_plant'];
