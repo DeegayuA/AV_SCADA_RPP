@@ -1,0 +1,19 @@
+{
+  "backupSchemaVersion": "1.0.0",
+  "createdAt": "2025-08-26T22:35:53.410Z",
+  "application": {
+    "name": "Test Backup",
+    "version": "1.0.0"
+  },
+  "plant": {
+    "name": "Test Plant",
+    "location": "Test Location",
+    "capacity": "100kW"
+  },
+  "configurations": {},
+  "browserStorage": {
+    "indexedDB": {},
+    "localStorage": {}
+  },
+  "sldLayouts": {}
+}

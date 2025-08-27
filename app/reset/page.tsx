@@ -302,6 +302,28 @@ export default function ResetApplicationPage() {
       toast.info("Generating encrypted backup file...", { id: backupToastId, description: "Finalizing..." });
       await new Promise(res => setTimeout(res, 200)); // Simulate final packaging
       const jsonData = JSON.stringify(backupData, null, 2);
+
+      // Save to server
+      try {
+        const response = await fetch('/api/backup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: jsonData,
+        });
+        if (response.ok) {
+          const result = await response.json();
+          toast.info("Server-side backup created", { id: backupToastId, description: `File ${result.filename} saved.` });
+        } else {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to save backup to server');
+        }
+      } catch (error) {
+        console.error("Failed to save backup to server:", error);
+        toast.error("Server Backup Failed", { id: backupToastId, description: (error as Error).message });
+        // Do not abort the download, just notify the user
+      }
+
+      // Save to user's machine
       const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8' });
       saveAs(blob, `${APP_NAME.toLowerCase().replace(/\s+/g, '_')}_backup_${new Date().toISOString().replace(/:/g, '-')}.json`);
       

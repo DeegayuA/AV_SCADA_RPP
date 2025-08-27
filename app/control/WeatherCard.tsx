@@ -27,9 +27,7 @@ import { useAppStore } from '@/stores/appStore';
 import { DataPoint } from '@/config/dataPoints';
 import { NodeData } from '@/app/DashboardData/dashboardInterfaces';
 import { cn } from '@/lib/utils';
-
-// --- Plant Location (configurable via environment variable or default) ---
-export const PLANT_LOCATION = process.env.NEXT_PUBLIC_PLANT_LOCATION;
+import { PLANT_NAME, PLANT_LOCATION } from '@/config/constants';
 
 // --- Types for OpenWeatherMap API Responses (Free Tier Focus) ---
 interface OWMGeocodingResponseItem { lat: number; lon: number; name: string; country: string; state?: string; }
@@ -460,7 +458,7 @@ export interface WeatherCardConfig {
   enabled?: boolean;
 }
 interface WeatherCardProps { initialConfig: WeatherCardConfig; opcUaData: NodeData; allPossibleDataPoints: DataPoint[]; onConfigChange: (newConfig: WeatherCardConfig) => void; }
-export const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${process.env.NEXT_PUBLIC_PLANT_NAME || 'defaultPlant'}`;
+export const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${PLANT_NAME || 'defaultPlant'}`;
 const SELECT_NONE_VALUE = '__SELECT_NONE_VALUE__';
 
 // --- Animated Value & Hooks ---
