@@ -1046,7 +1046,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     const localLayoutId = layoutId;
     switch (message.type) {
       case 'all-sld-layouts':
-        setAvailableLayouts(message.payload);
+        setAvailableLayouts(message.payload as unknown as Record<string, SLDLayout>);
         break;
       case 'layout-data':
         if (message.payload?.key !== currentLayoutIdKey) return;
