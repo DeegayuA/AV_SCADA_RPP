@@ -44,7 +44,10 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants';
+import * as SLD_CONSTANTS from '@/config/constants';
+const { AVAILABLE_SLD_LAYOUT_IDS } = SLD_CONSTANTS;
+// Fallback if constantSldLayouts is not exported; prevents compile error
+const constantSldLayouts: Record<string, SLDLayout> = (SLD_CONSTANTS as any).constantSldLayouts || {};
 import { dataPoints as appDataPoints } from '@/config/dataPoints';
 
 import DataLabelNode from './nodes/DataLabelNode';
@@ -169,6 +172,8 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const [nodes, setNodes] = useState<CustomNodeType[]>([]);
   const [edges, setEdges] = useState<CustomFlowEdge[]>([]);
   const [availableLayouts, setAvailableLayouts] = useState<Record<string, SLDLayout>>({});
+  // Holds (id,name) list discovered from localStorage + constants for selection UI
+  const [dynamicAvailableLayouts, setDynamicAvailableLayouts] = useState<{ id: string; name: string }[]>([]);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [selectedElement, setSelectedElement] = useState<CustomNodeType | CustomFlowEdge | null>(null);
   const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
@@ -500,58 +505,68 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     setActiveGlobalAnimationSettings(undefined); // Also reset global animation settings for this layout
     toast.success("Layout Cleared", { description: "Canvas reset. Save to persist." });
     initialFitViewDone.current = false;
-  }, [canEdit, layoutId, currentThemeHookValue]);
+  const persistLayout = useCallback(
+    (
+      nodesToSave: CustomNodeType[],
+      edgesToSave: CustomFlowEdge[],
+      rfInstance: ReactFlowInstance | null,
+      currentLayoutId: string,
+      manualSave: boolean
+    ) => {
+      if (!canEdit || !currentLayoutId) return false;
+      const nodesForStorage = nodesToSave.filter(n => n.id !== PLACEHOLDER_NODE_ID);
+      const viewport = rfInstance ? rfInstance.getViewport() : undefined;
+      const layoutKey = `${LOCAL_STORAGE_KEY_PREFIX}${currentLayoutId}`;
 
-  const persistLayout = useCallback((nodesToSave: CustomNodeType[], edgesToSave: CustomFlowEdge[], rfInstance: ReactFlowInstance | null, currentLayoutId: string, manualSave: boolean) => {
-    if (!canEdit || !currentLayoutId) return false;
-    const nodesForStorage = nodesToSave.filter(n => n.id !== PLACEHOLDER_NODE_ID);
-    const viewport = rfInstance ? rfInstance.getViewport() : undefined;
-
-    let currentMeta: SLDLayout['meta'] = {}; // Default to empty meta
-    // Attempt to load existing meta to preserve fields not managed here (e.g., version, author)
-    try {
+      let currentMeta: SLDLayout['meta'] = {};
+      try {
         const existingLayoutString = localStorage.getItem(layoutKey);
         if (existingLayoutString) {
-            const parsedExisting = JSON.parse(existingLayoutString) as SLDLayout;
-            currentMeta = parsedExisting.meta || {}; // Use existing meta if available
+          const parsedExisting = JSON.parse(existingLayoutString) as SLDLayout;
+          currentMeta = parsedExisting.meta || {};
         }
-    } catch (e) {
+      } catch (e) {
         console.warn(`Error parsing existing layout meta from localStorage for key ${layoutKey}:`, e);
-    }
+      }
 
-    const layoutToPersist: SLDLayout = {
+      const layoutToPersist: SLDLayout = {
         layoutId: currentLayoutId,
-        nodes: nodesForStorage.map(n => ({ ...n, data: { ...n.data } })), // Deep copy data
-        edges: edgesToSave.map(e => ({ ...e, data: { ...e.data } })),     // Deep copy data
+        nodes: nodesForStorage.map(n => ({ ...n, data: { ...n.data } })),
+        edges: edgesToSave.map(e => ({ ...e, data: { ...e.data } })),
         viewport,
         meta: {
-            ...currentMeta, // Preserve other existing meta fields
-            globalAnimationSettings: activeGlobalAnimationSettings // Overwrite/set with current global settings
-        },
-    };
-    const layoutJsonString = JSON.stringify(layoutToPersist);
+          ...currentMeta,
+          globalAnimationSettings: activeGlobalAnimationSettings
+        }
+      };
+      const layoutJsonString = JSON.stringify(layoutToPersist);
 
-    try {
+      try {
         localStorage.setItem(layoutKey, layoutJsonString);
         if (manualSave) toast.success("Layout Saved Locally");
-    } catch (error) {
+      } catch (error) {
         console.error(`PersistLayout: Error saving to LS:`, error);
         if (manualSave) toast.error("Local Save Failed");
-    }
+      }
 
-    if (onCodeChangeRef.current) {
+      if (onCodeChangeRef.current) {
         onCodeChangeRef.current(layoutJsonString, currentLayoutId);
-    }
+      }
 
-    if (isWebSocketConnected && sendJsonMessage) {
-        sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${currentLayoutId}`, layout: layoutToPersist } });
+      if (isWebSocketConnected && sendJsonMessage) {
+        sendJsonMessage({
+          type: 'save-sld-widget-layout',
+            payload: { key: `sld_${currentLayoutId}`, layout: layoutToPersist }
+        });
         if (manualSave) toast.info("Syncing to Server...", { id: `save-pending-${currentLayoutId}` });
         return true;
-    } else {
+      } else {
         if (manualSave && isWebSocketConnected === false) toast.warning("Offline: Server Sync Skipped");
         return true;
-    }
-  }, [canEdit, isWebSocketConnected, sendJsonMessage, activeGlobalAnimationSettings]);
+      }
+    },
+    [canEdit, isWebSocketConnected, sendJsonMessage, activeGlobalAnimationSettings]
+  );
   }, [canEdit, isWebSocketConnected, sendJsonMessage, activeGlobalAnimationSettings]);
 
   const debouncedAutoSave = useMemo(
@@ -828,7 +843,6 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     }
 
     const layoutToExport = availableLayouts[layoutId];
-
     if (!layoutToExport) {
       toast.info(`Layout '${layoutId.replace(/_/g, ' ')}' not found or is empty.`);
       return;
@@ -838,18 +852,17 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       const layoutDataString = JSON.stringify(layoutToExport, null, 2);
       const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(layoutDataString);
       const exportFileDefaultName = `${layoutId}_sld_layout_${new Date().toISOString().split('T')[0]}.json`;
-      
+
       const linkElement = document.createElement('a');
       linkElement.setAttribute('href', dataUri);
       linkElement.setAttribute('download', exportFileDefaultName);
       document.body.appendChild(linkElement);
-      document.body.appendChild(linkElement);
       linkElement.click();
       document.body.removeChild(linkElement);
-      
+
       toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully.`);
     } catch (error) {
-      console.error(`SLDWidget: Error during single layout export for ${layoutId}:`, error);
+      console.error("SLDWidget: Error during single layout export:", error);
       toast.error("Failed to export layout.");
     }
   }, [canEdit, layoutId, availableLayouts]);
@@ -860,36 +873,52 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       return;
     }
 
-    if (Object.keys(availableLayouts).length === 0) {
+    const allLayouts: Record<string, SLDLayout> = {};
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw) as SLDLayout;
+            if (parsed?.layoutId) {
+              allLayouts[parsed.layoutId] = parsed;
+            }
+          }
+        } catch {
+          /* ignore invalid */
+        }
+      }
+    }
+
+    AVAILABLE_SLD_LAYOUT_IDS.forEach(id => {
+      if (!allLayouts[id] && constantSldLayouts[id]) {
+        allLayouts[id] = JSON.parse(JSON.stringify(constantSldLayouts[id]));
+      }
+    });
+
+    if (Object.keys(allLayouts).length === 0) {
       toast.info("No layouts available to export.");
       return;
     }
 
     try {
-      if (loadedFrom === "predefined constants") {
-        if (!layoutToExport.viewport && constantSldLayouts[layoutId]?.viewport) {
-            layoutToExport.viewport = constantSldLayouts[layoutId]!.viewport;
-        }
-      }
-
-
-      layoutDataString = JSON.stringify(layoutToExport, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(layoutDataString);
-      const exportFileDefaultName = `${layoutId}_sld_layout_${new Date().toISOString().split('T')[0]}.json`;
-
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      document.body.appendChild(linkElement);
-      linkElement.click();
-      document.body.removeChild(linkElement);
-
-      toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully from ${loadedFrom}.`);
+      const json = JSON.stringify(allLayouts, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+      const exportFileDefaultName = `all_sld_layouts_${new Date().toISOString().split('T')[0]}.json`;
+      const link = document.createElement('a');
+      link.setAttribute('href', dataUri);
+      link.setAttribute('download', exportFileDefaultName);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("All layouts exported successfully.");
     } catch (error) {
       console.error("SLDWidget: Error during all layouts export:", error);
       toast.error("Failed to export all layouts.");
     }
-  }, [canEdit, availableLayouts]);
+  }, [canEdit]);
 
 
   useEffect(() => {
@@ -1866,3 +1895,66 @@ const SLDWidget: React.FC<SLDWidgetProps> = (props) => {
 };
 
 export default React.memo(SLDWidget);
+function persistLayout(
+  nodes: CustomNodeType[],
+  edges: CustomFlowEdge[],
+  reactFlowInstance: ReactFlowInstance | null,
+  layoutId: string,
+  manualSave: boolean
+): boolean {
+  if (!layoutId) return false;
+
+  try {
+    // Filter out placeholder node (if any)
+    const nodesToSave = nodes.filter(n => n.id !== PLACEHOLDER_NODE_ID);
+
+    // Preserve existing meta (if any) so we do not wipe user-friendly name/description
+    const storageKey = `${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`;
+    let existingMeta: SLDLayout['meta'] = {};
+    try {
+      const existingRaw = localStorage.getItem(storageKey);
+      if (existingRaw) {
+        const parsed = JSON.parse(existingRaw) as SLDLayout;
+        if (parsed && typeof parsed === 'object' && parsed.meta) {
+          existingMeta = parsed.meta;
+        }
+      }
+    } catch {
+      /* ignore meta parse errors */
+    }
+
+    const viewport = reactFlowInstance ? reactFlowInstance.getViewport() : undefined;
+
+    const layoutToPersist: SLDLayout = {
+      layoutId,
+      nodes: nodesToSave.map(n => ({ ...n, selected: false })), // strip selection state
+      edges: edges.map(e => ({ ...e, selected: false })),
+      viewport,
+      meta: existingMeta, // globalAnimationSettings (if any) is preserved inside meta
+    };
+
+    localStorage.setItem(storageKey, JSON.stringify(layoutToPersist));
+
+    if (manualSave) {
+      try {
+        // Optional: lightweight user feedback without relying on component scope
+        // (toast may not be available here if refactoring later)
+        // @ts-ignore
+        if (typeof toast?.success === 'function') toast.success('Layout Saved Locally');
+      } catch {
+        /* ignore toast issues */
+      }
+    }
+
+    return true;
+  } catch (err) {
+    if (manualSave) {
+      try {
+        // @ts-ignore
+        if (typeof toast?.error === 'function') toast.error('Failed to save layout');
+      } catch { /* ignore */ }
+    }
+    console.error('persistLayout: error persisting layout', err);
+    return false;
+  }
+}
