@@ -97,9 +97,9 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
     const headerTitle = currentPathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Dashboard';
     const isAdmin = currentUserRole === UserRole.ADMIN;
 
-    const navigateToResetPage = () => {
+    const navigateToResetPage = useCallback(() => {
       router.push('/reset');
-    };
+    }, [router]);
 
     return (
       <>
@@ -273,10 +273,10 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
       </>
     );
   });
-interface HeaderConnectivityComponentProps extends DashboardHeaderControlProps { }
-const HeaderConnectivityComponent: React.FC<HeaderConnectivityComponentProps> = (props) => {
-  return <DashboardHeaderControl {...props} />;
-};
+// interface HeaderConnectivityComponentProps extends DashboardHeaderControlProps { }
+// const HeaderConnectivityComponent: React.FC<HeaderConnectivityComponentProps> = (props) => {
+//   return <DashboardHeaderControl {...props} />;
+// };
 
 
 interface SectionToRender { title: string; items: (DataPoint | ThreePhaseGroupInfo)[]; gridCols: string; }
@@ -537,6 +537,15 @@ const UnifiedDashboardPage: React.FC = () => {
     toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}` });
   }, [tempWsUrl, changeWebSocketUrl]);
 
+    const handleOpenConfigurator = useCallback(() => {
+    setIsConfiguratorOpen(true);
+  }, []);
+
+  const handleWsStatusClick = useCallback(() => {
+    setTempWsUrl(webSocketUrl || '');
+    setIsWsConfigModalOpen(true);
+  }, [webSocketUrl]);
+
   const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
   const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
 
@@ -636,12 +645,12 @@ const UnifiedDashboardPage: React.FC = () => {
   return (
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
       <div className="max-w-screen-4xl mx-auto">
-        <HeaderConnectivityComponent
+        <DashboardHeaderControl
           plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
-          onClickWsStatus={() => { setTempWsUrl(webSocketUrl); setIsWsConfigModalOpen(true); }}
+          onClickWsStatus={handleWsStatusClick}
           currentTime={currentTime} delay={delay} version={VERSION}
           isEditMode={isGlobalEditMode} toggleEditMode={toggleEditModeAction}
-          currentUserRole={currentUserRole} onOpenConfigurator={() => setIsConfiguratorOpen(true)}
+          currentUserRole={currentUserRole} onOpenConfigurator={handleOpenConfigurator}
           onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} wsAddress={webSocketUrl} />
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}

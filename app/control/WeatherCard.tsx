@@ -1055,7 +1055,7 @@ const contentFadeProps: MotionProps = { initial: { opacity: 0, y: 5 }, animate: 
 export const loadWeatherCardConfigFromStorage = (): WeatherCardConfig => {
   if (typeof window === 'undefined') return JSON.parse(JSON.stringify(defaultConfig));
   const storedConfig = localStorage.getItem(WEATHER_CARD_CONFIG_KEY);
-  console.log(`WeatherCard: Loading config from key "${WEATHER_CARD_CONFIG_KEY}"`, storedConfig);
+  // console.log(`WeatherCard: Loading config from key "${WEATHER_CARD_CONFIG_KEY}"`, storedConfig);
   if (storedConfig) {
     try {
       const parsed = JSON.parse(storedConfig) as Partial<WeatherCardConfig>;
