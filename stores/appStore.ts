@@ -76,6 +76,8 @@ interface AppActions {
 interface TransientState {
   sendJsonMessage: (message: WebSocketMessageToServer) => void;
   setSendJsonMessage: (fn: (message: WebSocketMessageToServer) => void) => void;
+  requestWithResponse: <T>(message: WebSocketMessageToServer, timeout?: number) => Promise<T>;
+  setRequestWithResponse: (fn: <T>(message: WebSocketMessageToServer, timeout?: number) => Promise<T>) => void;
 }
 
 // The complete type for our store
@@ -108,6 +110,15 @@ export const useAppStore = create<FullStoreState>()(
 
       setSendJsonMessage: (fn) => {
         set({ sendJsonMessage: fn });
+      },
+
+      requestWithResponse: async (message, timeout) => {
+        console.warn("WebSocket requestWithResponse not yet initialized.");
+        return Promise.reject(new Error("WebSocket not initialized."));
+      },
+
+      setRequestWithResponse: (fn) => {
+        set({ requestWithResponse: fn });
       },
 
       updateOpcUaNodeValues: (updates) =>
@@ -273,6 +284,8 @@ export const useAppStore = create<FullStoreState>()(
             // Transient state to explicitly ignore
             sendJsonMessage,
             setSendJsonMessage,
+            requestWithResponse,
+            setRequestWithResponse,
             // ...rest now contains only the AppState we want to save
             ...rest
         } = state;

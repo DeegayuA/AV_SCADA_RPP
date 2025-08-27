@@ -13,6 +13,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { SearchableSelect, ComboboxOption } from '@/app/circuit/sld/ui/SearchableSelect';
+import DataLinkLiveValuePreview from '@/app/circuit/sld/ui/DataLinkLiveValuePreview';
 
 
 import {
@@ -27,9 +29,7 @@ import { useAppStore } from '@/stores/appStore';
 import { DataPoint } from '@/config/dataPoints';
 import { NodeData } from '@/app/DashboardData/dashboardInterfaces';
 import { cn } from '@/lib/utils';
-
-// --- Plant Location (configurable via environment variable or default) ---
-export const PLANT_LOCATION = process.env.NEXT_PUBLIC_PLANT_LOCATION;
+import { PLANT_NAME, PLANT_LOCATION, WEATHER_CARD_CONFIG_KEY } from '@/config/constants';
 
 // --- Types for OpenWeatherMap API Responses (Free Tier Focus) ---
 interface OWMGeocodingResponseItem { lat: number; lon: number; name: string; country: string; state?: string; }
@@ -460,7 +460,6 @@ export interface WeatherCardConfig {
   enabled?: boolean;
 }
 interface WeatherCardProps { initialConfig: WeatherCardConfig; opcUaData: NodeData; allPossibleDataPoints: DataPoint[]; onConfigChange: (newConfig: WeatherCardConfig) => void; }
-export const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${process.env.NEXT_PUBLIC_PLANT_NAME || 'defaultPlant'}`;
 const SELECT_NONE_VALUE = '__SELECT_NONE_VALUE__';
 
 // --- Animated Value & Hooks ---
@@ -500,6 +499,14 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
   const [config, setConfig] = useState<WeatherCardConfig>(defaultConfig);
   const [localConfig, setLocalConfig] = useState<WeatherCardConfig>(defaultConfig);
   const [isConfigDialogOpen, setIsConfigDialogOpen] = useState(false);
+
+  const dataPointOptions = useMemo((): ComboboxOption[] => {
+    return allPossibleDataPoints.map(dp => ({
+        value: dp.nodeId,
+        label: dp.name,
+        description: `ID: ${dp.nodeId}`
+    }));
+  }, [allPossibleDataPoints]);
 
   const [resolvedCoordinates, setResolvedCoordinates] = useState<{ lat: number, lon: number } | null>(null);
   const [isLoadingGeocoding, setIsLoadingGeocoding] = useState(false);
@@ -711,8 +718,22 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
                   {STANDARD_WEATHER_ITEM_DEFINITIONS.map((itemDef, defIndex) => {
                     let currentItemConfig = localConfig.opcUaItems.find(ci => ci.definitionId === itemDef.id) || { definitionId: itemDef.id, iconName: itemDef.id === 'custom1' ? 'Package' : undefined, opcUaNodeId: undefined, label: itemDef.defaultLabel, unit: itemDef.defaultUnit };
                     const selectedDataPoint = allPossibleDataPoints.find(dp => dp.nodeId === currentItemConfig.opcUaNodeId);
-                    const filteredDataPoints = allPossibleDataPoints.filter(dp => (dp.category === 'weather' || !dp.category || ['Float', 'Double', 'Boolean'].includes(dp.dataType || '') || (dp.dataType || '').includes('Int')) && (searchTerm[itemDef.id] ? dp.name.toLowerCase().includes(searchTerm[itemDef.id].toLowerCase()) || dp.nodeId.toLowerCase().includes(searchTerm[itemDef.id].toLowerCase()) : true));
-                    return (<motion.div key={itemDef.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 * defIndex }} className="p-4 border rounded-lg bg-muted/30 dark:bg-muted/20 space-y-3 shadow-sm"><h4 className="font-semibold text-md text-foreground flex items-center gap-2 border-b pb-1.5 mb-2.5"><itemDef.defaultIcon className={cn("w-4 h-4", itemDef.iconColorClass)} />{itemDef.id === 'custom1' ? (currentItemConfig.label || itemDef.defaultLabel) : itemDef.defaultLabel}{itemDef.id !== 'custom1' ? <Badge variant="outline" className="ml-auto text-xs px-1.5 py-0.5">Std</Badge> : <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0.5">Custom</Badge>}</h4>{itemDef.id === 'custom1' && (<AnimatePresence><motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-2.5 overflow-hidden"><div className="space-y-1"><Label htmlFor={`cl-${itemDef.id}`} className="text-xs">Label</Label><Input id={`cl-${itemDef.id}`} value={currentItemConfig.label || ''} onChange={(e) => setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, label: e.target.value } : c) }))} className="h-8 text-xs" /></div><div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label htmlFor={`cu-${itemDef.id}`} className="text-xs">Unit</Label><Input id={`cu-${itemDef.id}`} value={currentItemConfig.unit || ''} onChange={(e) => setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, unit: e.target.value } : c) }))} className="h-8 text-xs" /></div><div className="space-y-1"><Label htmlFor={`ci-${itemDef.id}`} className="text-xs">Icon</Label><Select value={currentItemConfig.iconName || 'Package'} onValueChange={(val) => setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, iconName: val as any } : c) }))}><SelectTrigger id={`ci-${itemDef.id}`} className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(AVAILABLE_CUSTOM_ICONS).map(([n, Ic]) => (<SelectItem key={n} value={n} className="text-xs"><div className="flex items-center gap-2"><Ic className="w-3.5 h-3.5" />{n}</div></SelectItem>))}</SelectContent></Select></div></div></motion.div></AnimatePresence>)}<div className="space-y-1"><Label htmlFor={`st-${itemDef.id}`} className="text-xs">OPC UA Source</Label><Popover modal><PopoverTrigger asChild id={`st-${itemDef.id}`}><Button variant="outline" role="combobox" className="w-full justify-between font-normal text-xs h-8">{selectedDataPoint ? <div className="truncate"><span className="font-medium">{selectedDataPoint.name}</span><span className="text-xs op-60 ml-1.5">({selectedDataPoint.dataType})</span></div> : `Select source...`}<ChevronDown className="ml-1 h-3.5 w-3.5 op-50" /></Button></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-xl"><Command><CommandInput placeholder="Search name/ID..." value={searchTerm[itemDef.id] || ''} onValueChange={s => setSearchTerm(p => ({ ...p, [itemDef.id]: s }))} className="h-8 text-xs" /><CommandList><CommandEmpty>No results.</CommandEmpty>{selectedDataPoint && <CommandGroup heading="Current"><CommandItem value={selectedDataPoint.nodeId} className="op-50 pt-event-none text-xs">{selectedDataPoint.name}<Badge variant="outline" className="ml-auto text-[10px]">{selectedDataPoint.dataType}</Badge></CommandItem></CommandGroup>}<CommandGroup><CommandItem value={SELECT_NONE_VALUE} onSelect={() => { setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, opcUaNodeId: undefined } : c) })); (document.activeElement as HTMLElement)?.blur() }} className="text-xs"><XCircle className="mr-1.5 h-3.5 w-3.5" />Clear</CommandItem></CommandGroup><CommandGroup heading="Available">{filteredDataPoints.map(dp => (<CommandItem key={dp.id} value={dp.nodeId} onSelect={v => { setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, opcUaNodeId: v === SELECT_NONE_VALUE ? undefined : v } : c) })); (document.activeElement as HTMLElement)?.blur() }} className="text-xs">{dp.name}<Badge variant="outline" className="ml-auto text-[10px]">{dp.dataType}</Badge></CommandItem>))}</CommandGroup></CommandList></Command></PopoverContent></Popover></div>{selectedDataPoint && (<motion.div initial={{ opacity: 0, y: -5, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto', marginTop: '0.5rem' }} className="p-2 border border-dashed rounded-md bg-background/50 text-[11px] space-y-0.5"><p><strong>Raw:</strong> <Badge variant="outline" className="font-mono text-[10px]">{String(getOpcUaRawValue(selectedDataPoint.nodeId) ?? 'N/A')}</Badge></p><p><strong>Processed:</strong> <Badge variant="secondary" className="text-[10px]">{getOpcUaProcessedValue(selectedDataPoint.nodeId, selectedDataPoint)} {selectedDataPoint.unit || currentItemConfig.unit || itemDef.defaultUnit}</Badge></p></motion.div>)}</motion.div>);
+                    const filteredDataPoints = allPossibleDataPoints.filter(dp => (dp.category === 'weather' || !dp.category || ['Float', 'Double', 'Boolean'].includes(dp.dataType || '') || (dp.dataType || '').includes('Int')));
+                    return (<motion.div key={itemDef.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 * defIndex }} className="p-4 border rounded-lg bg-muted/30 dark:bg-muted/20 space-y-3 shadow-sm"><h4 className="font-semibold text-md text-foreground flex items-center gap-2 border-b pb-1.5 mb-2.5"><itemDef.defaultIcon className={cn("w-4 h-4", itemDef.iconColorClass)} />{itemDef.id === 'custom1' ? (currentItemConfig.label || itemDef.defaultLabel) : itemDef.defaultLabel}{itemDef.id !== 'custom1' ? <Badge variant="outline" className="ml-auto text-xs px-1.5 py-0.5">Std</Badge> : <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0.5">Custom</Badge>}</h4>{itemDef.id === 'custom1' && (<AnimatePresence><motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-2.5 overflow-hidden"><div className="space-y-1"><Label htmlFor={`cl-${itemDef.id}`} className="text-xs">Label</Label><Input id={`cl-${itemDef.id}`} value={currentItemConfig.label || ''} onChange={(e) => setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, label: e.target.value } : c) }))} className="h-8 text-xs" /></div><div className="grid grid-cols-2 gap-3"><div className="space-y-1"><Label htmlFor={`cu-${itemDef.id}`} className="text-xs">Unit</Label><Input id={`cu-${itemDef.id}`} value={currentItemConfig.unit || ''} onChange={(e) => setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, unit: e.target.value } : c) }))} className="h-8 text-xs" /></div><div className="space-y-1"><Label htmlFor={`ci-${itemDef.id}`} className="text-xs">Icon</Label><Select value={currentItemConfig.iconName || 'Package'} onValueChange={(val) => setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, iconName: val as any } : c) }))}><SelectTrigger id={`ci-${itemDef.id}`} className="h-8 text-xs"><SelectValue /></SelectTrigger><SelectContent>{Object.entries(AVAILABLE_CUSTOM_ICONS).map(([n, Ic]) => (<SelectItem key={n} value={n} className="text-xs"><div className="flex items-center gap-2"><Ic className="w-3.5 h-3.5" />{n}</div></SelectItem>))}</SelectContent></Select></div></div></motion.div></AnimatePresence>)}<div className="space-y-1"><Label htmlFor={`st-${itemDef.id}`} className="text-xs">OPC UA Source</Label>
+                    <SearchableSelect
+                        options={dataPointOptions}
+                        value={currentItemConfig.opcUaNodeId}
+                        onChange={(value) => setLocalConfig(p => ({ ...p, opcUaItems: p.opcUaItems.map(c => c.definitionId === itemDef.id ? { ...c, opcUaNodeId: value === SELECT_NONE_VALUE ? undefined : value } : c) }))}
+                        placeholder="Select source..."
+                        searchPlaceholder="Search name/ID..."
+                        notFoundText="No results."
+                        className="h-8 text-xs"
+                    />
+                    </div>{selectedDataPoint && (
+                        <motion.div initial={{ opacity: 0, y: -5, height: 0 }} animate={{ opacity: 1, y: 0, height: 'auto', marginTop: '0.5rem' }} className="p-2 border border-dashed rounded-md bg-background/50 text-[11px] space-y-0.5">
+                            <DataLinkLiveValuePreview dataPointId={selectedDataPoint.nodeId} format={{type: 'string'}} valueMapping={undefined} />
+                        </motion.div>
+                    )}</motion.div>);
                   })}
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 * STANDARD_WEATHER_ITEM_DEFINITIONS.length }} className="p-4 border rounded-lg bg-muted/30 dark:bg-muted/20 space-y-3 shadow-sm">
                     <h4 className="font-semibold text-md text-foreground flex items-center gap-2 border-b pb-1.5 mb-2.5"><CloudSun className="w-4 h-4 text-yellow-500" /> External Forecast & Display</h4>
@@ -1034,9 +1055,11 @@ const contentFadeProps: MotionProps = { initial: { opacity: 0, y: 5 }, animate: 
 export const loadWeatherCardConfigFromStorage = (): WeatherCardConfig => {
   if (typeof window === 'undefined') return JSON.parse(JSON.stringify(defaultConfig));
   const storedConfig = localStorage.getItem(WEATHER_CARD_CONFIG_KEY);
+  // console.log(`WeatherCard: Loading config from key "${WEATHER_CARD_CONFIG_KEY}"`, storedConfig);
   if (storedConfig) {
     try {
       const parsed = JSON.parse(storedConfig) as Partial<WeatherCardConfig>;
+      console.log('WeatherCard: Parsed stored config:', parsed);
       const mergedConfig = JSON.parse(JSON.stringify(defaultConfig));
       if (parsed.forecastApiKey !== undefined) mergedConfig.forecastApiKey = parsed.forecastApiKey;
       mergedConfig.forecastCityName = parsed.forecastCityName || defaultConfig.forecastCityName;

@@ -34,19 +34,7 @@ const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
 ];
 const EXPECTED_BACKUP_SCHEMA_VERSION = "2.0.0";
 
-interface BackupFileContent {
-  backupSchemaVersion: string;
-  createdAt: string;
-  application: { name: string; version: string };
-  plant: { name: string; location: string; capacity: string };
-  configurations?: { dataPointDefinitions?: any[] };
-  userSettings?: { dashboardLayout?: any };
-  browserStorage: {
-    indexedDB?: { onboardingData?: ExpectedAppOnboardingData; };
-    localStorage: Record<string, any>;
-  };
-  sldLayouts?: Record<string, SLDLayout | null>;
-}
+import { BackupFileContent, restoreFromBackupContent } from '@/lib/restore';
 
 type ImportStage = 'idle' | 'fileSelected' | 'validating' | 'confirmation' | 'importing' | 'completed' | 'error';
 type ValidationStatus = 'pending' | 'valid' | 'invalid' | 'warning';
@@ -185,80 +173,24 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
   }, [validateFile]);
 
 
+
   const handleImportData = async () => {
     if (!parsedBackupData || validationStatus === 'invalid') {
       toast.error("Cannot Import: Backup data missing or invalid."); return;
     }
     setImportStage('importing'); setShowConfirmDialog(false);
-    const importToastId = toast.loading("Importing data...");
 
     try {
-      setImportProgressMessage("Clearing local settings...");
-      await new Promise(res => setTimeout(res, 200));
-      APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT.forEach(key => localStorage.removeItem(key));
-      const currentTheme = localStorage.getItem('theme'); // Preserve theme
-      if (currentTheme) localStorage.setItem('theme', currentTheme);
-
-      setImportProgressMessage("Restoring LocalStorage...");
-      await new Promise(res => setTimeout(res, 200));
-      if (parsedBackupData.browserStorage.localStorage) {
-        for (const key in parsedBackupData.browserStorage.localStorage) {
-          if (APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT.includes(key) || key.startsWith('react-flow')) {
-            localStorage.setItem(key, JSON.stringify(parsedBackupData.browserStorage.localStorage[key]));
-          }
-        }
-      }
-      toast.info("LocalStorage restored.", { id: importToastId });
-
-      setImportProgressMessage("Restoring Onboarding Data (IDB)...");
-      await new Promise(res => setTimeout(res, 200));
-      if (parsedBackupData.browserStorage.indexedDB?.onboardingData) {
-        await clearIdbBeforeImport();
-        const onboardingToSave = parsedBackupData.browserStorage.indexedDB.onboardingData as Omit<ExpectedAppOnboardingData, 'onboardingCompleted' | 'version'>;
-        await saveIdbOnboardingData(onboardingToSave);
-        toast.info("Onboarding data (IDB) restored.", { id: importToastId });
-      } else {
-        toast.warning("No onboarding data in backup to restore.", { id: importToastId });
-      }
-
-      if (parsedBackupData.sldLayouts && Object.keys(parsedBackupData.sldLayouts).length > 0) {
-        setImportProgressMessage("Restoring SLD layouts...");
-        await new Promise(res => setTimeout(res, 200));
-        if (!isConnected) {
-          toast.warning("WebSocket disconnected. Attempting connection...", { id: importToastId });
-          connectWebSocket(); await new Promise(resolve => setTimeout(resolve, 1500));
-        }
-        if (isConnected) {
-          let sldSuccess = 0;
-          Object.values(parsedBackupData.sldLayouts).forEach(layout => {
-            if(layout) {
-                 sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${layout.layoutId}`, layout }});
-                 sldSuccess++;
-            }
-          });
-          toast.info(`Sent ${sldSuccess} SLD layouts for restoration.`, { id: importToastId });
-        } else {
-          toast.error("SLD restore failed: WebSocket not connected.", { id: importToastId });
-        }
-      } else {
-         toast.info("No SLD layouts found in backup.", {id: importToastId});
-      }
-
-      setImportProgressMessage("Finalizing...");
-      await new Promise(res => setTimeout(res, 300));
-      logoutUser();
-      toast.success("Import Complete! Reloading...", {
-        id: importToastId, duration: 3000,
-        onAutoClose: () => window.location.reload(), onDismiss: () => window.location.reload(),
-      });
+      await restoreFromBackupContent(
+        parsedBackupData,
+        { isConnected, connect: connectWebSocket, sendJsonMessage },
+        logoutUser,
+        setImportProgressMessage
+      );
       setImportStage('completed');
-      // onDialogClose?.(); // Close dialog on success, though reload will achieve this
-
-    } catch (error: any) {
-      console.error("Import failed:", error);
-      toast.error("Import Failed", { id: importToastId, description: error.message || String(error) });
+    } catch (error) {
       setImportStage('error');
-      setValidationIssues(prev => [...prev, `Runtime import error: ${error.message}`]);
+      setValidationIssues(prev => [...prev, `Runtime import error: ${(error as Error).message}`]);
     }
   };
 

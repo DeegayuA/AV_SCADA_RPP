@@ -45,7 +45,6 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants';
-import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
 import { dataPoints as appDataPoints } from '@/config/dataPoints';
 
 import DataLabelNode from './nodes/DataLabelNode';
@@ -169,7 +168,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [nodes, setNodes] = useState<CustomNodeType[]>([]);
   const [edges, setEdges] = useState<CustomFlowEdge[]>([]);
-  const [dynamicAvailableLayouts, setDynamicAvailableLayouts] = useState<{ id: string; name: string }[]>([]);
+  const [availableLayouts, setAvailableLayouts] = useState<Record<string, SLDLayout>>({});
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
   const [selectedElement, setSelectedElement] = useState<CustomNodeType | CustomFlowEdge | null>(null);
   const [isDrillDownOpen, setIsDrillDownOpen] = useState(false);
@@ -285,8 +284,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
       return;
     }
 
-    // Check for uniqueness
-    const isNameTaken = dynamicAvailableLayouts.some(layout => layout.id === sanitizedLayoutId);
+    const isNameTaken = availableLayouts[sanitizedLayoutId];
     if (isNameTaken) {
       toast.error(`Layout ID "${sanitizedLayoutId}" is already taken. Please choose a different name.`);
       return;
@@ -506,7 +504,6 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
   const persistLayout = useCallback((nodesToSave: CustomNodeType[], edgesToSave: CustomFlowEdge[], rfInstance: ReactFlowInstance | null, currentLayoutId: string, manualSave: boolean) => {
     if (!canEdit || !currentLayoutId) return false;
-    const layoutKey = `${LOCAL_STORAGE_KEY_PREFIX}${currentLayoutId}`;
     const nodesForStorage = nodesToSave.filter(n => n.id !== PLACEHOLDER_NODE_ID);
     const viewport = rfInstance ? rfInstance.getViewport() : undefined;
 
@@ -554,6 +551,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         if (manualSave && isWebSocketConnected === false) toast.warning("Offline: Server Sync Skipped");
         return true;
     }
+  }, [canEdit, isWebSocketConnected, sendJsonMessage, activeGlobalAnimationSettings]);
   }, [canEdit, isWebSocketConnected, sendJsonMessage, activeGlobalAnimationSettings]);
 
   const debouncedAutoSave = useMemo(
@@ -823,90 +821,47 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
   }, [canEdit, layoutId, currentThemeHookValue]);
 
 
-  const handleExportAllLayouts = useCallback(() => {
-    if (!canEdit) {
-      toast.error("Export is only available in edit mode.");
-      return;
-    }
-    const allLayoutsData: { [key: string]: SLDLayout } = {};
-    let layoutsFound = 0;
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-        const layoutIdFromKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
-        const layoutJSON = localStorage.getItem(key);
-        if (layoutJSON) {
-          try {
-            const layoutData = JSON.parse(layoutJSON) as SLDLayout;
-            if (layoutData && layoutData.layoutId === layoutIdFromKey && Array.isArray(layoutData.nodes)) {
-              allLayoutsData[layoutIdFromKey] = layoutData;
-              layoutsFound++;
-            } else {
-              console.warn(`SLDWidget: Invalid LS item ${key}.`);
-            }
-          } catch (e) { console.error(`SLDWidget: Error parsing LS item ${key}:`, e); }
-        }
-      }
-    }
-    if (layoutsFound === 0) {
-      toast.info("No SLD layouts found in local storage to export.");
-      return;
-    }
-    try {
-      const dataStr = JSON.stringify(allLayoutsData, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-      const exportFileDefaultName = `all_sld_layouts_${new Date().toISOString().split('T')[0]}.json`;
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      document.body.appendChild(linkElement);
-      linkElement.click();
-      document.body.removeChild(linkElement);
-      toast.success(`${layoutsFound} SLD layout(s) exported successfully.`);
-    } catch (error) {
-      console.error("SLDWidget: Error during export:", error);
-      toast.error("Failed to export layouts.");
-    }
-  }, [canEdit]);
-
   const handleExportSingleLayout = useCallback(() => {
     if (!canEdit || !layoutId) {
       toast.error("Export is only available in edit mode with a selected layout.");
       return;
     }
 
-    let layoutDataString: string | null = null;
-    let loadedFrom = "";
-    let layoutToExport: SLDLayout | null = null;
-
-    // 1. Try localStorage
-    const localStorageKey = `${LOCAL_STORAGE_KEY_PREFIX}${layoutId}`;
-    const localData = localStorage.getItem(localStorageKey);
-
-    if (localData) {
-      try {
-        const parsed = JSON.parse(localData) as SLDLayout;
-        if (parsed && parsed.layoutId === layoutId && Array.isArray(parsed.nodes)) {
-          layoutToExport = parsed;
-          loadedFrom = "localStorage";
-        } else {
-          console.warn(`SLDWidget: Invalid layout data in LS for ${layoutId} during single export. Ignoring.`);
-        }
-      } catch (e) {
-        console.warn(`SLDWidget: Error parsing LS data for ${layoutId} during single export. Ignoring.`, e);
-      }
-    }
-
-    // 2. If not in localStorage, try constantSldLayouts
-    if (!layoutToExport && constantSldLayouts[layoutId]) {
-      layoutToExport = JSON.parse(JSON.stringify(constantSldLayouts[layoutId])); // Deep clone
-      loadedFrom = "predefined constants";
-    }
+    const layoutToExport = availableLayouts[layoutId];
 
     if (!layoutToExport) {
-      toast.info(`Layout '${layoutId.replace(/_/g, ' ')}' not found or is empty.`, {
-        description: "No saved data in localStorage or predefined constants for this layout ID.",
-      });
+      toast.info(`Layout '${layoutId.replace(/_/g, ' ')}' not found or is empty.`);
+      return;
+    }
+
+    try {
+      const layoutDataString = JSON.stringify(layoutToExport, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(layoutDataString);
+      const exportFileDefaultName = `${layoutId}_sld_layout_${new Date().toISOString().split('T')[0]}.json`;
+      
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      document.body.appendChild(linkElement);
+      document.body.appendChild(linkElement);
+      linkElement.click();
+      document.body.removeChild(linkElement);
+      
+      toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully.`);
+    } catch (error) {
+      console.error(`SLDWidget: Error during single layout export for ${layoutId}:`, error);
+      toast.error("Failed to export layout.");
+    }
+  }, [canEdit, layoutId, availableLayouts]);
+
+  const handleExportAllLayouts = useCallback(() => {
+    if (!canEdit) {
+      toast.error("Export is only available in edit mode.");
+      return;
+    }
+
+    if (Object.keys(availableLayouts).length === 0) {
+      toast.info("No layouts available to export.");
       return;
     }
 
@@ -931,10 +886,10 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
 
       toast.success(`Layout '${layoutId.replace(/_/g, ' ')}' exported successfully from ${loadedFrom}.`);
     } catch (error) {
-      console.error(`SLDWidget: Error during single layout export for ${layoutId}:`, error);
-      toast.error("Failed to export layout.");
+      console.error("SLDWidget: Error during all layouts export:", error);
+      toast.error("Failed to export all layouts.");
     }
-  }, [canEdit, layoutId]);
+  }, [canEdit, availableLayouts]);
 
 
   useEffect(() => {
@@ -1053,7 +1008,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         }
         initialFitViewDone.current = true;
     }
-  }, [nodes, edges, reactFlowInstance, isLoading, layoutId, fitViewOptions]);
+  }, [nodes, edges, reactFlowInstance, isLoading, layoutId, fitViewOptions, availableLayouts]);
 
   useEffect(() => {
     if (!lastJsonMessage || !currentLayoutIdKey) return;
@@ -1061,7 +1016,11 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
     if (message.payload?.key && message.payload.key !== currentLayoutIdKey && (message.type === 'layout-data' || message.type === 'layout-error')) return;
     const localLayoutId = layoutId;
     switch (message.type) {
+      case 'all-sld-layouts':
+        setAvailableLayouts(message.payload);
+        break;
       case 'layout-data':
+        if (message.payload?.key !== currentLayoutIdKey) return;
         const serverLayout = message.payload.layout as SLDLayout | null;
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true;
         initialFitViewDone.current = false;
@@ -1087,6 +1046,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
         }
         setIsDirty(false); break;
       case 'layout-error':
+        if (message.payload?.key !== currentLayoutIdKey) return;
         setIsLoading(false); currentLayoutLoadedFromServerOrInitialized.current = true;
         initialFitViewDone.current = false;
         if (localLayoutId) setNodes([createPlaceholderNode(localLayoutId + " (Error)", currentThemeHookValue)]);
@@ -1328,7 +1288,7 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                   <SelectValue placeholder="Switch Layout..." />
                 </div>
               </SelectTrigger>
-              <SelectContent>{dynamicAvailableLayouts.map(layout => (<SelectItem key={layout.id} value={layout.id} className="text-xs">{layout.name}</SelectItem>))}</SelectContent>
+              <SelectContent>{Object.values(availableLayouts).map(layout => (<SelectItem key={layout.layoutId} value={layout.layoutId} className="text-xs">{layout.meta?.name || layout.layoutId}</SelectItem>))}</SelectContent>
             </Select>
             <TooltipProvider delayDuration={100}>
               <Tooltip>
@@ -1350,6 +1310,28 @@ const SLDWidgetCore: React.FC<SLDWidgetCoreProps> = ({
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+             <AlertDialog>
+                <TooltipProvider delayDuration={100}>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <AlertDialogTrigger asChild>
+                                <Button size="sm" variant="destructive" className="h-9" disabled={!layoutId}>
+                                    <X className="h-4 w-4"/>
+                                </Button>
+                            </AlertDialogTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Delete current layout</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                <AlertDialogContent>
+                    <AlertDialogHeader><AlertDialogTitle>Delete SLD Layout?</AlertDialogTitle>
+                    <AlertDialogDescription>Are you sure you want to delete the layout "{layoutId}"? This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => sendJsonMessage({ type: 'delete-sld-layout', payload: { key: `sld_${layoutId}` } })} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
           </div>
       )}
 
