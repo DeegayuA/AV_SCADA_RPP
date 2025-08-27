@@ -2,8 +2,8 @@ import { exportIdbData } from '@/lib/idb-store';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
 import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
 import { SLDLayout } from '@/types/sld';
-import { useWebSocket } from '@/hooks/useWebSocketListener';
 import { toast } from 'sonner';
+import { useAppStore } from '@/stores/appStore';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${PLANT_NAME || 'defaultPlant'}`;
@@ -19,73 +19,38 @@ const APP_LOCAL_STORAGE_KEYS = [
 
 const SLD_LAYOUT_IDS_TO_BACKUP: string[] = ['main_plant'];
 
-async function fetchAllSldLayouts(
-  sendJsonMessage: (jsonMessage: any) => void,
-  connectWebSocket: () => void,
-  isConnected: boolean
-): Promise<Record<string, SLDLayout | null>> {
+async function fetchAllSldLayouts(): Promise<Record<string, SLDLayout | null>> {
   if (SLD_LAYOUT_IDS_TO_BACKUP.length === 0) return {};
 
-  if (!isConnected) {
-    connectWebSocket();
-    await new Promise(resolve => setTimeout(resolve, 2000)); // Wait for connection
+  const { isWebSocketConnected, requestWithResponse } = useAppStore.getState();
+  if (!isWebSocketConnected || !requestWithResponse) {
+    console.warn("Cannot fetch SLD layouts for backup: WebSocket not connected or request function unavailable.");
+    return {};
   }
 
-  const collectedSldLayouts: Record<string, SLDLayout | null> = {};
-  const promises = SLD_LAYOUT_IDS_TO_BACKUP.map(layoutId => {
-    return new Promise<void>(resolve => {
-      const timeout = setTimeout(() => {
-        console.warn(`Timeout fetching SLD for backup: ${layoutId}`);
-        collectedSldLayouts[layoutId] = null;
-        resolve();
-      }, 10000);
+  const results = await Promise.allSettled(
+    SLD_LAYOUT_IDS_TO_BACKUP.map(layoutId =>
+      requestWithResponse<SLDLayout>({ type: 'get-layout', payload: { key: `sld_${layoutId}` } }, 5000)
+    )
+  );
 
-      const handleSldMessage = (message: any) => {
-        const layoutKeyWithPrefix = message.payload?.key;
-        if (!layoutKeyWithPrefix || !layoutKeyWithPrefix.startsWith('sld_')) return;
-        const receivedSldLayoutId = layoutKeyWithPrefix.substring(4);
-
-        if (receivedSldLayoutId === layoutId) {
-          clearTimeout(timeout);
-          if (message.type === 'layout-data') {
-            collectedSldLayouts[layoutId] = message.payload.layout;
-          } else {
-            collectedSldLayouts[layoutId] = null;
-          }
-          // This is a simplified listener, assuming one message per layout request
-          // In a real scenario, you'd need a more robust way to correlate requests and responses.
-          // For this script, we'll assume the WebSocket hook handles this correlation.
-          resolve();
-        }
-      };
-
-      // This is a conceptual implementation. The actual WebSocket message handling
-      // is managed by the useWebSocket hook, which isn't directly accessible here.
-      // A refactor would be needed to share the message handling logic.
-      // For now, we will rely on the hook's existing message handling and
-      // just send the request. This is a simplification.
-      sendJsonMessage({ type: 'get-layout', payload: { key: `sld_${layoutId}` } });
-
-      // The logic to wait for the response needs to be handled outside this function,
-      // typically in a useEffect hook that can listen to `lastJsonMessage`.
-      // This function is not a complete solution for fetching SLDs without a major refactor.
-      // We will proceed with this simplified version for now.
-      // A more robust solution would be to refactor the WebSocket logic to be reusable outside of a React component.
-
-      // For this script, we will assume a simplified flow and proceed.
-      // We will need to address this limitation.
-      // Let's assume for now that the SLD fetching part will be handled by the component that calls this.
-      // This is a placeholder for the actual implementation.
-      resolve();
-    });
+  const sldDataForBackup: Record<string, SLDLayout | null> = {};
+  results.forEach((result, index) => {
+    const layoutId = SLD_LAYOUT_IDS_TO_BACKUP[index];
+    if (result.status === 'fulfilled') {
+      sldDataForBackup[layoutId] = result.value;
+    } else {
+      console.error(`Failed to fetch SLD layout "${layoutId}" for backup:`, result.reason);
+      sldDataForBackup[layoutId] = null;
+    }
   });
 
-  await Promise.all(promises);
-  return collectedSldLayouts;
+  return sldDataForBackup;
 }
 
 
 export async function getBackupData(): Promise<any> {
+  const { currentUser } = useAppStore.getState();
   const idbData = await exportIdbData();
   const localStorageData: Record<string, any> = {};
   APP_LOCAL_STORAGE_KEYS.forEach(key => {
@@ -99,16 +64,16 @@ export async function getBackupData(): Promise<any> {
     }
   });
 
-  // Fetching SLD layouts is problematic here as it depends on a React hook (useWebSocket).
-  // This function is designed to be called from a non-component context (a periodic timer),
-  // so we cannot use hooks here.
-  // For now, we will skip backing up SLD layouts in the periodic backup.
-  // This is a limitation that needs to be addressed, potentially by refactoring the WebSocket logic.
-  const sldDataForBackup = {};
+  const sldDataForBackup = await fetchAllSldLayouts();
+
+  const now = new Date();
+  const localTimeForFilename = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
 
   const backupData = {
     backupSchemaVersion: "1.0.0",
-    createdAt: new Date().toISOString(),
+    createdAt: now.toISOString(),
+    createdBy: currentUser?.name || 'System', // Default to 'System' for periodic backups
+    localTime: localTimeForFilename,
     application: { name: APP_NAME, version: VERSION },
     plant: { name: PLANT_NAME, location: PLANT_LOCATION, capacity: PLANT_CAPACITY },
     configurations: { dataPointDefinitions: rawDataPointsDefinitions },

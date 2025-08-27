@@ -4,11 +4,15 @@ import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as cle
 import { PLANT_NAME } from '@/config/constants';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
+import { WEATHER_CARD_CONFIG_KEY, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
+
 const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
   'app-storage',
   'user',
   USER_DASHBOARD_CONFIG_KEY,
   'dashboardSoundEnabled',
+  WEATHER_CARD_CONFIG_KEY,
+  WEBSOCKET_CUSTOM_URL_KEY,
   // Consider 'theme' separately, usually user preference
 ];
 
@@ -44,9 +48,12 @@ export async function restoreFromBackupContent(
     setProgress?.("Restoring LocalStorage...");
     await new Promise(res => setTimeout(res, 200));
     if (backupData.browserStorage.localStorage) {
+      console.log('Restoring localStorage data:', backupData.browserStorage.localStorage);
       for (const key in backupData.browserStorage.localStorage) {
         if (APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT.includes(key) || key.startsWith('react-flow')) {
-          localStorage.setItem(key, JSON.stringify(backupData.browserStorage.localStorage[key]));
+          const value = backupData.browserStorage.localStorage[key];
+          console.log(`Restoring key: ${key}`, value);
+          localStorage.setItem(key, JSON.stringify(value));
         }
       }
     }
@@ -67,10 +74,12 @@ export async function restoreFromBackupContent(
       setProgress?.("Restoring SLD layouts...");
       await new Promise(res => setTimeout(res, 200));
       if (!webSocket.isConnected) {
-        toast.warning("WebSocket disconnected. Attempting connection...", { id: importToastId });
-        webSocket.connect(); await new Promise(resolve => setTimeout(resolve, 1500));
-      }
-      if (webSocket.isConnected) {
+        toast.error("SLD Restore Failed: Not Connected", {
+          id: importToastId,
+          description: "The real-time server is not connected, so SLD layouts cannot be restored. Please check the connection and try again.",
+          duration: 10000
+        });
+      } else {
         let sldSuccess = 0;
         Object.values(backupData.sldLayouts).forEach(layout => {
           if (layout) {
@@ -78,9 +87,9 @@ export async function restoreFromBackupContent(
             sldSuccess++;
           }
         });
-        toast.info(`Sent ${sldSuccess} SLD layouts for restoration.`, { id: importToastId });
-      } else {
-        toast.error("SLD restore failed: WebSocket not connected.", { id: importToastId });
+        if (sldSuccess > 0) {
+          toast.info(`Sent ${sldSuccess} SLD layouts for restoration.`, { id: importToastId });
+        }
       }
     } else {
       toast.info("No SLD layouts found in backup.", { id: importToastId });

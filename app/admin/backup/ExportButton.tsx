@@ -6,9 +6,9 @@ import { toast } from "sonner";
 import { useWebSocket } from "@/hooks/useWebSocketListener";
 import { useEffect, useState } from "react";
 import { SLDLayout } from "@/types/sld";
-import { WEATHER_CARD_CONFIG_KEY, WeatherCardConfig, loadWeatherCardConfigFromStorage } from "@/app/control/WeatherCard";
+import { WeatherCardConfig, loadWeatherCardConfigFromStorage } from "@/app/control/WeatherCard";
 import * as APP_CONFIG from "@/config/appConfig";
-import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION } from "@/config/constants";
+import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION, WEATHER_CARD_CONFIG_KEY } from "@/config/constants";
 
 
 const EXPECTED_BACKUP_SCHEMA_VERSION = "2.0.0";
