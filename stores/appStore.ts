@@ -9,9 +9,14 @@ import {
     DataPoint,
     CustomNodeType,
     CustomFlowEdge,
+    SLDLayout,
 } from '@/types/sld';
 import { ActiveAlarm } from '@/types';
 import { User, UserRole } from '@/types/auth';
+import { exportIdbData } from '@/lib/idb-store';
+import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
+import * as appConstants from '@/config/constants';
+import { BackupFileContent } from '@/lib/restore';
 import { logActivity } from '@/lib/activityLog';
 import {
     ApiConfig,
@@ -70,6 +75,7 @@ interface AppActions {
   loadApiConfigs: (configs: Record<string, ApiConfig>) => void;
   loadApiDowntimes: (downtimes: ApiDowntimeEvent[]) => void;
   clearApiMonitoringData: () => void;
+  handleAutoBackup: () => Promise<void>;
 }
 
 // Non-reactive ("transient") state and actions. These should NOT be persisted.
@@ -253,6 +259,73 @@ export const useAppStore = create<FullStoreState>()(
       loadApiConfigs: (configs) => set({ apiConfigs: configs }),
       loadApiDowntimes: (downtimes) => set({ apiDowntimes: downtimes }),
       clearApiMonitoringData: () => set ({ apiConfigs: {}, apiDowntimes: [] }),
+
+      handleAutoBackup: async () => {
+        console.log("Performing automated hourly backup...");
+        const currentUser = get().currentUser;
+
+        try {
+          const now = new Date();
+          const sldStoragePrefix = 'sldLayout_';
+          const allLayouts: Record<string, SLDLayout> = JSON.parse(JSON.stringify(constantSldLayouts));
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(sldStoragePrefix)) {
+              try {
+                const rawLayout = localStorage.getItem(key);
+                if (rawLayout) {
+                  const parsedLayout = JSON.parse(rawLayout) as SLDLayout;
+                  if (parsedLayout?.layoutId) {
+                    allLayouts[parsedLayout.layoutId] = parsedLayout;
+                  }
+                }
+              } catch (error) {
+                console.warn(`AutoBackup: Could not parse SLD layout from localStorage for key: ${key}`, error);
+              }
+            }
+          }
+
+          const idbData = await exportIdbData();
+          const localStorageData: Record<string, any> = {};
+          const appLocalStorageKeys = [
+            `userDashboardLayout_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_v2`,
+            'user-preferences',
+            'last-session',
+            'theme',
+            `weatherCardConfig_v3.5_compact_${appConstants.PLANT_NAME || 'defaultPlant'}`,
+            appConstants.WEBSOCKET_CUSTOM_URL_KEY,
+          ];
+          appLocalStorageKeys.forEach(key => {
+              const item = localStorage.getItem(key);
+              if (item !== null) {
+                  try { localStorageData[key] = JSON.parse(item); } catch { localStorageData[key] = item; }
+              }
+          });
+
+          const backupData: Partial<BackupFileContent> = {
+            backupSchemaVersion: "2.0.0",
+            createdAt: now.toISOString(),
+            createdBy: 'auto-backup',
+            application: { name: appConstants.APP_NAME, version: appConstants.VERSION },
+            plant: { name: appConstants.PLANT_NAME, location: appConstants.PLANT_LOCATION, capacity: appConstants.PLANT_CAPACITY },
+            configurations: { dataPointDefinitions: rawDataPoints },
+            browserStorage: { indexedDB: idbData, localStorage: localStorageData },
+            sldLayouts: allLayouts,
+          };
+
+          const jsonData = JSON.stringify(backupData, null, 2);
+
+          await fetch('/api/backup', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: jsonData,
+          });
+          console.log("Automated backup successful.");
+
+        } catch (error) {
+          console.error("Automated backup failed:", error);
+        }
+      },
     }),
     {
       name: 'app-user-session-storage',
@@ -281,6 +354,7 @@ export const useAppStore = create<FullStoreState>()(
             loadApiConfigs,
             loadApiDowntimes,
             clearApiMonitoringData,
+            handleAutoBackup,
             // Transient state to explicitly ignore
             sendJsonMessage,
             setSendJsonMessage,

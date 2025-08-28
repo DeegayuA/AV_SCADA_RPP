@@ -31,15 +31,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
 import { exportIdbData, clearOnboardingData } from '@/lib/idb-store';
-import { restoreFromBackupContent, BackupFileContent } from '@/lib/restore';
+import { restoreFromBackupContent, BackupFileContent, RestoreSelection } from '@/lib/restore';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
-import { PLANT_NAME, PLANT_LOCATION, PLANT_CAPACITY, APP_NAME, VERSION, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
+import * as appConstants from '@/config/constants';
+import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
 import { SLDLayout } from '@/types/sld';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 
 // --- CONFIGURATION ---
-const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
-const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${PLANT_NAME || 'defaultPlant'}`;
+const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_v2`;
+const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${appConstants.PLANT_NAME || 'defaultPlant'}`;
 
 const APP_LOCAL_STORAGE_KEYS = [
   USER_DASHBOARD_CONFIG_KEY,
@@ -47,7 +48,7 @@ const APP_LOCAL_STORAGE_KEYS = [
   'last-session',
   'theme',
   WEATHER_CARD_CONFIG_KEY,
-  WEBSOCKET_CUSTOM_URL_KEY,
+  appConstants.WEBSOCKET_CUSTOM_URL_KEY,
 ];
 
 const SLD_LAYOUT_IDS_TO_BACKUP: string[] = ['main_plant'];
@@ -282,10 +283,31 @@ export default function ResetApplicationPage() {
     sldLayouts: true,
   });
 
-  const collectedSldLayoutsRef = useRef<Record<string, SLDLayout | null>>({});
-  const resolveSldFetchRef = useRef<Map<string, (value: SLDLayout | null) => void>>(new Map());
+  // --- LOGIC HOOKS ---
 
-  // --- LOGIC HOOKS --- (Largely unchanged from your functional original)
+  const getAllSldLayoutsFromStorage = useCallback((): Record<string, SLDLayout> => {
+    const allLayouts: Record<string, SLDLayout> = JSON.parse(JSON.stringify(constantSldLayouts));
+    const sldStoragePrefix = 'sldLayout_';
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(sldStoragePrefix)) {
+        try {
+          const rawLayout = localStorage.getItem(key);
+          if (rawLayout) {
+            const parsedLayout = JSON.parse(rawLayout) as SLDLayout;
+            if (parsedLayout?.layoutId) {
+              // Overwrite constant layout with user-saved version
+              allLayouts[parsedLayout.layoutId] = parsedLayout;
+            }
+          }
+        } catch (error) {
+          console.warn(`Could not parse SLD layout from localStorage for key: ${key}`, error);
+        }
+      }
+    }
+    return allLayouts;
+  }, []);
 
   useEffect(() => {
     if (!storeHasHydrated) {
@@ -307,73 +329,7 @@ export default function ResetApplicationPage() {
     }
   }, [storeHasHydrated, directStoreUser, router]);
 
-  useEffect(() => {
-    if (!lastJsonMessage || resolveSldFetchRef.current.size === 0) return;
-    const message = lastJsonMessage as any;
-    const layoutKeyWithPrefix = message.payload?.key;
-    if (!layoutKeyWithPrefix || !layoutKeyWithPrefix.startsWith('sld_')) return;
-    const sldLayoutId = layoutKeyWithPrefix.substring(4);
 
-    if (resolveSldFetchRef.current.has(sldLayoutId)) {
-      const resolvePromise = resolveSldFetchRef.current.get(sldLayoutId);
-      if (message.type === 'layout-data') {
-        collectedSldLayoutsRef.current[sldLayoutId] = message.payload.layout;
-        resolvePromise?.(message.payload.layout);
-      } else if (message.type === 'layout-error') {
-        toast.error(`Failed to fetch SLD for backup: ${sldLayoutId}`, { description: message.payload.error });
-        collectedSldLayoutsRef.current[sldLayoutId] = null;
-        resolvePromise?.(null);
-      }
-      resolveSldFetchRef.current.delete(sldLayoutId);
-    }
-  }, [lastJsonMessage]);
-
-  const fetchAllSldLayouts = useCallback(async (): Promise<Record<string, SLDLayout | null>> => {
-    if (SLD_LAYOUT_IDS_TO_BACKUP.length === 0) return {};
-    if (!isConnected && connectWebSocket) {
-        const connectToastId = toast.loading("WebSocket for SLD backup disconnected. Reconnecting...");
-        connectWebSocket();
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        if (!isConnected) {
-            toast.error("WebSocket reconnect failed. SLDs cannot be backed up.", {id: connectToastId});
-            return SLD_LAYOUT_IDS_TO_BACKUP.reduce((acc, id) => ({...acc, [id]: null}), {});
-        }
-        toast.success("WebSocket reconnected.", {id: connectToastId});
-    } else if(!connectWebSocket && !isConnected) {
-        toast.error("WebSocket not available. SLDs cannot be backed up.");
-        return SLD_LAYOUT_IDS_TO_BACKUP.reduce((acc, id) => ({...acc, [id]: null}), {});
-    }
-
-    collectedSldLayoutsRef.current = {};
-    resolveSldFetchRef.current.clear();
-    const fetchPromises = SLD_LAYOUT_IDS_TO_BACKUP.map(layoutId =>
-      new Promise<void>(resolve => {
-        const timeoutId = setTimeout(() => {
-          if (resolveSldFetchRef.current.has(layoutId)) {
-            toast.warning(`Timeout fetching SLD: ${layoutId}`);
-            resolveSldFetchRef.current.get(layoutId)?.(null);
-            resolveSldFetchRef.current.delete(layoutId);
-          }
-          resolve();
-        }, 10000);
-
-        resolveSldFetchRef.current.set(layoutId, (layoutData) => {
-          clearTimeout(timeoutId);
-          resolve();
-        });
-
-        if (sendJsonMessage) sendJsonMessage({ type: 'get-layout', payload: { key: `sld_${layoutId}` } });
-        else {
-           toast.error(`Cannot send WS message for SLD: ${layoutId}.`);
-           resolveSldFetchRef.current.get(layoutId)?.(null);
-           resolveSldFetchRef.current.delete(layoutId);
-           resolve();
-        }
-      })
-    );
-    await Promise.all(fetchPromises);
-    return { ...collectedSldLayoutsRef.current };
-  }, [isConnected, sendJsonMessage, connectWebSocket]);
 
   const handleDownloadBackup = async () => {
     if (Object.values(backupSelection).every(v => !v)) {
@@ -390,8 +346,8 @@ export default function ResetApplicationPage() {
         backupSchemaVersion: "2.0.0",
         createdAt: now.toISOString(),
         createdBy: currentUserForUI?.name || 'Unknown Admin',
-        application: { name: APP_NAME, version: VERSION },
-        plant: { name: PLANT_NAME, location: PLANT_LOCATION, capacity: PLANT_CAPACITY },
+        application: { name: appConstants.APP_NAME, version: appConstants.VERSION },
+        plant: { name: appConstants.PLANT_NAME, location: appConstants.PLANT_LOCATION, capacity: appConstants.PLANT_CAPACITY },
         browserStorage: { localStorage: {} },
       };
 
@@ -420,10 +376,8 @@ export default function ResetApplicationPage() {
       }
 
       if (backupSelection.sldLayouts) {
-        toast.info("Fetching SLD layouts...", { id: backupToastId });
-        if (SLD_LAYOUT_IDS_TO_BACKUP.length > 0) {
-          backupData.sldLayouts = await fetchAllSldLayouts();
-        }
+        toast.info("Packaging SLD layouts...", { id: backupToastId });
+        backupData.sldLayouts = getAllSldLayoutsFromStorage();
       }
 
       const jsonData = JSON.stringify(backupData, null, 2);

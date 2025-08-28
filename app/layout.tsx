@@ -16,18 +16,16 @@ import {
 import { APP_AUTHOR, APP_NAME } from '@/config/constants';
 import NotificationSystemProvider from '@/components/NotificationSystemProvider';
 import ActiveAlarmsDisplay from '@/components/ActiveAlarmsDisplay';
-import { useWebSocket } from '@/hooks/useWebSocketListener'; // <-- IMPORTANT
-import { syncBackupToServer } from '@/lib/backup';
+import { useWebSocket } from '@/hooks/useWebSocketListener';
+import { useAppStore } from '@/stores/appStore';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
+  const handleAutoBackup = useAppStore((state) => state.handleAutoBackup);
+  const currentUserRole = useAppStore((state) => state.currentUser?.role);
 
-  // --- CRITICAL FIX ---
-  // Initialize the WebSocket connection ONCE for the entire application.
-  // By calling the hook here, we create a single, persistent instance.
-  // The hook itself handles all connection, message, and reconnection logic.
   useWebSocket(); 
 
   useEffect(() => {
@@ -38,20 +36,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       sessionStorage.setItem('hasLoadedBefore', 'true');
     }
 
-    // Set up periodic backup sync
-    const backupInterval = setInterval(() => {
-      // We only want to run this if the user is likely an admin and has data.
-      // This is a simple check. A more robust solution might check the user's role.
-      if (localStorage.getItem('user-preferences')) {
-        console.log('Triggering periodic backup sync...');
-        syncBackupToServer();
-      }
-    }, 1000 * 60 * 60); // Every hour
+    if (currentUserRole === 'admin') {
+      // Perform a backup on initial load for admin
+      handleAutoBackup();
 
-    return () => {
-      clearInterval(backupInterval);
-    };
-  }, []);
+      const backupInterval = setInterval(() => {
+        handleAutoBackup();
+      }, 1000 * 60 * 60); // Every hour
+
+      return () => {
+        clearInterval(backupInterval);
+      };
+    }
+  }, [currentUserRole, handleAutoBackup]);
 
   return (
     <html lang="en" suppressHydrationWarning>
