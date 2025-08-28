@@ -6,35 +6,28 @@ import React, { useState, useEffect, useCallback, ChangeEvent } from 'react';
 // Primary auth check happens at the point where the dialog is triggered.
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  UploadCloud, Loader2, CheckCircle, AlertTriangle, XCircle, Info, ListChecks, RotateCw
+  UploadCloud, Loader2, CheckCircle, AlertTriangle, XCircle, Info, ListChecks, RotateCw,
+  Settings, Brush, Network, Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-// Card components for internal structuring
-import { CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'; 
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog";
+import { Checkbox } from '@/components/ui/checkbox';
 import { useAppStore, useCurrentUser } from '@/stores/appStore';
 import { SLDLayout, AppOnboardingData as ExpectedAppOnboardingData } from '@/types/index';
-import { UserRole } from '@/types/auth'; // Assuming this path is correct for UserRole
+import { UserRole } from '@/types/auth';
 import { toast } from 'sonner';
 
 import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as clearIdbBeforeImport } from '@/lib/idb-store';
 import { PLANT_NAME } from '@/config/constants';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 
-const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
-const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
-  'app-storage',
-  'user',
-  USER_DASHBOARD_CONFIG_KEY,
-  'dashboardSoundEnabled',
-  // Consider 'theme' separately, usually user preference
-];
 const EXPECTED_BACKUP_SCHEMA_VERSION = "2.0.0";
 
-import { BackupFileContent, restoreFromBackupContent } from '@/lib/restore';
+import { BackupFileContent, restoreFromBackupContent, RestoreSelection } from '@/lib/restore';
 
 type ImportStage = 'idle' | 'fileSelected' | 'validating' | 'confirmation' | 'importing' | 'completed' | 'error';
 type ValidationStatus = 'pending' | 'valid' | 'invalid' | 'warning';
@@ -59,6 +52,11 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [importProgressMessage, setImportProgressMessage] = useState('');
+  const [restoreSelection, setRestoreSelection] = useState<RestoreSelection>({
+    ui: true,
+    appSettings: true,
+    sldLayouts: true,
+  });
 
   useEffect(() => {
     setIsLoadingAuth(true);
@@ -185,7 +183,8 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
         parsedBackupData,
         { isConnected, connect: connectWebSocket, sendJsonMessage },
         logoutUser,
-        setImportProgressMessage
+        setImportProgressMessage,
+        restoreSelection
       );
       setImportStage('completed');
     } catch (error) {
@@ -197,29 +196,60 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
   const itemVariants = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 }};
 
-  const BackupSummaryDisplay = () => { /* ... same as before, adjusted for smaller space if needed ... */
+  const BackupSummaryDisplay = () => {
     if (!parsedBackupData) return null;
-    const { application, plant, createdAt, sldLayouts, browserStorage } = parsedBackupData;
-    const sldCount = sldLayouts ? Object.values(sldLayouts).filter(Boolean).length : 0;
-    const localStorageKeyCount = browserStorage.localStorage ? Object.keys(browserStorage.localStorage).length : 0;
-    const hasOnboardingData = !!browserStorage.indexedDB?.onboardingData;
+
+    const availableComponents = {
+      ui: parsedBackupData.browserStorage?.localStorage && Object.keys(parsedBackupData.browserStorage.localStorage).length > 0,
+      appSettings: !!parsedBackupData.browserStorage?.indexedDB?.onboardingData,
+      sldLayouts: parsedBackupData.sldLayouts && Object.keys(parsedBackupData.sldLayouts).length > 0,
+    };
+
+    const restoreItems = [
+      { id: 'ui', label: 'User Interface & Preferences', icon: Brush, available: availableComponents.ui },
+      { id: 'appSettings', label: 'Application Settings (IndexedDB)', icon: Database, available: availableComponents.appSettings },
+      { id: 'sldLayouts', label: 'SLD Network Diagram Layouts', icon: Network, available: availableComponents.sldLayouts },
+    ];
+
     return (
-        <motion.div variants={itemVariants} className="space-y-1.5 p-3 border rounded-md bg-muted/30 text-xs">
-            <h4 className="text-sm font-semibold text-foreground mb-1">Backup Summary:</h4>
-            <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                <li><strong>Time:</strong> {new Date(createdAt).toLocaleTimeString()} ({new Date(createdAt).toLocaleDateString()})</li>
-                <li><strong>App:</strong> {application.name} v{application.version}</li>
-                <li><strong>Plant:</strong> {plant.name}</li>
-                <li><strong>SLDs:</strong> {sldCount}</li>
-                <li><strong>LocalStorage Keys:</strong> {localStorageKeyCount} (app-specific)</li>
-                <li><strong>IDB Onboarding Data:</strong> {hasOnboardingData ? "Present" : "Missing"}</li>
-            </ul>
-            {validationStatus === 'warning' && validationIssues.find(iss => iss.includes("Schema version mismatch")) && (
-                 <p className="text-yellow-700 dark:text-yellow-400 text-[11px] mt-1.5 p-1.5 bg-yellow-500/10 rounded-md border border-yellow-500/30">
-                    <AlertTriangle className="inline h-3 w-3 mr-1" /> Schema version mismatch. Use with caution.
-                 </p>
-            )}
-        </motion.div>
+      <Card className="bg-muted/30">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base">Backup Contents</CardTitle>
+          <CardDescription className="text-xs">
+            Created at {new Date(parsedBackupData.createdAt).toLocaleString()}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm font-medium">Select components to restore:</p>
+          {restoreItems.map(item => (
+            <div
+              key={item.id}
+              className={`flex items-center space-x-3 p-2.5 rounded-md transition-all ${!item.available ? 'opacity-50' : ''}`}
+            >
+              <Checkbox
+                id={`restore-${item.id}`}
+                checked={item.available && restoreSelection[item.id as keyof RestoreSelection]}
+                onCheckedChange={(checked) =>
+                  setRestoreSelection(prev => ({...prev, [item.id]: !!checked}))
+                }
+                disabled={!item.available}
+              />
+              <label
+                htmlFor={`restore-${item.id}`}
+                className={`flex items-center text-sm font-medium leading-none ${!item.available ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <item.icon className="w-4 h-4 mr-2" />
+                {item.label}
+              </label>
+            </div>
+          ))}
+          {validationStatus === 'warning' && validationIssues.find(iss => iss.includes("Schema version mismatch")) && (
+               <p className="text-yellow-700 dark:text-yellow-400 text-[11px] mt-1.5 p-1.5 bg-yellow-500/10 rounded-md border border-yellow-500/30">
+                  <AlertTriangle className="inline h-3 w-3 mr-1" /> Schema version mismatch. Use with caution.
+               </p>
+          )}
+        </CardContent>
+      </Card>
     );
   };
   

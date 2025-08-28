@@ -30,53 +30,70 @@ export interface BackupFileContent {
   sldLayouts?: Record<string, SLDLayout | null>;
 }
 
+export interface RestoreSelection {
+  ui: boolean;
+  appSettings: boolean;
+  sldLayouts: boolean;
+}
+
 export async function restoreFromBackupContent(
   backupData: BackupFileContent,
   webSocket: { isConnected: boolean; connect: () => void; sendJsonMessage: (message: any) => void },
   logout: () => void,
-  setProgress?: (message: string) => void
+  setProgress?: (message: string) => void,
+  selection?: RestoreSelection
 ) {
-  const importToastId = toast.loading("Importing data...");
+  const importToastId = toast.loading("Starting restore...");
+
+  const fullSelection: RestoreSelection = {
+    ui: !!backupData.browserStorage?.localStorage,
+    appSettings: !!backupData.browserStorage?.indexedDB,
+    sldLayouts: !!backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0,
+  };
+
+  const finalSelection = selection || fullSelection;
+  const nothingIsSelected = Object.values(finalSelection).every(v => !v);
+
+  if (nothingIsSelected) {
+    toast.warning("Nothing selected to restore.", { id: importToastId });
+    return;
+  }
+
 
   try {
-    setProgress?.("Clearing local settings...");
-    await new Promise(res => setTimeout(res, 200));
-    APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT.forEach(key => localStorage.removeItem(key));
-    const currentTheme = localStorage.getItem('theme'); // Preserve theme
-    if (currentTheme) localStorage.setItem('theme', currentTheme);
+    if (finalSelection.ui && backupData.browserStorage.localStorage) {
+      setProgress?.("Restoring UI & Preferences...");
+      await new Promise(res => setTimeout(res, 200));
 
-    setProgress?.("Restoring LocalStorage...");
-    await new Promise(res => setTimeout(res, 200));
-    if (backupData.browserStorage.localStorage) {
-      console.log('Restoring localStorage data:', backupData.browserStorage.localStorage);
+      APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT.forEach(key => localStorage.removeItem(key));
+      const currentTheme = localStorage.getItem('theme'); // Preserve theme
+      if (currentTheme) localStorage.setItem('theme', currentTheme);
+
       for (const key in backupData.browserStorage.localStorage) {
         if (APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT.includes(key) || key.startsWith('react-flow')) {
           const value = backupData.browserStorage.localStorage[key];
-          console.log(`Restoring key: ${key}`, value);
           localStorage.setItem(key, JSON.stringify(value));
         }
       }
+      toast.info("UI & Preferences restored.", { id: importToastId });
     }
-    toast.info("LocalStorage restored.", { id: importToastId });
 
-    setProgress?.("Restoring Onboarding Data (IDB)...");
-    await new Promise(res => setTimeout(res, 200));
-    if (backupData.browserStorage.indexedDB?.onboardingData) {
+    if (finalSelection.appSettings && backupData.browserStorage.indexedDB?.onboardingData) {
+      setProgress?.("Restoring App Settings (IDB)...");
+      await new Promise(res => setTimeout(res, 200));
       await clearIdbBeforeImport();
       const onboardingToSave = backupData.browserStorage.indexedDB.onboardingData as Omit<ExpectedAppOnboardingData, 'onboardingCompleted' | 'version'>;
       await saveIdbOnboardingData(onboardingToSave);
-      toast.info("Onboarding data (IDB) restored.", { id: importToastId });
-    } else {
-      toast.warning("No onboarding data in backup to restore.", { id: importToastId });
+      toast.info("App Settings (IDB) restored.", { id: importToastId });
     }
 
-    if (backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0) {
+    if (finalSelection.sldLayouts && backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0) {
       setProgress?.("Restoring SLD layouts...");
       await new Promise(res => setTimeout(res, 200));
       if (!webSocket.isConnected) {
         toast.error("SLD Restore Failed: Not Connected", {
           id: importToastId,
-          description: "The real-time server is not connected, so SLD layouts cannot be restored. Please check the connection and try again.",
+          description: "The real-time server is not connected. Please check connection and try again.",
           duration: 10000
         });
       } else {
@@ -91,8 +108,6 @@ export async function restoreFromBackupContent(
           toast.info(`Sent ${sldSuccess} SLD layouts for restoration.`, { id: importToastId });
         }
       }
-    } else {
-      toast.info("No SLD layouts found in backup.", { id: importToastId });
     }
 
     setProgress?.("Finalizing...");
