@@ -343,6 +343,7 @@ export default function ResetApplicationPage() {
 
     try {
       const now = new Date();
+      const now = new Date();
       const localTime = getFormattedTimestamp();
       let backupData: Partial<BackupFileContent> & { backupSchemaVersion: string, createdAt: string, createdBy: string, application: object, plant: object, backupType: string, localTime: string } = {
         backupSchemaVersion: "2.0.0",
@@ -369,7 +370,6 @@ export default function ResetApplicationPage() {
                 try { localStorageData[key] = JSON.parse(item); } catch { localStorageData[key] = item; }
             }
         });
-        if (!backupData.browserStorage) backupData.browserStorage = { localStorage: {} };
         backupData.browserStorage.localStorage = localStorageData;
       }
 
