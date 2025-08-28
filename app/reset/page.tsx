@@ -366,6 +366,7 @@ export default function ResetApplicationPage() {
                 try { localStorageData[key] = JSON.parse(item); } catch { localStorageData[key] = item; }
             }
         });
+        if (!backupData.browserStorage) backupData.browserStorage = { localStorage: {} };
         backupData.browserStorage.localStorage = localStorageData;
       }
 
