@@ -8,7 +8,11 @@ export async function POST(request: Request) {
     const backupData = await request.json();
 
     const username = backupData.createdBy?.replace(/\s+/g, '_') || 'system';
-    const localTime = backupData.localTime || new Date().toISOString().replace(/:/g, '-');
+    const localTime = backupData.localTime;
+
+    if (!localTime) {
+      throw new Error("localTime not provided in backup data");
+    }
 
     let prefix = 'backup_';
     if (backupData.backupType === 'manual') {

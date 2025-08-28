@@ -17,6 +17,7 @@ import { exportIdbData } from '@/lib/idb-store';
 import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
 import * as appConstants from '@/config/constants';
 import { BackupFileContent } from '@/lib/restore';
+import { getFormattedTimestamp } from '@/lib/timeUtils';
 import { logActivity } from '@/lib/activityLog';
 import {
     ApiConfig,
@@ -266,6 +267,7 @@ export const useAppStore = create<FullStoreState>()(
 
         try {
           const now = new Date();
+          const localTime = getFormattedTimestamp();
           const sldStoragePrefix = 'sldLayout_';
           const allLayouts: Record<string, SLDLayout> = JSON.parse(JSON.stringify(constantSldLayouts));
           for (let i = 0; i < localStorage.length; i++) {
@@ -306,6 +308,7 @@ export const useAppStore = create<FullStoreState>()(
             backupSchemaVersion: "2.0.0",
             createdAt: now.toISOString(),
             createdBy: 'auto-backup',
+            localTime: localTime,
             application: { name: appConstants.APP_NAME, version: appConstants.VERSION },
             plant: { name: appConstants.PLANT_NAME, location: appConstants.PLANT_LOCATION, capacity: appConstants.PLANT_CAPACITY },
             configurations: { dataPointDefinitions: rawDataPoints },
