@@ -90,23 +90,21 @@ export async function restoreFromBackupContent(
     if (finalSelection.sldLayouts && backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0) {
       setProgress?.("Restoring SLD layouts...");
       await new Promise(res => setTimeout(res, 200));
-      if (!webSocket.isConnected) {
-        toast.error("SLD Restore Failed: Not Connected", {
-          id: importToastId,
-          description: "The real-time server is not connected. Please check connection and try again.",
-          duration: 10000
-        });
-      } else {
+      try {
         let sldSuccess = 0;
         Object.values(backupData.sldLayouts).forEach(layout => {
-          if (layout) {
-            webSocket.sendJsonMessage({ type: 'save-sld-widget-layout', payload: { key: `sld_${layout.layoutId}`, layout } });
+          if (layout && layout.layoutId) {
+            const key = `sldLayout_${layout.layoutId}`;
+            localStorage.setItem(key, JSON.stringify(layout));
             sldSuccess++;
           }
         });
         if (sldSuccess > 0) {
-          toast.info(`Sent ${sldSuccess} SLD layouts for restoration.`, { id: importToastId });
+          toast.info(`${sldSuccess} SLD layouts restored to local storage.`, { id: importToastId });
         }
+      } catch (error) {
+        console.error("Failed to restore SLD layouts to localStorage:", error);
+        toast.error("SLD Restore Failed", { id: importToastId, description: "Could not save SLD layouts to local storage." });
       }
     }
 

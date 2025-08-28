@@ -9,7 +9,7 @@ export async function GET() {
 
     const backupDetails = await Promise.all(
       files
-        .filter(file => file.endsWith('.json') && file.startsWith('backup_'))
+        .filter(file => file.endsWith('.json') && /^(manual_backup_|auto_backup_|backup_)/.test(file))
         .map(async (file) => {
           try {
             const filePath = path.join(backupsDir, file);

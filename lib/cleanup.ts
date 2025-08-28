@@ -7,7 +7,7 @@ export async function cleanupBackups() {
 
   const backups = files
     .map(file => {
-      const match = file.match(/^backup_(.+?)_(.+)\.json$/);
+      const match = file.match(/^(?:manual_backup_|auto_backup_|backup_)(.+?)_(.+)\.json$/);
       if (!match) return null;
 
       let date;
@@ -80,7 +80,7 @@ export async function cleanupBackups() {
   monthlyBackups.forEach(file => filesToKeep.add(file));
 
   const allFiles = await fs.readdir(backupsDir).catch(() => []);
-  const filesToDelete = allFiles.filter(file => !filesToKeep.has(file) && file.startsWith('backup_'));
+  const filesToDelete = allFiles.filter(file => !filesToKeep.has(file) && /^(manual_backup_|auto_backup_|backup_)/.test(file));
 
   for (const fileToDelete of filesToDelete) {
     console.log(`Deleting old backup as per retention policy: ${fileToDelete}`);
