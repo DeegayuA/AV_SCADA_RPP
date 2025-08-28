@@ -92,9 +92,15 @@ export default function WelcomeStep() {
       fetch('/api/backups')
         .then(res => res.json())
         .then(data => {
-          if (Array.isArray(data)) {
-            setBackups(data);
+          if (data && Array.isArray(data.backups)) {
+            setBackups(data.backups);
+          } else {
+            setBackups([]);
           }
+        })
+        .catch(error => {
+          console.error("Failed to fetch backups:", error);
+          setBackups([]);
         });
     }
   }, [isAdmin]);
