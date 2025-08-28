@@ -84,7 +84,9 @@ export async function cleanupBackups() {
     autoBackupsToKeep.add(autoBackups[i].file);
   }
 
-  const allFilesToKeep = new Set([...manualBackups, ...autoBackupsToKeep]);
+  const allFilesToKeep = new Set<string>();
+  manualBackups.forEach(file => allFilesToKeep.add(file));
+  autoBackupsToKeep.forEach(file => allFilesToKeep.add(file));
 
   const filesToDelete = allFiles.filter(file => !allFilesToKeep.has(file));
 
