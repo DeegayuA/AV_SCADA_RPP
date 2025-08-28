@@ -35,6 +35,7 @@ import { restoreFromBackupContent, BackupFileContent, RestoreSelection } from '@
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
 import * as appConstants from '@/config/constants';
 import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
+import { getFormattedTimestamp } from '@/lib/timeUtils';
 import { SLDLayout } from '@/types/sld';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 
@@ -342,10 +343,13 @@ export default function ResetApplicationPage() {
 
     try {
       const now = new Date();
-      let backupData: Partial<BackupFileContent> & { backupSchemaVersion: string, createdAt: string, createdBy: string, application: object, plant: object, backupType: string } = {
+      const now = new Date();
+      const localTime = getFormattedTimestamp();
+      let backupData: Partial<BackupFileContent> & { backupSchemaVersion: string, createdAt: string, createdBy: string, application: object, plant: object, backupType: string, localTime: string } = {
         backupSchemaVersion: "2.0.0",
         createdAt: now.toISOString(),
         createdBy: currentUserForUI?.name || 'Unknown Admin',
+        localTime: localTime,
         application: { name: appConstants.APP_NAME, version: appConstants.VERSION },
         plant: { name: appConstants.PLANT_NAME, location: appConstants.PLANT_LOCATION, capacity: appConstants.PLANT_CAPACITY },
         browserStorage: { localStorage: {} },
@@ -400,7 +404,7 @@ export default function ResetApplicationPage() {
 
       // Save to client machine
       const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8' });
-      saveAs(blob, `${appConstants.APP_NAME.toLowerCase().replace(/\s+/g, '_')}_backup_${now.toISOString().replace(/:/g, '-')}.json`);
+      saveAs(blob, `manual_backup_${localTime}_${(currentUserForUI?.name || 'system').replace(/\s+/g, '_')}.json`);
 
       toast.success("Backup Download Started!", { id: backupToastId, duration: 6000, description: "Check your browser downloads." });
       setBackupDownloaded(true);
