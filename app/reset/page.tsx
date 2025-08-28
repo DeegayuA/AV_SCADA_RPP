@@ -365,6 +365,9 @@ export default function ResetApplicationPage() {
                 try { localStorageData[key] = JSON.parse(item); } catch { localStorageData[key] = item; }
             }
         });
+        if (!backupData.browserStorage) {
+          backupData.browserStorage = { localStorage: {} };
+        }
         backupData.browserStorage.localStorage = localStorageData;
       }
 
@@ -398,7 +401,7 @@ export default function ResetApplicationPage() {
 
       // Save to client machine
       const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8' });
-      saveAs(blob, `${APP_NAME.toLowerCase().replace(/\s+/g, '_')}_backup_${now.toISOString().replace(/:/g, '-')}.json`);
+      saveAs(blob, `${appConstants.APP_NAME.toLowerCase().replace(/\s+/g, '_')}_backup_${now.toISOString().replace(/:/g, '-')}.json`);
 
       toast.success("Backup Download Started!", { id: backupToastId, duration: 6000, description: "Check your browser downloads." });
       setBackupDownloaded(true);
