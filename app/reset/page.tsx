@@ -342,13 +342,14 @@ export default function ResetApplicationPage() {
 
     try {
       const now = new Date();
-      let backupData: Partial<BackupFileContent> & { backupSchemaVersion: string, createdAt: string, createdBy: string, application: object, plant: object } = {
+      let backupData: Partial<BackupFileContent> & { backupSchemaVersion: string, createdAt: string, createdBy: string, application: object, plant: object, backupType: string } = {
         backupSchemaVersion: "2.0.0",
         createdAt: now.toISOString(),
         createdBy: currentUserForUI?.name || 'Unknown Admin',
         application: { name: appConstants.APP_NAME, version: appConstants.VERSION },
         plant: { name: appConstants.PLANT_NAME, location: appConstants.PLANT_LOCATION, capacity: appConstants.PLANT_CAPACITY },
         browserStorage: { localStorage: {} },
+        backupType: 'manual',
       };
 
       if (backupSelection.configurations) {

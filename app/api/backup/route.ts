@@ -9,7 +9,15 @@ export async function POST(request: Request) {
 
     const username = backupData.createdBy?.replace(/\s+/g, '_') || 'system';
     const localTime = backupData.localTime || new Date().toISOString().replace(/:/g, '-');
-    const filename = `backup_${localTime}_${username}.json`;
+
+    let prefix = 'backup_';
+    if (backupData.backupType === 'manual') {
+      prefix = 'manual_backup_';
+    } else if (backupData.createdBy === 'auto-backup') {
+      prefix = 'auto_backup_';
+    }
+
+    const filename = `${prefix}${localTime}_${username}.json`;
 
     const backupsDir = path.join(process.cwd(), 'backups');
 

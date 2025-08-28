@@ -6,21 +6,34 @@ export async function GET() {
   try {
     const backupsDir = path.join(process.cwd(), 'backups');
     const files = await fs.readdir(backupsDir);
-    const backupFiles = files
-      .filter(file => file.endsWith('.json'))
-      .map(file => {
-        return {
-          filename: file,
-          // We could add more metadata here if needed, like creation time from the filename
-        };
-      })
-      .reverse(); // Show newest first
 
-    return NextResponse.json(backupFiles);
+    const backupDetails = await Promise.all(
+      files
+        .filter(file => file.endsWith('.json') && file.startsWith('backup_'))
+        .map(async (file) => {
+          try {
+            const filePath = path.join(backupsDir, file);
+            const stats = await fs.stat(filePath);
+            return {
+              filename: file,
+              createdAt: stats.birthtime.toISOString(),
+              size: stats.size,
+            };
+          } catch (statError) {
+            console.error(`Failed to get stats for file ${file}:`, statError);
+            return null;
+          }
+        })
+    );
+
+    const validBackups = backupDetails
+      .filter((b): b is { filename: string; createdAt: string; size: number } => b !== null)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return NextResponse.json({ backups: validBackups });
   } catch (error) {
-    // If the directory doesn't exist, return an empty array
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return NextResponse.json([]);
+      return NextResponse.json({ backups: [] });
     }
     console.error('Failed to list backups:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
