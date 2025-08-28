@@ -19,6 +19,9 @@ const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
 export interface BackupFileContent {
   backupSchemaVersion: string;
   createdAt: string;
+  createdBy?: string;
+  localTime?: string;
+  backupType?: 'manual' | 'auto-backup';
   application: { name: string; version: string };
   plant: { name: string; location: string; capacity: string };
   configurations?: { dataPointDefinitions?: any[] };
