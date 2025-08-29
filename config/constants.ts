@@ -59,7 +59,7 @@ export const getWebSocketUrl = async (): Promise<string> => {
 
     // Vercel deployment check
     if (process.env.NEXT_PUBLIC_VERCEL_URL) {
-      return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
+        return `${protocol}//${process.env.NEXT_PUBLIC_VERCEL_URL}${WS_API_PATH}`;
     }
 
     // Construct the base URL, always using the default WebSocket port.
@@ -106,36 +106,37 @@ export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 export const USER = "viewer";
 
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
-  'ranna_main_sld',
-  'Ranna_PLC',
-  'PV_Array01',
-  'PV_Array02',
-  'PV_Array03',
-  'PV_Array04',
-  'PV_Array05',
-  'PV_Array06',
-  'PV_Array07',
-  'PV_Array08',
-  'PV_Array09',
-  'PV_Array10',
-  'PV_Array11',
-  'PV_Array12',
-  'PV_Array13',
-  'PV_Array14',
-  'PV_Array15',
-  'PV_Array16',
-  'PV_Array17',
-  'PV_Array18',
-  'weather',
-  'misc1',
-  'misc2',
-  'misc3',
-  'Power_Analyser1',
-  'Power_Analyser2',
-  'MiCom_Relay',
-  'empty_template',
-  'test_data_nodes_layout',
+    'ranna_main_sld',
+    'Ranna_PLC',
+    'PV_Array01',
+    'PV_Array02',
+    'PV_Array03',
+    'PV_Array04',
+    'PV_Array05',
+    'PV_Array06',
+    'PV_Array07',
+    'PV_Array08',
+    'PV_Array09',
+    'PV_Array10',
+    'PV_Array11',
+    'PV_Array12',
+    'PV_Array13',
+    'PV_Array14',
+    'PV_Array15',
+    'PV_Array16',
+    'PV_Array17',
+    'PV_Array18',
+    'weather',
+    'misc1',
+    'misc2',
+    'misc3',
+    'Power_Analyser1',
+    'Power_Analyser2',
+    'MiCom_Relay',
+    'empty_template',
+    'test_data_nodes_layout',
 ];
 
 export const API_MONITORING_CONFIG_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringConfigs_v1`;
 export const API_MONITORING_DOWNTIME_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringDowntimes_v1`;
+export const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${PLANT_NAME || 'defaultPlant'}`;
