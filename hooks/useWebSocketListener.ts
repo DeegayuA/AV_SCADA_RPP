@@ -101,7 +101,7 @@ export const useWebSocket = () => {
         };
         const handleMessage = (jsonString: string) => {
             try {
-                const message: WebSocketMessageFromServer = JSON.parse(jsonString);
+                const message: any = JSON.parse(jsonString);
                 setLastJsonMessage(message);
 
                 if (message.type === 'opc-ua-data' && message.payload) {
@@ -116,6 +116,9 @@ export const useWebSocket = () => {
                     const { message: toastMsg, options } = message.payload as ToastMessagePayload;
                     const toastType = options?.id?.toString().includes('error') ? 'error' : 'info';
                     toast[toastType](toastMsg, options);
+                } else if (typeof message === 'object' && message !== null && !message.type) {
+                    // This is the data payload itself
+                    updateOpcUaNodeValues(message);
                 }
 
             } catch (error) {
