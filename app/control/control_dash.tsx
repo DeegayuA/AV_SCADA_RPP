@@ -451,8 +451,24 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
 
   const checkPlcConnection = useCallback(async () => {
-    if (!authCheckComplete) return; try { const r = await fetch('/api/opcua/status'); if (!r.ok) throw new Error(`API Err:${r.status}`); const d = await r.json(); const nS = d.connectionStatus; if (nS && ['online', 'offline', 'disconnected'].includes(nS)) setPlcStatus(nS); else { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (e) { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); }
-  }, [plcStatus, authCheckComplete]);
+    if (!authCheckComplete) return;
+    try {
+      const r = await fetch('/api/opcua/status');
+      if (!r.ok) {
+        setPlcStatus('disconnected');
+        return;
+      }
+      const d = await r.json();
+      const nS = d.connectionStatus;
+      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
+        setPlcStatus(nS);
+      } else {
+        setPlcStatus('disconnected');
+      }
+    } catch (e) {
+      setPlcStatus('disconnected');
+    }
+  }, [authCheckComplete]);
   const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
   const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath); }, [currentUserRole, displayedDataPointIds, currentPath]);
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
