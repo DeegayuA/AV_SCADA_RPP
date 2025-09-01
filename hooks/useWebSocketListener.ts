@@ -259,11 +259,22 @@ export const useWebSocket = () => {
         }
     }, [wsUrl]);
 
+    const resetWebSocketUrl = useCallback(() => {
+        const defaultUrl = getDefaultWebSocketUrl();
+        if (wsUrl !== defaultUrl) {
+            console.log(`WebSocket: Resetting to default URL: ${defaultUrl}`);
+            changeWebSocketUrl(defaultUrl);
+        } else {
+            toast.info("Already using default URL.");
+        }
+    }, [wsUrl, changeWebSocketUrl]);
+
     return {
         sendJsonMessage,
         lastJsonMessage,
         isConnected: useAppStore((state) => state.isWebSocketConnected),
         changeWebSocketUrl,
+        resetWebSocketUrl,
         connect,
         activeUrl: wsUrl
     };
