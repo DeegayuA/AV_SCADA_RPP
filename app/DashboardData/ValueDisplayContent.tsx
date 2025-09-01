@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 interface ValueDisplayContentProps {
     item: DataPoint;
-    rawValue: string | number | boolean | undefined;
+    rawValue: string | number | boolean | null | undefined;
     isDisabled: boolean;
     sendDataToWebSocket: (nodeId: string, value: any) => void;
     playNotificationSound: (type: 'success' | 'error' | 'warning' | 'info') => void;

@@ -141,7 +141,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                                 <div className="w-1/2 text-right">
                                                     <ValueDisplayContent
                                                         item={phaseConfig}
-                                                        nodeValues={nodeValues} isDisabled={isDisabled}
+                                                        rawValue={nodeValues[phaseConfig.nodeId]} isDisabled={isDisabled}
                                                         sendDataToWebSocket={sendDataToWebSocket}
                                                         playNotificationSound={playNotificationSound}
                                                         lastToastTimestamps={lastToastTimestamps}
@@ -155,7 +155,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                         <div className="flex justify-between items-center text-xs pt-1.5 mt-1.5 border-t border-dashed">
                                             <span className="text-muted-foreground font-medium w-1/2 truncate" title={groupInfoItem.average.name}>{groupInfoItem.average.name || 'Average'}</span>
                                             <div className="w-1/2 text-right">
-                                                <ValueDisplayContent item={groupInfoItem.average} nodeValues={nodeValues} isDisabled={isDisabled} sendDataToWebSocket={sendDataToWebSocket} playNotificationSound={playNotificationSound} lastToastTimestamps={lastToastTimestamps} isEditMode={isEditMode} />
+                                                <ValueDisplayContent item={groupInfoItem.average} rawValue={nodeValues[groupInfoItem.average.nodeId]} isDisabled={isDisabled} sendDataToWebSocket={sendDataToWebSocket} playNotificationSound={playNotificationSound} lastToastTimestamps={lastToastTimestamps} isEditMode={isEditMode} />
                                             </div>
                                         </div>
                                     )}
@@ -163,7 +163,7 @@ const DashboardSection: React.FC<DashboardSectionProps> = ({
                                         <div className="flex justify-between items-center text-xs pt-1.5 mt-1.5 border-t">
                                             <span className="text-muted-foreground font-semibold w-1/2 truncate" title={groupInfoItem.total.name}>{groupInfoItem.total.name || 'Total'}</span>
                                             <div className="w-1/2 text-right">
-                                                <ValueDisplayContent item={groupInfoItem.total} nodeValues={nodeValues} isDisabled={isDisabled} sendDataToWebSocket={sendDataToWebSocket} playNotificationSound={playNotificationSound} lastToastTimestamps={lastToastTimestamps} isEditMode={isEditMode} />
+                                                <ValueDisplayContent item={groupInfoItem.total} rawValue={nodeValues[groupInfoItem.total.nodeId]} isDisabled={isDisabled} sendDataToWebSocket={sendDataToWebSocket} playNotificationSound={playNotificationSound} lastToastTimestamps={lastToastTimestamps} isEditMode={isEditMode} />
                                             </div>
                                         </div>
                                     )}
