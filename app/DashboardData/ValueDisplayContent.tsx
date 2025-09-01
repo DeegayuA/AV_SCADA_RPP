@@ -16,7 +16,8 @@ interface ValueDisplayContentProps {
     isEditMode: boolean;
 }
 
-const ValueDisplayContent: React.FC<ValueDisplayContentProps> = ({
+const ValueDisplayContent: React.FC<ValueDisplayContentProps> = React.memo(
+  ({
     item,
     nodeValues,
     isDisabled, // Represents effectiveIsDisabled
@@ -24,7 +25,7 @@ const ValueDisplayContent: React.FC<ValueDisplayContentProps> = ({
     playNotificationSound,
     lastToastTimestamps,
     isEditMode,
-}) => {
+  }) => {
     const rawValue = nodeValues[item.nodeId];
     const numericValue = typeof rawValue === 'number' ? rawValue : 
                         (typeof rawValue === 'string' ? parseFloat(rawValue) : null);
@@ -182,6 +183,6 @@ const ValueDisplayContent: React.FC<ValueDisplayContentProps> = ({
             {displayValue}
         </span>
     );
-};
+});
 
 export default ValueDisplayContent;

@@ -340,7 +340,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
 
   // WebSocket connection via dedicated hook
-  const { sendJsonMessage, changeWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
+  const { sendJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
 
   const currentUserRole = currentUser?.role;
 
@@ -536,6 +536,13 @@ const UnifiedDashboardPage: React.FC = () => {
     setIsWsConfigModalOpen(false);
     toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}` });
   }, [tempWsUrl, changeWebSocketUrl]);
+
+  const handleResetWsUrl = useCallback(() => {
+    if(resetWebSocketUrl) {
+      resetWebSocketUrl();
+      setIsWsConfigModalOpen(false);
+    }
+  }, [resetWebSocketUrl]);
 
     const handleOpenConfigurator = useCallback(() => {
     setIsConfiguratorOpen(true);
@@ -896,11 +903,18 @@ const UnifiedDashboardPage: React.FC = () => {
               </p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)}>
-              Close
+          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
+            <Button variant="secondary" onClick={handleResetWsUrl} className="w-full sm:w-auto">
+                <RotateCcw className="mr-2 h-4 w-4" /> Reset to Default
             </Button>
-            <Button onClick={handleSaveWsUrl}>Save & Reconnect</Button>
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
+                <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)} className="w-full sm:w-auto">
+                    Close
+                </Button>
+                <Button onClick={handleSaveWsUrl} className="w-full sm:w-auto">
+                    Save & Reconnect
+                </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
