@@ -36,6 +36,7 @@ interface DataPointDisplayCardProps {
 
 const DataPointDisplayCard: React.FC<DataPointDisplayCardProps> = React.memo(
     ({ point, nodeValues, isDisabled, currentHoverEffect, playNotificationSound, lastToastTimestamps, sendDataToWebSocket, isEditMode }) => {
+        const rawValue = nodeValues[point.nodeId];
         const PointIcon = point.icon || HelpCircle;
         const effectiveIsDisabled = isDisabled && point.category !== 'status';
 
@@ -53,13 +54,13 @@ const DataPointDisplayCard: React.FC<DataPointDisplayCardProps> = React.memo(
                                 </div>
                                 <div className="text-sm sm:text-base md:text-lg text-right flex-shrink-0 pl-1 whitespace-nowrap">
                                     <ValueDisplayContent
-                                        item={point} // Changed from config={point}
-                                        nodeValues={nodeValues} // Added (passed as full map)
-                                        isDisabled={effectiveIsDisabled} // Pass appropriate disabled state
-                                        sendDataToWebSocket={sendDataToWebSocket} // Added
+                                        item={point}
+                                        rawValue={rawValue}
+                                        isDisabled={effectiveIsDisabled}
+                                        sendDataToWebSocket={sendDataToWebSocket}
                                         playNotificationSound={playNotificationSound}
                                         lastToastTimestamps={lastToastTimestamps}
-                                        isEditMode={isEditMode} // Added
+                                        isEditMode={isEditMode}
                                     />
                                 </div>
                             </Card>

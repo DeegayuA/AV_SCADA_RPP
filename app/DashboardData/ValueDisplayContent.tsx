@@ -8,8 +8,8 @@ import { toast } from 'sonner';
 
 interface ValueDisplayContentProps {
     item: DataPoint;
-    nodeValues: NodeData;
-    isDisabled: boolean; // This is the effectiveIsDisabled from DataPointDisplayCard
+    rawValue: string | number | boolean | undefined;
+    isDisabled: boolean;
     sendDataToWebSocket: (nodeId: string, value: any) => void;
     playNotificationSound: (type: 'success' | 'error' | 'warning' | 'info') => void;
     lastToastTimestamps: React.MutableRefObject<Record<string, number>>;
@@ -19,14 +19,13 @@ interface ValueDisplayContentProps {
 const ValueDisplayContent: React.FC<ValueDisplayContentProps> = React.memo(
   ({
     item,
-    nodeValues,
-    isDisabled, // Represents effectiveIsDisabled
+    rawValue,
+    isDisabled,
     sendDataToWebSocket,
     playNotificationSound,
     lastToastTimestamps,
     isEditMode,
   }) => {
-    const rawValue = nodeValues[item.nodeId];
     const numericValue = typeof rawValue === 'number' ? rawValue : 
                         (typeof rawValue === 'string' ? parseFloat(rawValue) : null);
     const displayValue = formatValue(

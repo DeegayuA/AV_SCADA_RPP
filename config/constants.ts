@@ -76,16 +76,16 @@ export const getWebSocketUrl = async (): Promise<string> => {
 
 // --- Other Application Constants ---
 
-export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
-export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.178.74:4840";
-export const VERSION = "- Release v2025.09.01 Colombo • 14:30 (GMT+5:30)";
-export const PLANT_NAME = "Colombo Office Mini Grid";
-export const PLANT_LOCATION = "Athurugiriya, Sri Lanka";
-export const PLANT_TYPE = "Mini Grid";
-export const PLANT_CAPACITY = "25kW";
-export const PLANT_CAPACITY_WATTS = 25000;
+export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://0.0.0.0:4841";
+export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://123.231.16.208:4841";
+export const VERSION = "- Release v2025.08.29 • 12:30 (GMT+5:30)";
+export const PLANT_NAME= "Ranna 2MW Solar Power Plant";
+export const PLANT_LOCATION = "Ranna, Sri Lanka";
+export const PLANT_TYPE = "Solar Power Plant";
+export const PLANT_CAPACITY = "2000 kW"; // 2 MW
+export const PLANT_CAPACITY_WATTS = 2000000; // 2 MW in watts
 
-export const APP_NAME = "Colombo Office Mini Grid";
+export const APP_NAME = "Ranna 2MW - Synergy Power";
 export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app";
 export const APP_URL = "https://yourwebsite.com";
 export const APP_KEYWORDS = "solar, monitoring, control, energy, management";
@@ -93,9 +93,9 @@ export const APP_DESCRIPTION = "A web-based plant monitoring system for real-tim
 export const APP_LOGO = logo;
 export const APP_LOGO2 = logo2;
 export const APP_FAVICON = "/favicon.ico";
-export const APP_AUTHOR = "Alta Vision";
+export const APP_AUTHOR = "Synergy Power";
 export const APP_AUTHOR_URL = "https://yourwebsite.com";
-export const APP_COPYRIGHT = "© 2025 Alta Vision. All rights reserved.";
+export const APP_COPYRIGHT = "© 2025 Synergy Power. All rights reserved.";
 export const APP_COPYRIGHT_URL = "https://yourwebsite.com/copyright";
 export const APP_PRIVACY_POLICY = "https://yourwebsite.com/privacy-policy";
 export const APP_TERMS_OF_SERVICE = "https://yourwebsite.com/terms-of-service";
@@ -107,13 +107,32 @@ export const USER = "viewer";
 
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
     'ranna_main_sld',
-    'Mini_Grid_SLD',
     'Ranna_PLC',
-    'Mini-Grid',
+    'PV_Array01',
+    'PV_Array02',
+    'PV_Array03',
+    'PV_Array04',
+    'PV_Array05',
+    'PV_Array06',
+    'PV_Array07',
+    'PV_Array08',
+    'PV_Array09',
+    'PV_Array10',
+    'PV_Array11',
+    'PV_Array12',
+    'PV_Array13',
+    'PV_Array14',
+    'PV_Array15',
+    'PV_Array16',
+    'PV_Array17',
+    'PV_Array18',
     'weather',
     'misc1',
     'misc2',
     'misc3',
+    'Power_Analyser1',
+    'Power_Analyser2',
+    'MiCom_Relay',
     'empty_template',
     'test_data_nodes_layout',
 ];
