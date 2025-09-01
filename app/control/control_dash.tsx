@@ -920,8 +920,9 @@ const UnifiedDashboardPage: React.FC = () => {
             </div>
           </div>
           <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
-            <Button variant="secondary" onClick={handleResetWsUrl} className="w-full sm:w-auto">
-                <RotateCcw className="mr-2 h-4 w-4" /> Reset to Default
+            <Button variant="secondary" onClick={handleResetWsUrl} size="icon" title="Reset to Default">
+              <RotateCcw className="h-4 w-4" />
+              <span className="sr-only">Reset to Default</span>
             </Button>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
                 <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)} className="w-full sm:w-auto">
