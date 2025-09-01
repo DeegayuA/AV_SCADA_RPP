@@ -334,7 +334,7 @@ export const useAppStore = create<FullStoreState>()(
       name: 'app-user-session-storage',
       storage: createJSONStorage(() => safeLocalStorage),
       // `partialize` tells `persist` what to save. This is the robust fix.
-      partialize: (state: FullStoreState): AppState => {
+      partialize: (state: FullStoreState) => {
         // This destructuring cleanly separates the persisted state from all functions.
         const {
             // Actions to explicitly ignore
@@ -363,6 +363,8 @@ export const useAppStore = create<FullStoreState>()(
             setSendJsonMessage,
             requestWithResponse,
             setRequestWithResponse,
+            // State to explicitly ignore
+            opcUaNodeValues,
             // ...rest now contains only the AppState we want to save
             ...rest
         } = state;
