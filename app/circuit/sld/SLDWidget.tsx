@@ -44,10 +44,8 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import * as SLD_CONSTANTS from '@/config/constants';
-const { AVAILABLE_SLD_LAYOUT_IDS } = SLD_CONSTANTS;
-// Fallback if constantSldLayouts is not exported; prevents compile error
-const constantSldLayouts: Record<string, SLDLayout> = (SLD_CONSTANTS as any).constantSldLayouts || {};
+import { AVAILABLE_SLD_LAYOUT_IDS } from '@/config/constants';
+import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
 import { dataPoints as appDataPoints } from '@/config/dataPoints';
 
 import DataLabelNode from './nodes/DataLabelNode';

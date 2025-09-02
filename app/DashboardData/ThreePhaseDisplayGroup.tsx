@@ -163,7 +163,7 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
                                                     <div key={`${group.groupKey}-${phase}`} className="text-center pt-1.5 min-h-[36px] flex flex-col items-center justify-center">
                                                         <ValueDisplayContent
                                                             item={itemForDisplay}
-                                                            nodeValues={{ [point.nodeId]: displayValue }}
+                                                            rawValue={displayValue}
                                                             isDisabled={isDisabled}
                                                             sendDataToWebSocket={sendDataToWebSocket}
                                                             playNotificationSound={playNotificationSound}
@@ -185,7 +185,7 @@ const ThreePhaseDisplayGroup: React.FC<ThreePhaseDisplayGroupProps> = React.memo
                                             {aggregatedValueData.value !== undefined ? (
                                                 <ValueDisplayContent
                                                     item={totalOrAverageItemConfig}
-                                                    nodeValues={{ [totalOrAverageItemConfig.nodeId]: aggregatedValueData.value }}
+                                                    rawValue={aggregatedValueData.value}
                                                     isDisabled={isDisabled}
                                                     sendDataToWebSocket={sendDataToWebSocket} 
                                                     playNotificationSound={playNotificationSound}

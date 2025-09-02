@@ -15,14 +15,14 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
-import DashboardData from "../DashboardData/page"
+import ControlPanel from "../control/control_dash"
 
-import { useParams, usePathname } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { PLANT_LOCATION } from "@/config/constants";
 
 export default function Page() {
   const pathname = usePathname();
-  const controlParam = pathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Control Panel';
+  const controlParam = pathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Dashboard';
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -50,7 +50,7 @@ export default function Page() {
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 px-4 pt-0 ">
-        <DashboardData />
+        <ControlPanel />
         </div>
       </SidebarInset>
     </SidebarProvider>
