@@ -1,58 +1,84 @@
 'use client';
 
-// src/components/dashboard/PlcConnectionStatus.tsx
 import React from 'react';
 import { motion } from 'framer-motion';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Wifi, Server, WifiOff, RefreshCw } from 'lucide-react';
 
 interface PlcConnectionStatusProps {
     status: 'online' | 'offline' | 'disconnected';
 }
 
 const PlcConnectionStatus: React.FC<PlcConnectionStatusProps> = React.memo(({ status }) => {
-    let statusText = '';
-    let dotClass = '';
-    let title = `PLC Status: ${status}`;
-    let clickHandler = () => { };
+    let StatusIcon;
+    let statusText;
+    let title;
+    let iconColor;
 
-    // NOTE: The original code had 'online' for remote and 'offline' for local.
-    // This seems counter-intuitive to standard 'online/offline' meaning.
-    // Reverted to more standard interpretation: 'online' means connected (remote or local),
-    // 'offline' might mean PLC is running but not exposed via API, 'disconnected' is no response.
-    // If the original 'online/offline' mapping is required, adjust the text/titles.
-     switch (status) {
-        case 'online': statusText = 'PLC: Connected (Remote)'; dotClass = 'bg-blue-500 ring-2 ring-blue-500/30 animate-pulse'; title = 'PLC connected remotely via API'; break;
-        case 'offline': statusText = 'PLC: Running (Local)'; dotClass = 'bg-sky-400 ring-2 ring-sky-400/30 animate-pulse'; title = 'PLC connected locally (Direct API?)'; break;
-        case 'disconnected': default: statusText = 'PLC: Disconnected'; dotClass = 'bg-gray-400 dark:bg-gray-600'; title = 'PLC Disconnected. Click to refresh page.'; clickHandler = () => { if (typeof window !== 'undefined') window.location.reload(); }; break;
+    switch (status) {
+        case 'online':
+            StatusIcon = Wifi;
+            statusText = 'Online';
+            title = 'PLC connected remotely via API';
+            iconColor = 'text-blue-500';
+            break;
+        case 'offline':
+            StatusIcon = Server;
+            statusText = 'Local';
+            title = 'PLC connected locally';
+            iconColor = 'text-sky-400';
+            break;
+        case 'disconnected':
+        default:
+            StatusIcon = WifiOff;
+            statusText = 'Offline';
+            title = 'PLC Disconnected';
+            iconColor = 'text-gray-400 dark:text-gray-600';
+            break;
     }
 
-    const dotVariants = { initial: { scale: 0 }, animate: { scale: 1 } };
+    const handleRefresh = () => {
+        if (status === 'disconnected' && typeof window !== 'undefined') {
+            window.location.reload();
+        }
+    };
 
     return (
-        <motion.div className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}>
+        <motion.div
+            className="flex items-center gap-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+        >
             <TooltipProvider delayDuration={100}>
                 <Tooltip>
                     <TooltipTrigger asChild>
-                         {/* TooltipTrigger requires a single child that accepts ref/event handlers */}
-                        <motion.div
-                            className={`w-3 h-3 rounded-full ${dotClass} ${status === 'disconnected' ? 'cursor-pointer hover:opacity-80' : ''} flex-shrink-0`}
-                            variants={dotVariants}
-                            initial="initial"
-                            animate="animate"
-                            onClick={clickHandler}
-                            whileHover={status === 'disconnected' ? { scale: 1.2 } : {}}
-                            aria-label={`PLC Status: ${status}`}
-                        />
+                        <div className="flex items-center gap-2">
+                            <StatusIcon className={`h-5 w-5 ${iconColor}`} />
+                            <span className="text-xs sm:text-sm text-muted-foreground">{statusText}</span>
+                        </div>
                     </TooltipTrigger>
                     <TooltipContent><p>{title}</p></TooltipContent>
                 </Tooltip>
             </TooltipProvider>
-            <span className="text-xs sm:text-sm text-muted-foreground">{statusText}</span>
+
+            <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            onClick={handleRefresh}
+                            disabled={status !== 'disconnected'}
+                            className="disabled:opacity-50 disabled:cursor-not-allowed"
+                            aria-label="Refresh PLC Status"
+                        >
+                            <RefreshCw className={`h-4 w-4 ${status === 'disconnected' ? 'animate-spin' : ''}`} />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        {status === 'disconnected' ? <p>Click to refresh</p> : <p>Refresh (disabled)</p>}
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
         </motion.div>
     );
 });
