@@ -14,6 +14,8 @@ import {
   NodeClass,
   BrowseDescription,
   NodeId,
+  ClientSubscription,
+  TimestampsToReturn,
 } from "node-opcua";
 import { WebSocketServer, WebSocket } from "ws";
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,13 +24,17 @@ import path from 'path';
 
 const KEEP_OPCUA_ALIVE = true;
 let endpointUrl: string = OPC_UA_ENDPOINT_OFFLINE;
-const POLLING_INTERVAL = 3000;
 const RECONNECT_DELAY = 5000;
 const SESSION_TIMEOUT = 60000;
 const WEBSOCKET_HEARTBEAT_INTERVAL = 30000;
+const CONNECTION_MONITOR_INTERVAL = 5000;
+const OPCUA_MAX_RETRY = 3;
+const OPCUA_RETRY_BACKOFF = [1500, 3000, 6000]; // ms
+
 
 let opcuaClient: OPCUAClient | null = null;
 let opcuaSession: ClientSession | null = null;
+let opcuaSubscription: ClientSubscription | null = null;
 
 // Global variable for discovery progress
 export let discoveryProgressCache = {
@@ -39,7 +45,6 @@ export let discoveryProgressCache = {
 };
 
 const connectedClients = new Set<WebSocket>();
-let dataInterval: NodeJS.Timeout | null = null;
 const nodeDataCache: Record<string, any> = {};
 let isConnectingOpcua = false;
 let isDisconnectingOpcua = false;
@@ -746,21 +751,21 @@ async function connectOPCUA() {
       console.log("Creating new OPCUAClient instance.");
       opcuaClient = OPCUAClient.create({
         endpointMustExist: false,
-        connectionStrategy: { maxRetry: 0, initialDelay: RECONNECT_DELAY, maxDelay: RECONNECT_DELAY * 2 },
+        connectionStrategy: { maxRetry: OPCUA_MAX_RETRY, initialDelay: OPCUA_RETRY_BACKOFF[0], maxDelay: OPCUA_RETRY_BACKOFF[OPCUA_RETRY_BACKOFF.length - 1] },
         keepSessionAlive: true,
         securityMode: MessageSecurityMode.None,
         securityPolicy: SecurityPolicy.None,
         requestedSessionTimeout: SESSION_TIMEOUT,
-        clientName: `AVR&D_Solar_Power_Plant_Dashboard-PID${process.pid}`
+        applicationName: "MainAppClient-MyApp"
       });
 
-      opcuaClient.on("backoff", (retry, delay) => console.log(`OPC UA internal backoff: retry ${retry} in ${delay}ms (Note: custom retry logic is primary)`));
-      opcuaClient.on("connection_lost", () => { console.error("OPC UA CEvt: Connection lost."); opcuaSession = null; stopDataPolling(); attemptReconnect("connection_lost_event"); });
+      opcuaClient.on("backoff", (retry, delay) => console.log(`OPC UA internal backoff: retry ${retry} in ${delay}ms`));
+      opcuaClient.on("connection_lost", () => { console.error("OPC UA CEvt: Connection lost."); opcuaSession = null; stopSubscription(); attemptReconnect("connection_lost_event"); });
       opcuaClient.on("connection_reestablished", () => {
         console.log("OPC UA CEvt: Connection re-established.");
-        if (!opcuaSession) { console.log("Re-creating session after re-established connection."); createSessionAndStartPolling(); }
+        if (!opcuaSession) { console.log("Re-creating session after re-established connection."); createSessionAndStartSubscription(); }
       });
-      opcuaClient.on("close", (err?: Error) => { console.log(`OPC UA CEvt: Connection closed. Error: ${err ? err.message : 'No error info'}`); opcuaSession = null; stopDataPolling(); });
+      opcuaClient.on("close", (err?: Error) => { console.log(`OPC UA CEvt: Connection closed. Error: ${err ? err.message : 'No error info'}`); opcuaSession = null; stopSubscription(); });
       opcuaClient.on("timed_out_request", (request) => console.warn("OPC UA CEvt: Request timed out:", request?.toString().substring(0,100)));
     }
 
@@ -768,7 +773,8 @@ async function connectOPCUA() {
 
     await opcuaClient.connect(endpointUrl);
     console.log("OPC UA client connected to:", endpointUrl);
-    await createSessionAndStartPolling();
+    await createSessionAndStartSubscription();
+    startConnectionMonitor();
   } catch (err: any) {
     console.error(`Failed to connect OPC UA client to ${endpointUrl}:`, err.message);
     if (endpointUrl === OPC_UA_ENDPOINT_OFFLINE && OPC_UA_ENDPOINT_ONLINE && (OPC_UA_ENDPOINT_ONLINE as string) !== (OPC_UA_ENDPOINT_OFFLINE as string)) {
@@ -778,7 +784,8 @@ async function connectOPCUA() {
           if (opcuaClient) {
             await opcuaClient.connect(endpointUrl);
             console.log("OPC UA client connected to fallback:", endpointUrl);
-            await createSessionAndStartPolling();
+            await createSessionAndStartSubscription();
+            startConnectionMonitor();
           } else {
              console.error("OPC UA Client became null before fallback connection attempt.");
              attemptReconnect("fallback_client_null_state");
@@ -821,18 +828,19 @@ function attemptReconnect(reason: string) {
   }, RECONNECT_DELAY);
 }
 
-async function createSessionAndStartPolling() {
+async function createSessionAndStartSubscription() {
   if (!opcuaClient) {
-      console.log("Cannot create session: OPC UA client non-existent.");
-      attemptReconnect("session_creation_no_client");
-      return;
+    console.log("Cannot create session: OPC UA client non-existent.");
+    attemptReconnect("session_creation_no_client");
+    return;
   }
   if (opcuaSession) {
-      console.log("OPC UA Session already exists. Ensuring polling is active.");
-      if(!dataInterval) startDataPolling();
-      return;
+    console.log("OPC UA Session already exists. Ensuring subscription is active.");
+    if (!opcuaSubscription) {
+      await createSubscriptionAndMonitorItems();
+    }
+    return;
   }
-  if (dataInterval) { console.log("Polling was active without session. Stopping polling before creating new session."); stopDataPolling(); }
 
   try {
     opcuaSession = await opcuaClient.createSession();
@@ -840,17 +848,20 @@ async function createSessionAndStartPolling() {
     connectionAttempts = 0;
 
     opcuaSession.on("session_closed", (statusCode) => {
-        console.warn(`OPC UA SEvt: Session closed. Status: ${statusCode.toString()}`);
-        opcuaSession = null;
-        stopDataPolling();
-        attemptReconnect("session_closed_event");
+      console.warn(`OPC UA SEvt: Session closed. Status: ${statusCode.toString()}`);
+      opcuaSession = null;
+      stopSubscription();
+      attemptReconnect("session_closed_event");
     });
-    opcuaSession.on("keepalive", (state) => {/*console.log("OPC UA SEvt: Session keepalive:", state.toString());*/});
+    opcuaSession.on("keepalive", (state) => { /*console.log("OPC UA SEvt: Session keepalive:", state.toString());*/ });
     opcuaSession.on("keepalive_failure", (state) => {
-        console.error("OPC UA SEvt: Session keepalive failure:", state ? state.toString() : "No state info");
-        opcuaSession = null; stopDataPolling(); attemptReconnect("keepalive_failure_event");
+      console.error("OPC UA SEvt: Session keepalive failure:", state ? state.toString() : "No state info");
+      opcuaSession = null;
+      stopSubscription();
+      attemptReconnect("keepalive_failure_event");
     });
-    startDataPolling();
+
+    await createSubscriptionAndMonitorItems();
   } catch (err: any) {
     console.error("Failed to create OPC UA session:", err.message);
     opcuaSession = null;
@@ -858,78 +869,129 @@ async function createSessionAndStartPolling() {
   }
 }
 
-function startDataPolling() {
-  if (dataInterval) { return; }
-  if (!opcuaSession) { console.log("Polling not started: No OPC UA session."); return; }
-  const monitorIds = nodeIdsToMonitor();
-  if (monitorIds.length === 0) { console.log("No nodes configured to monitor. Polling will not start effectively."); return;}
+async function createSubscriptionAndMonitorItems() {
+  if (!opcuaSession) {
+    console.error("Cannot create subscription without a session.");
+    return;
+  }
 
-  console.log(`Starting data polling for ${monitorIds.length} nodes...`);
-  dataInterval = setInterval(async () => {
-    if (!opcuaClient || !opcuaSession) {
-        console.warn("No client or session in poll cycle, stopping polling.");
-        stopDataPolling();
-        attemptReconnect("session_or_client_missing_in_poll");
-        return;
-    }
-    try {
-      const nodesToRead = monitorIds.map(nodeId => ({ nodeId, attributeId: AttributeIds.Value }));
-      if (nodesToRead.length === 0) return;
+  if (opcuaSubscription) {
+    console.log("Terminating existing subscription before creating a new one.");
+    await opcuaSubscription.terminate();
+    opcuaSubscription = null;
+  }
 
-      const dataValues = await opcuaSession.read(nodesToRead);
-      const currentDataBatch: Record<string, any> = {};
-      let changed = false;
+  try {
+    opcuaSubscription = await opcuaSession.createSubscription2({
+      requestedPublishingInterval: 1000,
+      requestedLifetimeCount: 600,
+      requestedMaxKeepAliveCount: 10,
+      maxNotificationsPerPublish: 100,
+      publishingEnabled: true,
+      priority: 10,
+    });
 
-      dataValues.forEach((dataValue, index) => {
-        const nodeId = nodesToRead[index].nodeId;
-        let newValue: any = nodeDataCache[nodeId] !== undefined ? nodeDataCache[nodeId] : "Error";
-        let readSuccess = false;
+    opcuaSubscription
+      .on("keepalive", () => { /* console.log("Subscription keepalive."); */ })
+      .on("terminated", () => {
+        console.warn("OPC UA Subscription terminated.");
+        opcuaSubscription = null;
+        // Do not reconnect here, the session keepalive or connection monitor will handle it.
+      });
 
+    const monitorIds = nodeIdsToMonitor();
+    console.log(`Setting up ${monitorIds.length} monitored items...`);
+
+    monitorIds.forEach(nodeId => {
+      const dataPoint = dataPoints.find(p => p.nodeId === nodeId);
+      const monitoredItem = opcuaSubscription.monitor(
+        { nodeId: nodeId, attributeId: AttributeIds.Value },
+        { samplingInterval: 1000, discardOldest: true, queueSize: 10 },
+        TimestampsToReturn.Both
+      );
+
+      monitoredItem.on("changed", (dataValue: DataValue) => {
+        let newValue: any = nodeDataCache[nodeId] ?? "Error";
         if (dataValue.statusCode.isGood() && dataValue.value?.value !== null && dataValue.value?.value !== undefined) {
           const rawValue = dataValue.value.value;
-          const dataPoint = dataPoints.find(p => p.nodeId === nodeId);
           const factor = dataPoint?.factor ?? 1;
           const decimalPlaces = dataPoint?.decimalPlaces ?? 2;
 
           if (typeof rawValue === "number") {
-            if (dataPoint?.dataType === 'Float' || dataPoint?.dataType === 'Double' || (dataPoint?.dataType === undefined && !Number.isInteger(rawValue * factor)) ) {
-                newValue = parseFloat((rawValue * factor).toFixed(decimalPlaces));
+            if (dataPoint?.dataType === 'Float' || dataPoint?.dataType === 'Double' || !Number.isInteger(rawValue * factor)) {
+              newValue = parseFloat((rawValue * factor).toFixed(decimalPlaces));
             } else {
-                newValue = Math.round(rawValue * factor);
+              newValue = Math.round(rawValue * factor);
             }
-          } else { newValue = rawValue; }
-          readSuccess = true;
-        } else {
-          if(dataValue.statusCode !== StatusCodes.BadNodeIdUnknown && dataValue.statusCode !== StatusCodes.BadNodeIdInvalid){
-            // console.warn(`Failed to read NodeId ${nodeId}: ${dataValue.statusCode.toString()}`);
+          } else {
+            newValue = rawValue;
           }
-          if(!readSuccess && nodeDataCache[nodeId] !== "Error") { newValue = "Error"; }
         }
 
         if (nodeDataCache[nodeId] !== newValue || !(nodeId in nodeDataCache)) {
           nodeDataCache[nodeId] = newValue;
-          currentDataBatch[nodeId] = newValue;
-          changed = true;
+          const update = { [nodeId]: newValue };
+          broadcast(JSON.stringify(update));
         }
       });
-
-      if (changed && Object.keys(currentDataBatch).length > 0 && connectedClients.size > 0) {
-        broadcast(JSON.stringify(currentDataBatch));
-      }
-    } catch (err: any) {
-      console.error("Error during OPC UA read poll:", err.message);
-      if (err.message?.includes("BadSession") || err.message?.includes("BadNotConnected") || err.message?.includes("Socket is closed") || err.message?.includes("BadSecureChannelClosed")) {
-        console.error("OPC UA Session/Connection error during poll. Will attempt to reconnect.");
-        if (opcuaSession) opcuaSession = null;
-        stopDataPolling();
-        attemptReconnect("polling_error_session_connection");
-      }
+    });
+    console.log("Monitored items set up successfully.");
+  } catch (err: any) {
+    console.error("Failed to create subscription or monitor items:", err.message);
+    if (opcuaSubscription) {
+      await opcuaSubscription.terminate();
     }
-  }, POLLING_INTERVAL);
+    opcuaSubscription = null;
+    attemptReconnect("subscription_creation_failure");
+  }
 }
 
-function stopDataPolling() {
-  if (dataInterval) { clearInterval(dataInterval); dataInterval = null; console.log("Data polling stopped."); }
+async function stopSubscription() {
+  if (opcuaSubscription) {
+    console.log("Stopping OPC UA subscription...");
+    try {
+      await opcuaSubscription.terminate();
+    } catch (err: any) {
+      console.error("Error terminating subscription:", err.message);
+    } finally {
+      opcuaSubscription = null;
+      console.log("OPC UA subscription stopped.");
+    }
+  }
+}
+
+let connectionMonitorInterval: NodeJS.Timeout | null = null;
+
+function startConnectionMonitor() {
+    if (connectionMonitorInterval) {
+        clearInterval(connectionMonitorInterval);
+    }
+    connectionMonitorInterval = setInterval(() => {
+        if (isConnectingOpcua) {
+            return; // Don't interfere with an ongoing connection attempt
+        }
+        const isSessionInvalid = !opcuaSession || opcuaSession.sessionId.isEmpty();
+        const isSubscriptionInvalid = opcuaSession && !isSessionInvalid && !opcuaSubscription;
+
+        if (isSessionInvalid) {
+            console.log("Connection Monitor: Session is invalid. Triggering reconnect.");
+            attemptReconnect("monitor_session_invalid");
+        } else if (isSubscriptionInvalid) {
+            console.log("Connection Monitor: Subscription is invalid. Re-creating subscription.");
+            createSubscriptionAndMonitorItems().catch(err => {
+                console.error("Error from monitor-triggered createSubscription:", err);
+                attemptReconnect("monitor_resub_failed");
+            });
+        }
+    }, CONNECTION_MONITOR_INTERVAL);
+}
+
+function stopConnectionMonitor() {
+    if (connectionMonitorInterval) {
+        clearInterval(connectionMonitorInterval);
+        connectionMonitorInterval = null;
+        console.log("Connection monitor stopped.");
+    }
 }
 
 function broadcast(data: string) {
@@ -962,7 +1024,8 @@ async function disconnectOPCUA() {
 
   isDisconnectingOpcua = true;
   console.log("Disconnecting OPC UA client and session...");
-  stopDataPolling();
+  stopConnectionMonitor();
+  await stopSubscription();
 
   if (opcuaSession) {
     try {
@@ -1119,5 +1182,16 @@ if (typeof process !== 'undefined') {
     });
 }
 
-export { opcuaSession, connectOPCUA, discoverAndSaveDatapoints };
+export function getOpcuaStatus(): 'connected' | 'disconnected' | 'connecting' {
+    if (isConnectingOpcua) {
+        return 'connecting';
+    }
+    // Session exists and has not been closed, and subscription is active
+    if (opcuaSession && !opcuaSession.sessionId.isEmpty() && opcuaSubscription) {
+        return 'connected';
+    }
+    return 'disconnected';
+}
+
+export { opcuaSession, connectOPCUA, discoverAndSaveDatapoints, getOpcuaStatus };
 export type { DiscoveredDataPoint };
