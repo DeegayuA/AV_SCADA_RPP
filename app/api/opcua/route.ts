@@ -335,7 +335,10 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
         ws.on('pong', () => { wsWithAlive.isAlive = true; });
 
         if (Object.keys(nodeDataCache).length > 0) {
-            try { ws.send(JSON.stringify(nodeDataCache)); }
+            try {
+                const initialData = { type: 'opc-ua-data', payload: nodeDataCache };
+                ws.send(JSON.stringify(initialData));
+            }
             catch (err) { console.error("Error sending initial cache to new client:", err); }
         }
 
@@ -914,7 +917,8 @@ function startDataPolling() {
       });
 
       if (changed && Object.keys(currentDataBatch).length > 0 && connectedClients.size > 0) {
-        broadcast(JSON.stringify(currentDataBatch));
+        const dataToSend = { type: 'opc-ua-data', payload: currentDataBatch };
+        broadcast(JSON.stringify(dataToSend));
       }
     } catch (err: any) {
       console.error("Error during OPC UA read poll:", err.message);
