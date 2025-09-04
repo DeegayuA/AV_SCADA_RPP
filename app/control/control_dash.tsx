@@ -351,6 +351,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const [opcuaConnectionStatus, setOpcuaConnectionStatus] = useState<any>(null);
   const [isStatusLoading, setIsStatusLoading] = useState<boolean>(false);
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
+  const [apiPlcStatus, setApiPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
@@ -457,26 +458,25 @@ const UnifiedDashboardPage: React.FC = () => {
       const r = await fetch('/api/opcua/status');
       if (!r.ok) throw new Error(`API Err:${r.status}`);
       const d = await r.json();
-      let nS = d.connectionStatus;
-
-      // If data is flowing, don't show as disconnected
-      if (isConnected && nS === 'disconnected') {
-        nS = 'online'; // Default to online if WS is connected but API says disconnected
-      }
-
+      const nS = d.connectionStatus;
       if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
-        setPlcStatus(nS);
+        setApiPlcStatus(nS);
       } else {
-        if (plcStatus !== 'disconnected') setPlcStatus('disconnected');
+        setApiPlcStatus('disconnected');
       }
     } catch (e) {
-      if (isConnected) {
-        setPlcStatus('online'); // Assume online if API fails but WS is connected
-      } else {
-        if (plcStatus !== 'disconnected') setPlcStatus('disconnected');
-      }
+      setApiPlcStatus('disconnected');
     }
-  }, [plcStatus, authCheckComplete, isConnected]);
+  }, [authCheckComplete]);
+
+  useEffect(() => {
+    const isDataFlowing = delay < 15000; // Liveness check: data received within last 15s
+    if (isDataFlowing && apiPlcStatus === 'disconnected') {
+      setPlcStatus('online'); // Override: if data is flowing, we are at least online
+    } else {
+      setPlcStatus(apiPlcStatus); // Otherwise, trust the API
+    }
+  }, [apiPlcStatus, delay]);
   const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
   const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath); }, [currentUserRole, displayedDataPointIds, currentPath]);
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
@@ -616,17 +616,7 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { if (displayedDataPointIds.length > 0) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify(displayedDataPointIds)); else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY)) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([])); } }, [displayedDataPointIds, authCheckComplete]);
   useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
   useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); connectWebSocket(); } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 15000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
-  useEffect(() => {
-    if (!authCheckComplete) return;
-
-    if (isConnected) {
-      checkPlcConnection(); // Initial check on connect
-      const plcI = setInterval(checkPlcConnection, 15000);
-      return () => clearInterval(plcI);
-    } else {
-      setPlcStatus('disconnected');
-    }
-  }, [isConnected, authCheckComplete, checkPlcConnection]);
+  useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphWindDpIds(JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_WIND_KEY, JSON.stringify(powerGraphWindDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphWindDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
