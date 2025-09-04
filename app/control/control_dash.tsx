@@ -452,8 +452,31 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
 
   const checkPlcConnection = useCallback(async () => {
-    if (!authCheckComplete) return; try { const r = await fetch('/api/opcua/status'); if (!r.ok) throw new Error(`API Err:${r.status}`); const d = await r.json(); const nS = d.connectionStatus; if (nS && ['online', 'offline', 'disconnected'].includes(nS)) setPlcStatus(nS); else { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (e) { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); }
-  }, [plcStatus, authCheckComplete]);
+    if (!authCheckComplete) return;
+    try {
+      const r = await fetch('/api/opcua/status');
+      if (!r.ok) throw new Error(`API Err:${r.status}`);
+      const d = await r.json();
+      let nS = d.connectionStatus;
+
+      // If data is flowing, don't show as disconnected
+      if (isConnected && nS === 'disconnected') {
+        nS = 'online'; // Default to online if WS is connected but API says disconnected
+      }
+
+      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
+        setPlcStatus(nS);
+      } else {
+        if (plcStatus !== 'disconnected') setPlcStatus('disconnected');
+      }
+    } catch (e) {
+      if (isConnected) {
+        setPlcStatus('online'); // Assume online if API fails but WS is connected
+      } else {
+        if (plcStatus !== 'disconnected') setPlcStatus('disconnected');
+      }
+    }
+  }, [plcStatus, authCheckComplete, isConnected]);
   const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
   const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath); }, [currentUserRole, displayedDataPointIds, currentPath]);
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {

@@ -31,7 +31,7 @@ const PlcConnectionStatus: React.FC<PlcConnectionStatusProps> = React.memo(({ st
         case 'disconnected':
         default:
             StatusIcon = WifiOff;
-            statusText = 'Offline';
+            statusText = 'Disconnected';
             title = 'PLC Disconnected';
             iconColor = 'text-gray-400 dark:text-gray-600';
             break;
