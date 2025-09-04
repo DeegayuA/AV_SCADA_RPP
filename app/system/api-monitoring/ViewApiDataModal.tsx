@@ -8,6 +8,7 @@ import { Loader2, X, Calendar as CalendarIcon, Clock } from 'lucide-react';
 import { ApiConfig, ApiType } from '@/types/apiMonitoring';
 import { fetchReadRange, TimeSeriesData } from '@/lib/apiClient';
 import ApiRangeGraph from './ApiRangeGraph';
+import { timelineConfig } from '@/config/timelineConfig';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -95,7 +96,7 @@ const ViewApiDataModal: React.FC<ViewApiDataModalProps> = ({
         return;
       }
 
-      const result = await fetchReadRange(apiConfig, apiConfig.nodeId, startDateTime.toISOString(), endDateTime.toISOString());
+      const result = await fetchReadRange(timelineConfig.historicalApiUrl, apiConfig.nodeId, startDateTime.toISOString(), endDateTime.toISOString());
       if (result) {
         setRangeData(result);
       } else {

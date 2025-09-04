@@ -6,6 +6,8 @@ import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, ReferenceLine, Legend
 import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
 import { NodeData } from '@/app/DashboardData/dashboardInterfaces';
 import { DataPoint } from '@/config/dataPoints';
+import { timelineConfig } from '@/config/timelineConfig';
+import { fetchReadRange } from '@/lib/apiClient';
 import { useTheme } from 'next-themes';
 import {
     Loader2, Zap, ShoppingCart, Send, Leaf, AlertTriangleIcon, ArrowRightToLine,
@@ -133,13 +135,26 @@ const AnimatedNumber = ({ value, precision }: { value: number; precision: number
 };
 
 interface ChartDataPoint {
-    timestamp: number; generation: number; usage: number; gridFeed: number; isSelfSufficient?: boolean;
+    timestamp: number;
+    generation: number;
+    usage: number;
+    gridFeed: number;
+    isSelfSufficient?: boolean;
+    generationByCategory: Record<string, number>;
 }
 interface GridFeedSegment { type: 'export' | 'import'; data: ChartDataPoint[]; }
 interface PowerTimelineGraphProps {
-    nodeValues: NodeData; allPossibleDataPoints: DataPoint[]; generationDpIds: string[];
-    usageDpIds: string[]; exportDpIds: string[]; windDpIds: string[]; exportMode: 'auto' | 'manual';
-    timeScale: TimeScale; isLiveSourceAvailable?: boolean; useDemoDataSource?: boolean; useWindDemoDataSource?: boolean;
+    nodeValues: NodeData;
+    allPossibleDataPoints: DataPoint[];
+    generationDpIds: string[];
+    usageDpIds: string[];
+    exportDpIds: string[];
+    windDpIds: string[];
+    exportMode: 'auto' | 'manual';
+    timeScale: TimeScale;
+    isLiveSourceAvailable?: boolean;
+    useDemoDataSource?: boolean;
+    useWindDemoDataSource?: boolean;
 }
 
 const timeScaleAggregationInterval: Record<TimeScale, number | null> = {
@@ -165,6 +180,19 @@ const unitToFactorMap: Record<PowerUnit, number> = { W: 1, kW: 1000, MW: 1000000
 const convertToWatts = (v: number, u?: string): number => { if (typeof v !== 'number' || !isFinite(v)) return 0; if (typeof u !== 'string' || !u.trim()) return v; const unitClean = u.trim().toUpperCase() as PowerUnit | string; const factor = unitToFactorMap[unitClean as PowerUnit]; return factor !== undefined ? v * factor : v; };
 const convertFromWatts = (v: number, targetUnit: PowerUnit): number => { if (typeof v !== 'number' || !isFinite(v)) return 0; return v / (unitToFactorMap[targetUnit] || 1);};
 
+const formatValue = (value: number, unit: PowerUnit, precision: number) => {
+    if (value >= 1000000000) {
+        return `${(value / 1000000000).toFixed(precision)} GW`;
+    }
+    if (value >= 1000000) {
+        return `${(value / 1000000).toFixed(precision)} MW`;
+    }
+    if (value >= 1000) {
+        return `${(value / 1000).toFixed(precision)} kW`;
+    }
+    return `${value.toFixed(precision)} W`;
+};
+
 const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     nodeValues, allPossibleDataPoints, generationDpIds, usageDpIds, exportDpIds, windDpIds,
     exportMode, timeScale, isLiveSourceAvailable = true, useDemoDataSource = false, useWindDemoDataSource = false,
@@ -174,6 +202,9 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const [isGraphReady, setIsGraphReady] = useState(false);
     const [animationKey, setAnimationKey] = useState(Date.now());
     const [lastUpdatedDisplayTime, setLastUpdatedDisplayTime] = useState<string>('N/A');
+    const [todayGeneration, setTodayGeneration] = useState(0);
+    const [monthlyGeneration, setMonthlyGeneration] = useState(0);
+    const [previousPeriodData, setPreviousPeriodData] = useState<ChartDataPoint[]>([]);
 
     const displayUnitLabel = CHART_TARGET_UNIT;
     const valuePrecision = POWER_PRECISION[CHART_TARGET_UNIT];
@@ -200,14 +231,15 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const effectiveUseDemoData = useMemo(() => (useDemoDataSource || useWindDemoDataSource) && !isForcedLiveUiButtonActive && historicalTimeOffsetMs === 0, [useDemoDataSource, useWindDemoDataSource, isForcedLiveUiButtonActive, historicalTimeOffsetMs]);
     const effectiveIsLive = useMemo(() => (isLiveSourceAvailable || isForcedLiveUiButtonActive) && !effectiveUseDemoData && historicalTimeOffsetMs === 0, [isLiveSourceAvailable, isForcedLiveUiButtonActive, effectiveUseDemoData, historicalTimeOffsetMs]);
 
-    const processDataPoint = useCallback((timestamp: number, gen: number, use: number, gridFeedVal: number): ChartDataPoint => {
-      return {
-        timestamp,
-        generation: parseFloat(gen.toFixed(valuePrecision)),
-        usage: parseFloat(use.toFixed(valuePrecision)),
-        gridFeed: parseFloat(gridFeedVal.toFixed(valuePrecision)),
-        isSelfSufficient: gridFeedVal >= 0
-      };
+    const processDataPoint = useCallback((timestamp: number, gen: number, use: number, gridFeedVal: number, generationByCategory: Record<string, number>): ChartDataPoint => {
+        return {
+            timestamp,
+            generation: parseFloat(gen.toFixed(valuePrecision)),
+            usage: parseFloat(use.toFixed(valuePrecision)),
+            gridFeed: parseFloat(gridFeedVal.toFixed(valuePrecision)),
+            isSelfSufficient: gridFeedVal >= 0,
+            generationByCategory,
+        };
     }, [valuePrecision]);
 
     const generateDemoValues = useCallback(() => {
@@ -243,6 +275,221 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         return convertFromWatts(sumInWatts, CHART_TARGET_UNIT);
     }, [nodeValues, allPossibleDataPoints, CHART_TARGET_UNIT]);
 
+    const fetchHistoricalData = useCallback(async () => {
+        const { durationMs } = timeScaleConfig[timeScale];
+        const end = new Date();
+        const start = new Date(end.getTime() - durationMs);
+
+        const allDpIds = [...generationDpIds, ...usageDpIds, ...exportDpIds, ...windDpIds];
+        const uniqueDpIds = Array.from(new Set(allDpIds));
+
+        const promises = uniqueDpIds.map(dpId => {
+            const dp = allPossibleDataPoints.find(p => p.id === dpId);
+            if (dp) {
+                // @ts-ignore
+                return fetchReadRange(timelineConfig.historicalApiUrl, dp.nodeId, start.toISOString(), end.toISOString());
+            }
+            return Promise.resolve(null);
+        });
+
+        const results = await Promise.all(promises);
+
+        const historicalData: Record<string, { value: number; timestamp: number }[]> = {};
+
+        results.forEach(result => {
+            if (result && result.length > 0) {
+                const dpId = allPossibleDataPoints.find(p => p.nodeId === result[0].nodeId)?.id;
+                if (dpId) {
+                    historicalData[dpId] = result.map(point => ({
+                        // @ts-ignore
+                        value: point.value,
+                        // @ts-ignore
+                        timestamp: new Date(point.timestamp).getTime(),
+                    }));
+                }
+            }
+        });
+
+        const mergedData: ChartDataPoint[] = [];
+        const timestamps = new Set<number>();
+        Object.values(historicalData).forEach(data => {
+            data.forEach(point => timestamps.add(point.timestamp));
+        });
+
+        const sortedTimestamps = Array.from(timestamps).sort();
+
+        sortedTimestamps.forEach(timestamp => {
+            let generation = 0;
+            let usage = 0;
+            let gridFeed = 0;
+            const generationByCategory: Record<string, number> = {};
+
+            timelineConfig.generationCategories.forEach(category => {
+                let categoryGeneration = 0;
+                category.dataPointIds.forEach(dpId => {
+                    const data = historicalData[dpId];
+                    if (data) {
+                        const point = data.find(p => p.timestamp === timestamp);
+                        if (point) {
+                            categoryGeneration += point.value;
+                        }
+                    }
+                });
+                generationByCategory[category.id] = categoryGeneration;
+                generation += categoryGeneration;
+            });
+
+            usageDpIds.forEach(dpId => {
+                const data = historicalData[dpId];
+                if (data) {
+                    const point = data.find(p => p.timestamp === timestamp);
+                    if (point) {
+                        usage += point.value;
+                    }
+                }
+            });
+
+            if (exportMode === 'manual') {
+                exportDpIds.forEach(dpId => {
+                    const data = historicalData[dpId];
+                    if (data) {
+                        const point = data.find(p => p.timestamp === timestamp);
+                        if (point) {
+                            gridFeed += point.value;
+                        }
+                    }
+                });
+            } else {
+                gridFeed = generation - usage;
+            }
+
+            mergedData.push(processDataPoint(timestamp, generation, usage, gridFeed, generationByCategory));
+        });
+
+        dataBufferRef.current = mergedData;
+
+        const prevEnd = start;
+        const prevStart = new Date(prevEnd.getTime() - durationMs);
+
+        const prevPromises = uniqueDpIds.map(dpId => {
+            const dp = allPossibleDataPoints.find(p => p.id === dpId);
+            if (dp) {
+                // @ts-ignore
+                return fetchReadRange(timelineConfig.historicalApiUrl, dp.nodeId, prevStart.toISOString(), prevEnd.toISOString());
+            }
+            return Promise.resolve(null);
+        });
+
+        const prevResults = await Promise.all(prevPromises);
+        const prevHistoricalData: Record<string, { value: number; timestamp: number }[]> = {};
+        prevResults.forEach(result => {
+            if (result && result.length > 0) {
+                const dpId = allPossibleDataPoints.find(p => p.nodeId === result[0].nodeId)?.id;
+                if (dpId) {
+                    prevHistoricalData[dpId] = result.map(point => ({
+                        // @ts-ignore
+                        value: point.value,
+                        // @ts-ignore
+                        timestamp: new Date(point.timestamp).getTime(),
+                    }));
+                }
+            }
+        });
+
+        const prevMergedData: ChartDataPoint[] = [];
+        const prevTimestamps = new Set<number>();
+        Object.values(prevHistoricalData).forEach(data => {
+            data.forEach(point => prevTimestamps.add(point.timestamp));
+        });
+
+        const prevSortedTimestamps = Array.from(prevTimestamps).sort();
+
+        prevSortedTimestamps.forEach(timestamp => {
+            let generation = 0;
+            let usage = 0;
+            let gridFeed = 0;
+            const generationByCategory: Record<string, number> = {};
+
+            timelineConfig.generationCategories.forEach(category => {
+                let categoryGeneration = 0;
+                category.dataPointIds.forEach(dpId => {
+                    const data = prevHistoricalData[dpId];
+                    if (data) {
+                        const point = data.find(p => p.timestamp === timestamp);
+                        if (point) {
+                            categoryGeneration += point.value;
+                        }
+                    }
+                });
+                generationByCategory[category.id] = categoryGeneration;
+                generation += categoryGeneration;
+            });
+
+            usageDpIds.forEach(dpId => {
+                const data = prevHistoricalData[dpId];
+                if (data) {
+                    const point = data.find(p => p.timestamp === timestamp);
+                    if (point) {
+                        usage += point.value;
+                    }
+                }
+            });
+
+            if (exportMode === 'manual') {
+                exportDpIds.forEach(dpId => {
+                    const data = prevHistoricalData[dpId];
+                    if (data) {
+                        const point = data.find(p => p.timestamp === timestamp);
+                        if (point) {
+                            gridFeed += point.value;
+                        }
+                    }
+                });
+            } else {
+                gridFeed = generation - usage;
+            }
+
+            prevMergedData.push(processDataPoint(timestamp, generation, usage, gridFeed, generationByCategory));
+        });
+
+        setPreviousPeriodData(prevMergedData);
+    }, [timeScale, generationDpIds, usageDpIds, exportDpIds, windDpIds, allPossibleDataPoints, exportMode, processDataPoint]);
+
+    useEffect(() => {
+        fetchHistoricalData();
+    }, [fetchHistoricalData]);
+
+    useEffect(() => {
+        const now = new Date();
+        const today = now.getDate();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        let dailyTotal = 0;
+        let monthlyTotal = 0;
+
+        chartData.forEach(point => {
+            const pointDate = new Date(point.timestamp);
+            if (
+                pointDate.getDate() === today &&
+                pointDate.getMonth() === currentMonth &&
+                pointDate.getFullYear() === currentYear
+            ) {
+                dailyTotal += point.generation;
+            }
+
+            if (
+                pointDate.getMonth() === currentMonth &&
+                pointDate.getFullYear() === currentYear
+            ) {
+                monthlyTotal += point.generation;
+            }
+        });
+
+        setTodayGeneration(dailyTotal);
+        setMonthlyGeneration(monthlyTotal);
+    }, [chartData]);
+
     useEffect(() => {
       setChartData([]);
       setIsGraphReady(false);
@@ -264,7 +511,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
           const demoIngestInterval = 1000;
           const generateAndBufferDemo = () => {
               const demo = useWindDemoDataSource ? { generation: getSimulatedHistoricalWindData(timeScale, new Date(), 15000).generation[0].value, usage: generateUsageData(Date.now(), 600, 200), gridFeed: 0 } : generateDemoValues();
-              dataBufferRef.current.push(processDataPoint(Date.now(), demo.generation, demo.usage, demo.gridFeed));
+              dataBufferRef.current.push(processDataPoint(Date.now(), demo.generation, demo.usage, demo.gridFeed, {}));
           };
           if (dpsConfigured) {
             if (dataBufferRef.current.length === 0) generateAndBufferDemo();
@@ -272,12 +519,22 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
           }
       } else if (effectiveIsLive && dpsConfigured && allPossibleDataPoints?.length > 0 && nodeValues && Object.keys(nodeValues).length > 0) {
           const currentTimestamp = Date.now();
-          let currentGen = sumValuesForDpIds(generationDpIds);
+          let currentGen = 0;
+          const generationByCategory: Record<string, number> = {};
+          timelineConfig.generationCategories.forEach(category => {
+                let categoryGeneration = 0;
+                category.dataPointIds.forEach(dpId => {
+                    categoryGeneration += sumValuesForDpIds([dpId]);
+                });
+                generationByCategory[category.id] = categoryGeneration;
+                currentGen += categoryGeneration;
+          });
+
           let currentUse = sumValuesForDpIds(usageDpIds);
           let currentGridFeedVal = (exportMode === 'manual' && exportDpIds.length > 0)
                                    ? sumValuesForDpIds(exportDpIds)
                                    : (currentGen - currentUse);
-          dataBufferRef.current.push(processDataPoint(currentTimestamp, currentGen, currentUse, currentGridFeedVal));
+          dataBufferRef.current.push(processDataPoint(currentTimestamp, currentGen, currentUse, currentGridFeedVal, generationByCategory));
       }
 
       return () => { if (demoDataIngestTimer.current) { clearInterval(demoDataIngestTimer.current); demoDataIngestTimer.current = null; }};
@@ -298,7 +555,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                         const avgGeneration = currentBucketPoints.reduce((sum, p) => sum + p.generation, 0) / currentBucketPoints.length;
                         const avgUsage = currentBucketPoints.reduce((sum, p) => sum + p.usage, 0) / currentBucketPoints.length;
                         const avgGridFeed = currentBucketPoints.reduce((sum, p) => sum + p.gridFeed, 0) / currentBucketPoints.length;
-                        aggregated.push(processDataPoint(bucketStart + intervalMs / 2, avgGeneration, avgUsage, avgGridFeed));
+                        aggregated.push(processDataPoint(bucketStart + intervalMs / 2, avgGeneration, avgUsage, avgGridFeed, {}));
                     }
                     bucketStart = Math.floor(point.timestamp / intervalMs) * intervalMs;
                     currentBucketPoints = [point];
@@ -310,7 +567,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                 const avgGeneration = currentBucketPoints.reduce((sum, p) => sum + p.generation, 0) / currentBucketPoints.length;
                 const avgUsage = currentBucketPoints.reduce((sum, p) => sum + p.usage, 0) / currentBucketPoints.length;
                 const avgGridFeed = currentBucketPoints.reduce((sum, p) => sum + p.gridFeed, 0) / currentBucketPoints.length;
-                aggregated.push(processDataPoint(bucketStart + intervalMs / 2, avgGeneration, avgUsage, avgGridFeed));
+                aggregated.push(processDataPoint(bucketStart + intervalMs / 2, avgGeneration, avgUsage, avgGridFeed, {}));
             }
             return aggregated;
         };
@@ -616,6 +873,7 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                   usage: prevPoint.usage + (point.usage - prevPoint.usage) * factor,
                   gridFeed: 0,
                   isSelfSufficient: true,
+                  generationByCategory: {},
                 };
                 const lastPushedSegment = segments[segments.length-1];
                 if(lastPushedSegment) lastPushedSegment.data.push(interpolatedPoint);
@@ -794,6 +1052,34 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                 </div>
               </div>
             </div>
+            {todayGeneration > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                    <div className="p-4 rounded-lg bg-background/70 dark:bg-black/30 shadow-md">
+                        <h4 className="text-sm text-muted-foreground">Today's Generation</h4>
+                        <p className="text-2xl font-bold">
+                            {formatValue(todayGeneration, 'W', 2)}
+                        </p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-background/70 dark:bg-black/30 shadow-md">
+                        <h4 className="text-sm text-muted-foreground">Today's Income</h4>
+                        <p className="text-2xl font-bold">
+                            {(todayGeneration * timelineConfig.unitPrice[timelineConfig.currency]).toFixed(2)} {timelineConfig.currency}
+                        </p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-background/70 dark:bg-black/30 shadow-md">
+                        <h4 className="text-sm text-muted-foreground">Monthly Generation</h4>
+                        <p className="text-2xl font-bold">
+                            {formatValue(monthlyGeneration, 'W', 2)}
+                        </p>
+                    </div>
+                    <div className="p-4 rounded-lg bg-background/70 dark:bg-black/30 shadow-md">
+                        <h4 className="text-sm text-muted-foreground">Monthly Income</h4>
+                        <p className="text-2xl font-bold">
+                            {(monthlyGeneration * timelineConfig.unitPrice[timelineConfig.currency]).toFixed(2)} {timelineConfig.currency}
+                        </p>
+                    </div>
+                </div>
+            )}
             <AnimatePresence mode="wait">
                 <motion.div
                     key={animationKey + "-" + Object.values(visibleLines).join('') + "-" + historicalTimeOffsetMs}
@@ -910,9 +1196,44 @@ const  PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                             }
                             <ReferenceLine y={0} yAxisId="left" stroke="hsl(var(--foreground)/0.3)" strokeDasharray="3 3" strokeWidth={1}/>
 
-                            {visibleLines.generation && <Line yAxisId="left" dataKey="generation" name={baseChartConfig.generation.label} type="monotone" stroke={getResolvedColor("generation", resolvedTheme)} strokeWidth={2.2} dot={false} activeDot={{r:4, fillOpacity:0.7}} isAnimationActive={isGraphReady&&(isCurrentlyDrawingLiveOrDemo)} animationDuration={effectiveUseDemoData?200:120} connectNulls={false} />}
+                            {timelineConfig.generationCategories.map(category => (
+                                visibleLines.generation && (
+                                    <Line
+                                        key={category.id}
+                                        yAxisId="left"
+                                        dataKey={`generationByCategory.${category.id}`}
+                                        name={category.label}
+                                        type="monotone"
+                                        stroke={category.color}
+                                        strokeWidth={2.2}
+                                        dot={false}
+                                        activeDot={{r:4, fillOpacity:0.7}}
+                                        isAnimationActive={isGraphReady&&(isCurrentlyDrawingLiveOrDemo)}
+                                        animationDuration={effectiveUseDemoData?200:120}
+                                        connectNulls={false}
+                                    />
+                                )
+                            ))}
                             {visibleLines.usage && <Line yAxisId="left" dataKey="usage" name={baseChartConfig.usage.label} type="monotone" stroke={getResolvedColor("usage", resolvedTheme)} strokeWidth={2.2} dot={false} activeDot={{r:4, fillOpacity:0.7}} isAnimationActive={isGraphReady&&(isCurrentlyDrawingLiveOrDemo)} animationDuration={effectiveUseDemoData?200:120} connectNulls={false} />}
 
+                            {previousPeriodData.length > 0 && timelineConfig.generationCategories.map(category => (
+                                <Line
+                                    key={`${category.id}-shadow`}
+                                    yAxisId="left"
+                                    dataKey={`generationByCategory.${category.id}`}
+                                    data={previousPeriodData}
+                                    name={`${category.label} (prev)`}
+                                    type="monotone"
+                                    stroke={category.color}
+                                    strokeWidth={1.5}
+                                    strokeDasharray="5 5"
+                                    dot={false}
+                                    activeDot={false}
+                                    isAnimationActive={false}
+                                    connectNulls={false}
+                                    legendType="none"
+                                />
+                            ))}
                             {visibleLines.gridFeed && gridFeedSegments.map((segment, index) => (
                                 <Line
                                     key={`gridFeed-segment-${segment.type}-${index}`}

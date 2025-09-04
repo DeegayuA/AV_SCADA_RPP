@@ -56,65 +56,36 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout 
   return response;
 }
 
-// Helper to determine active URL (local first, then online)
-// This simplified version assumes the status is already updated by useApiStatusMonitor
-// A more robust version might re-check status here if needed, or take current statuses as args.
-const getActiveUrl = (apiConfig: ApiConfig): { url: string; type: 'local' | 'online' } | null => {
-  if (apiConfig.localApi.url && apiConfig.localApi.status === 'online') {
-    return { url: apiConfig.localApi.url, type: 'local' };
-  }
-  if (apiConfig.onlineApi.url && apiConfig.onlineApi.status === 'online') {
-    return { url: apiConfig.onlineApi.url, type: 'online' };
-  }
-  // Fallback if neither is 'online' but URLs exist (e.g. if called before status check or both are offline)
-  if (apiConfig.localApi.url) {
-      return { url: apiConfig.localApi.url, type: 'local' };
-  }
-  if (apiConfig.onlineApi.url) {
-      return { url: apiConfig.onlineApi.url, type: 'online' };
-  }
-  return null;
-};
 
 
 export async function fetchReadRange(
-  apiConfig: ApiConfig,
+  baseUrl: string,
   nodeId: string,
   start: string, // ISO string
   end: string,   // ISO string
 ): Promise<TimeSeriesData[] | null> {
-  const activeApi = getActiveUrl(apiConfig);
-  if (!activeApi) {
-    console.error(`No active URL for API: ${apiConfig.name}`);
-    // throw new Error(`No active URL for API: ${apiConfig.name}`);
+  if (!baseUrl) {
+    console.error("API base URL is not configured.");
     return null;
   }
 
   const params = new URLSearchParams({
-    nodeId: nodeId,
     start: start,
     end: end,
   });
-  if (apiConfig.withFactor) {
-    params.append('withFactor', 'true');
-  }
 
-  const url = `${activeApi.url}${activeApi.url.includes('?') ? '&' : '?'}${params.toString()}`;
+  const url = `${baseUrl}${encodeURIComponent(nodeId)}?${params.toString()}`;
 
   try {
     const response = await fetchWithTimeout(url, { method: 'GET' });
     if (!response.ok) {
-      // throw new Error(`API request failed: ${response.status} ${response.statusText} from ${url}`);
       console.error(`API request failed: ${response.status} ${response.statusText} from ${url}`);
       return null;
     }
     const data = await response.json();
-    // Assuming the API returns data directly in TimeSeriesData[] format or similar
-    // Add validation or transformation if needed
     return data as TimeSeriesData[];
   } catch (error) {
     console.error(`Error fetching read-range data from ${url}:`, error);
-    // throw error;
     return null;
   }
 }
@@ -122,9 +93,8 @@ export async function fetchReadRange(
 export async function fetchReadAll(
   apiConfig: ApiConfig,
 ): Promise<AllDataResponse | null> {
-  const activeApi = getActiveUrl(apiConfig);
-  if (!activeApi) {
-    // throw new Error(`No active URL for API: ${apiConfig.name}`);
+  const baseUrl = apiConfig.localApi.status === 'online' ? apiConfig.localApi.url : apiConfig.onlineApi.url;
+  if (!baseUrl) {
     console.error(`No active URL for API: ${apiConfig.name}`);
     return null;
   }
@@ -134,22 +104,19 @@ export async function fetchReadAll(
     params.append('withFactor', 'true');
   }
   const paramString = params.toString();
-  const url = `${activeApi.url}${paramString ? (activeApi.url.includes('?') ? '&' : '?') + paramString : ''}`;
+  const url = `${baseUrl}${paramString ? (baseUrl.includes('?') ? '&' : '?') + paramString : ''}`;
 
 
   try {
     const response = await fetchWithTimeout(url, { method: 'GET' });
     if (!response.ok) {
-      // throw new Error(`API request failed: ${response.status} ${response.statusText} from ${url}`);
       console.error(`API request failed: ${response.status} ${response.statusText} from ${url}`);
       return null;
     }
     const data = await response.json();
-    // Add validation or transformation if needed
     return data as AllDataResponse;
   } catch (error) {
     console.error(`Error fetching read-all data from ${url}:`, error);
-    // throw error;
     return null;
   }
 }
@@ -158,46 +125,36 @@ export async function fetchReadOne(
   apiConfig: ApiConfig,
   nodeId: string,
 ): Promise<SingleDataResponse | null> {
-  const activeApi = getActiveUrl(apiConfig);
-  if (!activeApi) {
-    // throw new Error(`No active URL for API: ${apiConfig.name}`);
+  const baseUrl = apiConfig.localApi.status === 'online' ? apiConfig.localApi.url : apiConfig.onlineApi.url;
+  if (!baseUrl) {
     console.error(`No active URL for API: ${apiConfig.name}`);
     return null;
   }
 
-  // The example URL for read-one is like: http://192.168.1.9:8200/read-one/ns=4;i=187
-  // So, the nodeId should be appended as a path segment.
-  // Ensure the base URL in config does not end with a slash if nodeId is appended directly.
-  // Or, ensure the base URL *does* end with a slash.
-  // For this example, assuming base URL might be "http://host/path" or "http://host/path/"
-
-  let baseUrl = activeApi.url;
-  if (!baseUrl.endsWith('/')) {
-    baseUrl += '/';
+  let url = baseUrl;
+  if (!url.endsWith('/')) {
+    url += '/';
   }
 
-  const fullUrlWithoutParams = `${baseUrl}${encodeURIComponent(nodeId)}`;
+  const fullUrlWithoutParams = `${url}${encodeURIComponent(nodeId)}`;
 
   const params = new URLSearchParams();
   if (apiConfig.withFactor) {
     params.append('withFactor', 'true');
   }
   const paramString = params.toString();
-  const url = `${fullUrlWithoutParams}${paramString ? '?' + paramString : ''}`;
+  const finalUrl = `${fullUrlWithoutParams}${paramString ? '?' + paramString : ''}`;
 
   try {
-    const response = await fetchWithTimeout(url, { method: 'GET' });
+    const response = await fetchWithTimeout(finalUrl, { method: 'GET' });
     if (!response.ok) {
-      // throw new Error(`API request failed: ${response.status} ${response.statusText} from ${url}`);
-      console.error(`API request failed: ${response.status} ${response.statusText} from ${url}`);
+      console.error(`API request failed: ${response.status} ${response.statusText} from ${finalUrl}`);
       return null;
     }
     const data = await response.json();
-    // Add validation or transformation if needed
     return data as SingleDataResponse;
   } catch (error) {
-    console.error(`Error fetching read-one data from ${url}:`, error);
-    // throw error;
+    console.error(`Error fetching read-one data from ${finalUrl}:`, error);
     return null;
   }
 }

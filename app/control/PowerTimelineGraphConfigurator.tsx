@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DataPoint } from '@/config/dataPoints'; // Assuming this path is correct
+import { GenerationCategory, timelineConfig, UnitPrice } from '@/config/timelineConfig';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -8,6 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { X, PlusCircle, Search, Zap, Activity, Send, Settings2, ArrowLeft, ArrowRight, Save } from 'lucide-react'; // Icons
+import CategoryManager from './CategoryManager';
+import SettingsManager from './SettingsManager';
 import { Badge } from '@/components/ui/badge';
 
 // Interface for Props remains the same
@@ -189,10 +192,12 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
 
 // Define steps
 const STEPS = [
-  { id: 'generation', title: 'Generation', description: 'Select data points that represent power generation.' },
-  { id: 'usage', title: 'Usage', description: 'Choose data points for tracking power consumption.' },
-  { id: 'wind', title: 'Wind', description: 'Select data points for wind generation.' },
-  { id: 'export', title: 'Export', description: 'Configure how exported power is calculated or tracked.' },
+    { id: 'generation', title: 'Generation', description: 'Select data points that represent power generation.' },
+    { id: 'usage', title: 'Usage', description: 'Choose data points for tracking power consumption.' },
+    { id: 'wind', title: 'Wind', description: 'Select data points for wind generation.' },
+    { id: 'export', title: 'Export', description: 'Configure how exported power is calculated or tracked.' },
+    { id: 'categories', title: 'Categories', description: 'Manage generation categories.' },
+    { id: 'settings', title: 'Settings', description: 'Configure advanced settings.' },
 ] as const;
 
 
@@ -215,6 +220,9 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
   const [exportDpIds, setExportDpIds] = useState<string[]>([]);
   const [windDpIds, setWindDpIds] = useState<string[]>([]);
   const [exportMode, setExportMode] = useState<'auto' | 'manual'>(initialExportMode);
+  const [generationCategories, setGenerationCategories] = useState<GenerationCategory[]>(timelineConfig.generationCategories);
+  const [historicalApiUrl, setHistoricalApiUrl] = useState(timelineConfig.historicalApiUrl);
+  const [unitPrice, setUnitPrice] = useState<UnitPrice>(timelineConfig.unitPrice);
 
   const dataPointsMap = useMemo(() => {
     const map = new Map<string, DataPoint>();
@@ -404,6 +412,23 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
               </AnimatePresence>
             </div>
           </div>
+        );
+      case 'categories':
+        return (
+            <CategoryManager
+                categories={generationCategories}
+                allPossibleDataPoints={allPossibleDataPoints}
+                onCategoriesChange={setGenerationCategories}
+            />
+        );
+      case 'settings':
+        return (
+            <SettingsManager
+                historicalApiUrl={historicalApiUrl}
+                unitPrice={unitPrice}
+                onHistoricalApiUrlChange={setHistoricalApiUrl}
+                onUnitPriceChange={setUnitPrice}
+            />
         );
       default:
         return null;

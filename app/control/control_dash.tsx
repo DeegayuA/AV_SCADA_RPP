@@ -69,6 +69,7 @@ import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appSto
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
+import ConfigurableDataPointTable from './ConfigurableDataPointTable';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
@@ -340,7 +341,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
 
   // WebSocket connection via dedicated hook
-  const { sendJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
+  const { sendJsonMessage, changeWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
 
   const currentUserRole = currentUser?.role;
 
@@ -451,24 +452,8 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
 
   const checkPlcConnection = useCallback(async () => {
-    if (!authCheckComplete) return;
-    try {
-      const r = await fetch('/api/opcua/status');
-      if (!r.ok) {
-        setPlcStatus('disconnected');
-        return;
-      }
-      const d = await r.json();
-      const nS = d.connectionStatus;
-      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
-        setPlcStatus(nS);
-      } else {
-        setPlcStatus('disconnected');
-      }
-    } catch (e) {
-      setPlcStatus('disconnected');
-    }
-  }, [authCheckComplete]);
+    if (!authCheckComplete) return; try { const r = await fetch('/api/opcua/status'); if (!r.ok) throw new Error(`API Err:${r.status}`); const d = await r.json(); const nS = d.connectionStatus; if (nS && ['online', 'offline', 'disconnected'].includes(nS)) setPlcStatus(nS); else { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (e) { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); }
+  }, [plcStatus, authCheckComplete]);
   const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
   const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath); }, [currentUserRole, displayedDataPointIds, currentPath]);
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
@@ -552,13 +537,6 @@ const UnifiedDashboardPage: React.FC = () => {
     setIsWsConfigModalOpen(false);
     toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}` });
   }, [tempWsUrl, changeWebSocketUrl]);
-
-  const handleResetWsUrl = useCallback(() => {
-    if(resetWebSocketUrl) {
-      resetWebSocketUrl();
-      setIsWsConfigModalOpen(false);
-    }
-  }, [resetWebSocketUrl]);
 
     const handleOpenConfigurator = useCallback(() => {
     setIsConfiguratorOpen(true);
@@ -765,6 +743,9 @@ const UnifiedDashboardPage: React.FC = () => {
             </CardContent>
           </Card>
         </div>
+        <div className="my-4 md:my-6">
+            <ConfigurableDataPointTable allPossibleDataPoints={allPossibleDataPoints} nodeValues={nodeValues} />
+        </div>
       </div>
 
       {gaugesOverviewSectionDefinition && (<RenderingComponent sections={[gaugesOverviewSectionDefinition]} {...commonRenderingProps} />)}
@@ -919,19 +900,11 @@ const UnifiedDashboardPage: React.FC = () => {
               </p>
             </div>
           </div>
-          <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
-            <Button variant="secondary" onClick={handleResetWsUrl} size="icon" title="Reset to Default">
-              <RotateCcw className="h-4 w-4" />
-              <span className="sr-only">Reset to Default</span>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)}>
+              Close
             </Button>
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
-                <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)} className="w-full sm:w-auto">
-                    Close
-                </Button>
-                <Button onClick={handleSaveWsUrl} className="w-full sm:w-auto">
-                    Save & Reconnect
-                </Button>
-            </div>
+            <Button onClick={handleSaveWsUrl}>Save & Reconnect</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
