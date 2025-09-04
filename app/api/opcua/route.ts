@@ -353,8 +353,8 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
             }
             if (!opcuaClient && !isConnectingOpcua) {
                 connectOPCUA().catch(err => console.error("Error in connectOPCUA from WS connection:", err));
-            } else if (opcuaSession && !dataInterval) {
-                startDataPolling();
+            } else if (opcuaSession && !opcuaSubscription) {
+                createSubscriptionAndMonitorItems().catch(err => console.error("Error starting subscription from WS connection:", err));
             }
         }
 
@@ -568,7 +568,7 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
 sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
                     sendToastToClient(ws, 'error', errorMsg);
                     if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
-                        opcuaSession = null; stopDataPolling(); attemptReconnect("controlWrite_error_session_lost");
+                        opcuaSession = null; stopSubscription(); attemptReconnect("controlWrite_error_session_lost");
                     }
                 }
                 return; 
@@ -648,7 +648,7 @@ sendStatusToClient(ws, 'error', opcUaNodeId, errorMsg);
                     sendStatusToClient(ws, 'error', nodeId, errorMsg);
                     sendToastToClient(ws, 'error', errorMsg);
                     if (writeError?.message?.includes("BadSession") || writeError?.message?.includes("BadNotConnected")) {
-                        opcuaSession = null; stopDataPolling(); attemptReconnect("direct_write_error_session_lost");
+                        opcuaSession = null; stopSubscription(); attemptReconnect("direct_write_error_session_lost");
                     }
                 }
             } else {
@@ -734,7 +734,7 @@ async function connectOPCUA() {
   endpointUrl = OPC_UA_ENDPOINT_OFFLINE;
   if (opcuaClient && opcuaSession) {
     console.log("OPC UA session already active and client presumed connected.");
-    if(!dataInterval) startDataPolling();
+    if(!opcuaSubscription) createSubscriptionAndMonitorItems().catch(err => console.error("Error starting subscription from connectOPCUA:", err));
     return;
   }
   if (isConnectingOpcua || isDisconnectingOpcua) {
@@ -902,7 +902,11 @@ async function createSubscriptionAndMonitorItems() {
     const monitorIds = nodeIdsToMonitor();
     console.log(`Setting up ${monitorIds.length} monitored items...`);
 
-    monitorIds.forEach(nodeId => {
+    monitorIds.forEach(async nodeId => {
+      if (!opcuaSubscription) {
+        console.warn(`Skipping monitor setup for ${nodeId} because subscription is null.`);
+        return;
+      }
       const dataPoint = dataPoints.find(p => p.nodeId === nodeId);
       const monitoredItem = opcuaSubscription.monitor(
         { nodeId: nodeId, attributeId: AttributeIds.Value },
@@ -910,7 +914,7 @@ async function createSubscriptionAndMonitorItems() {
         TimestampsToReturn.Both
       );
 
-      monitoredItem.on("changed", (dataValue: DataValue) => {
+      (await monitoredItem).on("changed", (dataValue: DataValue) => {
         let newValue: any = nodeDataCache[nodeId] ?? "Error";
         if (dataValue.statusCode.isGood() && dataValue.value?.value !== null && dataValue.value?.value !== undefined) {
           const rawValue = dataValue.value.value;
@@ -1193,5 +1197,5 @@ export function getOpcuaStatus(): 'connected' | 'disconnected' | 'connecting' {
     return 'disconnected';
 }
 
-export { opcuaSession, connectOPCUA, discoverAndSaveDatapoints, getOpcuaStatus };
+export { opcuaSession, connectOPCUA, discoverAndSaveDatapoints };
 export type { DiscoveredDataPoint };
