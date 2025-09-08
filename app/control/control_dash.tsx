@@ -116,7 +116,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
             <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
             <motion.div variants={itemVariants}>
-              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} />
+              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} delay={delay} />
             </motion.div>
             <motion.div variants={itemVariants}><SoundToggle /></motion.div>
             <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
@@ -249,21 +249,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           <div className="flex items-center gap-2">
             <Clock className="h-3 w-3" />
             <span>{currentTime}</span>
-            {isConnected ? (
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                      : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
-                    }>
-                      {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Last data received {delay} ms ago</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
+            {!isConnected && (
               <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
                 (reconnect)
               </Button>
@@ -351,7 +337,6 @@ const UnifiedDashboardPage: React.FC = () => {
   const [opcuaConnectionStatus, setOpcuaConnectionStatus] = useState<any>(null);
   const [isStatusLoading, setIsStatusLoading] = useState<boolean>(false);
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
-  const [apiPlcStatus, setApiPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
@@ -453,30 +438,8 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
 
   const checkPlcConnection = useCallback(async () => {
-    if (!authCheckComplete) return;
-    try {
-      const r = await fetch('/api/opcua/status');
-      if (!r.ok) throw new Error(`API Err:${r.status}`);
-      const d = await r.json();
-      const nS = d.connectionStatus;
-      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
-        setApiPlcStatus(nS);
-      } else {
-        setApiPlcStatus('disconnected');
-      }
-    } catch (e) {
-      setApiPlcStatus('disconnected');
-    }
-  }, [authCheckComplete]);
-
-  useEffect(() => {
-    const isDataFlowing = delay < 15000; // Liveness check: data received within last 15s
-    if (isDataFlowing && apiPlcStatus === 'disconnected') {
-      setPlcStatus('online'); // Override: if data is flowing, we are at least online
-    } else {
-      setPlcStatus(apiPlcStatus); // Otherwise, trust the API
-    }
-  }, [apiPlcStatus, delay]);
+    if (!authCheckComplete) return; try { const r = await fetch('/api/opcua/status'); if (!r.ok) throw new Error(`API Err:${r.status}`); const d = await r.json(); const nS = d.connectionStatus; if (nS && ['online', 'offline', 'disconnected'].includes(nS)) setPlcStatus(nS); else { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); } } catch (e) { if (plcStatus !== 'disconnected') setPlcStatus('disconnected'); }
+  }, [plcStatus, authCheckComplete]);
   const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
   const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath); }, [currentUserRole, displayedDataPointIds, currentPath]);
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
