@@ -1,0 +1,635 @@
+@import 'tailwindcss';
+
+/* Custom Variants */
+@custom-variant dark (&:is(.dark *));
+
+/* Theme Definition Block */
+@theme {
+  /* Gradients */
+  --background-image-gradient-radial: radial-gradient(var(--tw-gradient-stops));
+  --background-image-gradient-conic: conic-gradient(
+    from 180deg at 50% 50%,
+    var(--tw-gradient-stops)
+  );
+
+  /* Radius (Semantic) */
+  --radius-lg: var(--radius); /* Maintained link to base --radius */
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  /* Core Semantic Colors (referencing CSS vars defined in :root) */
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+
+  /* Chart Colors (referencing CSS vars defined in :root) */
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+
+  /* Animations */
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/* --- Base Theme Variables (Light & Dark) --- */
+@layer base {
+  /* Light Theme Variables */
+  :root {
+    /* Core HSL Values - Light Theme */
+    --background: 0 0% 100%;                      /* White */
+    --foreground: 0 0% 10%;                       /* Neutral Dark Gray (Almost Black) */
+    --card: 0 0% 100%;                            /* White */
+    --card-foreground: 0 0% 10%;                  /* Neutral Dark Gray */
+    --popover: 0 0% 100%;                         /* White */
+    --popover-foreground: 0 0% 10%;               /* Neutral Dark Gray */
+    
+    --primary: 0 0% 30%;                          /* Dark Gray */
+    --primary-foreground: 0 0% 98%;               /* Almost White (for contrast on Dark Gray) */
+    --secondary: 215 30% 96%;                     /* Light Gray-Blue */
+    --secondary-foreground: 222 50% 35%;          /* Muted Blue-Gray */
+    --muted: 215 30% 93%;                         /* Slightly darker Light Gray-Blue */
+    --muted-foreground: 215 20% 55%;              /* Softer Gray-Blue */
+    --accent: 0 0% 30%;                           /* Dark Gray (same as primary) */
+    --accent-foreground: 0 0% 98%;                /* Almost White (for contrast on Dark Gray) */
+    --destructive: 0 82% 55%;                     /* Strong Red */
+    --destructive-foreground: 0 0% 100%;          /* White */
+    --border: 215 25% 88%;                        /* Softer Gray-Blue Border */
+    --input: 215 25% 88%;                         /* Same as Border */
+    --ring: 0 0% 50%;                             /* Medium Gray for rings */
+    --radius: 0.5rem;
+
+    /* Chart Colors - Light Theme (distinct & vibrant) */
+    --chart-1: 205 85% 50%;   /* Bright Blue */
+    --chart-2: 155 65% 45%;   /* Tealish Green */
+    --chart-3: 45 95% 55%;    /* Bright Yellow (will now contrast more with gray primary) */
+    --chart-4: 25 90% 60%;    /* Orange */
+    --chart-5: 275 70% 60%;   /* Purple */
+
+    /* --- SLD Component Style Guide Colors (Light Theme Base Palette) --- */
+    --sld-palette-text-on-light-bg: #24292f;
+    --sld-palette-text-on-dark-bg: #f0f6fc;
+
+    --sld-palette-nominal-light: #1f883d;
+    --sld-palette-deenergized-light: #8c959f;
+    --sld-palette-warning-light: #d4a72c;
+    --sld-palette-fault-light: #cf222e;
+    --sld-palette-standby-light: #0969da;
+    --sld-palette-accent-light: hsl(var(--primary)); /* Will now be Dark Gray */
+    --sld-color-panel-cell-base: hsl(220, 25%, 20%); /* Dark blue-grey default for cells */
+  --sld-color-panel-cell-offline: hsl(220, 10%, 45%);
+  --sld-color-panel-cell-night: hsl(220, 25%, 15%);
+  --sld-color-panel-cell-idle: hsl(210, 40%, 55%); /* A cool blue for idle daytime */
+  --sld-color-panel-cell-producing: hsl(205, 80%, 55%); /* Bright solar blue base for active cells */
+
+    --sld-palette-neutral-border-light: #d0d7de;
+    --sld-palette-neutral-bg-light: #f6f8fa;
+    
+    /* --- SLD Semantic Colors (Defaults to Light Theme from Palette) --- */
+    --sld-color-text: var(--sld-palette-text-on-light-bg);
+    --sld-color-text-on-status: var(--sld-palette-text-on-dark-bg);
+    --sld-color-nominal: var(--sld-palette-nominal-light);
+    --sld-color-energized: var(--sld-palette-nominal-light);
+    --sld-color-deenergized: var(--sld-palette-deenergized-light);
+    --sld-color-offline: var(--sld-palette-deenergized-light);
+    --sld-color-warning: var(--sld-palette-warning-light);
+    --sld-color-fault: var(--sld-palette-fault-light);
+    --sld-color-standby: var(--sld-palette-standby-light);
+    --sld-color-accent: var(--sld-palette-accent-light); /* Will now be Dark Gray */
+    --sld-color-handle-border: var(--sld-palette-neutral-border-light);
+    --sld-color-handle-bg: var(--sld-palette-neutral-bg-light);
+    
+    /* --- SLD Specific Overrides & Additional Colors (Light Theme - Consolidated) --- */
+    --sld-color-node-bg: #ffffff;
+    --sld-color-node-bg-subtle: #f9fafb; 
+    --sld-color-border: #e5e7eb; 
+    --sld-color-text-muted: #6b7280;
+    --sld-color-text-dark: #ffffff; 
+    --sld-color-dc: #2563eb;
+    --sld-color-dc-dark: #1d4ed8;
+    --sld-color-pv: hsl(var(--primary)); /* PV Color is now Dark Gray */
+    --sld-color-battery: #10b981;
+    --sld-color-fault-bg: rgba(239, 68, 68, 0.1);
+    --sld-color-warning-bg: rgba(249, 115, 22, 0.1);
+
+    /* Battery/Energy Storage Specific Colors (Light Theme) */
+    --sld-color-charging-fill: #2563eb;           /* Medium blue for charging fill */
+    --sld-color-charging: #60a5fa;                /* Lighter blue for charging status */
+    --sld-color-discharging-fill: #10b981;        /* Medium green for discharging fill */
+    --sld-color-discharging: #34d399;             /* Lighter green for discharging status */
+    --sld-color-idle-full: #059669;               /* Darker satisfied green for full idle */
+    --sld-color-idle-medium: #0891b2;             /* Neutral cyan for medium idle */
+    --sld-color-warning-dim: #d97706;             /* Less intense amber for low SOC fill */
+    --sld-color-fault-dim: #dc2626;               /* Less intense red for critical SOC fill */
+    --sld-color-border-subtle: rgba(156, 163, 175, 0.3); /* Semi-transparent light gray border */
+  }
+
+  /* Dark Theme Variables */
+  .dark {
+    /* Core HSL Values - Dark Theme */
+    --background: 0 0% 4%;                        /* Very Dark Gray/Almost Black */
+    --foreground: 0 0% 96%;                       /* Very Light Gray/Almost White */
+    --card: 0 0% 7%;                              /* Slightly Lighter Dark Gray */
+    --card-foreground: 0 0% 96%;                  /* Very Light Gray */
+    --popover: 0 0% 7%;                           /* Slightly Lighter Dark Gray */
+    --popover-foreground: 0 0% 96%;               /* Very Light Gray */
+    
+    --primary: 0 0% 75%;                          /* Light Gray */
+    --primary-foreground: 0 0% 5%;                /* Very Dark Gray/Almost Black (for contrast on Light Gray) */
+    --secondary: 220 40% 25%;                     /* Muted Dark Blue-Gray */
+    --secondary-foreground: 210 40% 85%;          /* Lighter Cool Gray */
+    --muted: 220 40% 22%;                         /* Darker Muted Dark Blue-Gray */
+    --muted-foreground: 215 20% 60%;              /* Muted Cool Gray */
+    --accent: 0 0% 75%;                           /* Light Gray (same as primary) */
+    --accent-foreground: 0 0% 5%;                 /* Very Dark Gray/Almost Black */
+    --destructive: 0 80% 70%;                     /* Brighter Red for Dark Mode */
+    --destructive-foreground: 0 0% 100%;          /* White */
+    --border: 220 20% 20%;                        /* Darker, more neutral Border */
+    --input: 220 20% 20%;                         /* Same as Border */
+    --ring: 0 0% 60%;                             /* Medium-Light Gray for rings */
+
+    /* Chart Colors - Dark Theme (brighter versions for dark bg) */
+    --chart-1: 205 85% 75%;
+    --chart-2: 155 65% 60%;
+    --chart-3: 45 90% 70%;   /* Bright Yellow, still available for charts */
+    --chart-4: 25 90% 70%;
+    --chart-5: 275 70% 75%;
+
+    /* --- SLD Component Style Guide Colors (Dark Theme Base Palette) --- */
+    --sld-palette-nominal-dark: #238636;
+    --sld-palette-deenergized-dark: #6e7681;
+    --sld-palette-warning-dark: #bc8c25;
+    --sld-palette-fault-dark: #da3633;
+    --sld-palette-standby-dark: #1f6feb;
+    --sld-palette-accent-dark: hsl(var(--primary)); /* Will now be Light Gray */
+     --sld-color-panel-cell-base: hsl(220, 20%, 15%);
+  --sld-color-panel-cell-offline: hsl(220, 10%, 30%);
+  --sld-color-panel-cell-night: hsl(220, 20%, 10%);
+  --sld-color-panel-cell-idle: hsl(210, 35%, 30%);
+  --sld-color-panel-cell-producing: hsl(205, 75%, 60%);
+    
+    --sld-palette-neutral-border-dark: #30363d;
+    --sld-palette-neutral-bg-dark: #22272e;
+    
+    /* --- SLD Semantic Colors (Dark Theme from Palette) --- */
+    --sld-color-text: var(--sld-palette-text-on-dark-bg);
+    --sld-color-text-on-status: var(--sld-palette-text-on-dark-bg);
+    --sld-color-nominal: var(--sld-palette-nominal-dark);
+    --sld-color-energized: var(--sld-palette-nominal-dark);
+    --sld-color-deenergized: var(--sld-palette-deenergized-dark);
+    --sld-color-offline: var(--sld-palette-deenergized-dark);
+    --sld-color-warning: var(--sld-palette-warning-dark);
+    --sld-color-fault: var(--sld-palette-fault-dark);
+    --sld-color-standby: var(--sld-palette-standby-dark);
+    --sld-color-accent: var(--sld-palette-accent-dark); /* Will now be Light Gray */
+    --sld-color-handle-border: var(--sld-palette-neutral-border-dark);
+    --sld-color-handle-bg: var(--sld-palette-neutral-bg-dark);
+    
+    /* --- SLD Specific Overrides & Additional Colors (Dark Theme - Consolidated) --- */
+    --sld-color-node-bg: hsl(var(--card));
+    --sld-color-node-bg-subtle: hsl(0 0% 10%);
+    --sld-color-border: hsl(var(--border));
+    --sld-color-text-muted: #9ca3af;
+    --sld-color-dc: #3b82f6;
+    --sld-color-dc-dark: #2563eb;
+    --sld-color-pv: hsl(var(--primary)); /* PV Color is now Light Gray */
+    --sld-color-battery: #34d399;
+    --sld-color-fault-bg: rgba(239, 68, 68, 0.2);
+    --sld-color-warning-bg: rgba(249, 115, 22, 0.2);
+
+    /* Battery/Energy Storage Specific Colors (Dark Theme) */
+    --sld-color-charging-fill: #3b82f6;           /* Medium blue for charging fill */
+    --sld-color-charging: #60a5fa;                /* Lighter blue for charging status */
+    --sld-color-discharging-fill: #10b981;        /* Medium green for discharging fill */
+    --sld-color-discharging: #34d399;             /* Lighter green for discharging status */
+    --sld-color-idle-full: #059669;               /* Darker satisfied green for full idle */
+    --sld-color-idle-medium: #0891b2;             /* Neutral cyan for medium idle */
+    --sld-color-warning-dim: #92400e;             /* Less intense amber for low SOC fill */
+    --sld-color-fault-dim: #991b1b;               /* Less intense red for critical SOC fill */
+    --sld-color-border-subtle: rgba(156, 163, 175, 0.3); /* Semi-transparent light gray border */
+  }
+}
+
+/* Tailwind CSS v3 Compatibility for Border Color */
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+/* Tailwind Layer: Base Element Styling */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      Helvetica, Arial, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Tailwind Layer: Utilities */
+@layer utilities {
+  :root {
+    --foreground-rgb: 0, 0, 0;
+    --background-start-rgb: 214, 219, 220;
+    --background-end-rgb: 255, 255, 255;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --foreground-rgb: 255, 255, 255;
+      --background-start-rgb: 0, 0, 0;
+      --background-end-rgb: 0, 0, 0;
+    }
+  }
+
+  @keyframes dashdraw {
+    to {
+      stroke-dashoffset: var(--edge-animation-dashoffset-end, -100);
+    }
+  }
+}
+
+
+/* --- Sidebar Specific Theme Variables --- */
+:root {
+  --sidebar-bg: hsl(220 25% 98%);
+  --sidebar-fg: hsl(220 30% 25%);
+  --sidebar-primary: hsl(var(--primary)); /* Will be Dark Gray */
+  --sidebar-primary-fg: hsl(var(--primary-foreground)); /* Will be Almost White */
+  --sidebar-accent: hsl(0 0% 40%); /* Lighter gray for hover/accent within sidebar */
+  --sidebar-accent-fg: hsl(0 0% 98%); /* Almost white text on lighter gray */
+  --sidebar-border: hsl(220 20% 90%);
+  --sidebar-ring: hsl(var(--ring)); /* Will be Medium Gray */
+}
+
+.dark {
+  --sidebar-bg: hsl(0 0% 10%);
+  --sidebar-fg: hsl(0 0% 90%);
+  --sidebar-primary: hsl(var(--primary)); /* Will be Light Gray */
+  --sidebar-primary-fg: hsl(var(--primary-foreground)); /* Will be Almost Black */
+  --sidebar-accent: hsl(0 0% 65%); /* Darker gray for hover/accent within dark sidebar */
+  --sidebar-accent-fg: hsl(0 0% 5%); /* Almost black text on medium-light gray */
+  --sidebar-border: hsl(0 0% 18%);
+  --sidebar-ring: hsl(var(--ring)); /* Will be Medium-Light Gray */
+}
+
+/* --- Apply Sidebar variables to @theme namespace --- */
+@theme inline {
+  --color-sidebar: var(--sidebar-bg);
+  --color-sidebar-foreground: var(--sidebar-fg);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-fg);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-fg);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+/* --- Custom Animations & Keyframes --- */
+@keyframes pulse-glow {
+  0%, 100% {
+    filter: drop-shadow(0 0 3px rgba(var(--glow-color), 0.4)) opacity(1);
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 10px rgba(var(--glow-color), 0.7)) opacity(0.95);
+     transform: scale(1.01);
+  }
+}
+
+@keyframes faultPulse {
+  0%, 100% { 
+    opacity: 1; 
+    stroke-width: var(--base-stroke-width, inherit);
+  }
+  50% { 
+    opacity: 0.25; 
+    stroke-width: calc(var(--base-stroke-width, 1px) + 1.5px);
+  }
+}
+
+@keyframes subtlePulse {
+  0%, 100% { opacity: 0.65; }
+  50% { opacity: 1; }
+}
+
+@keyframes flow-preview-bullet-normal {
+  from { left: -10px; }
+  to { left: 100%; }
+}
+
+@keyframes flow-preview-bullet-reverse {
+  from { right: -10px; }
+  to { right: 100%; }
+}
+
+@keyframes handlePulseAnimation { /* Kept as cyan unless you want gray pulses too */
+  0%, 100% {
+    box-shadow: 0 0 0 0px hsla(var(--color-electric-cyan, 190 95% 55%), 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 6px hsla(var(--color-electric-cyan, 190 95% 55%), 0);
+  }
+}
+
+@keyframes status-change-highlight {
+  0% { 
+    box-shadow: 0 0 0px 0px hsla(var(--primary), 0.2); /* Primary is now gray */
+  }
+  50% { 
+    box-shadow: 0 0 12px 5px hsla(var(--primary), 0.45); /* Primary is now gray */
+  }
+  100% { 
+    box-shadow: 0 0 0px 0px hsla(var(--primary), 0.2); /* Primary is now gray */
+  }
+}
+
+@keyframes statusHighlightPulse {
+  0% { box-shadow: 0 0 12px 2px var(--current-glow-color, hsla(var(--primary), 0.2)); }  /* Primary is now gray */
+  50% { box-shadow: 0 0 25px 8px hsla(var(--primary), 0.7); } /* Using primary gray for this pulse too */
+  100% { box-shadow: 0 0 12px 2px var(--current-glow-color, hsla(var(--primary), 0.2)); } /* Primary is now gray */
+}
+
+
+/* --- Component Specific Styles --- */
+
+/* Animated Flow Paths */
+.animated-flow {
+  stroke-dasharray: 5;
+  stroke-dashoffset: 1000;
+  animation: dashdraw 30s linear infinite;
+  --edge-animation-dashoffset-end: -1000;
+}
+
+.animated-flow-reverse {
+  stroke-dasharray: 5;
+  stroke-dashoffset: -1000; 
+  animation: dashdraw 30s linear infinite reverse;
+  --edge-animation-dashoffset-end: 1000;
+}
+
+/* React Flow MiniMap Responsive Adjustments */
+@media (max-width: 768px) {
+  .react-flow__minimap {
+    max-width: 120px !important;
+    max-height: 80px !important;
+    --xy-shadow: 0 2px 4px -1px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1) !important;
+    --xy-border-radius: 0.25rem !important;
+  }
+  .react-flow__minimap.bottom.right {
+    bottom: var(--xy-minimap-position-bottom, 10px) !important;
+    right: var(--xy-minimap-position-right, 10px) !important;
+  }
+  .react-flow__minimap.bottom.left {
+    bottom: var(--xy-minimap-position-bottom, 10px) !important;
+    left: var(--xy-minimap-position-left, 10px) !important;
+  }
+}
+
+/* Text Shadow Utilities */
+.shadow-text-lg { text-shadow: 0px 2px 5px rgba(0,0,0,0.4); }
+.shadow-text-md { text-shadow: 0px 1px 3px rgba(0,0,0,0.35); }
+
+/* Custom Scrollbar Styling */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: hsl(var(--border) / 0.7);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--ring) / 0.9); /* Ring is now gray derived */
+}
+
+/* SLD Loader Styling */
+.sld-loader-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  color: hsl(var(--muted-foreground));
+}
+.sld-loader-svg {
+  width: 60px;
+  height: 60px;
+  animation: sld-rotate 2s linear infinite;
+  margin-bottom: 16px;
+}
+.sld-loader-path {
+  stroke: currentColor;
+  stroke-linecap: round;
+  animation: sld-dash 1.5s ease-in-out infinite;
+}
+@keyframes sld-rotate { 100% { transform: rotate(360deg); } }
+@keyframes sld-dash {
+  0% { stroke-dasharray: 1, 150; stroke-dashoffset: 0; }
+  50% { stroke-dasharray: 100, 150; stroke-dashoffset: -35; }
+  100% { stroke-dasharray: 100, 150; stroke-dashoffset: -125; }
+}
+
+/* SLD Handle Styles */
+.sld-handle-style {
+  @apply !w-3 !h-3 !opacity-0 group-hover:!opacity-100 
+         !bg-primary/70 !border-primary-foreground/30 /* Primary is now gray, primary-fg is light/dark accordingly */
+         dark:!bg-primary dark:!border-slate-600 
+         transition-all duration-200 ease-out !rounded-sm !border-[1.5px];
+}
+.reactflow-node.selected .sld-handle-style,
+.reactflow-node:focus .sld-handle-style, 
+.reactflow-node:focus-within .sld-handle-style {
+    @apply !opacity-100 !bg-primary !border-primary-foreground/60; /* Primary is now gray */
+}
+.sld-handle-style:hover, .handle-pulse:hover { 
+  opacity: 1 !important;
+  transform: scale(1.25); 
+  animation: handlePulseAnimation 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+}
+.handle-pulse { 
+  animation: handlePulseAnimation 1.5s infinite cubic-bezier(0.66, 0, 0, 1);
+  opacity: 1 !important;
+}
+
+
+/* Custom Node Effects */
+.custom-node-hover {
+  @apply transition-all duration-150 ease-in-out;
+}
+.custom-node-hover:hover {
+  box-shadow: 0 0 12px 4px hsla(var(--primary), 0.35); /* Primary is now gray */
+}
+.node-content-wrapper { 
+  @apply transition-all duration-200 ease-in-out;
+}
+.reactflow-node.selected .node-content-wrapper {
+  @apply !border-2 !border-primary; /* Primary is now gray */
+  box-shadow: 0 0 15px 5px hsla(var(--primary), 0.55); /* Primary is now gray */
+}
+.react-flow__node-default.selected, .react-flow__node-custom.selected {
+    /* box-shadow: 0 0 15px 5px hsla(var(--primary), 0.55); */
+}
+
+/* Status Change Animations */
+.animate-pulse-glow {
+  animation: pulse-glow 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.animate-status-highlight {
+  animation: status-change-highlight 0.8s ease-out;
+}
+
+
+/* --- Edge Color Variables & Styles --- */
+:root, [data-theme="light"] {
+  --edge-color-ac-hv: #C2410C;
+  --edge-color-ac-mv: #F59E0B;
+  --edge-color-ac-lv: #FBBF24;
+  --edge-color-dc-hv: #1D4ED8;
+  --edge-color-dc-mv: #3B82F6;
+  --edge-color-dc-lv: #60A5FA;
+  --edge-color-control-signal: #16A34A;
+  --edge-color-data-bus: #0D9488;
+  --edge-color-aux-power: #9333EA;
+  --edge-color-energized-default: #65A30D;
+  --edge-color-offline: #9CA3AF;
+  --edge-color-fault: #DC2626;
+  --edge-color-warning: #EAB308;
+  --edge-color-selected: hsl(var(--primary)); /* Primary is now gray */
+  
+  --edge-animated-dash-default: #FFFFFF;
+  --edge-animated-dash-on-warning: #422006;
+  --edge-animated-dash-on-selected: hsl(var(--primary-foreground)); /* primary-fg is now light/dark based on theme */
+
+  --edge-label-bg: hsl(var(--card));
+  --edge-label-bg-inactive: hsl(var(--muted));
+  --edge-label-text: hsl(var(--card-foreground));
+  --edge-label-border-inactive: hsl(var(--border));
+  --edge-label-shadow-color: hsla(var(--foreground), 0.1);
+}
+
+[data-theme="dark"] {
+  --edge-color-ac-hv: #F59E0B;
+  --edge-color-ac-mv: #FB923C;
+  --edge-color-ac-lv: #F97316;
+  --edge-color-dc-hv: #60A5FA;
+  --edge-color-dc-mv: #38BDF8;
+  --edge-color-dc-lv: #7DD3FC;
+  --edge-color-control-signal: #4ADE80;
+  --edge-color-data-bus: #2DD4BF;
+  --edge-color-aux-power: #C084FC;
+  --edge-color-energized-default: #84CC16;
+  --edge-color-offline: #6B7280;
+  --edge-color-fault: #F87171;
+  --edge-color-warning: #FCD34D;
+  --edge-color-selected: hsl(var(--primary)); /* Primary is now gray */
+
+  --edge-animated-dash-default: hsl(var(--background));
+  --edge-animated-dash-on-warning: #1F2937;
+  --edge-animated-dash-on-selected: hsl(var(--primary-foreground)); /* primary-fg is now light/dark based on theme */
+
+  --edge-label-bg: hsl(var(--card));
+  --edge-label-bg-inactive: hsl(var(--muted));
+  --edge-label-text: hsl(var(--card-foreground));
+  --edge-label-border-inactive: hsl(var(--border));
+  --edge-label-shadow-color: hsla(0, 0%, 0%, 0.3);
+}
+
+/* General purpose or project specific global CSS Variables */
+:root {
+  --color-electric-cyan: 190 95% 55%; 
+  /* --color-solar-yellow: 45 100% 55%; Removed as primary is now gray, keeping only if explicitly used elsewhere */
+}
+
+/* Ensure base for pulse animation defined in faultPulse */
+.faulty-edge-class {
+  --base-stroke-width: 2px;
+  animation: faultPulse 1.5s infinite ease-in-out;
+}
+
+@keyframes pulse-briefly {
+  0%, 100% { filter: brightness(1) contrast(1); }
+  50% { filter: brightness(1.08) contrast(1.05); } /* Subtle pulse */
+}
+.animate-pulse-briefly {
+  animation: pulse-briefly 0.8s ease-in-out;
+}
+
+@layer utilities {
+  .animated-gradient {
+    background-size: 200% 200%; /* Or 400% 400% for more subtle, larger gradients */
+    animation: gradient-animation 15s ease infinite;
+  }
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.7);
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background-color: hsl(var(--muted) / 0.5);
+    border-radius: 4px;
+  }
+}

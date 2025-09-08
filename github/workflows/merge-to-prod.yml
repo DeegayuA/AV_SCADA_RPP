@@ -1,0 +1,56 @@
+name: Auto Merge to Production Branches
+
+on:
+  push:
+    branches:
+      - main_dev
+
+jobs:
+  merge-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main_dev
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PERSONAL_TOKEN }}
+          fetch-depth: 0  # Required for pushing to other branches
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-key C99B11DEB97541F0
+          sudo apt-add-repository https://cli.github.com/packages
+          sudo apt update
+          sudo apt install gh -y
+
+      - name: Merge main_dev into production branches or create PR if conflict
+        run: |
+          PROD_BRANCHES=("Prod_RUSL_Mini_Grid" "Prod_Ranna_2MW")
+
+          for BRANCH in "${PROD_BRANCHES[@]}"; do
+            echo "Processing branch: $BRANCH"
+            git checkout $BRANCH
+            git pull origin $BRANCH
+
+            if git merge origin/main_dev --no-edit; then
+              echo "✅ Merged successfully into $BRANCH"
+              git push origin $BRANCH
+            else
+              echo "⚠️ Merge conflict detected. Creating Pull Request..."
+              git merge --abort
+              git checkout -b "auto-pr-${BRANCH}" origin/main_dev
+              git push origin "auto-pr-${BRANCH}"
+
+              gh pr create --base "$BRANCH" \
+                           --head "auto-pr-${BRANCH}" \
+                           --title "Auto PR: Merge main_dev into $BRANCH" \
+                           --body "This PR was created automatically due to a merge conflict."
+            fi
+          done
+        env:
+          GH_TOKEN: ${{ secrets.PERSONAL_TOKEN }}

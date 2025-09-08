@@ -1,0 +1,13 @@
+{
+  "entryPoints": ["./app", "./components", "./hooks", "./lib", "./stores"],
+  "out": "./docs/typedoc",
+  "entryPointStrategy": "expand",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-theme-hierarchy"],
+  "theme": "hierarchy",
+  "name": "AV Solar Local Control Panel Documentation",
+  "readme": "none",
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "excludeNotDocumented": false,
+  "gitRevision": "main"
+}
