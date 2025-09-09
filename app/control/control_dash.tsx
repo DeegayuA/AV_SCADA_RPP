@@ -58,6 +58,7 @@ import PlcConnectionStatus from '@/app/DashboardData/PlcConnectionStatus';
 import WebSocketStatus from '@/app/DashboardData/WebSocketStatus';
 import SoundToggle from '@/app/DashboardData/SoundToggle';
 import ThemeToggle from '@/app/DashboardData/ThemeToggle';
+import ErrorLogDisplay from '@/components/ErrorLogDisplay';
 import DashboardSection from '@/app/DashboardData/DashboardSection';
 import { UserRole } from '@/types/auth';
 import SLDWidget from "@/app/circuit/sld/SLDWidget";
@@ -120,6 +121,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
             </motion.div>
             <motion.div variants={itemVariants}><SoundToggle /></motion.div>
             <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
+            <motion.div variants={itemVariants}><ErrorLogDisplay /></motion.div>
             {isAdmin && isEditMode && (
               <>
                 <motion.div variants={itemVariants}>

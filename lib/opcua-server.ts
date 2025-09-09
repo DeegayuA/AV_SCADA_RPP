@@ -41,7 +41,7 @@ const initializeGlobal = <T>(name: keyof typeof globalThis, defaultValue: T): T 
   return globalThis[name] as T;
 };
 
-let endpointUrl: string = OPC_UA_ENDPOINT_OFFLINE;
+globalThis.endpointUrl = initializeGlobal('endpointUrl', OPC_UA_ENDPOINT_OFFLINE);
 const RECONNECT_DELAY = 5000;
 const SESSION_TIMEOUT = 60000;
 const WEBSOCKET_HEARTBEAT_INTERVAL = 30000;
@@ -84,6 +84,18 @@ function broadcast(data: string) {
     });
 }
 
+function broadcastError(message: string) {
+    console.error(`Broadcasting backend error: ${message}`);
+    const errorPayload = {
+        type: 'backend-error',
+        payload: {
+            message,
+            timestamp: new Date().toISOString(),
+        }
+    };
+    broadcast(JSON.stringify(errorPayload));
+}
+
 async function stopSubscription() {
   if (globalThis.opcuaSubscription) {
     console.log("Stopping OPC UA subscription...");
@@ -122,8 +134,10 @@ async function createSubscriptionAndMonitorItems() {
       globalThis.opcuaSubscription
         .on("keepalive", () => { /* console.log("Subscription keepalive."); */ })
         .on("terminated", () => {
-          console.warn("OPC UA Subscription terminated.");
+          console.error("CRITICAL: OPC UA Subscription terminated unexpectedly.");
           globalThis.opcuaSubscription = undefined;
+          // Attempt to reconnect the whole stack to be safe
+          attemptReconnect("subscription_terminated");
         });
 
       const monitorIds = nodeIdsToMonitor();
@@ -167,8 +181,12 @@ async function createSubscriptionAndMonitorItems() {
       });
       console.log("Monitored items set up successfully.");
     } catch (err: any) {
-      console.error("Failed to create subscription or monitor items:", err.message);
-      await stopSubscription();
+      const errorMsg = `Failed to create subscription or monitor items: ${err.message}`;
+      broadcastError(errorMsg);
+      if (globalThis.opcuaSubscription) {
+        await globalThis.opcuaSubscription.terminate();
+        globalThis.opcuaSubscription = undefined;
+      }
       attemptReconnect("subscription_creation_failure");
     }
 }
@@ -207,7 +225,8 @@ async function createSessionAndStartSubscription() {
 
         await createSubscriptionAndMonitorItems();
     } catch (err: any) {
-        console.error("Failed to create OPC UA session:", err.message);
+        const errorMsg = `Failed to create OPC UA session: ${err.message}`;
+        broadcastError(errorMsg);
         globalThis.opcuaSession = undefined;
         attemptReconnect("session_creation_failure");
     }
@@ -236,7 +255,8 @@ async function connectOPCUA() {
 
     globalThis.isConnectingOpcua = true;
     globalThis.connectionAttempts!++;
-    console.log(`Attempting to connect to OPC UA server (attempt ${globalThis.connectionAttempts}): ${endpointUrl}`);
+    // Use globalThis.endpointUrl
+    console.log(`Attempting to connect to OPC UA server (attempt ${globalThis.connectionAttempts}): ${globalThis.endpointUrl}`);
 
     try {
       if (!globalThis.opcuaClient) {
@@ -259,20 +279,22 @@ async function connectOPCUA() {
         globalThis.opcuaClient.on("close", (err?: Error) => { console.log(`OPC UA CEvt: Connection closed.`); globalThis.opcuaSession = undefined; stopSubscription(); });
       }
 
-      await globalThis.opcuaClient.connect(endpointUrl);
-      console.log("OPC UA client connected to:", endpointUrl);
+      await globalThis.opcuaClient.connect(globalThis.endpointUrl as string);
+      console.log("OPC UA client connected to:", globalThis.endpointUrl);
       await createSessionAndStartSubscription();
     } catch (err: any) {
-      console.error(`Failed to connect OPC UA client to ${endpointUrl}:`, err.message);
-      if (endpointUrl === OPC_UA_ENDPOINT_OFFLINE && OPC_UA_ENDPOINT_ONLINE) {
+      const errorMsg = `Failed to connect OPC UA client to ${globalThis.endpointUrl}: ${err.message}`;
+      broadcastError(errorMsg);
+      if (globalThis.endpointUrl === OPC_UA_ENDPOINT_OFFLINE && OPC_UA_ENDPOINT_ONLINE) {
         console.log("Falling back to online OPC UA endpoint...");
-        endpointUrl = OPC_UA_ENDPOINT_ONLINE;
+        globalThis.endpointUrl = OPC_UA_ENDPOINT_ONLINE;
         try {
-            await globalThis.opcuaClient!.connect(endpointUrl);
-            console.log("OPC UA client connected to fallback:", endpointUrl);
+            await globalThis.opcuaClient!.connect(globalThis.endpointUrl as string);
+            console.log("OPC UA client connected to fallback:", globalThis.endpointUrl);
             await createSessionAndStartSubscription();
         } catch (fallbackErr: any) {
-            console.error("Failed to connect to fallback OPC UA:", fallbackErr.message);
+            const fallbackErrorMsg = `Failed to connect to fallback OPC UA: ${fallbackErr.message}`;
+            broadcastError(fallbackErrorMsg);
             attemptReconnect("fallback_failure");
         }
       } else {
@@ -334,12 +356,16 @@ export function ensureServerInitialized() {
     }
 }
 
-export function getOpcuaStatus(): 'connected' | 'disconnected' | 'connecting' {
+export function getOpcuaStatus(): 'online' | 'offline' | 'disconnected' | 'connecting' {
     if (globalThis.isConnectingOpcua) {
         return 'connecting';
     }
     if (globalThis.opcuaSession && !globalThis.opcuaSession.sessionId.isEmpty() && globalThis.opcuaSubscription) {
-        return 'connected';
+        const url = globalThis.endpointUrl as string || '';
+        if (url.startsWith('opc.tcp://192.168.') || url.startsWith('opc.tcp://10.') || (url.startsWith('opc.tcp://172.') && parseInt(url.split('.')[1],10) >= 16 && parseInt(url.split('.')[1],10) <= 31)) {
+            return 'offline'; // Local connection
+        }
+        return 'online'; // Remote connection
     }
     return 'disconnected';
 }

@@ -112,6 +112,8 @@ export const useWebSocket = () => {
                         resolve(message.payload);
                         connectionManager.pendingRequests.delete(message.requestId);
                     }
+                } else if (message.type === 'backend-error' && message.payload) {
+                    useAppStore.getState().addErrorLogEntry(message.payload);
                 } else if (message.type === 'toast' && message.payload) {
                     const { message: toastMsg, options } = message.payload as ToastMessagePayload;
                     const toastType = options?.id?.toString().includes('error') ? 'error' : 'info';

@@ -53,6 +53,7 @@ interface AppState {
   apiDowntimes: ApiDowntimeEvent[];
   isWebSocketConnected: boolean;
   activeWebSocketUrl: string;
+  errorLog: { id: string; message: string; timestamp: string }[];
 }
 
 // All functions (actions) for the store
@@ -67,6 +68,8 @@ interface AppActions {
   setSoundEnabled: (enabled: boolean) => void;
   setActiveAlarms: (alarms: ActiveAlarm[]) => void;
   setWebSocketStatus: (isConnected: boolean, url: string) => void;
+  addErrorLogEntry: (error: { message: string; timestamp: string }) => void;
+  clearErrorLog: () => void;
   addApiConfig: (config: Omit<ApiConfig, 'id' | 'localApi' | 'onlineApi'> & { localUrl: string, onlineUrl: string }) => void;
   updateApiConfig: (configId: string, updates: Partial<ApiConfig>) => void;
   removeApiConfig: (configId: string) => void;
@@ -102,6 +105,7 @@ const initialState: AppState = {
   apiDowntimes: [],
   isWebSocketConnected: false,
   activeWebSocketUrl: '',
+  errorLog: [],
 };
 
 const safeLocalStorage: StateStorage = typeof window !== 'undefined' ? localStorage : { getItem: () => null, setItem: () => {}, removeItem: () => {} };
@@ -192,6 +196,12 @@ export const useAppStore = create<FullStoreState>()(
         isWebSocketConnected: isConnected,
         activeWebSocketUrl: url
       }),
+
+      addErrorLogEntry: (error) => set((state) => ({
+        errorLog: [...state.errorLog, { ...error, id: uuidv4() }]
+      })),
+
+      clearErrorLog: () => set({ errorLog: [] }),
 
       addApiConfig: (newConfigPartial) => set((state) => {
         const newId = uuidv4();
