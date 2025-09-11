@@ -99,6 +99,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
                 isConnected={isConnected} 
                 onClick={handleWsClick} 
                 wsAddress={activeWsUrl}
+                delay={delay}
               />
             </motion.div>
             
