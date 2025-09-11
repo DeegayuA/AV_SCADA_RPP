@@ -2,92 +2,88 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Wifi, Server, WifiOff, RefreshCw } from 'lucide-react';
+import { Wifi, WifiOff, Server, RefreshCcw } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+type PlcStatus = 'connected' | 'connecting' | 'disconnected';
+
 interface PlcConnectionStatusProps {
-    status: 'online' | 'offline' | 'disconnected';
+    status: PlcStatus;
+    onRefresh: () => void;
 }
 
-const PlcConnectionStatus: React.FC<PlcConnectionStatusProps> = React.memo(({ status }) => {
-    let StatusIcon;
-    let statusText;
-    let title;
-    let iconColor;
-    let bgColor;
-
-    switch (status) {
-        case 'online':
-            StatusIcon = Wifi;
-            statusText = 'Online';
-            title = 'PLC connected remotely via API';
-            iconColor = 'text-blue-600 dark:text-blue-300';
-            bgColor = 'bg-blue-100 dark:bg-blue-900/50';
-            break;
-        case 'offline':
-            StatusIcon = Server;
-            statusText = 'Local';
-            title = 'PLC connected locally';
-            iconColor = 'text-sky-600 dark:text-sky-300';
-            bgColor = 'bg-sky-100 dark:bg-sky-900/50';
-            break;
-        case 'disconnected':
-        default:
-            StatusIcon = WifiOff;
-            statusText = 'Disconnected';
-            title = 'PLC Disconnected';
-            iconColor = 'text-gray-600 dark:text-gray-400';
-            bgColor = 'bg-gray-200 dark:bg-gray-800';
-            break;
-    }
-
-    const handleRefresh = () => {
-        if (status === 'disconnected' && typeof window !== 'undefined') {
-            window.location.reload();
+const PlcConnectionStatus: React.FC<PlcConnectionStatusProps> = React.memo(({ status, onRefresh }) => {
+    const getStatusInfo = (): { icon: React.ReactNode; text: string; color: string; tooltip: string; } => {
+        switch (status) {
+            case 'connected':
+                return {
+                    icon: <Wifi className="h-5 w-5" />,
+                    text: 'PLC Connected',
+                    color: 'text-green-500',
+                    tooltip: 'PLC connection is active.'
+                };
+            case 'connecting':
+                return {
+                    icon: <Server className="h-5 w-5 animate-pulse" />,
+                    text: 'PLC Connecting',
+                    color: 'text-yellow-500',
+                    tooltip: 'Attempting to connect to the PLC...'
+                };
+            case 'disconnected':
+            default:
+                return {
+                    icon: <WifiOff className="h-5 w-5" />,
+                    text: 'PLC Disconnected',
+                    color: 'text-red-500',
+                    tooltip: 'PLC is not connected. Click refresh to try again.'
+                };
         }
     };
 
-    return (
-        <motion.div
-            className="flex items-center gap-2"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-        >
-            <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <div className={cn(
-                            "flex items-center gap-2 pl-2 pr-3 py-1 rounded-full text-xs sm:text-sm font-medium",
-                            bgColor
-                        )}>
-                            <StatusIcon className={cn("h-4 w-4", iconColor)} />
-                            <span className={cn("text-muted-foreground", iconColor)}>{statusText}</span>
-                        </div>
-                    </TooltipTrigger>
-                    <TooltipContent><p>{title}</p></TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
+    const { icon, text, color, tooltip } = getStatusInfo();
 
-            <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <button
-                            onClick={handleRefresh}
-                            disabled={status !== 'disconnected'}
-                            className="disabled:opacity-50 disabled:cursor-not-allowed"
-                            aria-label="Refresh PLC Status"
-                        >
-                            <RefreshCw className={`h-4 w-4 ${status === 'disconnected' ? 'animate-spin' : ''} text-muted-foreground`} />
-                        </button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        {status === 'disconnected' ? <p>Click to refresh</p> : <p>Refresh (disabled)</p>}
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-        </motion.div>
+    return (
+        <TooltipProvider delayDuration={100}>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <div className={cn(
+                        "flex items-center gap-2 rounded-full border bg-background py-1 pl-2 pr-3 transition-all",
+                        status === 'connected' && 'border-green-500/20',
+                        status === 'connecting' && 'border-yellow-500/20',
+                        status === 'disconnected' && 'border-red-500/20',
+                    )}>
+                        <div className={cn("flex-shrink-0", color)}>
+                            {icon}
+                        </div>
+                        <span className="text-xs sm:text-sm text-muted-foreground hidden sm:inline">{text}</span>
+
+                        {status === 'disconnected' && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="ml-1 h-6 w-6"
+                                onClick={(e) => {
+                                    e.stopPropagation(); // prevent tooltip from staying open
+                                    onRefresh();
+                                }}
+                            >
+                                <RefreshCcw className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>{tooltip}</p>
+                </TooltipContent>
+            </Tooltip>
+        </TooltipProvider>
     );
 });
 

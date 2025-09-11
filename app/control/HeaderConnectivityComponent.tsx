@@ -4,7 +4,7 @@ import { UserRole } from '@/types/auth';
 import DashboardHeaderControl from './DashboardHeader';
 
 interface HeaderComponentProps {
-    plcStatus: 'online' | 'offline' | 'disconnected';
+    plcStatus: 'connected' | 'connecting' | 'disconnected';
     isConnected: boolean;
     connectWebSocket: () => Promise<void>;
     currentTime: string;

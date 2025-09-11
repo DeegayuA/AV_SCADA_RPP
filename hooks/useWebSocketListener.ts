@@ -21,7 +21,7 @@ interface ToastMessagePayload {
   };
 }
 export interface WebSocketMessageFromServer {
-  type: 'opc-ua-data' | 'toast' | 'opc-ua-status' | 'layout-data' | 'layout-error' | 'response' | string;
+  type: 'opc-ua-data' | 'toast' | 'opc-ua-status' | 'layout-data' | 'layout-error' | 'response' | 'backend-error' | string;
   payload?: any;
   requestId?: string;
   timestamp?: string;
@@ -67,7 +67,7 @@ export const useWebSocket = () => {
     
     // memoize connect function to avoid re-creation on every render. wsUrl is a dependency
     const connect = useCallback(() => {
-        const { setWebSocketStatus, updateOpcUaNodeValues } = useAppStore.getState();
+        const { setWebSocketStatus, updateOpcUaNodeValues, addBackendError } = useAppStore.getState();
         const url = wsUrl;
         
         if (!url) return;
@@ -112,12 +112,12 @@ export const useWebSocket = () => {
                         resolve(message.payload);
                         connectionManager.pendingRequests.delete(message.requestId);
                     }
-                } else if (message.type === 'backend-error' && message.payload) {
-                    useAppStore.getState().addErrorLogEntry(message.payload);
                 } else if (message.type === 'toast' && message.payload) {
                     const { message: toastMsg, options } = message.payload as ToastMessagePayload;
                     const toastType = options?.id?.toString().includes('error') ? 'error' : 'info';
                     toast[toastType](toastMsg, options);
+                } else if (message.type === 'backend-error' && typeof message.payload === 'string') {
+                    addBackendError(message.payload);
                 } else if (typeof message === 'object' && message !== null && !message.type) {
                     // This is the data payload itself
                     updateOpcUaNodeValues(message);

@@ -1,9 +1,11 @@
 // app/api/opcua/discover/status/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { discoveryProgressCache } from '../../route'; // Adjust path as necessary
+import { getDiscoveryProgress, ensureServerInitialized } from '@/lib/opcua-server';
 
 export async function GET(req: NextRequest) {
-  return NextResponse.json(discoveryProgressCache, {
+  ensureServerInitialized();
+  const progress = getDiscoveryProgress();
+  return NextResponse.json(progress, {
     status: 200,
     headers: {
       'Cache-Control': 'no-store',

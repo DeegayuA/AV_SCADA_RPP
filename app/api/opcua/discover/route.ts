@@ -1,53 +1,42 @@
 // app/api/opcua/discover/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+// Import from the new singleton module
 import {
-    opcuaSession,
-    connectOPCUA,
+    ensureServerInitialized,
+    getOpcuaSession,
     discoverAndSaveDatapoints,
-    DiscoveredDataPoint // Optional: for type safety if dealing with result.data directly
-} from '../route'; // Adjust path if Next.js resolves module paths differently, e.g. '../route.js' or specific alias
-import { ClientSession } from 'node-opcua'; // For type checking opcuaSession.isOpen if needed
+    getDiscoveryProgress, // The user might want to poll this, so let's handle GET
+} from '@/lib/opcua-server';
 
 export async function POST(req: NextRequest) {
     console.log("POST /api/opcua/discover endpoint hit.");
+    ensureServerInitialized(); // Make sure the server instance is active
 
     try {
-        // Check if opcuaSession is active and open
-        // Note: opcuaSession might be null or its internal state might indicate it's not truly "open"
-        // The ClientSession type itself doesn't have an `isOpen()` method.
-        // We rely on opcuaSession being non-null as an indicator of an active session.
-        // connectOPCUA should ensure the session is truly usable.
-        if (!opcuaSession) {
-            console.log("No active OPC UA session. Attempting to connect...");
-            await connectOPCUA(); // connectOPCUA handles its own logging and errors internally
-                                 // and sets up the shared opcuaSession
-        }
+        const session = getOpcuaSession();
 
-        // After attempting connection, check session status again
-        if (!opcuaSession) {
-            console.error("Failed to establish OPC UA session after connection attempt.");
+        if (!session) {
+            console.error("Discovery failed: OPC UA session is not available.");
             return NextResponse.json({
                 success: false,
-                message: 'Failed to establish OPC UA session.',
-                error: 'OPC UA session is not available after connection attempt.'
-            }, { status: 500 });
+                message: 'OPC UA is not connected. Please establish a connection before starting discovery.',
+                error: 'OPC UA session is not available.'
+            }, { status: 503 }); // 503 Service Unavailable is appropriate here
         }
 
         console.log("OPC UA session available. Proceeding with datapoint discovery...");
-        const result = await discoverAndSaveDatapoints(opcuaSession);
+        // The discovery function is now async and runs in the background.
+        // We can either await it here or just trigger it and let the client poll for progress.
+        // Let's await it for now, as that matches the original behavior.
+        const result = await discoverAndSaveDatapoints(session);
 
         if (result.success) {
             console.log("Datapoint discovery successful.");
             return NextResponse.json(result, { status: 200 });
         } else {
             console.error("Datapoint discovery failed.", result);
-            // Determine appropriate status code based on error
-            let statusCode = 400; // Default for general client-side correctable errors
-            if (result.message?.includes('Failed to save discovered datapoints to file')) {
-                statusCode = 500; // Server-side issue (file system)
-            } else if (result.message?.includes('Error during datapoint discovery')) {
-                statusCode = 500; // Could be server or OPC UA server issue
-            }
+            // Let the result itself determine the status code if possible, otherwise default
+            const statusCode = result.error?.includes('file') ? 500 : 400;
             return NextResponse.json(result, { status: statusCode });
         }
     } catch (error: any) {
@@ -60,12 +49,15 @@ export async function POST(req: NextRequest) {
     }
 }
 
+// It's useful to get the status of an ongoing discovery
 export async function GET(req: NextRequest) {
-    console.log("GET /api/opcua/discover endpoint hit. Method not allowed.");
+    console.log("GET /api/opcua/discover hit. Returning discovery progress.");
+    ensureServerInitialized();
+
+    const progress = getDiscoveryProgress();
+
     return NextResponse.json({
-        message: 'Method Not Allowed. Use POST to discover OPC UA datapoints.'
-    }, {
-        status: 405,
-        headers: { 'Allow': 'POST' }
+        success: true,
+        ...progress
     });
 }

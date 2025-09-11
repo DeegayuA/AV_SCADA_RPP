@@ -25,11 +25,12 @@ import PlcConnectionStatus from '@/app/DashboardData/PlcConnectionStatus';
 import WebSocketStatus from '@/app/DashboardData/WebSocketStatus';
 import SoundToggle from '@/app/DashboardData/SoundToggle';
 import ThemeToggle from '@/app/DashboardData/ThemeToggle';
+import { ErrorLogDisplay } from '@/app/DashboardData/ErrorLogDisplay';
 
 const itemVariants: Variants = _itemVariants as Variants;
 
 interface DashboardHeaderControlProps {
-    plcStatus: "online" | "offline" | "disconnected";
+    plcStatus: 'connected' | 'connecting' | 'disconnected';
     isConnected: boolean;
     connectWebSocket: () => Promise<void>;
     currentTime: string;
@@ -79,6 +80,11 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
         }
     };
 
+    const handlePlcRefresh = () => {
+        // This triggers the status check and reconnection attempt on the backend
+        fetch('/api/opcua/status').catch(console.error);
+    };
+
     return (
       <TooltipProvider delayDuration={100}>
         <motion.div
@@ -91,7 +97,9 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
             {PLANT_NAME} {headerTitle}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
+            <motion.div variants={itemVariants}>
+              <PlcConnectionStatus status={plcStatus} onRefresh={handlePlcRefresh} />
+            </motion.div>
             
             <motion.div variants={itemVariants}>
               {/* This usage is now correct because WebSocketStatus.tsx is updated */}
@@ -99,9 +107,10 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
                 isConnected={isConnected} 
                 onClick={handleWsClick} 
                 wsAddress={activeWsUrl}
+                delay={delay}
               />
             </motion.div>
-            
+            <motion.div variants={itemVariants}><ErrorLogDisplay /></motion.div>
             <motion.div variants={itemVariants}><SoundToggle /></motion.div>
             <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
 
@@ -230,21 +239,6 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           <div className="flex items-center gap-2">
             <Clock className="h-3 w-3" />
             <span>{currentTime}</span>
-            {isConnected ? (
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                      : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
-                    }>
-                      {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Last data received {delay} ms ago</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : null}
           </div>
           <span className='font-mono'>{version || '?.?.?'}</span>
         </motion.div>

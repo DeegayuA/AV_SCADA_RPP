@@ -127,7 +127,7 @@ export default function WelcomeStep() {
 
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         .animated-gradient {
           background-size: 200% 200%;
           animation: gradient-animation 15s ease infinite;

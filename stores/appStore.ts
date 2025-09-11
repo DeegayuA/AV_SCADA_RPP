@@ -27,6 +27,12 @@ import {
 import { WebSocketMessageToServer } from '@/hooks/useWebSocketListener';
 import { dataPoints as rawDataPoints } from '@/config/dataPoints';
 
+export interface BackendError {
+  id: string;
+  message: string;
+  timestamp: string;
+}
+
 const dataPointsWithIcons = rawDataPoints.map((dp) => ({
   ...dp,
   icon: typeof dp.icon === 'string' ? undefined : dp.icon
@@ -53,7 +59,7 @@ interface AppState {
   apiDowntimes: ApiDowntimeEvent[];
   isWebSocketConnected: boolean;
   activeWebSocketUrl: string;
-  errorLog: { id: string; message: string; timestamp: string }[];
+  errorLog: BackendError[];
 }
 
 // All functions (actions) for the store
@@ -68,8 +74,6 @@ interface AppActions {
   setSoundEnabled: (enabled: boolean) => void;
   setActiveAlarms: (alarms: ActiveAlarm[]) => void;
   setWebSocketStatus: (isConnected: boolean, url: string) => void;
-  addErrorLogEntry: (error: { message: string; timestamp: string }) => void;
-  clearErrorLog: () => void;
   addApiConfig: (config: Omit<ApiConfig, 'id' | 'localApi' | 'onlineApi'> & { localUrl: string, onlineUrl: string }) => void;
   updateApiConfig: (configId: string, updates: Partial<ApiConfig>) => void;
   removeApiConfig: (configId: string) => void;
@@ -80,6 +84,8 @@ interface AppActions {
   loadApiDowntimes: (downtimes: ApiDowntimeEvent[]) => void;
   clearApiMonitoringData: () => void;
   handleAutoBackup: () => Promise<void>;
+  addBackendError: (message: string) => void;
+  clearErrorLog: () => void;
 }
 
 // Non-reactive ("transient") state and actions. These should NOT be persisted.
@@ -196,12 +202,6 @@ export const useAppStore = create<FullStoreState>()(
         isWebSocketConnected: isConnected,
         activeWebSocketUrl: url
       }),
-
-      addErrorLogEntry: (error) => set((state) => ({
-        errorLog: [...state.errorLog, { ...error, id: uuidv4() }]
-      })),
-
-      clearErrorLog: () => set({ errorLog: [] }),
 
       addApiConfig: (newConfigPartial) => set((state) => {
         const newId = uuidv4();
@@ -339,6 +339,19 @@ export const useAppStore = create<FullStoreState>()(
           console.error("Automated backup failed:", error);
         }
       },
+
+      addBackendError: (message: string) => {
+        const newError: BackendError = {
+          id: uuidv4(),
+          message,
+          timestamp: new Date().toISOString(),
+        };
+        set((state) => ({
+          errorLog: [newError, ...state.errorLog].slice(0, 50),
+        }));
+      },
+
+      clearErrorLog: () => set({ errorLog: [] }),
     }),
     {
       name: 'app-user-session-storage',
@@ -368,6 +381,8 @@ export const useAppStore = create<FullStoreState>()(
             loadApiDowntimes,
             clearApiMonitoringData,
             handleAutoBackup,
+            addBackendError,
+            clearErrorLog,
             // Transient state to explicitly ignore
             sendJsonMessage,
             setSendJsonMessage,
@@ -375,6 +390,7 @@ export const useAppStore = create<FullStoreState>()(
             setRequestWithResponse,
             // State to explicitly ignore
             opcUaNodeValues,
+            errorLog,
             // ...rest now contains only the AppState we want to save
             ...rest
         } = state;

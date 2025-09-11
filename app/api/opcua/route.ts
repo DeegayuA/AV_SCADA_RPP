@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 import { ensureServerInitialized } from '@/lib/opcua-server';
 import { WS_PORT } from '@/config/constants';
 
-// This initializes the server when the API route is first hit.
-// In a real production app, this should be moved to a custom server entrypoint.
+// This initializes the server when the app starts up in dev mode,
+// or on the first API hit in a serverless environment.
 ensureServerInitialized();
 
 export async function GET(req: Request) {
@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const webSocketUrl = `${protocol}://${host.split(':')[0]}:${WS_PORT}`;
 
   return NextResponse.json({
-    message: "OPC UA WebSocket service is managed in a separate process. Use the provided URL to connect.",
+    message: "OPC UA WebSocket service is managed by a persistent server process.",
     webSocketUrl: webSocketUrl,
   });
 }

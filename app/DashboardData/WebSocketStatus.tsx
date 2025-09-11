@@ -2,69 +2,85 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Signal, SignalZero } from 'lucide-react';
+import { Wifi, WifiOff } from 'lucide-react';
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 interface WebSocketStatusProps {
     isConnected: boolean;
     onClick: () => void;
     wsAddress?: string;
-    delay?: number;
+    delay: number; // Delay in milliseconds
 }
 
-const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, onClick, wsAddress, delay = 0 }) => {
-    const StatusIcon = isConnected ? Signal : SignalZero;
-    let statusText: string;
-    let iconColor: string;
-    let bgColor: string;
+const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, onClick, wsAddress, delay }) => {
 
-    if (isConnected) {
-        statusText = delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`;
+    const getLagIndicator = () => {
+        if (!isConnected) {
+            return {
+                icon: <WifiOff className="h-5 w-5" />,
+                text: 'WS Offline',
+                color: 'text-red-500',
+                bgColor: 'bg-red-500/10 border-red-500/20',
+                tooltip: `WebSocket is disconnected. Click to manage connection.\nTarget: ${wsAddress || 'N/A'}`
+            };
+        }
+
         if (delay < 3000) {
-            iconColor = 'text-green-600 dark:text-green-300';
-            bgColor = 'bg-green-100 dark:bg-green-900/50';
+            return {
+                icon: <Wifi className="h-5 w-5" />,
+                text: `${(delay / 1000).toFixed(1)}s lag`,
+                color: 'text-green-500',
+                bgColor: 'bg-green-500/10 border-green-500/20',
+                tooltip: `Live data feed active. Last update was ${delay}ms ago.\nServer: ${wsAddress}`
+            };
         } else if (delay < 10000) {
-            iconColor = 'text-yellow-600 dark:text-yellow-400';
-            bgColor = 'bg-yellow-100 dark:bg-yellow-900/50';
+            return {
+                icon: <Wifi className="h-5 w-5" />,
+                text: `${(delay / 1000).toFixed(1)}s lag`,
+                color: 'text-yellow-500',
+                bgColor: 'bg-yellow-500/10 border-yellow-500/20',
+                tooltip: `Connection is lagging. Last update was ${delay}ms ago.\nServer: ${wsAddress}`
+            };
         } else {
-            iconColor = 'text-red-600 dark:text-red-400';
-            bgColor = 'bg-red-100 dark:bg-red-900/50';
+            return {
+                icon: <Wifi className="h-5 w-5" />,
+                text: '>10s lag',
+                color: 'text-orange-500',
+                bgColor: 'bg-orange-500/10 border-orange-500/20',
+                tooltip: `High connection lag. Last update was ${delay}ms ago.\nServer: ${wsAddress}`
+            };
         }
-    } else {
-        statusText = 'Offline';
-        iconColor = 'text-gray-600 dark:text-gray-400';
-        bgColor = 'bg-gray-200 dark:bg-gray-800';
-    }
-
-    const getTitle = () => {
-        const addressInfo = wsAddress || "address not available";
-        if (isConnected) {
-            return `Live Data Feed (WebSocket Connected)\nLast update: ${delay}ms ago\nServer: ${addressInfo}`;
-        }
-        return `Connection Offline. Click to manage.\nTarget Server: ${addressInfo}`;
     };
+
+    const { icon, text, color, bgColor, tooltip } = getLagIndicator();
 
     return (
         <TooltipProvider delayDuration={100}>
             <Tooltip>
                 <TooltipTrigger asChild>
-                    <motion.div
+                    <div
+                        onClick={onClick}
                         className={cn(
-                            "flex items-center gap-2 pl-2 pr-3 py-1 rounded-full text-xs sm:text-sm font-medium cursor-pointer",
+                            "flex items-center gap-2 rounded-full border bg-background py-1 pl-2 pr-3 transition-all cursor-pointer",
                             bgColor
                         )}
-                        onClick={onClick}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        aria-label={`WebSocket Status: ${statusText}`}
                     >
-                        <StatusIcon className={cn("h-4 w-4", iconColor, { 'animate-pulse': isConnected && delay < 5000 })} />
-                        <span className={cn("text-muted-foreground", iconColor)}>{statusText}</span>
-                    </motion.div>
+                        <div className={cn("flex-shrink-0", color)}>
+                            {icon}
+                        </div>
+                        <span className={cn("text-xs sm:text-sm font-mono", color)}>
+                            {text}
+                        </span>
+                    </div>
                 </TooltipTrigger>
                 <TooltipContent>
-                    <p className="whitespace-pre-line">{getTitle()}</p>
+                    <p className="whitespace-pre-line">{tooltip}</p>
                 </TooltipContent>
             </Tooltip>
         </TooltipProvider>
