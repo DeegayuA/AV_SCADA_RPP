@@ -47,7 +47,7 @@ interface ExtendedDataPoint extends DataPoint {
   phase?: string;
   icon?: any; 
 }
-import { VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX, WEBSOCKET_CUSTOM_URL_KEY as CUSTOM_WEBSOCKET_URL_KEY } from '@/config/constants';
+import { VERSION, PLANT_NAME, AVAILABLE_SLD_LAYOUT_IDS, LOCAL_STORAGE_KEY_PREFIX, WEBSOCKET_CUSTOM_URL_KEY as CUSTOM_WEBSOCKET_URL_KEY, OPC_UA_CUSTOM_ENDPOINT_URL_KEY } from '@/config/constants';
 import { containerVariants, itemVariants as _itemVariants } from '@/config/animationVariants';
 const itemVariants: Variants = _itemVariants as Variants;
 import { playSuccessSound, playErrorSound, playWarningSound, playInfoSound } from '@/lib/utils';
@@ -76,6 +76,7 @@ interface DashboardHeaderControlProps {
   isConnected: boolean;
   connectWebSocket: () => void;
   onClickWsStatus: () => void;
+  onClickOpcuaStatus: () => void;
   currentTime: string;
   delay: number;
   version: string;
@@ -90,7 +91,7 @@ interface DashboardHeaderControlProps {
 
 const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
+    plcStatus, isConnected, connectWebSocket, onClickWsStatus, onClickOpcuaStatus, currentTime, delay,
     version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault, wsAddress
   }) => {
     const router = useRouter();
@@ -114,7 +115,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
             {PLANT_NAME} {headerTitle}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
+            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} onClick={onClickOpcuaStatus} /></motion.div>
             <motion.div variants={itemVariants}>
               <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} />
             </motion.div>
@@ -356,6 +357,8 @@ const UnifiedDashboardPage: React.FC = () => {
   const [delay, setDelay] = useState<number>(0);
   const [isWsConfigModalOpen, setIsWsConfigModalOpen] = useState(false);
   const [tempWsUrl, setTempWsUrl] = useState<string>('');
+  const [isOpcuaConfigModalOpen, setIsOpcuaConfigModalOpen] = useState(false);
+  const [tempOpcuaUrl, setTempOpcuaUrl] = useState<string>('');
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
   const [isSldModalOpen, setIsSldModalOpen] = useState(false);
   const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
@@ -538,6 +541,59 @@ const UnifiedDashboardPage: React.FC = () => {
     toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}` });
   }, [tempWsUrl, changeWebSocketUrl]);
 
+  const handleTestOpcuaConnection = useCallback(async () => {
+    if (!tempOpcuaUrl) {
+      toast.error("Please enter an endpoint URL to test.");
+      return;
+    }
+    toast.info("Testing OPC UA connection...", { id: 'opcua-test-toast' });
+    try {
+      const response = await fetch(`/api/opcua/status?testedClientSideEndpoint=${encodeURIComponent(tempOpcuaUrl)}`);
+      const data = await response.json();
+      if (data.connectionStatus !== 'disconnected') {
+        toast.success("Connection Successful", { id: 'opcua-test-toast', description: data.message });
+      } else {
+        toast.error("Connection Failed", { id: 'opcua-test-toast', description: data.errorDetail || data.message });
+      }
+    } catch (error) {
+      toast.error("Connection Test Failed", { id: 'opcua-test-toast', description: "An error occurred while testing the connection." });
+    }
+  }, [tempOpcuaUrl]);
+
+  const handleSaveOpcuaConnection = useCallback(async () => {
+    if (!tempOpcuaUrl) {
+      toast.error("Please enter an endpoint URL to save.");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/opcua/set-endpoint', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: tempOpcuaUrl }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        localStorage.setItem(OPC_UA_CUSTOM_ENDPOINT_URL_KEY, tempOpcuaUrl);
+        toast.success("Endpoint URL Saved", {
+          description: "The new OPC UA endpoint URL has been saved and the server is reconnecting.",
+          duration: 10000,
+        });
+        setIsOpcuaConfigModalOpen(false);
+        // Manually trigger a status check after a short delay
+        setTimeout(checkPlcConnection, 1000);
+      } else {
+        toast.error("Failed to Save Endpoint", { description: data.message });
+      }
+    } catch (error) {
+      toast.error("Failed to Save Endpoint", { description: "An error occurred while saving the new endpoint URL." });
+    }
+  }, [tempOpcuaUrl, checkPlcConnection]);
+
     const handleOpenConfigurator = useCallback(() => {
     setIsConfiguratorOpen(true);
   }, []);
@@ -546,6 +602,17 @@ const UnifiedDashboardPage: React.FC = () => {
     setTempWsUrl(webSocketUrl || '');
     setIsWsConfigModalOpen(true);
   }, [webSocketUrl]);
+
+  const handleOpcuaConfigClick = useCallback(() => {
+    const storedUrl = localStorage.getItem('custom_opcua_endpoint_url');
+    setTempOpcuaUrl(storedUrl || '');
+    setIsOpcuaConfigModalOpen(true);
+  }, []);
+
+  const handleOpcuaConfigClick = useCallback(() => {
+    // Here you would also pre-fill with the current custom URL if it exists
+    setIsOpcuaConfigModalOpen(true);
+  }, []);
 
   const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
   const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
@@ -830,6 +897,41 @@ const UnifiedDashboardPage: React.FC = () => {
         onSaveNewDataPoint={handleSaveNewDataPoint}
         itemTypeName="Dashboard Card"
       />
+
+      <Dialog open={isOpcuaConfigModalOpen} onOpenChange={setIsOpcuaConfigModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeaderComponentInternal>
+            <DialogTitleComponentInternal>OPC UA Connection</DialogTitleComponentInternal>
+            <DialogDescription>
+              Configure the OPC UA server endpoint URL.
+            </DialogDescription>
+          </DialogHeaderComponentInternal>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2 pt-2">
+              <label htmlFor="opcuaUrl" className="text-sm font-medium">
+                Endpoint URL
+              </label>
+              <Input
+                id="opcuaUrl"
+                value={tempOpcuaUrl}
+                onChange={(e) => setTempOpcuaUrl(e.target.value)}
+                placeholder="opc.tcp://localhost:4840"
+                aria-label="OPC UA Endpoint URL Input"
+              />
+              <p className="text-xs text-muted-foreground pt-1">
+                Enter the full OPC UA endpoint URL of your server.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsOpcuaConfigModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleTestOpcuaConnection}>Test Connection</Button>
+            <Button onClick={handleSaveOpcuaConnection}>Save & Reconnect</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={isWsConfigModalOpen} onOpenChange={setIsWsConfigModalOpen}>
         <DialogContent className="sm:max-w-[425px]">

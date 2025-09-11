@@ -12,13 +12,14 @@ import {
 
 interface PlcConnectionStatusProps {
     status: 'online' | 'offline' | 'disconnected';
+    onClick?: () => void;
 }
 
-const PlcConnectionStatus: React.FC<PlcConnectionStatusProps> = React.memo(({ status }) => {
+const PlcConnectionStatus: React.FC<PlcConnectionStatusProps> = React.memo(({ status, onClick }) => {
     let statusText = '';
     let dotClass = '';
     let title = `PLC Status: ${status}`;
-    let clickHandler = () => { };
+    let clickHandler = onClick || (() => {});
 
     // NOTE: The original code had 'online' for remote and 'offline' for local.
     // This seems counter-intuitive to standard 'online/offline' meaning.
@@ -28,7 +29,7 @@ const PlcConnectionStatus: React.FC<PlcConnectionStatusProps> = React.memo(({ st
      switch (status) {
         case 'online': statusText = 'PLC: Connected (Remote)'; dotClass = 'bg-blue-500 ring-2 ring-blue-500/30 animate-pulse'; title = 'PLC connected remotely via API'; break;
         case 'offline': statusText = 'PLC: Running (Local)'; dotClass = 'bg-sky-400 ring-2 ring-sky-400/30 animate-pulse'; title = 'PLC connected locally (Direct API?)'; break;
-        case 'disconnected': default: statusText = 'PLC: Disconnected'; dotClass = 'bg-gray-400 dark:bg-gray-600'; title = 'PLC Disconnected. Click to refresh page.'; clickHandler = () => { if (typeof window !== 'undefined') window.location.reload(); }; break;
+        case 'disconnected': default: statusText = 'PLC: Disconnected'; dotClass = 'bg-gray-400 dark:bg-gray-600'; title = 'PLC Disconnected. Click to configure.'; if (!onClick) { clickHandler = () => { if (typeof window !== 'undefined') window.location.reload(); }; title = 'PLC Disconnected. Click to refresh page.'; } break;
     }
 
     const dotVariants = { initial: { scale: 0 }, animate: { scale: 1 } };

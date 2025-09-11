@@ -8,6 +8,7 @@ export const WS_PORT = 2001;
 export const WS_API_PATH = "/api/opcua";
 export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
 export const WEBSOCKET_CUSTOM_URL_KEY = `${LOCAL_STORAGE_KEY_PREFIX}custom_websocket_url`;
+export const OPC_UA_CUSTOM_ENDPOINT_URL_KEY = `${LOCAL_STORAGE_KEY_PREFIX}custom_opcua_endpoint_url`;
 
 /**
  * Gets the definitive WebSocket URL.

@@ -1,6 +1,7 @@
 // app/api/opcua/route.ts
 import { WS_PORT, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE } from "@/config/constants";
 import { dataPoints, DataPoint } from "@/config/dataPoints";
+import { getCustomEndpointUrl } from './set-endpoint/route';
 import {
   OPCUAClient,
   ClientSession,
@@ -729,7 +730,8 @@ async function ensureWebSocketServerInitialized() {
 
 
 async function connectOPCUA() {
-  endpointUrl = OPC_UA_ENDPOINT_OFFLINE;
+  const customUrl = getCustomEndpointUrl();
+  endpointUrl = customUrl || OPC_UA_ENDPOINT_OFFLINE;
   if (opcuaClient && opcuaSession) {
     console.log("OPC UA session already active and client presumed connected.");
     if(!dataInterval) startDataPolling();

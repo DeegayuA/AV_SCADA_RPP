@@ -3,6 +3,7 @@
 import { OPCUAClient, ClientSubscription, MessageSecurityMode, SecurityPolicy, ClientSession } from 'node-opcua';
 import { OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE } from '@/config/constants';
 import { NextRequest, NextResponse } from 'next/server';
+import { getCustomEndpointUrl } from '../set-endpoint/route';
 
 export const dynamic = 'force-dynamic';
 
@@ -112,8 +113,11 @@ const connectMainOPCClient = async (): Promise<'offline' | 'online' | 'disconnec
 
     let connectionType: 'offline' | 'online' | 'disconnected' = 'disconnected';
     
+    const customUrl = getCustomEndpointUrl();
+    const offlineEndpoint = customUrl || OPC_UA_ENDPOINT_OFFLINE;
+
     // Attempt OFFLINE
-    console.log("Main Client: Attempting OFFLINE endpoint...");
+    console.log(`Main Client: Attempting OFFLINE endpoint... (${offlineEndpoint})`);
     mainClient = OPCUAClient.create({ 
         endpointMustExist: false, keepSessionAlive: true,
         connectionStrategy: { maxRetry: MAIN_CLIENT_MAX_RETRIES, initialDelay: MAIN_CLIENT_RETRY_BACKOFF[0], maxDelay: MAIN_CLIENT_RETRY_BACKOFF[MAIN_CLIENT_RETRY_BACKOFF.length -1]},
@@ -130,7 +134,7 @@ const connectMainOPCClient = async (): Promise<'offline' | 'online' | 'disconnec
         mainCurrentConnectionStatus = 'disconnected'; 
     });
 
-    mainSession = await tryConnectAndCreateMainSession(OPC_UA_ENDPOINT_OFFLINE, mainClient);
+    mainSession = await tryConnectAndCreateMainSession(offlineEndpoint, mainClient);
     if (mainSession) {
         console.log("Main client successfully connected to OFFLINE endpoint.");
         connectionType = 'offline';
