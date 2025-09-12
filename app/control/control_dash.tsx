@@ -115,7 +115,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
             <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
             <motion.div variants={itemVariants}>
-              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} />
+              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} delay={delay} />
             </motion.div>
             <motion.div variants={itemVariants}><SoundToggle /></motion.div>
             <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
