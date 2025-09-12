@@ -22,13 +22,14 @@ const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnecte
         return `Connection Offline. Click to manage.\nTarget Server: ${addressInfo}`;
     };
 
-    const lagText = delay > 30000 ? '>30s' : `${(delay / 1000).toFixed(1)}s`;
+    const validDelay = typeof delay === 'number' && !isNaN(delay) ? delay : 0;
+    const lagText = validDelay > 30000 ? '>30s' : `${(validDelay / 1000).toFixed(1)}s`;
 
     const getStatusInfo = () => {
         if (isConnected) {
             let lagColor = 'text-green-800 dark:text-green-300';
-            if (delay >= 10000) lagColor = 'text-red-800 dark:text-red-300';
-            else if (delay >= 3000) lagColor = 'text-yellow-800 dark:text-yellow-300';
+            if (validDelay >= 10000) lagColor = 'text-red-800 dark:text-red-300';
+            else if (validDelay >= 3000) lagColor = 'text-yellow-800 dark:text-yellow-300';
 
             return {
                 text: 'WS: Live',
