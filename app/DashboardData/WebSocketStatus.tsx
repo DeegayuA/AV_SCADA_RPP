@@ -14,15 +14,15 @@ interface WebSocketStatusProps {
 }
 
 const WebSocketStatus: React.FC<WebSocketStatusProps> = React.memo(({ isConnected, onClick, wsAddress, delay }) => {
+    const validDelay = typeof delay === 'number' && !isNaN(delay) ? delay : 0;
+
     const getTitle = () => {
         const addressInfo = wsAddress || "address not available";
         if (isConnected) {
-            return `Live Data Feed (WebSocket Connected)\nServer: ${addressInfo}\nLast data received ${delay} ms ago.`;
+            return `Live Data Feed (WebSocket Connected)\nServer: ${addressInfo}\nLast data received ${validDelay} ms ago.`;
         }
         return `Connection Offline. Click to manage.\nTarget Server: ${addressInfo}`;
     };
-
-    const validDelay = typeof delay === 'number' && !isNaN(delay) ? delay : 0;
     const lagText = validDelay > 30000 ? '>30s' : `${(validDelay / 1000).toFixed(1)}s`;
 
     const getStatusInfo = () => {
