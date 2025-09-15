@@ -10,7 +10,7 @@ import { useTheme } from 'next-themes';
 import {
     Loader2, Zap, ShoppingCart, Send, Leaf, AlertTriangleIcon, ArrowRightToLine,
     ArrowLeftFromLine, PlugZap, RadioTower, ChevronLeft, ChevronRight, Scale,
-    TrendingDown, TrendingUp as TrendingUpIcon,
+    TrendingDown, TrendingUp,
     Wind, Sun, CloudSun, CloudMoon, Moon, BatteryCharging, BatteryFull, Battery,
     Home, Factory, Building, Waves, Thermometer, Gauge, Activity, Server, Cloud, Cog,
     Plug, type LucideIcon
@@ -397,60 +397,62 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         return () => { if (graphUpdateTimer.current) { clearInterval(graphUpdateTimer.current); graphUpdateTimer.current = null; }};
     }, [timeScale, isGraphReady, timelineSeries, effectiveIsLive, effectiveUseDemoData, historicalTimeOffsetMs, processDataPoint, sumValuesForDpIds, nodeValues]);
 
-    const currentValues = useMemo(() => {
+    const currentData = useMemo(() => {
         const dpsConfigured = timelineSeries.length > 0 && timelineSeries.some(s => s.dpIds.length > 0);
-        const values: { [key: string]: number } = {};
+        const seriesValues: { [key: string]: number } = {};
 
         if (historicalTimeOffsetMs > 0 && chartData.length > 0) {
             const lastPointInView = chartData[chartData.length - 1];
             if (lastPointInView) {
                 timelineSeries.forEach(series => {
-                    values[series.id] = lastPointInView[series.id] || 0;
+                    seriesValues[series.id] = lastPointInView[series.id] || 0;
                 });
             }
         } else if (effectiveUseDemoData && dpsConfigured) {
             const lastDemoPoint = dataBufferRef.current.length > 0 ? dataBufferRef.current[dataBufferRef.current.length - 1] : null;
             if (lastDemoPoint && lastDemoPoint.timestamp > Date.now() - 5000) {
                  timelineSeries.forEach(series => {
-                    values[series.id] = lastDemoPoint[series.id] || 0;
+                    seriesValues[series.id] = lastDemoPoint[series.id] || 0;
                 });
             } else {
                 const demo = generateDemoValues();
                  timelineSeries.forEach(series => {
-                    values[series.id] = demo[series.id] || 0;
+                    seriesValues[series.id] = demo[series.id] || 0;
                 });
             }
         } else if (effectiveIsLive && dpsConfigured && nodeValues && Object.keys(nodeValues).length > 0 && allPossibleDataPoints && allPossibleDataPoints.length > 0) {
             timelineSeries.forEach(series => {
-                values[series.id] = sumValuesForDpIds(series.dpIds);
+                seriesValues[series.id] = sumValuesForDpIds(series.dpIds);
             });
         } else if (chartData.length > 0) {
             const pointSource = chartData[chartData.length - 1];
             timelineSeries.forEach(series => {
-                values[series.id] = pointSource[series.id] || 0;
+                seriesValues[series.id] = pointSource[series.id] || 0;
             });
         }
 
         timelineSeries.forEach(series => {
-            if (values[series.id] === undefined) {
-                values[series.id] = 0;
+            if (seriesValues[series.id] === undefined) {
+                seriesValues[series.id] = 0;
             }
         });
 
         const totalGeneration = timelineSeries
             .filter(s => s.role === 'generation')
-            .reduce((sum, s) => sum + (values[s.id] || 0), 0);
+            .reduce((sum, s) => sum + (seriesValues[s.id] || 0), 0);
 
         const totalUsage = timelineSeries
             .filter(s => s.role === 'usage')
-            .reduce((sum, s) => sum + (values[s.id] || 0), 0);
+            .reduce((sum, s) => sum + (seriesValues[s.id] || 0), 0);
 
         const netPower = totalGeneration - totalUsage;
 
         return {
-            ...values,
-            netPower,
-            isSelfSufficient: netPower >= 0,
+            seriesValues,
+            metadata: {
+                netPower,
+                isSelfSufficient: netPower >= 0,
+            }
         };
     }, [
         nodeValues, allPossibleDataPoints, chartData, timelineSeries,
@@ -516,7 +518,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     },[timeScale, effectiveIsLive, effectiveUseDemoData, historicalTimeOffsetMs, chartData]);
 
     const yAxisDomain = useMemo(():[number,number] => {
-        const dataToUse = chartData.length > 0 ? chartData : [currentValues];
+        const dataToUse = chartData.length > 0 ? chartData : [currentData.seriesValues];
         let allValues: number[] = [];
         const seriesIds = timelineSeries.map(s => s.id);
 
@@ -550,7 +552,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         if (maxV < 0 && maxV > (CHART_TARGET_UNIT === 'kW' ? -2 : -200)) maxV = Math.max(0, maxV);
 
         return [Math.floor(minV), Math.ceil(maxV)];
-    }, [chartData, currentValues, timelineSeries, CHART_TARGET_UNIT]);
+    }, [chartData, currentData, timelineSeries, CHART_TARGET_UNIT]);
 
     const isCurrentlyDrawingLiveOrDemo = (effectiveIsLive || effectiveUseDemoData) && historicalTimeOffsetMs === 0;
 
@@ -608,7 +610,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         <motion.div
             className={cn(
                 "space-y-2 p-3 rounded-lg shadow-lg border-2 transition-colors duration-700 ease-in-out",
-                currentValues.isSelfSufficient ? "border-green-400/60 dark:border-green-500/70" : "border-red-400/60 dark:border-red-500/70",
+                currentData.metadata.isSelfSufficient ? "border-green-400/60 dark:border-green-500/70" : "border-red-400/60 dark:border-red-500/70",
                 "bg-background/50"
             )}
             transition={{ duration: 0.7, ease: [0.4, 0, 0.2, 1] }}
@@ -616,7 +618,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
             <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 text-xs sm:text-sm mb-2 px-1">
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-2 items-stretch">
                 {timelineSeries.map(series => {
-                    const value = currentValues[series.id] || 0;
+                    const value = currentData.seriesValues[series.id] || 0;
                     const IconToUse = chartConfig[series.id]?.icon || Zap;
                     const isVisible = seriesVisibility[series.id];
                     return (
@@ -641,17 +643,17 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                     </motion.button>
                 )})}
                  <motion.div
-                    key={currentValues.isSelfSufficient ? 'green-status' : 'red-status'}
+                    key={currentData.metadata.isSelfSufficient ? 'green-status' : 'red-status'}
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.4, delay:0.1, ease: "easeOut" }}
                     className={cn(
                         "flex items-center justify-center gap-1.5 p-2 rounded-lg font-semibold text-xs sm:text-sm col-span-2 sm:col-span-1 md:col-auto shadow-md",
-                        currentValues.isSelfSufficient ? 'bg-green-500/20 text-green-700 dark:bg-green-500/25 dark:text-green-300' : 'bg-red-500/20 text-red-700 dark:bg-red-500/25 dark:text-red-300'
+                        currentData.metadata.isSelfSufficient ? 'bg-green-500/20 text-green-700 dark:bg-green-500/25 dark:text-green-300' : 'bg-red-500/20 text-red-700 dark:bg-red-500/25 dark:text-red-300'
                     )}
                 >
-                    {currentValues.isSelfSufficient ? <Leaf className="h-4 w-4 sm:h-5 sm:w-5"/> : <AlertTriangleIcon className="h-4 w-4 sm:h-5 sm:w-5"/>}
-                    <span className="leading-tight">{currentValues.isSelfSufficient ? "Self-Sufficient" : "Grid Dependent"}</span>
+                    {currentData.metadata.isSelfSufficient ? <Leaf className="h-4 w-4 sm:h-5 sm:w-5"/> : <AlertTriangleIcon className="h-4 w-4 sm:h-5 sm:w-5"/>}
+                    <span className="leading-tight">{currentData.metadata.isSelfSufficient ? "Self-Sufficient" : "Grid Dependent"}</span>
                 </motion.div>
               </div>
               <div className="flex flex-wrap items-center space-x-1.5 text-xs text-muted-foreground mt-1 sm:mt-0">
