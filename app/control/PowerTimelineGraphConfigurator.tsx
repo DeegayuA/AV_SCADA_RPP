@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { X, PlusCircle, Search, Zap, Activity, Send, Settings2, ArrowLeft, ArrowRight, Save } from 'lucide-react'; // Icons
+import { X, PlusCircle, Search, Zap, Activity, Send, Settings2, ArrowLeft, ArrowRight, Save, ArrowUp, ArrowDown } from 'lucide-react'; // Icons
 import { Badge } from '@/components/ui/badge';
 import IconPicker from './IconPicker';
 
@@ -237,6 +237,25 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
     setter(prevIds => prevIds.filter(dpId => dpId !== id));
   };
 
+  const handleReorder = (seriesId: string, direction: 'up' | 'down') => {
+    const index = config.series.findIndex(s => s.id === seriesId);
+    if (index === -1) return;
+
+    const newSeries = [...config.series];
+    const [item] = newSeries.splice(index, 1);
+
+    if (direction === 'up' && index > 0) {
+      newSeries.splice(index - 1, 0, item);
+    } else if (direction === 'down' && index < newSeries.length) {
+      newSeries.splice(index + 1, 0, item);
+    } else {
+        // if move is not possible, put it back
+        newSeries.splice(index, 0, item);
+    }
+
+    setConfig({ ...config, series: newSeries });
+  };
+
   const [editingSeries, setEditingSeries] = useState<TimelineSeries | null>(null);
 
   if (!isOpen) {
@@ -269,7 +288,15 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 <p className="font-semibold">{series.name}</p>
                 <p className="text-xs text-muted-foreground">{series.dpIds.length} data point(s)</p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                 <div className="flex flex-col gap-1">
+                    <Button variant="ghost" size="icon" className="h-5 w-5" disabled={index === 0} onClick={() => handleReorder(series.id, 'up')}>
+                        <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-5 w-5" disabled={index === config.series.length - 1} onClick={() => handleReorder(series.id, 'down')}>
+                        <ArrowDown className="h-4 w-4" />
+                    </Button>
+                 </div>
                 <Button variant="outline" size="sm" onClick={() => setEditingSeries(series)}>
                   Edit
                 </Button>
