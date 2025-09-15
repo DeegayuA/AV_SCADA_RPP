@@ -190,11 +190,10 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
                 ))
               ) : (
               searchTerm ?
-                  <p className="text-sm text-muted-foreground text-center py-4 px-2">No matches for "{searchTerm}".</p> :
-                  <p className="text-sm text-muted-foreground text-center py-4 px-2">All possible items selected or none available.</p>
-              )}
-            </AnimatePresence>
-          </div>
+                <p className="text-sm text-muted-foreground text-center py-4 px-2">No matches for "{searchTerm}".</p> :
+                <p className="text-sm text-muted-foreground text-center py-4 px-2">All possible items selected or none available.</p>
+            )}
+          </AnimatePresence>
         </ScrollArea>
       </div>
     </div>
