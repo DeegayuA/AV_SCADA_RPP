@@ -293,7 +293,8 @@ const ChartLegendContent = React.forwardRef<
             <div
               key={item.value}
               className={cn(
-                'flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground'
+                'flex items-center gap-1.5 [&>svg]:h-3 [&>svg]:w-3 [&>svg]:text-muted-foreground',
+                item.inactive ? 'opacity-50' : 'cursor-pointer'
               )}
             >
               {itemConfig?.icon && !hideIcon ? (
@@ -306,7 +307,9 @@ const ChartLegendContent = React.forwardRef<
                   }}
                 />
               )}
-              {itemConfig?.label}
+              <span className={cn(item.inactive && 'line-through')}>
+                {itemConfig?.label}
+              </span>
             </div>
           );
         })}

@@ -4,7 +4,16 @@ import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as cle
 import { PLANT_NAME } from '@/config/constants';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
-import { WEATHER_CARD_CONFIG_KEY, WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
+import { WEATHER_CARD_CONFIG_KEY, WEBSOCKET_CUSTOM_URL_KEY, GRAPH_SERIES_CONFIG_KEY } from '@/config/constants';
+
+// Define legacy graph keys here to avoid circular dependency
+const PAGE_SLUG_FOR_GRAPH = 'control_dashboard';
+const LEGACY_GRAPH_CONFIG_KEY_PREFIX = `powerGraphConfig_${PLANT_NAME.replace(/\s+/g, '_')}_${PAGE_SLUG_FOR_GRAPH}`;
+const LEGACY_GRAPH_GEN_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_generationDpIds`;
+const LEGACY_GRAPH_USAGE_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_usageDpIds`;
+const LEGACY_GRAPH_EXPORT_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_exportDpIds`;
+const LEGACY_GRAPH_EXPORT_MODE_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_exportMode`;
+const LEGACY_GRAPH_WIND_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_windDpIds`;
 
 const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
   'app-storage',
@@ -13,6 +22,13 @@ const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
   'dashboardSoundEnabled',
   WEATHER_CARD_CONFIG_KEY,
   WEBSOCKET_CUSTOM_URL_KEY,
+  GRAPH_SERIES_CONFIG_KEY,
+  // Add legacy keys to ensure they are included in backups for backward compatibility
+  LEGACY_GRAPH_GEN_KEY,
+  LEGACY_GRAPH_USAGE_KEY,
+  LEGACY_GRAPH_EXPORT_KEY,
+  LEGACY_GRAPH_EXPORT_MODE_KEY,
+  LEGACY_GRAPH_WIND_KEY,
   // Consider 'theme' separately, usually user preference
 ];
 

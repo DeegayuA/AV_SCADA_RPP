@@ -9,24 +9,34 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Input } from '@/components/ui/input';
 import { X, PlusCircle, Search, Zap, Activity, Send, Settings2, ArrowLeft, ArrowRight, Save } from 'lucide-react'; // Icons
 import { Badge } from '@/components/ui/badge';
+import IconPicker from './IconPicker';
 
 // Interface for Props remains the same
+import { icons } from 'lucide-react';
+
+export interface TimelineSeries {
+  id: string;
+  name:string;
+  dpIds: string[];
+  color: string;
+  displayType: 'line' | 'area';
+  role: 'generation' | 'usage' | 'gridFeed' | 'other';
+  icon: keyof typeof icons;
+  visible: boolean;
+}
+
+export interface PowerTimelineGraphConfig {
+  series: TimelineSeries[];
+  exportMode: 'auto' | 'manual';
+  // Future global settings like auto-scaling can go here
+}
+
 interface PowerTimelineGraphConfiguratorProps {
   isOpen: boolean;
   onClose: () => void;
   allPossibleDataPoints: DataPoint[];
-  currentGenerationDpIds: string[];
-  currentUsageDpIds: string[];
-  currentExportDpIds: string[];
-  currentWindDpIds: string[];
-  initialExportMode?: 'auto' | 'manual';
-  onSaveConfiguration: (config: {
-    generationDpIds: string[];
-    usageDpIds: string[];
-    exportDpIds: string[];
-    windDpIds: string[];
-    exportMode: 'auto' | 'manual';
-  }) => void;
+  currentConfig: PowerTimelineGraphConfig;
+  onSaveConfiguration: (newConfig: PowerTimelineGraphConfig) => void;
 }
 
 // CategoryDataPointManager remains the same as your previous good version
@@ -187,34 +197,14 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
   );
 };
 
-// Define steps
-const STEPS = [
-  { id: 'generation', title: 'Generation', description: 'Select data points that represent power generation.' },
-  { id: 'usage', title: 'Usage', description: 'Choose data points for tracking power consumption.' },
-  { id: 'wind', title: 'Wind', description: 'Select data points for wind generation.' },
-  { id: 'export', title: 'Export', description: 'Configure how exported power is calculated or tracked.' },
-] as const;
-
-
 const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorProps> = ({
   isOpen,
   onClose,
   allPossibleDataPoints,
-  currentGenerationDpIds,
-  currentUsageDpIds,
-  currentExportDpIds,
-  currentWindDpIds,
-  initialExportMode = 'auto',
+  currentConfig,
   onSaveConfiguration,
 }) => {
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [animationDirection, setAnimationDirection] = useState<'forward' | 'backward'>('forward');
-
-  const [generationDpIds, setGenerationDpIds] = useState<string[]>([]);
-  const [usageDpIds, setUsageDpIds] = useState<string[]>([]);
-  const [exportDpIds, setExportDpIds] = useState<string[]>([]);
-  const [windDpIds, setWindDpIds] = useState<string[]>([]);
-  const [exportMode, setExportMode] = useState<'auto' | 'manual'>(initialExportMode);
+  const [config, setConfig] = useState<PowerTimelineGraphConfig>(currentConfig);
 
   const dataPointsMap = useMemo(() => {
     const map = new Map<string, DataPoint>();
@@ -224,47 +214,13 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
 
   useEffect(() => {
     if (isOpen) {
-      // Reset to first step and reload current props
-      setCurrentStepIndex(0);
-      setGenerationDpIds([...currentGenerationDpIds]);
-      setUsageDpIds([...currentUsageDpIds]);
-      setExportDpIds([...currentExportDpIds]);
-      setWindDpIds([...currentWindDpIds]);
-
-      let mode = initialExportMode;
-      if (currentExportDpIds.length > 0 && initialExportMode === 'auto') {
-        mode = 'manual';
-      } else if (currentExportDpIds.length === 0 && initialExportMode === 'manual') {
-        mode = 'auto';
-      } else {
-        mode = (currentExportDpIds.length > 0 || initialExportMode === 'manual') ? 'manual' : 'auto';
-      }
-      setExportMode(mode);
+      // Deep copy to prevent modifying the original object directly
+      setConfig(JSON.parse(JSON.stringify(currentConfig)));
     }
-  }, [isOpen, currentGenerationDpIds, currentUsageDpIds, currentExportDpIds, currentWindDpIds, initialExportMode]);
-
-  const handleNext = () => {
-    if (currentStepIndex < STEPS.length - 1) {
-      setAnimationDirection('forward');
-      setCurrentStepIndex(prev => prev + 1);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStepIndex > 0) {
-      setAnimationDirection('backward');
-      setCurrentStepIndex(prev => prev - 1);
-    }
-  };
+  }, [isOpen, currentConfig]);
 
   const handleSave = () => {
-    onSaveConfiguration({
-      generationDpIds,
-      usageDpIds,
-      exportDpIds: exportMode === 'manual' ? exportDpIds : [],
-      windDpIds,
-      exportMode,
-    });
+    onSaveConfiguration(config);
     onClose();
   };
   
@@ -278,136 +234,166 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
     setter(prevIds => prevIds.filter(dpId => dpId !== id));
   };
 
+  const [editingSeries, setEditingSeries] = useState<TimelineSeries | null>(null);
+
   if (!isOpen) {
     return null;
   }
 
-  const currentStepDetails = STEPS[currentStepIndex];
-
-  const stepAnimationVariants = {
-    enter: (direction: 'forward' | 'backward') => ({
-      x: direction === 'forward' ? '100%' : '-100%',
-      opacity: 0,
-      position: 'absolute' as 'absolute', // Keep current item in place while new one enters
-    }),
-    center: {
-      x: 0,
-      opacity: 1,
-      position: 'relative' as 'relative',
-    },
-    exit: (direction: 'forward' | 'backward') => ({
-      x: direction === 'forward' ? '-100%' : '100%',
-      opacity: 0,
-      position: 'absolute' as 'absolute', // Allow item to slide out without affecting layout
-    }),
-  };
-  
-  const exportSectionMotionVariants = {
-    hidden: { opacity: 0, height: 0, marginTop: 0, overflow: 'hidden' },
-    visible: { opacity: 1, height: 'auto', marginTop: '1rem', overflow: 'visible' },
-    exit: { opacity: 0, height: 0, marginTop: 0, overflow: 'hidden', transition: { duration: 0.2 } },
-  };
-
-
-  const renderStepContent = () => {
-    switch (STEPS[currentStepIndex].id) {
-      case 'generation':
-        return (
-          <CategoryDataPointManager
-            instanceId="gen"
-            categoryTitle="Generation Data Points"
-            allPossibleDataPoints={allPossibleDataPoints}
-            selectedDataPointIds={generationDpIds}
-            onDataPointAdd={(id) => addDataPoint(id, generationDpIds, setGenerationDpIds)}
-            onDataPointRemove={(id) => removeDataPoint(id, setGenerationDpIds)}
-            dataPointsMap={dataPointsMap}
-            icon={<Zap className="h-5 w-5" />}
-          />
-        );
-      case 'usage':
-        return (
-          <CategoryDataPointManager
-            instanceId="usage"
-            categoryTitle="Usage Data Points"
-            allPossibleDataPoints={allPossibleDataPoints}
-            selectedDataPointIds={usageDpIds}
-            onDataPointAdd={(id) => addDataPoint(id, usageDpIds, setUsageDpIds)}
-            onDataPointRemove={(id) => removeDataPoint(id, setUsageDpIds)}
-            dataPointsMap={dataPointsMap}
-            icon={<Activity className="h-5 w-5" />}
-          />
-        );
-        case 'wind':
-        return (
-          <CategoryDataPointManager
-            instanceId="wind"
-            categoryTitle="Wind Generation Data Points"
-            allPossibleDataPoints={allPossibleDataPoints}
-            selectedDataPointIds={windDpIds}
-            onDataPointAdd={(id) => addDataPoint(id, windDpIds, setWindDpIds)}
-            onDataPointRemove={(id) => removeDataPoint(id, setWindDpIds)}
-            dataPointsMap={dataPointsMap}
-            icon={<Zap className="h-5 w-5" />}
-          />
-        );
-      case 'export':
-        return (
-          <div className="space-y-4 p-4 border rounded-lg shadow-sm bg-card h-full flex flex-col">
-            <div className="flex items-center space-x-3">
-                <Send className="h-5 w-5 text-primary" />
-                <h3 className="text-lg font-semibold text-foreground">Export Data Mode</h3>
-            </div>
-            <RadioGroup
-              value={exportMode}
-              onValueChange={(value: 'auto' | 'manual') => setExportMode(value)}
-              className="space-y-2"
+  const renderSeriesList = () => (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-medium">Configured Series</h3>
+        <Button onClick={() => setEditingSeries({ id: `new_${Date.now()}`, name: 'New Series', dpIds: [], color: '#4d4dff', displayType: 'line', role: 'other', icon: 'Zap', visible: true })}>
+          <PlusCircle className="h-4 w-4 mr-2" />
+          Add New Series
+        </Button>
+      </div>
+      <ScrollArea className="h-[calc(100vh-300px)]">
+        <div className="space-y-3 pr-4">
+          {config.series.map((series, index) => (
+            <motion.div
+              key={series.id}
+              layout
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="p-3 border rounded-lg flex items-center gap-4 hover:bg-muted/50"
             >
-              <Label htmlFor="auto-export" className="flex items-center space-x-3 p-3 rounded-md border hover:border-primary has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-primary/30 transition-all cursor-pointer select-none bg-background hover:bg-muted/50">
-                <RadioGroupItem value="auto" id="auto-export" />
-                <div className="flex-grow">
-                  <span className="font-medium">Auto-calculate Net Export</span>
-                  <p className="text-xs text-muted-foreground">(Generation - Usage)</p>
-                </div>
-              </Label>
-              <Label htmlFor="manual-export" className="flex items-center space-x-3 p-3 rounded-md border hover:border-primary has-[[data-state=checked]]:border-primary has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-primary/30 transition-all cursor-pointer select-none bg-background hover:bg-muted/50">
-                <RadioGroupItem value="manual" id="manual-export" />
-                <div className="flex-grow">
-                  <span className="font-medium">Manual - Select Data Points</span>
-                    <p className="text-xs text-muted-foreground">Choose specific data points for export.</p>
-                </div>
-              </Label>
-            </RadioGroup>
+              <div className="w-6 h-6 rounded-sm shrink-0" style={{ backgroundColor: series.color }} />
+              <div className="flex-grow">
+                <p className="font-semibold">{series.name}</p>
+                <p className="text-xs text-muted-foreground">{series.dpIds.length} data point(s)</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => setEditingSeries(series)}>
+                  Edit
+                </Button>
+                <Button variant="destructive" size="sm" onClick={() => {
+                  const newSeries = config.series.filter(s => s.id !== series.id);
+                  setConfig({ ...config, series: newSeries });
+                }}>
+                  Remove
+                </Button>
+              </div>
+            </motion.div>
+          ))}
+          {config.series.length === 0 && (
+            <div className="text-center py-12 text-muted-foreground">
+              <p>No data series configured.</p>
+              <p className="text-sm">Click "Add New Series" to get started.</p>
+            </div>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
 
-            <div className="flex-grow min-h-0"> {/* This div will contain the animated part */}
-              <AnimatePresence initial={false} mode="popLayout">
-                {exportMode === 'manual' && (
-                  <motion.div
-                    key="manual-export-selector"
-                    variants={exportSectionMotionVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    transition={{ type: 'spring', stiffness: 300, damping: 30, duration: 0.3 }}
-                    className="h-full" // Ensure this takes height for CDM
-                  >
-                    <CategoryDataPointManager
-                      instanceId="export-manual" // Changed instanceId to avoid conflicts
-                      categoryTitle="Data Points for Manual Export"
-                      allPossibleDataPoints={allPossibleDataPoints}
-                      selectedDataPointIds={exportDpIds}
-                      onDataPointAdd={(id) => addDataPoint(id, exportDpIds, setExportDpIds)}
-                      onDataPointRemove={(id) => removeDataPoint(id, setExportDpIds)}
-                      dataPointsMap={dataPointsMap}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+  const renderEditView = () => {
+    if (!editingSeries) return null;
+
+    const handleSeriesUpdate = (updatedSeries: TimelineSeries) => {
+      const index = config.series.findIndex(s => s.id === updatedSeries.id);
+      let newSeriesList: TimelineSeries[];
+      if (index > -1) {
+        newSeriesList = [...config.series];
+        newSeriesList[index] = updatedSeries;
+      } else {
+        newSeriesList = [...config.series, updatedSeries];
+      }
+      setConfig({ ...config, series: newSeriesList });
+      setEditingSeries(null);
+    };
+
+    return (
+      <div className="space-y-4 h-full flex flex-col">
+        <Button variant="ghost" onClick={() => setEditingSeries(null)} className="self-start">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Series List
+        </Button>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2">
+            <Label htmlFor="series-name">Series Name</Label>
+            <Input
+              id="series-name"
+              value={editingSeries.name}
+              onChange={(e) => setEditingSeries({ ...editingSeries, name: e.target.value })}
+              placeholder="e.g., Solar Production"
+            />
+          </div>
+          <div>
+            <Label htmlFor="series-color">Color</Label>
+            <Input
+              id="series-color"
+              type="color"
+              value={editingSeries.color}
+              onChange={(e) => setEditingSeries({ ...editingSeries, color: e.target.value })}
+              className="h-10"
+            />
+          </div>
+          <div className="md:col-span-3 grid grid-cols-2 gap-4">
+            <div>
+                <Label htmlFor="series-role">Series Role</Label>
+                <Select
+                  value={editingSeries.role}
+                  onValueChange={(value: 'generation' | 'usage' | 'gridFeed' | 'other') => setEditingSeries({ ...editingSeries, role: value })}
+                >
+                  <SelectTrigger id="series-role">
+                    <SelectValue placeholder="Select a role..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="generation">Generation</SelectItem>
+                    <SelectItem value="usage">Usage</SelectItem>
+                    <SelectItem value="gridFeed">Grid Feed</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">Used for Net Power calculation.</p>
+            </div>
+            <div>
+                <Label htmlFor="display-type">Display Type</Label>
+                <Select
+                  value={editingSeries.displayType}
+                  onValueChange={(value: 'line' | 'area') => setEditingSeries({ ...editingSeries, displayType: value })}
+                >
+                  <SelectTrigger id="display-type">
+                    <SelectValue placeholder="Select a type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="line">Line</SelectItem>
+                    <SelectItem value="area">Area</SelectItem>
+                  </SelectContent>
+                </Select>
+                 <p className="text-xs text-muted-foreground mt-1">Visual style on the graph.</p>
             </div>
           </div>
-        );
-      default:
-        return null;
-    }
+           <div className="md:col-span-3">
+                <IconPicker
+                    selectedIcon={editingSeries.icon}
+                    onIconSelect={(iconName) => setEditingSeries({ ...editingSeries, icon: iconName as keyof typeof icons})}
+                />
+            </div>
+        </div>
+        <div className="flex-grow min-h-0">
+            <CategoryDataPointManager
+                instanceId={`series-editor-${editingSeries.id}`}
+                categoryTitle="Data Points for this Series"
+                allPossibleDataPoints={allPossibleDataPoints}
+                selectedDataPointIds={editingSeries.dpIds}
+                onDataPointAdd={(id) => setEditingSeries(prev => prev ? { ...prev, dpIds: [...prev.dpIds, id] } : null)}
+                onDataPointRemove={(id) => setEditingSeries(prev => prev ? { ...prev, dpIds: prev.dpIds.filter(dpId => dpId !== id) } : null)}
+                dataPointsMap={dataPointsMap}
+            />
+        </div>
+        <div className="flex justify-end pt-4">
+          <Button onClick={() => handleSeriesUpdate(editingSeries)}>
+            <Save className="h-4 w-4 mr-2" />
+            Save Series
+          </Button>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -419,54 +405,21 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
             Configure Power Timeline Graph
           </DialogTitle>
           <DialogDescription>
-             Step {currentStepIndex + 1} of {STEPS.length}: {currentStepDetails.description}
+            Add, remove, and edit the data series displayed on the timeline graph.
           </DialogDescription>
         </DialogHeader>
         
-        {/* Container for animated steps. Fixed height needed for absolute positioning during animation. */}
-        <div className="flex-grow p-6 overflow-hidden relative min-h-[450px]"> {/* Added min-height */}
-          <AnimatePresence initial={false} custom={animationDirection} mode="wait">
-            <motion.div
-              key={currentStepIndex}
-              custom={animationDirection}
-              variants={stepAnimationVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{
-                x: { type: 'spring', stiffness: 300, damping: 30 },
-                opacity: { duration: 0.2 },
-              }}
-              className="w-full h-full" // Ensure motion.div takes full space of its container
-            >
-              {/* The content of the step itself. It should handle its own internal scrolling if necessary. */}
-              {renderStepContent()}
-            </motion.div>
-          </AnimatePresence>
+        <div className="flex-grow p-6 overflow-y-auto">
+          {editingSeries ? renderEditView() : renderSeriesList()}
         </div>
 
-        <DialogFooter className="p-6 border-t shrink-0 flex justify-between">
-          <div>
-            {currentStepIndex > 0 && (
-              <Button variant="outline" onClick={handleBack}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Back
-              </Button>
-            )}
-          </div>
+        <DialogFooter className="p-6 border-t shrink-0 flex justify-end">
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            {currentStepIndex < STEPS.length - 1 ? (
-              <Button onClick={handleNext}>
-                Next
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Button>
-            ) : (
-              <Button onClick={handleSave}>
-                <Save className="h-4 w-4 mr-2" />
-                Save Configuration
-              </Button>
-            )}
+            <Button onClick={handleSave}>
+              <Save className="h-4 w-4 mr-2" />
+              Save Configuration
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>
