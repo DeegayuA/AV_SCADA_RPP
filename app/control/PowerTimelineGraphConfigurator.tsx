@@ -271,7 +271,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
           Add New Series
         </Button>
       </div>
-      <ScrollArea className="h-[calc(100vh-300px)]">
+      <ScrollArea className="h-[calc(100vh-200px)]">
         <div className="space-y-3 pr-4">
           {config.series.map((series, index) => (
             <motion.div
@@ -337,12 +337,12 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
     };
 
     return (
-      <div className="space-y-4 h-full flex flex-col">
+      <div className="space-y-1 h-full flex flex-col">
         <Button variant="ghost" onClick={() => setEditingSeries(null)} className="self-start">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Series List
         </Button>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
           <div className="md:col-span-2">
             <Label htmlFor="series-name">Series Name</Label>
             <Input
@@ -405,7 +405,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 />
             </div>
         </div>
-        <div className="flex items-center space-x-2 rounded-lg border p-3 mt-4">
+        <div className="flex items-center space-x-2 rounded-lg border p-3 mt-1">
             <Switch
                 id="draw-on-graph"
                 checked={editingSeries.drawOnGraph}
@@ -415,7 +415,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 Draw this series on the graph
             </Label>
         </div>
-        <div className="flex-grow min-h-0 pt-4">
+        <div className="flex-grow min-h-0 pt-1">
             <CategoryDataPointManager
                 instanceId={`series-editor-${editingSeries.id}`}
                 categoryTitle="Data Points for this Series"
@@ -438,7 +438,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); }}}>
-      <DialogContent className="sm:max-w-[700px] md:max-w-[750px] p-0 flex flex-col overflow-hidden h-[90vh] max-h-[800px]">
+      <DialogContent className="sm:max-w-[700px] md:max-w-[750px] p-0 flex flex-col overflow-hidden h-[95vh] max-h-[900px]">
         <DialogHeader className="p-6 pb-4 border-b shrink-0">
           <DialogTitle className="text-xl flex items-center">
             <Settings2 className="h-5 w-5 mr-2 text-primary" />
