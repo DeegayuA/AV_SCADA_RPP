@@ -10,16 +10,6 @@ import { useAppStore } from '@/stores/appStore';
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${appConstants.PLANT_NAME || 'defaultPlant'}`;
 
-// Define legacy graph keys here to avoid circular dependency
-const PAGE_SLUG_FOR_GRAPH = 'control_dashboard';
-const LEGACY_GRAPH_CONFIG_KEY_PREFIX = `powerGraphConfig_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_${PAGE_SLUG_FOR_GRAPH}`;
-const LEGACY_GRAPH_GEN_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_generationDpIds`;
-const LEGACY_GRAPH_USAGE_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_usageDpIds`;
-const LEGACY_GRAPH_EXPORT_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_exportDpIds`;
-const LEGACY_GRAPH_EXPORT_MODE_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_exportMode`;
-const LEGACY_GRAPH_WIND_KEY = `${LEGACY_GRAPH_CONFIG_KEY_PREFIX}_windDpIds`;
-
-
 const APP_LOCAL_STORAGE_KEYS = [
   USER_DASHBOARD_CONFIG_KEY,
   'user-preferences',
@@ -28,12 +18,6 @@ const APP_LOCAL_STORAGE_KEYS = [
   WEATHER_CARD_CONFIG_KEY,
   appConstants.WEBSOCKET_CUSTOM_URL_KEY,
   GRAPH_SERIES_CONFIG_KEY,
-  // Add legacy keys to ensure they are included in backups for backward compatibility
-  LEGACY_GRAPH_GEN_KEY,
-  LEGACY_GRAPH_USAGE_KEY,
-  LEGACY_GRAPH_EXPORT_KEY,
-  LEGACY_GRAPH_EXPORT_MODE_KEY,
-  LEGACY_GRAPH_WIND_KEY,
 ];
 
 function getAllSldLayoutsFromStorage(): Record<string, SLDLayout> {

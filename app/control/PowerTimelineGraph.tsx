@@ -128,8 +128,9 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         handleVisibilityToggle(e.dataKey);
     };
 
-    const visibleSeries = useMemo(() => timelineSeries.filter(s => seriesVisibility[s.id] && s.role !== 'gridFeed'), [timelineSeries, seriesVisibility]);
-    const gridFeedSeries = useMemo(() => timelineSeries.filter(s => seriesVisibility[s.id] && s.role === 'gridFeed'), [timelineSeries, seriesVisibility]);
+    const visibleSeries = useMemo(() => timelineSeries.filter(s => seriesVisibility[s.id]), [timelineSeries, seriesVisibility]);
+    const drawableSeries = useMemo(() => visibleSeries.filter(s => s.drawOnGraph && s.role !== 'gridFeed'), [visibleSeries]);
+    const gridFeedSeries = useMemo(() => visibleSeries.filter(s => s.drawOnGraph && s.role === 'gridFeed'), [visibleSeries]);
 
     const gridFeedSegments = useMemo(() => {
         const segments: { seriesId: string, type: 'export' | 'import', data: ChartDataPoint[] }[] = [];
@@ -786,7 +787,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                             { chartData.length > 3 &&
                               <ChartLegend
                                 onClick={handleLegendClick}
-                                payload={timelineSeries.map(series => ({
+                                payload={drawableSeries.map(series => ({
                                     id: series.id,
                                     dataKey: series.id,
                                     value: series.name,
@@ -799,7 +800,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                             }
                             <ReferenceLine y={0} yAxisId="left" stroke="hsl(var(--foreground)/0.3)" strokeDasharray="3 3" strokeWidth={1}/>
 
-                            {visibleSeries.map(series => {
+                            {drawableSeries.map(series => {
                                 if (series.displayType === 'area') {
                                     return (
                                         <Area

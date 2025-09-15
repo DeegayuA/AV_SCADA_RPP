@@ -631,51 +631,57 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => {
     if (typeof window !== 'undefined' && authCheckComplete) {
       const storedSeriesConfig = localStorage.getItem(GRAPH_SERIES_CONFIG_KEY);
+      let config = null;
       if (storedSeriesConfig) {
         try {
           const parsedConfig = JSON.parse(storedSeriesConfig);
           if (parsedConfig && Array.isArray(parsedConfig.series)) {
-            setPowerGraphConfig(parsedConfig);
+            config = parsedConfig;
           }
         } catch (e) {
-          console.error("Failed to parse timeline series config, resetting.", e);
+          console.error("Failed to parse timeline series config.", e);
         }
-      } else {
-        // Migration logic from old keys
-        const genDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
-        const usageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
-        const windDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
+      }
+
+      // Check for legacy keys IF no valid new config is found OR if the new config is empty.
+      const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
+      const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
+      const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
+
+      if ((!config || config.series.length === 0) && (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0)) {
         const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
-
         const migratedSeries: TimelineSeries[] = [];
-        if (genDpIds.length > 0) {
-          migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: genDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true });
+        if (legacyGenDpIds.length > 0) {
+          migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true });
         }
-        if (usageDpIds.length > 0) {
-          migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: usageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true });
+        if (legacyUsageDpIds.length > 0) {
+          migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true });
         }
-        if (windDpIds.length > 0) {
-          migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: windDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true });
+        if (legacyWindDpIds.length > 0) {
+          migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true });
         }
 
-        if (migratedSeries.length > 0) {
-          setPowerGraphConfig({ series: migratedSeries, exportMode });
-        } else {
-          // Set a default configuration if no old data is found
-          setPowerGraphConfig({
-            series: [
-              { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true },
-              { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true }
-            ],
-            exportMode: 'auto'
-          });
-        }
-        // Clean up old keys after migration
+        config = { series: migratedSeries, exportMode };
+
+        // Clean up old keys after successful migration
         localStorage.removeItem(GRAPH_GEN_KEY);
         localStorage.removeItem(GRAPH_USAGE_KEY);
         localStorage.removeItem(GRAPH_EXPORT_KEY);
         localStorage.removeItem(GRAPH_WIND_KEY);
         localStorage.removeItem(GRAPH_EXPORT_MODE_KEY);
+      }
+
+      if (config) {
+        setPowerGraphConfig(config);
+      } else {
+        // Set a default configuration if no config is found at all
+        setPowerGraphConfig({
+          series: [
+            { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true },
+            { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true }
+          ],
+          exportMode: 'auto'
+        });
       }
 
       setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');

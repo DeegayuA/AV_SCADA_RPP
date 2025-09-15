@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { X, PlusCircle, Search, Zap, Activity, Send, Settings2, ArrowLeft, ArrowRight, Save } from 'lucide-react'; // Icons
 import { Badge } from '@/components/ui/badge';
 import IconPicker from './IconPicker';
@@ -24,6 +25,7 @@ export interface TimelineSeries {
   role: 'generation' | 'usage' | 'gridFeed' | 'other';
   icon: keyof typeof icons;
   visible: boolean;
+  drawOnGraph: boolean;
 }
 
 export interface PowerTimelineGraphConfig {
@@ -133,7 +135,7 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
         </div>
       )}
 
-      <div className="flex-grow flex flex-col min-h-0"> {/* Allow this div to shrink and grow */}
+      <div className="flex-grow flex flex-col min-h-0">
         <Label className="text-xs font-medium text-muted-foreground mb-1 block">Available to add:</Label>
         <div className="relative mb-2">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -157,41 +159,40 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
             </Button>
           )}
         </div>
-        <ScrollArea className="flex-grow rounded-md border">
-          <div className="p-2">
-            <AnimatePresence mode="sync">
-              {availableDataPointsToSelect.length > 0 ? (
-                availableDataPointsToSelect.map((dp) => (
+        <ScrollArea className="h-[180px] rounded-md border flex-grow">
+          <AnimatePresence mode="sync">
+            {availableDataPointsToSelect.length > 0 ? (
+              availableDataPointsToSelect.map((dp) => (
                 <motion.div
                     key={`${instanceId}-available-${dp.id}`}
                     layout
                     variants={listItemAnimationVariants}
-                    initial="initial"
-                    animate="animate"
-                    exit="exit"
-                    transition={{ type: 'spring', stiffness: 500, damping: 25, duration: 0.2 }}
-                    className="flex items-center justify-between p-2.5 hover:bg-muted/50 rounded-md"
-                >
-                  <Label htmlFor={`add-${instanceId}-${dp.id}`} className="text-sm font-normal cursor-pointer flex-grow select-none">
-                    {dp.name} <span className="text-xs text-muted-foreground">({dp.id})</span>
-                  </Label>
-                  <Button
-                    id={`add-${instanceId}-${dp.id}`}
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDataPointAdd(dp.id)}
-                    className="text-primary hover:text-primary shrink-0"
-                    aria-label={`Add ${dp.name}`}
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      transition={{ type: 'spring', stiffness: 500, damping: 25, duration: 0.2 }}
+                      className="flex items-center justify-between p-2.5 hover:bg-muted/50 rounded-md"
                   >
-                    <PlusCircle className="h-4 w-4 mr-1.5" /> Add
-                  </Button>
-                </motion.div>
-              ))
-            ) : (
-             searchTerm ?
-                <p className="text-sm text-muted-foreground text-center py-4 px-2">No matches for "{searchTerm}".</p> :
-                <p className="text-sm text-muted-foreground text-center py-4 px-2">All possible items selected or none available.</p>
-            )}
+                    <Label htmlFor={`add-${instanceId}-${dp.id}`} className="text-sm font-normal cursor-pointer flex-grow select-none">
+                      {dp.name} <span className="text-xs text-muted-foreground">({dp.id})</span>
+                    </Label>
+                    <Button
+                      id={`add-${instanceId}-${dp.id}`}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDataPointAdd(dp.id)}
+                      className="text-primary hover:text-primary shrink-0"
+                      aria-label={`Add ${dp.name}`}
+                  >
+                      <PlusCircle className="h-4 w-4 mr-1.5" /> Add
+                    </Button>
+                  </motion.div>
+                ))
+              ) : (
+              searchTerm ?
+                  <p className="text-sm text-muted-foreground text-center py-4 px-2">No matches for "{searchTerm}".</p> :
+                  <p className="text-sm text-muted-foreground text-center py-4 px-2">All possible items selected or none available.</p>
+              )}
             </AnimatePresence>
           </div>
         </ScrollArea>
@@ -247,7 +248,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Configured Series</h3>
-        <Button onClick={() => setEditingSeries({ id: `new_${Date.now()}`, name: 'New Series', dpIds: [], color: '#4d4dff', displayType: 'line', role: 'other', icon: 'Zap', visible: true })}>
+        <Button onClick={() => setEditingSeries({ id: `new_${Date.now()}`, name: 'New Series', dpIds: [], color: '#4d4dff', displayType: 'line', role: 'other', icon: 'Zap', visible: true, drawOnGraph: true })}>
           <PlusCircle className="h-4 w-4 mr-2" />
           Add New Series
         </Button>
@@ -378,7 +379,17 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 />
             </div>
         </div>
-        <div className="flex-grow min-h-0">
+        <div className="flex items-center space-x-2 rounded-lg border p-3 mt-4">
+            <Switch
+                id="draw-on-graph"
+                checked={editingSeries.drawOnGraph}
+                onCheckedChange={(checked) => setEditingSeries({ ...editingSeries, drawOnGraph: checked })}
+            />
+            <Label htmlFor="draw-on-graph" className="cursor-pointer">
+                Draw this series on the graph
+            </Label>
+        </div>
+        <div className="flex-grow min-h-0 pt-4">
             <CategoryDataPointManager
                 instanceId={`series-editor-${editingSeries.id}`}
                 categoryTitle="Data Points for this Series"
