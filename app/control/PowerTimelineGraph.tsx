@@ -10,9 +10,17 @@ import { useTheme } from 'next-themes';
 import {
     Loader2, Zap, ShoppingCart, Send, Leaf, AlertTriangleIcon, ArrowRightToLine,
     ArrowLeftFromLine, PlugZap, RadioTower, ChevronLeft, ChevronRight, Scale,
-    TrendingDown, TrendingUp as TrendingUpIcon
+    TrendingDown, TrendingUp as TrendingUpIcon,
+    Wind, Sun, CloudSun, CloudMoon, Moon, BatteryCharging, BatteryFull, Battery,
+    Home, Factory, Building, Waves, Thermometer, Gauge, Activity, Server, Cloud, Cog, type LucideIcon
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
+
+const iconMap: Record<string, LucideIcon> = {
+  Zap, Wind, Sun, CloudSun, CloudMoon, Moon, BatteryCharging, BatteryFull, Battery,
+  PlugZap, Plug, ShoppingCart, Home, Factory, Building, Waves, Thermometer,
+  TrendingUp, TrendingDown, Gauge, Activity, Send, Server, Cloud, Cog
+};
 import {
   ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent,
 } from "@/components/ui/chart";
@@ -175,11 +183,11 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
             netPower: { label: "Net Power", icon: Scale, color: "hsl(var(--chart-5))" }
         };
         timelineSeries.forEach(series => {
-            const LucideIcon = icons[series.icon];
+            const LucideIcon = iconMap[series.icon] || Zap;
             dynamicConfig[series.id] = {
                 label: series.name,
                 color: series.color,
-                icon: LucideIcon || Zap,
+                icon: LucideIcon,
             };
         });
         return dynamicConfig;
