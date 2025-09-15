@@ -12,14 +12,15 @@ import {
     ArrowLeftFromLine, PlugZap, RadioTower, ChevronLeft, ChevronRight, Scale,
     TrendingDown, TrendingUp as TrendingUpIcon,
     Wind, Sun, CloudSun, CloudMoon, Moon, BatteryCharging, BatteryFull, Battery,
-    Home, Factory, Building, Waves, Thermometer, Gauge, Activity, Server, Cloud, Cog, type LucideIcon
+    Home, Factory, Building, Waves, Thermometer, Gauge, Activity, Server, Cloud, Cog,
+    Plug, type LucideIcon
 } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 
 const iconMap: Record<string, LucideIcon> = {
   Zap, Wind, Sun, CloudSun, CloudMoon, Moon, BatteryCharging, BatteryFull, Battery,
   PlugZap, Plug, ShoppingCart, Home, Factory, Building, Waves, Thermometer,
-  TrendingUp, TrendingDown, Gauge, Activity, Send, Server, Cloud, Cog
+  TrendingUp, TrendingDown, Gauge, Activity, Send, Server, Cloud, Cog,
 };
 import {
   ChartConfig, ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent,
