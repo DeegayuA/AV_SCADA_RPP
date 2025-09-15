@@ -64,7 +64,7 @@ import SLDWidget from "@/app/circuit/sld/SLDWidget";
 import { SLDLayout } from '@/types/sld';
 import { useDynamicDefaultDataPointIds } from '@/app/utils/defaultDataPoints';
 import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph';
-import PowerTimelineGraphConfigurator from './PowerTimelineGraphConfigurator';
+import PowerTimelineGraphConfigurator, { PowerTimelineGraphConfig, TimelineSeries } from './PowerTimelineGraphConfigurator';
 import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appStore';
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
@@ -309,6 +309,9 @@ const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+
 const DEFAULT_SLD_LAYOUT_ID_KEY = `userSldLayoutId_${PLANT_NAME.replace(/\s+/g, '_')}`;
 const CUSTOM_DATA_POINTS_KEY = `${LOCAL_STORAGE_KEY_PREFIX}_customDataPoints_v1`;
 
+import { GRAPH_SERIES_CONFIG_KEY } from '@/config/constants';
+
+// --- LEGACY KEYS FOR MIGRATION ---
 const PAGE_SLUG = 'control_dashboard';
 const GRAPH_CONFIG_KEY_PREFIX = `powerGraphConfig_${PLANT_NAME.replace(/\s+/g, '_')}_${PAGE_SLUG}`;
 const GRAPH_GEN_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_generationDpIds`;
@@ -318,6 +321,7 @@ const GRAPH_EXPORT_MODE_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_exportMode`;
 const GRAPH_DEMO_MODE_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_demoMode`;
 const GRAPH_TIMESCALESETTING_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_timeScaleSetting`;
 const GRAPH_WIND_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_windDpIds`;
+// --- END LEGACY KEYS ---
 
 const WEATHER_CARD_CONFIG_LS_KEY = `weatherCardConfig_${PLANT_NAME.replace(/\s+/g, '_') || 'defaultPlant'}`;
 
@@ -364,12 +368,8 @@ const UnifiedDashboardPage: React.FC = () => {
   const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
   const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>('1m');
   const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
-  const [powerGraphGenerationDpIds, setPowerGraphGenerationDpIds] = useState<string[]>([]);
-  const [powerGraphUsageDpIds, setPowerGraphUsageDpIds] = useState<string[]>([]);
-  const [powerGraphExportDpIds, setPowerGraphExportDpIds] = useState<string[]>([]);
+  const [powerGraphConfig, setPowerGraphConfig] = useState<PowerTimelineGraphConfig>({ series: [], exportMode: 'auto' });
   const [allPossibleDataPoints, setAllPossibleDataPoints] = useState<ExtendedDataPoint[]>(allPossibleDataPointsConfig);
-  const [powerGraphExportMode, setPowerGraphExportMode] = useState<'auto' | 'manual'>('auto');
-  const [powerGraphWindDpIds, setPowerGraphWindDpIds] = useState<string[]>([]);
   const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false);
   const [weatherCardConfig, setWeatherCardConfig] = useState<WeatherCardConfig | null>(null);
 
@@ -520,7 +520,16 @@ const UnifiedDashboardPage: React.FC = () => {
     const updatedCustomPoints = [...customPoints, newPoint];
     localStorage.setItem(CUSTOM_DATA_POINTS_KEY, JSON.stringify(updatedCustomPoints));
     
-    setAllPossibleDataPoints(prevPoints => [...prevPoints, newPoint].sort((a,b) => a.name.localeCompare(b.name)));
+    setAllPossibleDataPoints(prevPoints => {
+        const combined = [...prevPoints, newPoint];
+        const uniqueMap = new Map<string, DataPoint>();
+        combined.forEach(p => {
+            if (p && p.id) {
+                uniqueMap.set(p.id, p);
+            }
+        });
+        return Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+    });
     setDisplayedDataPointIds(prevIds => [...prevIds, newPoint.id]);
     
     toast.success("Data Point Created", { description: `'${newPoint.name}' has been created and added to the dashboard.` });
@@ -587,12 +596,15 @@ const UnifiedDashboardPage: React.FC = () => {
                 console.error("Failed to parse custom data points:", e);
             }
         }
-        if (customPoints.length > 0) {
-            const combined = [...allPossibleDataPointsConfig, ...customPoints];
-            const uniqueMap = new Map<string, DataPoint>();
-            combined.forEach(p => { if (!uniqueMap.has(p.id)) uniqueMap.set(p.id, p); });
-            setAllPossibleDataPoints(Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name)));
-        }
+
+        const combined = [...allPossibleDataPointsConfig, ...customPoints];
+        const uniqueMap = new Map<string, DataPoint>();
+        combined.forEach(p => {
+            if (p && p.id) { // Ensure point and its id are valid
+                uniqueMap.set(p.id, p);
+            }
+        });
+        setAllPossibleDataPoints(Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name)));
     }
   }, [authCheckComplete]);
   
@@ -616,8 +628,75 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
   useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); connectWebSocket(); } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 1000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
   useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { setPowerGraphGenerationDpIds(JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '["inverter-output-total-power"]')); setPowerGraphUsageDpIds(JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '["grid-total-active-power-side-to-side"]')); setPowerGraphExportDpIds(JSON.parse(localStorage.getItem(GRAPH_EXPORT_KEY) || '[]')); setPowerGraphWindDpIds(JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]')); setPowerGraphExportMode((localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as ('auto' | 'manual')) || 'auto'); setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true'); setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m'); } }, [authCheckComplete]);
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { localStorage.setItem(GRAPH_GEN_KEY, JSON.stringify(powerGraphGenerationDpIds)); localStorage.setItem(GRAPH_USAGE_KEY, JSON.stringify(powerGraphUsageDpIds)); localStorage.setItem(GRAPH_EXPORT_KEY, JSON.stringify(powerGraphExportDpIds)); localStorage.setItem(GRAPH_WIND_KEY, JSON.stringify(powerGraphWindDpIds)); localStorage.setItem(GRAPH_EXPORT_MODE_KEY, powerGraphExportMode); localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph)); localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale); } }, [powerGraphGenerationDpIds, powerGraphUsageDpIds, powerGraphExportDpIds, powerGraphWindDpIds, powerGraphExportMode, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
+  useEffect(() => {
+    if (typeof window !== 'undefined' && authCheckComplete) {
+      const storedSeriesConfig = localStorage.getItem(GRAPH_SERIES_CONFIG_KEY);
+      let config = null;
+      if (storedSeriesConfig) {
+        try {
+          const parsedConfig = JSON.parse(storedSeriesConfig);
+          if (parsedConfig && Array.isArray(parsedConfig.series)) {
+            config = parsedConfig;
+          }
+        } catch (e) {
+          console.error("Failed to parse timeline series config.", e);
+        }
+      }
+
+      // Check for legacy keys IF no valid new config is found OR if the new config is empty.
+      const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
+      const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
+      const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
+
+      if ((!config || config.series.length === 0) && (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0)) {
+        const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
+        const migratedSeries: TimelineSeries[] = [];
+        if (legacyGenDpIds.length > 0) {
+          migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true });
+        }
+        if (legacyUsageDpIds.length > 0) {
+          migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true });
+        }
+        if (legacyWindDpIds.length > 0) {
+          migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true });
+        }
+
+        config = { series: migratedSeries, exportMode };
+
+        // Clean up old keys after successful migration
+        localStorage.removeItem(GRAPH_GEN_KEY);
+        localStorage.removeItem(GRAPH_USAGE_KEY);
+        localStorage.removeItem(GRAPH_EXPORT_KEY);
+        localStorage.removeItem(GRAPH_WIND_KEY);
+        localStorage.removeItem(GRAPH_EXPORT_MODE_KEY);
+      }
+
+      if (config) {
+        setPowerGraphConfig(config);
+      } else {
+        // Set a default configuration if no config is found at all
+        setPowerGraphConfig({
+          series: [
+            { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true },
+            { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true }
+          ],
+          exportMode: 'auto'
+        });
+      }
+
+      setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');
+      setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m');
+    }
+  }, [authCheckComplete]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && authCheckComplete) {
+      localStorage.setItem(GRAPH_SERIES_CONFIG_KEY, JSON.stringify(powerGraphConfig));
+      localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph));
+      localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale);
+    }
+  }, [powerGraphConfig, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
+
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
 
   useEffect(() => {
@@ -756,8 +835,13 @@ const UnifiedDashboardPage: React.FC = () => {
             </CardHeader>
             <CardContent className="px-2 py-3 sm:px-3 flex-grow">
               <div className="h-full">
-                {(useDemoDataForGraph || (powerGraphGenerationDpIds && powerGraphGenerationDpIds.length > 0) || (powerGraphUsageDpIds && powerGraphUsageDpIds.length > 0)) ? (
-                  <PowerTimelineGraph nodeValues={nodeValues} allPossibleDataPoints={allPossibleDataPoints} generationDpIds={powerGraphGenerationDpIds} usageDpIds={powerGraphUsageDpIds} exportDpIds={powerGraphExportDpIds} exportMode={powerGraphExportMode} timeScale={graphTimeScale} windDpIds={powerGraphWindDpIds} />
+                {(useDemoDataForGraph || (powerGraphConfig.series && powerGraphConfig.series.length > 0)) ? (
+                  <PowerTimelineGraph
+                    nodeValues={nodeValues}
+                    allPossibleDataPoints={allPossibleDataPoints}
+                    config={powerGraphConfig}
+                    timeScale={graphTimeScale}
+                  />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
                 )}
@@ -824,18 +908,11 @@ const UnifiedDashboardPage: React.FC = () => {
         isOpen={isGraphConfiguratorOpen}
         onClose={() => setIsGraphConfiguratorOpen(false)}
         allPossibleDataPoints={allPossibleDataPoints}
-        currentGenerationDpIds={powerGraphGenerationDpIds}
-        currentUsageDpIds={powerGraphUsageDpIds}
-        currentExportDpIds={powerGraphExportDpIds}
-        currentWindDpIds={powerGraphWindDpIds}
-        initialExportMode={powerGraphExportMode}
-        onSaveConfiguration={(config) => {
-          setPowerGraphGenerationDpIds(config.generationDpIds);
-          setPowerGraphUsageDpIds(config.usageDpIds);
-          setPowerGraphExportDpIds(config.exportDpIds);
-          setPowerGraphWindDpIds(config.windDpIds);
-          setPowerGraphExportMode(config.exportMode);
+        currentConfig={powerGraphConfig}
+        onSaveConfiguration={(newConfig) => {
+          setPowerGraphConfig(newConfig);
           setIsGraphConfiguratorOpen(false);
+          toast.success("Power timeline configuration updated.");
         }}
       />
 

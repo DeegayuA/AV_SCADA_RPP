@@ -2,6 +2,7 @@ import { exportIdbData } from '@/lib/idb-store';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
 import * as appConstants from '@/config/constants';
 import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
+import { GRAPH_SERIES_CONFIG_KEY } from '@/config/constants';
 import { SLDLayout } from '@/types/sld';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/appStore';
@@ -16,6 +17,7 @@ const APP_LOCAL_STORAGE_KEYS = [
   'theme',
   WEATHER_CARD_CONFIG_KEY,
   appConstants.WEBSOCKET_CUSTOM_URL_KEY,
+  GRAPH_SERIES_CONFIG_KEY,
 ];
 
 function getAllSldLayoutsFromStorage(): Record<string, SLDLayout> {
