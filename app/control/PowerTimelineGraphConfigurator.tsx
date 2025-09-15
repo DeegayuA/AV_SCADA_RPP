@@ -157,10 +157,11 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
             </Button>
           )}
         </div>
-        <ScrollArea className="h-[180px] rounded-md border flex-grow"> {/* flex-grow for scroll area */}
-          <AnimatePresence mode="sync">
-            {availableDataPointsToSelect.length > 0 ? (
-              availableDataPointsToSelect.map((dp) => (
+        <ScrollArea className="flex-grow rounded-md border">
+          <div className="p-2">
+            <AnimatePresence mode="sync">
+              {availableDataPointsToSelect.length > 0 ? (
+                availableDataPointsToSelect.map((dp) => (
                 <motion.div
                     key={`${instanceId}-available-${dp.id}`}
                     layout
@@ -191,7 +192,8 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
                 <p className="text-sm text-muted-foreground text-center py-4 px-2">No matches for "{searchTerm}".</p> :
                 <p className="text-sm text-muted-foreground text-center py-4 px-2">All possible items selected or none available.</p>
             )}
-          </AnimatePresence>
+            </AnimatePresence>
+          </div>
         </ScrollArea>
       </div>
     </div>

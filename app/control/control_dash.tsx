@@ -520,7 +520,16 @@ const UnifiedDashboardPage: React.FC = () => {
     const updatedCustomPoints = [...customPoints, newPoint];
     localStorage.setItem(CUSTOM_DATA_POINTS_KEY, JSON.stringify(updatedCustomPoints));
     
-    setAllPossibleDataPoints(prevPoints => [...prevPoints, newPoint].sort((a,b) => a.name.localeCompare(b.name)));
+    setAllPossibleDataPoints(prevPoints => {
+        const combined = [...prevPoints, newPoint];
+        const uniqueMap = new Map<string, DataPoint>();
+        combined.forEach(p => {
+            if (p && p.id) {
+                uniqueMap.set(p.id, p);
+            }
+        });
+        return Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+    });
     setDisplayedDataPointIds(prevIds => [...prevIds, newPoint.id]);
     
     toast.success("Data Point Created", { description: `'${newPoint.name}' has been created and added to the dashboard.` });
@@ -587,12 +596,15 @@ const UnifiedDashboardPage: React.FC = () => {
                 console.error("Failed to parse custom data points:", e);
             }
         }
-        if (customPoints.length > 0) {
-            const combined = [...allPossibleDataPointsConfig, ...customPoints];
-            const uniqueMap = new Map<string, DataPoint>();
-            combined.forEach(p => { if (!uniqueMap.has(p.id)) uniqueMap.set(p.id, p); });
-            setAllPossibleDataPoints(Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name)));
-        }
+
+        const combined = [...allPossibleDataPointsConfig, ...customPoints];
+        const uniqueMap = new Map<string, DataPoint>();
+        combined.forEach(p => {
+            if (p && p.id) { // Ensure point and its id are valid
+                uniqueMap.set(p.id, p);
+            }
+        });
+        setAllPossibleDataPoints(Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name)));
     }
   }, [authCheckComplete]);
   
