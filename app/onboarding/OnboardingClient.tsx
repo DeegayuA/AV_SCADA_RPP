@@ -190,7 +190,8 @@ SuccessRedirector.displayName = "SuccessRedirector";
 const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     const context = useOnboarding();
     if (!context) throw new Error("useOnboarding must be used within OnboardingProvider");
-    const { currentStep, completeOnboarding, nextStep, prevStep, isLoading } = context as Required<OnboardingContextType>;
+    const { currentStep, completeOnboarding, restoreAndCompleteOnboarding, nextStep, prevStep, isLoading, backupDataToRestore } = context as Required<OnboardingContextType>;
+    const logoutUser = useAppStore((state) => state.logout);
     
     const [direction, setDirection] = useState(1);
     
@@ -211,11 +212,15 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     const handleNext = useCallback(async () => {
         setDirection(1);
         if (currentStep === totalSteps - 1) {
-            await completeOnboarding();
+            if (backupDataToRestore) {
+                await restoreAndCompleteOnboarding(logoutUser);
+            } else {
+                await completeOnboarding();
+            }
         } else if (nextStep) {
             nextStep();
         }
-    }, [currentStep, completeOnboarding, nextStep, totalSteps]);
+    }, [currentStep, completeOnboarding, restoreAndCompleteOnboarding, nextStep, totalSteps, backupDataToRestore, logoutUser]);
 
     const handlePrev = useCallback(() => {
         setDirection(-1);
