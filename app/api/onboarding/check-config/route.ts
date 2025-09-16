@@ -5,7 +5,7 @@ import { PLANT_NAME } from '@/config/appConfig';
 export async function GET() {
   try {
     // Check if the plant name is the default placeholder value
-    const isDefaultConfig = PLANT_NAME === 'Default Plant';
+    const isDefaultConfig = (PLANT_NAME as string) === 'Default Plant';
 
     // If it's the default config, it means the app is not configured yet
     const configExists = !isDefaultConfig;
