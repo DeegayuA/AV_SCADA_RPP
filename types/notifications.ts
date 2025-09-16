@@ -9,6 +9,8 @@ export interface NotificationRule {
   severity: 'info' | 'warning' | 'critical'; // CHANGED from priority and new values
   message?: string; // ADDED - Optional custom message
   enabled: boolean;    // CHANGED from isEnabled
+  sendEmail?: boolean;
+  sendSms?: boolean;
   createdAt?: Date;   // Often good to have these as optional if frontend doesn't always receive them initially
   updatedAt?: Date;   // or if they are set by the backend on creation/update.
   // If nodeId is still critical for backend interaction and dataPointKey is for user-facing selection:

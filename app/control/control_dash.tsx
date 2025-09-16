@@ -69,6 +69,7 @@ import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appSto
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
+import ActiveAlarmsDisplay from '@/components/ActiveAlarmsDisplay';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
@@ -1012,6 +1013,7 @@ const UnifiedDashboardPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      <ActiveAlarmsDisplay />
     </div>
   );
 };

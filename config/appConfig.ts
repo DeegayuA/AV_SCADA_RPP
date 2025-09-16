@@ -126,3 +126,5 @@ export const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${PLANT_N
 const PAGE_SLUG_FOR_GRAPH = 'control_dashboard'; // Or make this dynamic if needed
 const GRAPH_CONFIG_KEY_PREFIX = `powerGraphConfig_${PLANT_NAME.replace(/\s+/g, '_')}_${PAGE_SLUG_FOR_GRAPH}`;
 export const GRAPH_SERIES_CONFIG_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_timelineSeries_v1`;
+
+export const LOG_LEVEL = 'info'; // Can be 'info', 'warn', 'error'

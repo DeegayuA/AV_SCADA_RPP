@@ -175,6 +175,19 @@ export const useNotificationSystem = () => {
                   console.log(`[NotificationSystem] CRITICAL ALARM: "${rule.name}" (Value: ${currentValue})`);
                   break;
                 }
+
+              // Send external notifications if configured
+              if (rule.sendEmail || rule.sendSms) {
+                fetch('/api/notify', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ rule, currentValue }),
+                }).catch(error => {
+                  console.error('[NotificationSystem] Error sending external notification:', error);
+                });
+              }
             } catch (error) {
               console.error('[NotificationSystem] Error adding active alarm:', error);
             }

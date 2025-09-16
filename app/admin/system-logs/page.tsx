@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Trash2, RefreshCw, Search, FilterX } from 'lucide-react';
+import { ArrowLeft, Trash2, RefreshCw, Search, FilterX, Download } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
@@ -127,6 +127,14 @@ const SystemLogsPage = () => {
                 </div>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <div className='flex items-center gap-2'>
+                    <Button variant="outline" size="icon" onClick={() => window.location.href='/api/logs/download?file=system'} title="Download System Log">
+                        <Download className="h-5 w-5" />
+                    </Button>
+                    <Button variant="outline" size="icon" onClick={() => window.location.href='/api/logs/download?file=error'} title="Download Error Log">
+                        <Download className="h-5 w-5 text-destructive" />
+                    </Button>
+                </div>
                 <Button variant="outline" size="icon" onClick={fetchLogs} disabled={isLoading} title="Refresh Logs">
                     <RefreshCw className={`h-5 w-5 ${isLoading ? 'animate-spin' : ''}`} />
                     <span className="sr-only">Refresh Logs</span>

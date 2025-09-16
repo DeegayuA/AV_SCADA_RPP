@@ -29,7 +29,7 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { DataPoint } from '@/config/dataPoints';
 import { NotificationRule } from '@/types/notifications';
-import { Tags, Target, Binary, Sigma, Baseline, Zap, AlertTriangle, InfoIcon, Check, Loader2, Save, X } from 'lucide-react';
+import { Tags, Target, Binary, Sigma, Baseline, Zap, AlertTriangle, InfoIcon, Check, Loader2, Save, X, Mail, MessageSquare } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -47,6 +47,8 @@ const ruleFormSchemaBase = z.object({
   }),
   message: z.string().max(500, 'Message is too long').optional(),
   enabled: z.boolean(),
+  sendEmail: z.boolean(),
+  sendSms: z.boolean(),
 });
 
 type RuleFormValuesBase = z.infer<typeof ruleFormSchemaBase>;
@@ -89,6 +91,8 @@ export const NotificationRuleForm: React.FC<NotificationRuleFormProps> = ({
       severity: initialData?.severity || 'warning',
       message: initialData?.message || '',
       enabled: initialData?.enabled === undefined ? true : initialData.enabled,
+      sendEmail: initialData?.sendEmail || false,
+      sendSms: initialData?.sendSms || false,
     },
   });
 
@@ -96,6 +100,7 @@ export const NotificationRuleForm: React.FC<NotificationRuleFormProps> = ({
 
   const watchedDataPointKey = useWatch({ control: form.control, name: 'dataPointKey' });
   const watchedCondition = useWatch({ control: form.control, name: 'condition'});
+  const watchedSeverity = useWatch({ control: form.control, name: 'severity' });
 
   useEffect(() => {
     if (watchedDataPointKey) {
@@ -136,14 +141,19 @@ export const NotificationRuleForm: React.FC<NotificationRuleFormProps> = ({
         thresholdValue = String(values.thresholdInputString);
     }
     
+    const selectedDataPoint = allDataPoints.find(dp => dp.id === values.dataPointKey || dp.nodeId === values.dataPointKey);
+
     const dataToSubmit: Omit<NotificationRule, 'id' | 'createdAt' | 'updatedAt'> = {
         name: values.name,
         dataPointKey: values.dataPointKey,
+        nodeId: selectedDataPoint?.nodeId, // Add nodeId to the submission
         condition: values.condition,
         thresholdValue: thresholdValue as any,
         severity: values.severity,
         message: values.message || `${values.name} triggered for ${values.dataPointKey}`,
         enabled: values.enabled,
+        sendEmail: values.sendEmail,
+        sendSms: values.sendSms,
     };
     if (initialData?.id) {
         (dataToSubmit as NotificationRule).id = initialData.id;
@@ -291,6 +301,43 @@ export const NotificationRuleForm: React.FC<NotificationRuleFormProps> = ({
                     </FormControl>
                 </FormItem>
                 )} />
+
+            { (watchedSeverity === 'warning' || watchedSeverity === 'critical') && (
+                <div className="mt-4 space-y-3">
+                    <Separator />
+                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 pt-2">External Notifications</p>
+                    <FormField
+                        control={form.control}
+                        name="sendEmail"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-slate-50/50 dark:bg-slate-700/30 dark:border-slate-600">
+                                <div className="space-y-0.5">
+                                    <FormLabel className="flex items-center"><Mail className="mr-2 h-4 w-4 text-sky-600 dark:text-sky-400"/> Send Email</FormLabel>
+                                    <FormDescription className="text-xs text-slate-600 dark:text-slate-400">Send a notification via email to the configured address.</FormDescription>
+                                </div>
+                                <FormControl>
+                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                </FormControl>
+                            </FormItem>
+                        )}
+                    />
+                    <FormField
+                        control={form.control}
+                        name="sendSms"
+                        render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm bg-slate-50/50 dark:bg-slate-700/30 dark:border-slate-600">
+                                <div className="space-y-0.5">
+                                    <FormLabel className="flex items-center"><MessageSquare className="mr-2 h-4 w-4 text-green-600 dark:text-green-400"/> Send SMS</FormLabel>
+                                    <FormDescription className="text-xs text-slate-600 dark:text-slate-400">Send a notification via SMS to the configured number.</FormDescription>
+                                </div>
+                                <FormControl>
+                                    <Switch checked={field.value} onCheckedChange={field.onChange} />
+                                </FormControl>
+                            </FormItem>
+                        )}
+                    />
+                </div>
+            )}
         </motion.div>
 
         <div className="flex justify-end space-x-3 pt-4 border-t dark:border-slate-700 mt-6">
