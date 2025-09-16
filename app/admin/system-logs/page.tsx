@@ -67,8 +67,8 @@ const SystemLogsPage = () => {
   }, [currentUser, router]);
 
   const uniqueActionTypes = useMemo(() => {
-    const types = new Set(allLogs.map(log => log.actionType).filter(type => type && type.trim() !== ''));
-    return Array.from(types).sort();
+    const types = new Set(allLogs.map(log => log.actionType));
+    return Array.from(types).filter(type => type && type.trim() !== '').sort();
   }, [allLogs]);
 
   const filteredLogs = useMemo(() => {
@@ -159,12 +159,12 @@ const SystemLogsPage = () => {
                 className="pl-9 w-full"
               />
             </div>
-            <Select value={actionTypeFilter} onValueChange={setActionTypeFilter}>
+            <Select value={actionTypeFilter} onValueChange={(value) => setActionTypeFilter(value === 'all' ? '' : value)}>
               <SelectTrigger className="w-full sm:w-[220px]">
                 <SelectValue placeholder="Filter by Action Type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Action Types</SelectItem>
+                <SelectItem value="all">All Action Types</SelectItem>
                 {uniqueActionTypes.map(type => (
                   <SelectItem key={type} value={type}>{type}</SelectItem>
                 ))}
