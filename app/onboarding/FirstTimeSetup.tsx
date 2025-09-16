@@ -61,8 +61,9 @@ const FirstTimeSetup = () => {
         throw new Error('Failed to set up the plant template.');
       }
 
-      toast.success('Configuration has been set up successfully!');
-      router.push('/onboarding'); // Redirect to the standard onboarding flow
+      toast.success('Configuration has been set up successfully! The application will now reload.', {
+        onAutoClose: () => window.location.reload(),
+      });
     } catch (error) {
       toast.error('An error occurred during setup. Please try again.');
       console.error(error);

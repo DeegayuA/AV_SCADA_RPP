@@ -20,7 +20,7 @@
     "inject:RUSL": "cp config/config.RUSL.ts config/dataPoints.ts && cp config/config.RUSL.constants.ts config/constants.ts",
     "inject:Ranna": "cp config/config.Ranna.ts config/dataPoints.ts && cp config/config.Ranna.constants.ts config/constants.ts",
     "inject:Colombo": "cp config/config.Colombo.ts config/dataPoints.ts && cp config/config.Colombo.constants.ts config/constants.ts",
-    "inject:default": "cp config/config.default.ts config/dataPoints.ts && cp config/config/config.default.constants.ts config/constants.ts",
+    "inject:default": "cp config/config.Colombo.ts config/dataPoints.ts && cp config/config.Colombo.constants.ts config/constants.ts",
     "inject": "npm run inject:RUSL && npm run inject:Ranna && npm run inject:Colombo && npm run inject:default",
     "generate:docs": "typedoc --ousld t docs/api --theme hierarchy --readme none --excludeExternals --excludePrivate --excludeProtected --hideGenerator --disableSources --tsconfig tsconfig.json --plugin typedoc-plugin-markdown --plugin typedoc-theme-hierarchy",
     "vercel-build": "next build",

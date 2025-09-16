@@ -1,35 +1,18 @@
 // app/api/onboarding/check-config/route.ts
 import { NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
-
-async function checkFileExists(filePath: string): Promise<boolean> {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
+import { PLANT_NAME } from '@/config/appConfig';
 
 export async function GET() {
   try {
-    // Note: process.cwd() gives the root of the Next.js project
-    const configDir = path.join(process.cwd(), 'config');
+    // Check if the plant name is the default placeholder value
+    const isDefaultConfig = PLANT_NAME === 'Default Plant';
 
-    // Define paths for the essential configuration files
-    const appConfigPath = path.join(configDir, 'appConfig.ts');
-    const dataPointsPath = path.join(configDir, 'dataPoints.ts');
-
-    // Check if both configuration files exist
-    const appConfigExists = await checkFileExists(appConfigPath);
-    const dataPointsExists = await checkFileExists(dataPointsPath);
-
-    const configExists = appConfigExists && dataPointsExists;
+    // If it's the default config, it means the app is not configured yet
+    const configExists = !isDefaultConfig;
 
     return NextResponse.json({ configExists });
   } catch (error) {
-    console.error('Error checking configuration files:', error);
+    console.error('Error checking configuration:', error);
     // Return a generic error response to the client
     return NextResponse.json(
       { error: 'An error occurred while checking the configuration.' },
