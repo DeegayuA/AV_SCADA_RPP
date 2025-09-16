@@ -127,32 +127,6 @@ export default function WelcomeStep() {
 
   return (
     <>
-      <style jsx global>{`
-        .animated-gradient {
-          background-size: 200% 200%;
-          animation: gradient-animation 15s ease infinite;
-        }
-        @keyframes gradient-animation {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .button-shine::after {
-          content: '';
-          position: absolute;
-          top: -50%;
-          left: -50%;
-          width: 20%;
-          height: 200%;
-          background: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
-          transform: rotate(25deg);
-          transition: left 0.6s ease;
-          pointer-events: none;
-        }
-        .button-shine:hover::after {
-          left: 130%;
-        }
-      `}</style>
       <div className={`relative h-full w-full flex flex-col items-center justify-center overflow-hidden 
                      bg-gradient-to-br from-slate-100 via-sky-100 to-indigo-100 
                      dark:from-neutral-900 dark:via-sky-950 dark:to-indigo-950 

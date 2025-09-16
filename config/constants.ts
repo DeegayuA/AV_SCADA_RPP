@@ -108,7 +108,6 @@ export const USER = "viewer";
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
     'ranna_main_sld',
     'Mini_Grid_SLD',
-    'Ranna_PLC',
     'Mini-Grid',
     'weather',
     'misc1',

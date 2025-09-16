@@ -37,8 +37,6 @@ jobs:
           # Determine which inject script to run
           if [[ "$branch" == "Prod_RUSL_Mini_Grid" ]]; then
             npm run inject:RUSL
-          elif [[ "$branch" == "Prod_Ranna_2MW" ]]; then
-            npm run inject:Ranna
           elif [[ "$branch" == "Prod_Colombo_Office_Mini_Grid" ]]; then
             npm run inject:Colombo
           fi

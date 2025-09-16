@@ -30,7 +30,7 @@ jobs:
 
       - name: Merge main_dev into production branches or create PR if conflict
         run: |
-          PROD_BRANCHES=("Prod_RUSL_Mini_Grid" "Prod_Ranna_2MW")
+          PROD_BRANCHES=("Prod_RUSL_Mini_Grid")
 
           for BRANCH in "${PROD_BRANCHES[@]}"; do
             echo "Processing branch: $BRANCH"
