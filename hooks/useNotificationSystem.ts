@@ -160,7 +160,6 @@ export const useNotificationSystem = () => {
 
                 switch (rule.severity) {
                 case 'info':
-                  playNotificationSound('info');
                   toast.info(rule.name, { id: toastId, description, duration: 5000 });
                   console.log(`[NotificationSystem] INFO ALARM: "${rule.name}" (Value: ${currentValue})`);
                   break;
@@ -267,14 +266,6 @@ export const useNotificationSystem = () => {
               needsUpdate = true;
               soundPlayed = true; // Play only one high priority sound per interval check
                console.log(`[NotificationSystem] Periodic CRITICAL ALARM sound for rule "${alarm.originalRuleDetails.name}"`);
-            }
-          } else if (alarm.originalRuleDetails.severity === 'warning') {
-            if (now - lastNotified > MEDIUM_PRIORITY_INTERVAL && !soundPlayed) {
-              playNotificationSound('warning');
-              alarm.lastNotifiedAt = new Date();
-              needsUpdate = true;
-              soundPlayed = true; // Play only one medium priority sound per interval check (if no high prio played)
-              console.log(`[NotificationSystem] Periodic WARNING ALARM sound for rule "${alarm.originalRuleDetails.name}"`);
             }
           }
 

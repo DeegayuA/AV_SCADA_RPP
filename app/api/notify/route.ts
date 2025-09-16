@@ -1,9 +1,24 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { notificationConfig } from '@/config/notification.config';
+import fs from 'fs/promises';
+import path from 'path';
+
+const SETTINGS_FILE = path.resolve(process.cwd(), 'config/recipient-settings.json');
+
+async function getRecipients() {
+  try {
+    const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('Error reading recipient settings:', error);
+    return { email: '', sms: '' };
+  }
+}
 
 export async function POST(request: Request) {
   const { rule, currentValue } = await request.json();
+  const recipients = await getRecipients();
 
   if (!rule) {
     return NextResponse.json({ error: 'Missing notification rule data' }, { status: 400 });
@@ -11,7 +26,7 @@ export async function POST(request: Request) {
 
   const { name, severity, message, sendEmail, sendSms } = rule;
 
-  if (sendEmail && notificationConfig.email.enabled) {
+  if (sendEmail && recipients?.email) {
     try {
       const transporter = nodemailer.createTransport({
         host: notificationConfig.smtp.host,
@@ -25,7 +40,7 @@ export async function POST(request: Request) {
 
       const mailOptions = {
         from: `"AV Dashboard" <${notificationConfig.smtp.auth.user}>`,
-        to: notificationConfig.email.recipient,
+        to: recipients.email,
         subject: `[${severity.toUpperCase()}] Alert: ${name}`,
         html: `
           <h1>Alert: ${name}</h1>
@@ -44,10 +59,10 @@ export async function POST(request: Request) {
     }
   }
 
-  if (sendSms && notificationConfig.sms.enabled) {
+  if (sendSms && recipients?.sms) {
     const smsMessage = `[${severity.toUpperCase()}] Alert: ${name}. Value: ${currentValue}. Time: ${new Date().toLocaleTimeString()}`;
     console.log(`--- SIMULATING SMS ---`);
-    console.log(`To: ${notificationConfig.sms.recipient}`);
+    console.log(`To: ${recipients.sms}`);
     console.log(`Message: ${smsMessage}`);
     console.log(`----------------------`);
   }

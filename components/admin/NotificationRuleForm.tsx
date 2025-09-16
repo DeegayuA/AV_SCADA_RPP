@@ -32,6 +32,8 @@ import { NotificationRule } from '@/types/notifications';
 import { Tags, Target, Binary, Sigma, Baseline, Zap, AlertTriangle, InfoIcon, Check, Loader2, Save, X, Mail, MessageSquare } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { useAppStore } from '@/stores/appStore';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 type OPC_DATA_TYPE_FriendlyNames = 'Boolean' | 'Float' | 'Double' | 'Int16' | 'Int32' | 'UInt16' | 'UInt32' | 'Byte' | 'SByte' | 'Int64' | 'UInt64' | 'String';
@@ -101,21 +103,31 @@ export const NotificationRuleForm: React.FC<NotificationRuleFormProps> = ({
   const watchedDataPointKey = useWatch({ control: form.control, name: 'dataPointKey' });
   const watchedCondition = useWatch({ control: form.control, name: 'condition'});
   const watchedSeverity = useWatch({ control: form.control, name: 'severity' });
+  const opcUaNodeValues = useAppStore((state) => state.opcUaNodeValues);
+  const [liveValue, setLiveValue] = useState<any>(null);
 
   useEffect(() => {
     if (watchedDataPointKey) {
       const dataPoint = allDataPoints.find(dp => dp.id === watchedDataPointKey || dp.nodeId === watchedDataPointKey);
       setSelectedDataPointType(dataPoint ? dataPoint.dataType : null);
-      if (dataPoint?.dataType === 'Boolean' && (watchedCondition !== 'is_true' && watchedCondition !== 'is_false')) {
-         form.setValue('condition', 'is_true');
-         form.setValue('thresholdInputString', 'true');
-      } else if (dataPoint?.dataType !== 'Boolean' && (watchedCondition === 'is_true' || watchedCondition === 'is_false')) {
-         form.setValue('condition', '==');
+      if (dataPoint) {
+        console.log("dataPoint.nodeId", dataPoint.nodeId)
+        console.log("opcUaNodeValues", opcUaNodeValues)
+        setLiveValue(opcUaNodeValues[dataPoint.nodeId] ?? null);
+        if (dataPoint.dataType === 'Boolean' && (watchedCondition !== 'is_true' && watchedCondition !== 'is_false')) {
+           form.setValue('condition', 'is_true');
+           form.setValue('thresholdInputString', 'true');
+        } else if (dataPoint.dataType !== 'Boolean' && (watchedCondition === 'is_true' || watchedCondition === 'is_false')) {
+           form.setValue('condition', '==');
+        }
+      } else {
+        setLiveValue(null);
       }
     } else {
       setSelectedDataPointType(null);
+      setLiveValue(null);
     }
-  }, [watchedDataPointKey, allDataPoints, form, watchedCondition]);
+  }, [watchedDataPointKey, allDataPoints, form, watchedCondition, opcUaNodeValues]);
 
   const validateAndSubmit = async (values: RuleFormValues) => {
     let thresholdValue: string | number | boolean = values.thresholdInputString === undefined ? '' : values.thresholdInputString;
@@ -205,23 +217,24 @@ export const NotificationRuleForm: React.FC<NotificationRuleFormProps> = ({
             <FormField
             control={form.control} name="dataPointKey"
             render={({ field }) => (
-                <FormItem className="mb-4">
+                <FormItem className="mb-4 flex flex-col">
                 <FormLabel>Data Point to Monitor</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                    <SelectTrigger className="h-10"><SelectValue placeholder="Select a data point source" /></SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                    {allDataPoints.map((dp) => (
-                        <SelectItem key={dp.id || dp.nodeId} value={dp.id || dp.nodeId}>
-                        {dp.name || dp.id} <span className="text-xs opacity-70 ml-2">({dp.nodeId} - {dp.dataType})</span>
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
+                <SearchableSelect
+                  options={allDataPoints.map(dp => ({ value: dp.id, label: `${dp.name} (${dp.nodeId})` }))}
+                  value={field.value}
+                  onChange={field.onChange}
+                  placeholder="Select a data point..."
+                  searchPlaceholder="Search data points..."
+                  emptyMessage="No data points found."
+                />
                  {selectedDataPointType && (
                     <FormDescription className="mt-1">Selected type: <span className="font-semibold text-primary">{selectedDataPointType}</span></FormDescription>
                   )}
+                 {liveValue !== null && liveValue !== undefined && (
+                    <div className="mt-2 p-2 border rounded-md bg-slate-50 dark:bg-slate-800">
+                      <p className="text-sm font-medium">Live Value: <span className="font-bold text-lg text-primary">{String(liveValue)}</span></p>
+                    </div>
+                 )}
                 <FormMessage />
                 </FormItem>
             )} />

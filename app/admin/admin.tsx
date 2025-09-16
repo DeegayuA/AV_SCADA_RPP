@@ -6,11 +6,12 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { NotificationConfigModal } from '@/components/admin/NotificationConfigModal'; // Verify path
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ShieldCheck, BellRing, Users, ScrollText, AlertTriangle, Settings, SlidersHorizontal, BarChart3, LockKeyhole } from 'lucide-react';
+import { ShieldCheck, BellRing, Users, ScrollText, AlertTriangle, Settings, SlidersHorizontal, BarChart3, LockKeyhole, Mail, MessageSquare } from 'lucide-react';
 import { UserRole, User } from '@/types/auth';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils'; // For conditional class names
 import { APP_AUTHOR } from '@/config/constants';
+import { ManualNotificationModal } from '@/components/admin/ManualNotificationModal';
 
 const pageVariants = {
   initial: { opacity: 0, scale: 0.98, y: 10 },
@@ -121,6 +122,7 @@ const AdminActionCard: React.FC<AdminCardProps> = ({ title, description, icon: I
 const AdminPage: React.FC = () => {
     const router = useRouter();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isManualNotifyModalOpen, setIsManualNotifyModalOpen] = useState(false);
     const currentUser = useAppStore((state) => state.currentUser);
 
     if (currentUser?.role !== UserRole.ADMIN) {
@@ -164,6 +166,22 @@ const AdminPage: React.FC = () => {
         buttonText: "Configure Notifications",
         onClick: () => setIsModalOpen(true),
         colorClass: "sky", // Just the color name
+      },
+      {
+        title: "Notification Settings",
+        description: "Configure recipient email and SMS for notifications.",
+        icon: Mail,
+        buttonText: "Configure Recipients",
+        onClick: () => router.push('/admin/settings'),
+        colorClass: "blue",
+      },
+      {
+        title: "Manual Notification",
+        description: "Send a one-time email or SMS to configured recipients.",
+        icon: MessageSquare,
+        buttonText: "Send Message",
+        onClick: () => setIsManualNotifyModalOpen(true),
+        colorClass: "green",
       },
       {
         title: "User Management",
@@ -265,6 +283,11 @@ const AdminPage: React.FC = () => {
                 <NotificationConfigModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
+                />
+
+                <ManualNotificationModal
+                    isOpen={isManualNotifyModalOpen}
+                    onClose={() => setIsManualNotifyModalOpen(false)}
                 />
             </div>
              <footer className="py-10 text-center">

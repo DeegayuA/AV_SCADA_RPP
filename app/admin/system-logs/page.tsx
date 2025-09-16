@@ -67,7 +67,7 @@ const SystemLogsPage = () => {
   }, [currentUser, router]);
 
   const uniqueActionTypes = useMemo(() => {
-    const types = new Set(allLogs.map(log => log.actionType));
+    const types = new Set(allLogs.map(log => log.actionType).filter(type => type && type.trim() !== ''));
     return Array.from(types).sort();
   }, [allLogs]);
 

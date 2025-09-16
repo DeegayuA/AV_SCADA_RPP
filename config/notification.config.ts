@@ -1,19 +1,11 @@
 export const notificationConfig = {
-  email: {
-    enabled: true,
-    recipient: 'user@example.com',
-  },
-  sms: {
-    enabled: true,
-    recipient: '+1234567890',
-  },
   smtp: {
-    host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // true for 465, false for other ports
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '587', 10),
+    secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
     auth: {
-      user: 'your-email@gmail.com',
-      pass: 'your-app-password', // Use an app-specific password for services like Gmail
+      user: process.env.SMTP_USER || '',
+      pass: process.env.SMTP_PASS || '',
     },
   },
 };

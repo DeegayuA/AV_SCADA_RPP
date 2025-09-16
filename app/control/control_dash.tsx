@@ -69,7 +69,6 @@ import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appSto
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
-import ActiveAlarmsDisplay from '@/components/ActiveAlarmsDisplay';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
@@ -470,12 +469,12 @@ const UnifiedDashboardPage: React.FC = () => {
       setPlcStatus('disconnected');
     }
   }, [authCheckComplete]);
-  const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
-  const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath); }, [currentUserRole, displayedDataPointIds, currentPath]);
+  const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath, 'warn'); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
+  const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath, 'warn'); }, [currentUserRole, displayedDataPointIds, currentPath]);
   const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
     if (currentUserRole !== UserRole.ADMIN) return; const currentDisplayedSet = new Set(displayedDataPointIds); const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
     if (newIdsToAdd.length === 0 && selectedIds.length > 0) { toast.warning("Items already shown or none selected to add."); setIsConfiguratorOpen(false); return; }
-    if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new card${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath); }
+    if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new card${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath, 'info'); }
     setIsConfiguratorOpen(false);
   }, [displayedDataPointIds, currentUserRole, currentPath]);
   const handleSaveNewDataPoint = useCallback(async (data: any) => {
@@ -1013,7 +1012,6 @@ const UnifiedDashboardPage: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <ActiveAlarmsDisplay />
     </div>
   );
 };

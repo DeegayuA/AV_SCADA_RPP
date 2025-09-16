@@ -201,7 +201,8 @@ export default function LoginPage() {
       logActivity(
         'LOGIN_SUCCESS',
         { email: user.email, role: user.role },
-        '/login'
+        '/login',
+        'info'
       );
 
       setCurrentUserInStore(user); // Store user immediately
@@ -237,6 +238,12 @@ export default function LoginPage() {
     } else {
       const msg = 'Invalid credentials. Please review your email and password.';
       toast.error("Login Failed", { description: msg });
+      logActivity(
+        'LOGIN_FAILURE',
+        { error: msg, attemptedEmail: values.email },
+        '/login',
+        'warn'
+      );
       setLoginError(msg);
       if (isAdminSetupLogin) {
         adminSetupForm.setError("root.serverError", { message: msg });
