@@ -9,11 +9,19 @@ import LoadingScreen from '@/components/LoadingScreen';
 import { Toaster } from "@/components/ui/sonner";
 import PageViewLogger from '@/components/PageViewLogger';
 import { 
-    APP_DEFAULT_TITLE, APP_DESCRIPTION, APP_FAVICON, APP_KEYWORDS, 
-    APP_LOGO_PNG_HEIGHT, APP_LOGO_PNG_WIDTH, APP_OG_IMAGE_URL, 
-    APP_PUBLISHER, APP_THEME_COLOR_DARK, APP_THEME_COLOR_LIGHT, APP_URL 
-} from '@/config/appConfig';
-import { APP_AUTHOR, APP_NAME } from '@/config/constants';
+  APP_NAME as APP_DEFAULT_TITLE,
+  APP_BASE_URL as APP_OG_IMAGE_URL
+} from '@/config/constants';
+
+// Define constants that were missing from the provided file
+const APP_THEME_COLOR_LIGHT = '#ffffff';
+const APP_THEME_COLOR_DARK = '#000000';
+const APP_LOGO_PNG_WIDTH = 1200;
+const APP_LOGO_PNG_HEIGHT = 630;
+import { 
+    APP_AUTHOR, APP_DESCRIPTION, APP_FAVICON, APP_KEYWORDS, 
+    APP_NAME, APP_URL 
+} from '@/config/constants';
 import NotificationSystemProvider from '@/components/NotificationSystemProvider';
 import ActiveAlarmsDisplay from '@/components/ActiveAlarmsDisplay';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
@@ -59,7 +67,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="description" content={APP_DESCRIPTION} />
         <meta name="keywords" content={APP_KEYWORDS} />
         <meta name="author" content={APP_AUTHOR} />
-        <meta name="publisher" content={APP_PUBLISHER} />
         <link rel="icon" href={APP_FAVICON} type="image/x-icon" />
         <link rel="shortcut icon" href={APP_FAVICON} type="image/x-icon" />
         <meta name="theme-color" media="(prefers-color-scheme: light)" content={APP_THEME_COLOR_LIGHT} />

@@ -40,7 +40,7 @@ export interface BackupFileContent {
   backupType?: 'manual' | 'auto-backup';
   application: { name: string; version: string };
   plant: { name: string; location: string; capacity: string };
-  configurations?: { dataPointDefinitions?: any[] };
+  configurations?: Record<string, string>;
   userSettings?: { dashboardLayout?: any };
   browserStorage: {
     indexedDB?: { onboardingData?: ExpectedAppOnboardingData; };
@@ -53,6 +53,7 @@ export interface RestoreSelection {
   ui: boolean;
   appSettings: boolean;
   sldLayouts: boolean;
+  configurations: boolean;
 }
 
 export async function restoreFromBackupContent(
@@ -68,6 +69,7 @@ export async function restoreFromBackupContent(
     ui: !!backupData.browserStorage?.localStorage,
     appSettings: !!backupData.browserStorage?.indexedDB,
     sldLayouts: !!backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0,
+    configurations: !!backupData.configurations,
   };
 
   const finalSelection = selection || fullSelection;
@@ -124,6 +126,30 @@ export async function restoreFromBackupContent(
       } catch (error) {
         console.error("Failed to restore SLD layouts to localStorage:", error);
         toast.error("SLD Restore Failed", { id: importToastId, description: "Could not save SLD layouts to local storage." });
+      }
+    }
+
+    if (finalSelection.configurations && backupData.configurations) {
+      setProgress?.("Restoring All Plant Configurations...");
+      await new Promise(res => setTimeout(res, 200));
+      try {
+        const response = await fetch('/api/plant-configs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(backupData.configurations),
+        });
+
+        if (!response.ok) {
+          const errorResult = await response.json();
+          throw new Error(errorResult.message || 'Failed to restore plant configuration files.');
+        }
+
+        toast.info("All plant configurations restored.", { id: importToastId });
+      } catch (error) {
+        console.error("Failed to restore plant configuration files:", error);
+        toast.error("Plant Configuration Restore Failed", { id: importToastId, description: (error as Error).message });
       }
     }
 

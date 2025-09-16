@@ -56,6 +56,7 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
     ui: true,
     appSettings: true,
     sldLayouts: true,
+    configurations: true,
   });
 
   useEffect(() => {
@@ -203,12 +204,14 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
       ui: parsedBackupData.browserStorage?.localStorage && Object.keys(parsedBackupData.browserStorage.localStorage).length > 0,
       appSettings: !!parsedBackupData.browserStorage?.indexedDB?.onboardingData,
       sldLayouts: parsedBackupData.sldLayouts && Object.keys(parsedBackupData.sldLayouts).length > 0,
+      configurations: !!parsedBackupData.configurations && Object.keys(parsedBackupData.configurations).length > 0,
     };
 
     const restoreItems = [
       { id: 'ui', label: 'User Interface & Preferences', icon: Brush, available: availableComponents.ui },
       { id: 'appSettings', label: 'Application Settings (IndexedDB)', icon: Database, available: availableComponents.appSettings },
       { id: 'sldLayouts', label: 'SLD Network Diagram Layouts', icon: Network, available: availableComponents.sldLayouts },
+      { id: 'configurations', label: 'All Plant Configurations', icon: Settings, available: availableComponents.configurations },
     ];
 
     return (

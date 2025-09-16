@@ -78,7 +78,7 @@ export const getWebSocketUrl = async (): Promise<string> => {
 
 export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
 export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.178.74:4840";
-export const VERSION = "- Release v2025.09.01 • 16:30 (GMT+5:30)";
+export const VERSION = "- Release v2025.08.29 • 08:30 (GMT+5:30)";
 export const PLANT_NAME = "Colombo Office Mini Grid";
 export const PLANT_LOCATION = "Athurugiriya, Sri Lanka";
 export const PLANT_TYPE = "Mini Grid";
@@ -120,9 +120,3 @@ export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
 
 export const API_MONITORING_CONFIG_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringConfigs_v1`;
 export const API_MONITORING_DOWNTIME_KEY = `${LOCAL_STORAGE_KEY_PREFIX}apiMonitoringDowntimes_v1`;
-export const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${PLANT_NAME || 'defaultPlant'}`;
-
-// Key for storing the new, unified power timeline graph configuration
-const PAGE_SLUG_FOR_GRAPH = 'control_dashboard'; // Or make this dynamic if needed
-const GRAPH_CONFIG_KEY_PREFIX = `powerGraphConfig_${PLANT_NAME.replace(/\s+/g, '_')}_${PAGE_SLUG_FOR_GRAPH}`;
-export const GRAPH_SERIES_CONFIG_KEY = `${GRAPH_CONFIG_KEY_PREFIX}_timelineSeries_v1`;

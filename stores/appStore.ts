@@ -311,7 +311,7 @@ export const useAppStore = create<FullStoreState>()(
             localTime: localTime,
             application: { name: appConstants.APP_NAME, version: appConstants.VERSION },
             plant: { name: appConstants.PLANT_NAME, location: appConstants.PLANT_LOCATION, capacity: appConstants.PLANT_CAPACITY },
-            configurations: { dataPointDefinitions: rawDataPoints },
+            configurations: { dataPointDefinitions: JSON.stringify(rawDataPoints) },
             browserStorage: { indexedDB: idbData, localStorage: localStorageData },
             sldLayouts: allLayouts,
           };
