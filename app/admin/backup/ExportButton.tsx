@@ -18,7 +18,7 @@ interface BackupFileContent {
   createdAt: string;
   application: { name: string; version: string };
   plant: { name: string; location: string; capacity: string };
-  configurations?: { dataPointDefinitions?: any[] };
+  configurations?: Record<string, string>;
   userSettings?: { dashboardLayout?: any };
   browserStorage: {
     indexedDB?: any;
@@ -37,44 +37,24 @@ export default function ExportButton() {
       const message = lastJsonMessage as any;
       if (message.type === 'all-sld-layouts') {
         setLayouts(message.payload);
-        setIsExporting(false);
-        toast.success("Successfully fetched all SLD layouts.", {
-          description: `Found ${Object.keys(message.payload).length} layouts. You can now export.`,
-        });
       }
     }
   }, [lastJsonMessage]);
-
-  const fetchLayouts = () => {
-    if (!isConnected) {
-      toast.info("Connecting to the server to fetch layouts...");
-      connect();
-    }
-    setIsExporting(true);
-    toast.info("Requesting all SLD layouts from the server...");
-    sendJsonMessage({ type: 'get-all-sld-layouts' });
-  };
 
   const handleExport = async () => {
     setIsExporting(true);
     toast.info("Gathering data for backup...");
 
     try {
-      // 1. Fetch SLD Layouts
       if (!isConnected) {
         connect();
-        await new Promise(resolve => setTimeout(resolve, 1000)); // wait for connection
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
       sendJsonMessage({ type: 'get-all-sld-layouts' });
-
-      // The rest of the export process will be triggered by the useEffect when layouts are received.
-      // For now, we will just log a message.
-      console.log("Waiting for layouts to be fetched...");
-
-
+      // The main export logic is now in the useEffect below, triggered by receiving layouts.
     } catch (error) {
-      console.error("Error during export:", error);
-      toast.error("Failed to export system settings.", {
+      console.error("Error initiating export:", error);
+      toast.error("Failed to start export process.", {
         description: (error as Error).message,
       });
       setIsExporting(false);
@@ -82,61 +62,79 @@ export default function ExportButton() {
   };
 
   useEffect(() => {
-    if (Object.keys(layouts).length > 0) {
+    // This effect triggers once the layouts have been successfully fetched OR if the export was started when layouts were already present.
+    // It only runs when isExporting is true and layouts are available.
+    if (isExporting && Object.keys(layouts).length > 0) {
       const exportData = async () => {
-        // 2. Get Weather Card Config
-        const weatherCardConfig = loadWeatherCardConfigFromStorage();
+        try {
+          // 1. Fetch all plant configuration files
+          toast.info("Fetching all plant configuration files...");
+          const configResponse = await fetch('/api/plant-configs');
+          if (!configResponse.ok) {
+            throw new Error(`Failed to fetch plant configs: ${configResponse.statusText}`);
+          }
+          const plantConfigs = await configResponse.json();
+          toast.success("Successfully fetched all plant configurations.");
 
-        // 3. Get other relevant data from localStorage
-        const localStorageData: Record<string, any> = {};
-        const appStorage = localStorage.getItem('app-storage');
-        if (appStorage) {
-          localStorageData['app-storage'] = JSON.parse(appStorage);
+          // 2. Get Weather Card Config from localStorage
+          const weatherCardConfig = loadWeatherCardConfigFromStorage();
+
+          // 3. Get other relevant data from localStorage
+          const localStorageData: Record<string, any> = {};
+          const appStorage = localStorage.getItem('app-storage');
+          if (appStorage) {
+            localStorageData['app-storage'] = JSON.parse(appStorage);
+          }
+          localStorageData[WEATHER_CARD_CONFIG_KEY] = weatherCardConfig;
+
+          // 4. Assemble backup file
+          const backupData: BackupFileContent = {
+            backupSchemaVersion: EXPECTED_BACKUP_SCHEMA_VERSION,
+            createdAt: new Date().toISOString(),
+            application: {
+              name: APP_NAME,
+              version: VERSION,
+            },
+            plant: {
+              name: PLANT_NAME,
+              location: PLANT_LOCATION,
+              capacity: PLANT_CAPACITY,
+            },
+            sldLayouts: layouts,
+            configurations: plantConfigs,
+            browserStorage: {
+              localStorage: localStorageData,
+            },
+          };
+
+          // 5. Trigger download
+          const json = JSON.stringify(backupData, null, 2);
+          const blob = new Blob([json], { type: "application/json" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+          a.download = `av-dashboard-backup-${timestamp}.json`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+
+          toast.success("System settings exported successfully.");
+        } catch (error) {
+          console.error("Error during export data assembly:", error);
+          toast.error("Failed to export system settings.", {
+            description: (error as Error).message,
+          });
+        } finally {
+          setIsExporting(false);
+          setLayouts({}); // Reset layouts for the next export
         }
-        localStorageData[WEATHER_CARD_CONFIG_KEY] = weatherCardConfig;
-
-
-        // 4. Assemble backup file
-        const backupData: BackupFileContent = {
-          backupSchemaVersion: EXPECTED_BACKUP_SCHEMA_VERSION,
-          createdAt: new Date().toISOString(),
-          application: {
-            name: APP_NAME,
-            version: VERSION,
-          },
-          plant: {
-            name: PLANT_NAME,
-            location: PLANT_LOCATION,
-            capacity: PLANT_CAPACITY,
-          },
-          sldLayouts: layouts,
-          browserStorage: {
-            localStorage: localStorageData,
-          },
-        };
-
-        // 5. Trigger download
-        const json = JSON.stringify(backupData, null, 2);
-        const blob = new Blob([json], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        a.download = `av-dashboard-backup-${timestamp}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        toast.success("System settings exported successfully.");
-        setIsExporting(false);
-        setLayouts({}); // Reset layouts
       };
 
       exportData();
     }
-  }, [layouts]);
-
+  }, [isExporting, layouts]);
 
   return (
     <Button onClick={handleExport} disabled={isExporting}>
