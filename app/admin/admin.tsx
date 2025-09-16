@@ -206,6 +206,30 @@ const AdminPage: React.FC = () => {
         disabled: true,
         colorClass: "amber",
       },
+      {
+        title: "Reset Configuration",
+        description: "Delete the current configuration and start the setup process again.",
+        icon: Settings,
+        buttonText: "Reset Configuration",
+        onClick: async () => {
+            if (window.confirm("Are you sure you want to delete the current configuration? This action cannot be undone.")) {
+                try {
+                    const response = await fetch('/api/onboarding/delete-config', { method: 'POST' });
+                    if (response.ok) {
+                        alert("Configuration deleted successfully. You will now be redirected to the setup page.");
+                        router.push('/onboarding');
+                    } else {
+                        throw new Error('Failed to delete configuration.');
+                    }
+                } catch (error) {
+                    console.error(error);
+                    alert("An error occurred while deleting the configuration.");
+                }
+            }
+        },
+        disabled: false,
+        colorClass: "red",
+      }
     ];
 
     return (

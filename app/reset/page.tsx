@@ -357,7 +357,7 @@ export default function ResetApplicationPage() {
 
       if (backupSelection.configurations) {
         toast.info("Packaging configurations...", { id: backupToastId });
-        backupData.configurations = { dataPointDefinitions: rawDataPointsDefinitions };
+        backupData.configurations = { dataPointDefinitions: JSON.stringify(rawDataPointsDefinitions) };
       }
 
       if (backupSelection.ui) {
@@ -715,6 +715,7 @@ function RestoreSelectionDialog({ open, onOpenChange, backupData, onConfirm }: {
     ui: true,
     appSettings: true,
     sldLayouts: true,
+    configurations: true,
   });
 
   const availableComponents = {

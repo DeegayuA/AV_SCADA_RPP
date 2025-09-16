@@ -704,7 +704,7 @@ export default function PlantConfigStep() {
 import { Control } from 'react-hook-form';
 
 interface ManualUploadFormProps {
-  onApply: (contents: { constants: string; dataPoints: string; backup?: string }) => void;
+  onApply: (contents: { plantName: string; constants: string; dataPoints: string; backup?: string }) => void;
 }
 
 function ManualUploadForm({ onApply }: ManualUploadFormProps) {
@@ -796,7 +796,7 @@ const FormFieldItem: React.FC<FormFieldItemProps> = ({ control, name, label, pla
                 type={type} 
                 placeholder={placeholder} 
                 {...field} 
-                value={field.value ?? ''}
+                value={String(field.value ?? '')}
                 onChange={(e) => {
                     if (type === 'number') {
                         const val = e.target.value;

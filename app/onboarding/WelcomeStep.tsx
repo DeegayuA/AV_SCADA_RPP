@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 import { toast } from 'sonner';
+import styles from './WelcomeStep.module.css';
 
 const AppLogo = ({ className }: { className?: string }) => (
   <Image
@@ -127,36 +128,10 @@ export default function WelcomeStep() {
 
   return (
     <>
-      <style jsx global>{`
-        .animated-gradient {
-          background-size: 200% 200%;
-          animation: gradient-animation 15s ease infinite;
-        }
-        @keyframes gradient-animation {
-          0% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-          100% { background-position: 0% 50%; }
-        }
-        .button-shine::after {
-          content: '';
-          position: absolute;
-          top: -50%;
-          left: -50%;
-          width: 20%;
-          height: 200%;
-          background: linear-gradient(to right, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0));
-          transform: rotate(25deg);
-          transition: left 0.6s ease;
-          pointer-events: none;
-        }
-        .button-shine:hover::after {
-          left: 130%;
-        }
-      `}</style>
       <div className={`relative h-full w-full flex flex-col items-center justify-center overflow-hidden 
                      bg-gradient-to-br from-slate-100 via-sky-100 to-indigo-100 
                      dark:from-neutral-900 dark:via-sky-950 dark:to-indigo-950 
-                     animated-gradient p-4 rounded-lg`}>
+                     ${styles['animated-gradient']} p-4 rounded-lg`}>
 
         <Orb size="w-72 h-72 md:w-96 md:h-96" initialX="-25%" initialY="5%" colorFrom="hsla(var(--primary)/0.4)" colorTo="hsla(var(--primary)/0.05)" />
         <Orb size="w-64 h-64 md:w-80 md:h-80" initialX="65%" initialY="55%" colorFrom="hsla(220, 90%, 60%, 0.3)" colorTo="hsla(220, 90%, 60%, 0.05)" />
@@ -209,7 +184,7 @@ export default function WelcomeStep() {
               <Button
                 size="lg"
                 onClick={nextStep}
-                className={`w-full h-14 text-lg font-semibold rounded-xl group shadow-lg relative overflow-hidden button-shine
+                className={`w-full h-14 text-lg font-semibold rounded-xl group shadow-lg relative overflow-hidden ${styles['button-shine']}
                 bg-gradient-to-r from-primary to-primary-focus hover:shadow-primary/30 dark:hover:shadow-primary-light/20
                 text-primary-foreground focus-visible:ring-primary/60 transition-all duration-300 ease-out transform`}
               >

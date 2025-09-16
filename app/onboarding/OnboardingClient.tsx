@@ -26,6 +26,7 @@ import OpcuaTestStep from './OpcuaTestStep';
 import DatapointDiscoveryStep from './DatapointDiscoveryStep';
 import ReviewStep from './ReviewStep';
 import { useTheme } from 'next-themes';
+import FirstTimeSetup from './FirstTimeSetup';
 
 // --- Animation Variants (FIXED with explicit 'Variants' type) ---
 const pageTransitionVariants: Variants = {
@@ -295,7 +296,7 @@ const OnboardingPageContentInternal: React.FC = () => {
     const storeHasHydrated = useAppStore.persist.hasHydrated();
     const currentUserFromStore = useAppStore((state) => state.currentUser);
 
-    const [pageState, setPageState] = useState<'loading' | 'auth_required' | 'admin_setup_pending' | 'onboarding_active' | 'finalizing' | 'error_state'>('loading');
+    const [pageState, setPageState] = useState<'loading' | 'auth_required' | 'admin_setup_pending' | 'onboarding_active' | 'finalizing' | 'error_state' | 'first_time_setup'>('loading');
     const [hasSyncedUrlToContext, setHasSyncedUrlToContext] = useState(false);
 
     const stepsConfig = [
@@ -318,6 +319,17 @@ const OnboardingPageContentInternal: React.FC = () => {
 
         const performChecks = async () => {
             try {
+                // First, check if the configuration files exist on the server
+                const configCheckResponse = await fetch('/api/onboarding/check-config');
+                const { configExists } = await configCheckResponse.json();
+
+                if (!isMounted) return;
+
+                if (!configExists) {
+                    setPageState('first_time_setup');
+                    return;
+                }
+
                 const idbOnboardingCompleted = await isOnboardingComplete();
                 if (!isMounted) return;
                 const user = currentUserFromStore;
@@ -412,6 +424,9 @@ const OnboardingPageContentInternal: React.FC = () => {
                     <motion.p variants={itemVariants} className="text-xl font-medium text-slate-300">Initializing Setup...</motion.p>
                     <motion.p variants={itemVariants} className="text-sm text-slate-400 mt-2">Verifying your session and configuration.</motion.p>
                 </motion.div>
+            )}
+            {pageState === 'first_time_setup' && (
+                <FirstTimeSetup />
             )}
             {pageState === 'admin_setup_pending' && ( 
                 <motion.div key="admin_pending" {...pageTransitionVariants} className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-amber-100 via-orange-100 to-yellow-100 dark:from-neutral-900 dark:via-neutral-800 dark:to-gray-900 text-center p-6 z-[90]"
