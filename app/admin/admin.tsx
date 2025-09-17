@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { NotificationConfigModal } from '@/components/admin/NotificationConfigModal'; // Verify path
+import { AiSettingsDialog } from '@/components/admin/AiSettingsDialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ShieldCheck, BellRing, Users, ScrollText, AlertTriangle, Settings, SlidersHorizontal, BarChart3, LockKeyhole } from 'lucide-react';
+import { ShieldCheck, BellRing, Users, ScrollText, AlertTriangle, Settings, SlidersHorizontal, BarChart3, LockKeyhole, Wand2 } from 'lucide-react';
 import { UserRole, User } from '@/types/auth';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils'; // For conditional class names
@@ -120,7 +121,8 @@ const AdminActionCard: React.FC<AdminCardProps> = ({ title, description, icon: I
 
 const AdminPage: React.FC = () => {
     const router = useRouter();
-    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isNotificationModalOpen, setNotificationModalOpen] = useState(false);
+    const [isAiSettingsModalOpen, setAiSettingsModalOpen] = useState(false);
     const currentUser = useAppStore((state) => state.currentUser);
 
     if (currentUser?.role !== UserRole.ADMIN) {
@@ -162,8 +164,17 @@ const AdminPage: React.FC = () => {
         description: "Configure system alarms and notification triggers based on data point values.",
         icon: BellRing,
         buttonText: "Configure Notifications",
-        onClick: () => setIsModalOpen(true),
+        onClick: () => setNotificationModalOpen(true),
         colorClass: "sky", // Just the color name
+      },
+      {
+        title: "AI Assistant",
+        description: "Manage Gemini API keys, customize quick prompts, and configure AI features.",
+        icon: Wand2,
+        buttonText: "Configure AI",
+        onClick: () => setAiSettingsModalOpen(true),
+        disabled: false,
+        colorClass: "purple",
       },
       {
         title: "User Management",
@@ -239,8 +250,12 @@ const AdminPage: React.FC = () => {
                 </div>
 
                 <NotificationConfigModal
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
+                    isOpen={isNotificationModalOpen}
+                    onClose={() => setNotificationModalOpen(false)}
+                />
+                <AiSettingsDialog
+                    isOpen={isAiSettingsModalOpen}
+                    onClose={() => setAiSettingsModalOpen(false)}
                 />
             </div>
              <footer className="py-10 text-center">

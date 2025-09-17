@@ -8,7 +8,7 @@ import { useTheme } from 'next-themes';
 import { toast } from 'sonner';
 import {
   Settings, Clock, Trash2, RotateCcw, AlertTriangle, Check,
-  ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList
+  ShieldAlert, InfoIcon as InfoIconLucide, Loader2, Maximize2, X, Pencil, LayoutList, Wand2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -69,6 +69,8 @@ import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appSto
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
+import { AskAiPopup } from '@/components/ai/AskAiPopup';
+import { OnloadGreetingPopup } from '@/components/ai/OnloadGreetingPopup';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
@@ -85,12 +87,13 @@ interface DashboardHeaderControlProps {
   onRemoveAll: () => void;
   onResetToDefault: () => void;
   wsAddress?: string;
+  onAskAiClick: () => void;
 }
 
 const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
   ({
     plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
-    version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault, wsAddress
+    version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault, wsAddress, onAskAiClick
   }) => {
     const router = useRouter();
     const currentPathname = usePathname();
@@ -113,6 +116,12 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
             {PLANT_NAME} {headerTitle}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
+            <motion.div variants={itemVariants}>
+                <Button variant="outline" size="sm" onClick={onAskAiClick}>
+                    <Wand2 className="mr-1.5 h-4 w-4 text-purple-500" />
+                    Ask AI
+                </Button>
+            </motion.div>
             <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
             <motion.div variants={itemVariants}>
               <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} delay={delay} />
@@ -368,6 +377,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
   const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>('1m');
   const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [powerGraphConfig, setPowerGraphConfig] = useState<PowerTimelineGraphConfig>({ series: [], exportMode: 'auto' });
   const [allPossibleDataPoints, setAllPossibleDataPoints] = useState<ExtendedDataPoint[]>(allPossibleDataPointsConfig);
   const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false);
@@ -573,6 +583,10 @@ const UnifiedDashboardPage: React.FC = () => {
     setIsConfiguratorOpen(true);
   }, []);
 
+  const toggleAiChat = useCallback(() => {
+    setIsAiChatOpen(prev => !prev);
+  }, []);
+
   const handleWsStatusClick = useCallback(() => {
     setTempWsUrl(webSocketUrl || '');
     setIsWsConfigModalOpen(true);
@@ -746,6 +760,7 @@ const UnifiedDashboardPage: React.FC = () => {
 
   return (
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
+      <OnloadGreetingPopup />
       <div className="max-w-screen-4xl mx-auto">
         <DashboardHeaderControl
           plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
@@ -753,7 +768,10 @@ const UnifiedDashboardPage: React.FC = () => {
           currentTime={currentTime} delay={delay} version={VERSION}
           isEditMode={isGlobalEditMode} toggleEditMode={toggleEditModeAction}
           currentUserRole={currentUserRole} onOpenConfigurator={handleOpenConfigurator}
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} wsAddress={webSocketUrl} />
+          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} wsAddress={webSocketUrl}
+          onAskAiClick={toggleAiChat} />
+
+        <AskAiPopup isOpen={isAiChatOpen} onClose={toggleAiChat} />
 
         {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
 
