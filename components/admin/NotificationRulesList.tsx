@@ -116,7 +116,7 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
                 </TableCell>
                 <TableCell className="py-3 px-4 align-top text-sm text-slate-600 dark:text-slate-300">{rule.dataPointKey}</TableCell>
                 <TableCell className="py-3 px-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                    <span className="font-bold text-primary">{nodeValues[rule.nodeId] !== undefined ? String(nodeValues[rule.nodeId]) : 'N/A'}</span>
+                    <span className="font-bold text-primary">{rule.nodeId && nodeValues[rule.nodeId] !== undefined ? String(nodeValues[rule.nodeId]) : 'N/A'}</span>
                 </TableCell>
                 <TableCell className="py-3 px-4 align-top">
                   <Badge variant="outline" className="text-xs font-mono border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 whitespace-nowrap">
