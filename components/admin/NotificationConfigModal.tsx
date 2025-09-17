@@ -178,12 +178,21 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
   const handleExport = async () => {
     try {
       const allRules = await getAllNotificationRules();
-      const blob = new Blob([JSON.stringify(allRules, null, 2)], { type: "application/json;charset=utf-8" });
-      saveAs(blob, `notification_rules_backup_${new Date().toISOString()}.json`);
-      toast.success("Rules exported successfully.");
+      const recipients = await fetch('/api/settings/recipients').then(res => res.json());
+      const smtp = await fetch('/api/settings/smtp').then(res => res.json());
+
+      const backupData = {
+        notificationRules: allRules,
+        recipientSettings: recipients,
+        smtpSettings: smtp,
+      };
+
+      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json;charset=utf-8" });
+      saveAs(blob, `notification_config_backup_${new Date().toISOString()}.json`);
+      toast.success("Configuration exported successfully.");
     } catch (error) {
-      console.error('Failed to export rules:', error);
-      toast.error('Failed to export rules.');
+      console.error('Failed to export configuration:', error);
+      toast.error('Failed to export configuration.');
     }
   };
 
@@ -196,41 +205,56 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
       try {
         const content = e.target?.result;
         if (typeof content !== 'string') throw new Error("File content is not a string");
-        const importedRules = JSON.parse(content) as NotificationRule[];
+        const backupData = JSON.parse(content);
 
-        // Basic validation
-        if (!Array.isArray(importedRules)) {
-          throw new Error("Invalid file format: not an array.");
+        // Import recipient settings
+        if (backupData.recipientSettings) {
+          await fetch('/api/settings/recipients', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(backupData.recipientSettings),
+          });
         }
 
-        let successCount = 0;
-        let errorCount = 0;
+        // Import SMTP settings
+        if (backupData.smtpSettings) {
+          await fetch('/api/settings/smtp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(backupData.smtpSettings),
+          });
+        }
 
-        for (const rule of importedRules) {
-          try {
-            // Simple validation of a rule object
-            if (rule.name && rule.dataPointKey && rule.condition && rule.severity) {
-              await addNotificationRule({
-                ...rule,
-                id: undefined, // Let db assign new id
-                createdAt: undefined,
-                updatedAt: undefined,
-              });
-              successCount++;
-            } else {
+        // Import notification rules
+        if (Array.isArray(backupData.notificationRules)) {
+          let successCount = 0;
+          let errorCount = 0;
+
+          for (const rule of backupData.notificationRules) {
+            try {
+              if (rule.name && rule.dataPointKey && rule.condition && rule.severity) {
+                await addNotificationRule({
+                  ...rule,
+                  id: undefined,
+                  createdAt: undefined,
+                  updatedAt: undefined,
+                });
+                successCount++;
+              } else {
+                errorCount++;
+              }
+            } catch (error) {
+              console.error('Error importing rule:', rule.name, error);
               errorCount++;
             }
-          } catch (error) {
-            console.error('Error importing rule:', rule.name, error);
-            errorCount++;
           }
+          toast.success(`${successCount} rules imported successfully.`, {
+            description: errorCount > 0 ? `${errorCount} rules failed to import.` : undefined,
+          });
+          fetchRules(); // Refresh the list
         }
 
-        toast.success(`${successCount} rules imported successfully.`, {
-          description: errorCount > 0 ? `${errorCount} rules failed to import.` : undefined,
-        });
-
-        fetchRules(); // Refresh the list
+        toast.success("Configuration imported successfully.");
       } catch (error) {
         console.error('Failed to import rules:', error);
         toast.error('Failed to import rules.', { description: String(error) });

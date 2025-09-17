@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
-import { notificationConfig } from '@/config/notification.config';
 import fs from 'fs/promises';
 import path from 'path';
 
-const SETTINGS_FILE = path.resolve(process.cwd(), 'config/recipient-settings.json');
+const RECIPIENT_SETTINGS_FILE = path.resolve(process.cwd(), 'config/recipient-settings.json');
+const SMTP_SETTINGS_FILE = path.resolve(process.cwd(), 'config/smtp.config.json');
 
 async function getRecipients() {
   try {
-    const data = await fs.readFile(SETTINGS_FILE, 'utf-8');
+    const data = await fs.readFile(RECIPIENT_SETTINGS_FILE, 'utf-8');
     return JSON.parse(data);
   } catch (error) {
     console.error('Error reading recipient settings:', error);
@@ -16,9 +16,20 @@ async function getRecipients() {
   }
 }
 
+async function getSmtpConfig() {
+    try {
+        const data = await fs.readFile(SMTP_SETTINGS_FILE, 'utf-8');
+        return JSON.parse(data);
+    } catch (error) {
+        console.error('Error reading SMTP settings:', error);
+        return null;
+    }
+}
+
 export async function POST(request: Request) {
   const { rule, currentValue } = await request.json();
   const recipients = await getRecipients();
+  const smtpConfig = await getSmtpConfig();
 
   if (!rule) {
     return NextResponse.json({ error: 'Missing notification rule data' }, { status: 400 });
@@ -26,20 +37,12 @@ export async function POST(request: Request) {
 
   const { name, severity, message, sendEmail, sendSms } = rule;
 
-  if (sendEmail && recipients?.email) {
+  if (sendEmail && recipients?.email && smtpConfig) {
     try {
-      const transporter = nodemailer.createTransport({
-        host: notificationConfig.smtp.host,
-        port: notificationConfig.smtp.port,
-        secure: notificationConfig.smtp.secure,
-        auth: {
-          user: notificationConfig.smtp.auth.user,
-          pass: notificationConfig.smtp.auth.pass,
-        },
-      });
+      const transporter = nodemailer.createTransport(smtpConfig);
 
       const mailOptions = {
-        from: `"AV Dashboard" <${notificationConfig.smtp.auth.user}>`,
+        from: `"AV Dashboard" <${smtpConfig.auth.user}>`,
         to: recipients.email,
         subject: `[${severity.toUpperCase()}] Alert: ${name}`,
         html: `
