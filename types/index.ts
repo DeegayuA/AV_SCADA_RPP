@@ -32,3 +32,36 @@ export interface AppOnboardingData {
 }
 
 export * from './notifications';
+export * from './weather';
+
+// --- Weather Card Configuration ---
+export interface ConfiguredOpcUaItem {
+  definitionId: string;
+  opcUaNodeId?: string;
+  label?: string;
+  unit?: string;
+  iconName?: string;
+}
+
+export interface WeatherCardConfig {
+  opcUaItems: ConfiguredOpcUaItem[];
+  forecastApiKey?: string;
+  forecastCityName?: string;
+  showForecast: boolean;
+  showHourlyForecast: boolean;
+  showDailySummary: boolean;
+  showAirPollution: boolean;
+  numOpcSensorsToShow: number;
+  numHourlyForecastsToShow: number;
+  numDailyForecastsToShow: number;
+  enabled?: boolean;
+}
+
+export interface ScheduledEmail {
+    id: string;
+    subject: string;
+    message: string;
+    rate: number;
+    currency: string;
+    roles: string[];
+}

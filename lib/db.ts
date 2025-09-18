@@ -39,6 +39,43 @@ interface AppConfigValue {
 }
 
 interface SolarDB extends DBSchema {
+  emailQueue: {
+    key: string; // id
+    value: {
+        id: string;
+        email: any; // The email object to be sent
+        status: 'pending' | 'sending' | 'failed';
+        retryCount: number;
+        lastAttempt: number;
+    };
+    indexes: { status: 'string' };
+  };
+  emailLog: {
+    key: string; // YYYY-MM-DD
+    value: {
+        date: string;
+        status: 'sent' | 'failed' | 'pending';
+        lastAttempt: number;
+    };
+  };
+  scheduledEmails: {
+    key: string; // id
+    value: {
+      id: string;
+      subject: string;
+      message: string;
+      rate: number;
+      currency: string;
+      roles: string[];
+    };
+  };
+  dailyGeneration: {
+    key: string; // YYYY-MM-DD
+    value: {
+      totalGeneration: number;
+      lastTimestamp: number;
+    };
+  };
   dataPoints: {
     key: string;
     value: {
@@ -70,8 +107,8 @@ interface SolarDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'solar-minigrid';
-const DB_VERSION = 3; // Incremented version due to new object stores
+export const DB_NAME = 'solar-minigrid';
+const DB_VERSION = 7; // Incremented version due to new object stores
 const APP_CONFIG_KEY = 'mainConfiguration'; // Key for the single config object
 
 let dbPromise: Promise<IDBPDatabase<SolarDB> | null> | null = null;
@@ -127,6 +164,31 @@ export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
               console.log("Created 'activeAlarms' object store and 'ruleId', 'acknowledged' indexes.");
             }
           }
+          if (oldVersion < 4) {
+            if (!dbInstance.objectStoreNames.contains('dailyGeneration')) {
+              dbInstance.createObjectStore('dailyGeneration');
+              console.log("Created 'dailyGeneration' object store.");
+            }
+          }
+          if (oldVersion < 5) {
+            if (!dbInstance.objectStoreNames.contains('scheduledEmails')) {
+              dbInstance.createObjectStore('scheduledEmails', { keyPath: 'id' });
+              console.log("Created 'scheduledEmails' object store.");
+            }
+          }
+          if (oldVersion < 6) {
+            if (!dbInstance.objectStoreNames.contains('emailLog')) {
+              dbInstance.createObjectStore('emailLog', { keyPath: 'date' });
+              console.log("Created 'emailLog' object store.");
+            }
+          }
+          if (oldVersion < 7) {
+            if (!dbInstance.objectStoreNames.contains('emailQueue')) {
+                const emailQueueStore = dbInstance.createObjectStore('emailQueue', { keyPath: 'id' });
+                emailQueueStore.createIndex('status', 'status', { unique: false });
+                console.log("Created 'emailQueue' object store.");
+            }
+          }
         },
         blocked() {
           console.error('IndexedDB blocked. Please close other tabs using this database.');
@@ -153,6 +215,15 @@ export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
     }
   })();
   return dbPromise;
+}
+
+export async function closeDB() {
+    if (dbPromise) {
+        const db = await dbPromise;
+        db?.close();
+        dbPromise = null;
+        console.log("Database connection closed.");
+    }
 }
 
 // --- App Configuration Functions ---
@@ -401,6 +472,109 @@ export async function addNotificationRule(rule: Omit<NotificationRule, 'id' | 'c
     throw error;
   }
 }
+
+// --- Daily Generation Functions ---
+
+export async function updateDailyGeneration(generationNodeId: string, currentValue: number) {
+    const db = await initDB();
+    if (!db) return;
+
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const now = Date.now();
+
+    const tx = db.transaction('dailyGeneration', 'readwrite');
+    const store = tx.objectStore('dailyGeneration');
+
+    let todayData = await store.get(today);
+
+    if (!todayData) {
+        todayData = { totalGeneration: 0, lastTimestamp: now };
+    }
+
+    // This logic assumes currentValue is a cumulative meter reading.
+    // If it's a value for a time period, the logic would be simpler (just add it).
+    // For a cumulative meter, we calculate the delta.
+    const lastValue = (await db.get('dataPoints', generationNodeId))?.value as number | undefined;
+    if (typeof lastValue === 'number' && currentValue >= lastValue) {
+        const delta = currentValue - lastValue;
+        todayData.totalGeneration += delta;
+    }
+
+    todayData.lastTimestamp = now;
+
+    await store.put(todayData, today);
+    await tx.done;
+}
+
+export async function getDailyGeneration(date: string): Promise<number | null> {
+    const db = await initDB();
+    if (!db) return null;
+
+    const data = await db.get('dailyGeneration', date);
+    return data?.totalGeneration ?? null;
+}
+
+// --- Email Log Functions ---
+
+export async function getEmailLog(date: string) {
+    const db = await initDB();
+    if (!db) return null;
+    return db.get('emailLog', date);
+}
+
+export async function addEmailLog(log: { date: string; status: 'sent' | 'failed' | 'pending'; lastAttempt: number }) {
+    const db = await initDB();
+    if (!db) return;
+    return db.put('emailLog', log);
+}
+
+export async function getAllEmailLogs() {
+    const db = await initDB();
+    if (!db) return [];
+    return db.getAll('emailLog');
+}
+
+// --- Scheduled Email Functions ---
+
+export async function getAllScheduledEmails() {
+    const db = await initDB();
+    if (!db) return [];
+    return db.getAll('scheduledEmails');
+}
+
+// --- Email Queue Functions ---
+
+export async function addEmailToQueue(email: any) {
+    const db = await initDB();
+    if (!db) return;
+    const job = {
+        id: uuidv4(),
+        email,
+        status: 'pending',
+        retryCount: 0,
+        lastAttempt: 0,
+    };
+    return db.add('emailQueue', job);
+}
+
+export async function getPendingEmails() {
+    const db = await initDB();
+    if (!db) return [];
+    return db.getAllFromIndex('emailQueue', 'status', 'pending');
+}
+
+export async function updateEmailJob(job: any) {
+    const db = await initDB();
+    if (!db) return;
+    return db.put('emailQueue', job);
+}
+
+export async function deleteEmailJob(id: string) {
+    const db = await initDB();
+    if (!db) return;
+    return db.delete('emailQueue', id);
+}
+
 
 export async function getNotificationRule(id: string): Promise<NotificationRule | undefined> {
   const db = await initDB();

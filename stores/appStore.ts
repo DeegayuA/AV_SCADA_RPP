@@ -53,6 +53,7 @@ interface AppState {
   apiDowntimes: ApiDowntimeEvent[];
   isWebSocketConnected: boolean;
   activeWebSocketUrl: string;
+  sunsetTime: number | null;
 }
 
 // All functions (actions) for the store
@@ -67,6 +68,7 @@ interface AppActions {
   setSoundEnabled: (enabled: boolean) => void;
   setActiveAlarms: (alarms: ActiveAlarm[]) => void;
   setWebSocketStatus: (isConnected: boolean, url: string) => void;
+  setSunsetTime: (time: number) => void;
   addApiConfig: (config: Omit<ApiConfig, 'id' | 'localApi' | 'onlineApi'> & { localUrl: string, onlineUrl: string }) => void;
   updateApiConfig: (configId: string, updates: Partial<ApiConfig>) => void;
   removeApiConfig: (configId: string) => void;
@@ -102,6 +104,7 @@ const initialState: AppState = {
   apiDowntimes: [],
   isWebSocketConnected: false,
   activeWebSocketUrl: '',
+  sunsetTime: null,
 };
 
 const safeLocalStorage: StateStorage = typeof window !== 'undefined' ? localStorage : { getItem: () => null, setItem: () => {}, removeItem: () => {} };
@@ -192,6 +195,8 @@ export const useAppStore = create<FullStoreState>()(
         isWebSocketConnected: isConnected,
         activeWebSocketUrl: url
       }),
+
+      setSunsetTime: (time) => set({ sunsetTime: time }),
 
       addApiConfig: (newConfigPartial) => set((state) => {
         const newId = uuidv4();
@@ -365,6 +370,7 @@ export const useAppStore = create<FullStoreState>()(
             setRequestWithResponse,
             // State to explicitly ignore
             opcUaNodeValues,
+            sunsetTime,
             // ...rest now contains only the AppState we want to save
             ...rest
         } = state;

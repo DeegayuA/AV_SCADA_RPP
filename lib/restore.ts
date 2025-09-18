@@ -1,6 +1,7 @@
 import { SLDLayout, AppOnboardingData as ExpectedAppOnboardingData } from '@/types/index';
 import { toast } from 'sonner';
 import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as clearIdbBeforeImport } from '@/lib/idb-store';
+import { initDB, closeDB, DB_NAME } from '@/lib/db';
 import { PLANT_NAME } from '@/config/constants';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
@@ -80,8 +81,31 @@ export async function restoreFromBackupContent(
     return;
   }
 
-
   try {
+    // ---!! NEW: WIPE AND RECREATE DATABASE TO AVOID VERSION CONFLICTS !!---
+    setProgress?.("Preparing database...");
+    await closeDB(); // Ensure any existing connection is closed
+    await new Promise<void>((resolve, reject) => {
+        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+        deleteRequest.onsuccess = () => {
+            console.log(`Database "${DB_NAME}" deleted successfully.`);
+            resolve();
+        };
+        deleteRequest.onerror = (event) => {
+            console.error(`Error deleting database "${DB_NAME}":`, event);
+            reject(new Error("Could not delete existing database."));
+        };
+        deleteRequest.onblocked = () => {
+            console.error(`Database "${DB_NAME}" delete blocked. Close other tabs.`);
+            toast.error("Database Restore Blocked", { description: "Please close all other tabs with this application open and try again." });
+            reject(new Error("Database delete operation was blocked."));
+        };
+    });
+
+    await initDB(); // Re-initialize with the latest schema
+    toast.info("Database reset successfully.", { id: importToastId });
+    // ---!! END NEW LOGIC !!---
+
     if (finalSelection.ui && backupData.browserStorage.localStorage) {
       setProgress?.("Restoring UI & Preferences...");
       await new Promise(res => setTimeout(res, 200));

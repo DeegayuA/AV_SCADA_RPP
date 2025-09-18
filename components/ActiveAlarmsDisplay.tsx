@@ -5,16 +5,13 @@ import { useAppStore } from '@/stores/appStore';
 import { updateActiveAlarm } from '@/lib/db';
 import { ActiveAlarm } from '@/types/notifications';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { BellRing, CheckCheck } from 'lucide-react';
+import { BellRing, CheckCheck, X } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
 const ActiveAlarmsDisplay: React.FC = () => {
   const activeAlarms = useAppStore((state) => state.activeAlarms);
   const currentUser = useAppStore((state) => state.currentUser);
-  // No need to call setActiveAlarms directly from here, useNotificationSystem handles it.
 
   const unacknowledgedAlarms = activeAlarms.filter(
     (alarm) =>
@@ -47,65 +44,47 @@ const ActiveAlarmsDisplay: React.FC = () => {
   };
 
   if (unacknowledgedAlarms.length === 0) {
-    return null; // Or a subtle "No active critical alarms" message if preferred
+    return null;
   }
 
+  // Get the most severe alarm to display
+  const mostSevereAlarm = unacknowledgedAlarms.reduce((prev, current) => {
+    if (current.originalRuleDetails?.severity === 'critical') return current;
+    if (prev.originalRuleDetails?.severity === 'critical') return prev;
+    return current;
+  });
+
+  const isCritical = mostSevereAlarm.originalRuleDetails?.severity === 'critical';
+
   return (
-    <div className="fixed bottom-4 right-4 z-[100] w-full max-w-md space-y-3">
-      {unacknowledgedAlarms.map((alarm) => (
-        <Card
-          key={alarm.id}
-          className={`border-2 ${
-            alarm.originalRuleDetails?.severity === 'critical'
-              ? 'border-red-500/80 bg-red-500/10 dark:bg-red-900/30'
-              : 'border-yellow-500/80 bg-yellow-500/10 dark:bg-yellow-900/30'
-          } shadow-xl animate-pulse-once-fast`} // Custom animation for new alarms
-        >
-          <CardHeader className="py-3 px-4">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-base font-semibold flex items-center">
-                <BellRing
-                  className={`mr-2 h-5 w-5 ${
-                    alarm.originalRuleDetails?.severity === 'critical' ? 'text-red-500' : 'text-yellow-500'
-                  }`}
-                />
-                {alarm.originalRuleDetails?.name || 'Unnamed Alarm'}
-              </CardTitle>
-              <Badge
-                variant={
-                  alarm.originalRuleDetails?.severity === 'critical' ? 'destructive' : 'secondary'
-                }
-                className={
-                    alarm.originalRuleDetails?.severity === 'critical'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-yellow-500 text-black'
-                }
-              >
-                {alarm.originalRuleDetails?.severity?.toUpperCase() || 'UNKNOWN'}
-              </Badge>
+    <div className={`fixed top-0 left-0 right-0 z-[200] p-2 text-white shadow-lg flex items-center justify-between ${isCritical ? 'bg-red-600' : 'bg-yellow-500'}`}>
+        <div className="flex items-center">
+            <BellRing className="mr-3 h-6 w-6 animate-pulse" />
+            <div>
+                <p className="font-bold">{mostSevereAlarm.originalRuleDetails?.name || 'Unnamed Alarm'}</p>
+                <p className="text-sm">
+                    {String(mostSevereAlarm.currentValue)}{' '}
+                    {mostSevereAlarm.originalRuleDetails?.condition}{' '}
+                    {String(mostSevereAlarm.originalRuleDetails?.thresholdValue)}
+                </p>
             </div>
-          </CardHeader>
-          <CardContent className="py-2 px-4 text-xs">
-            <p className="text-muted-foreground">
-              Triggered: {formatDistanceToNow(new Date(alarm.triggeredAt), { addSuffix: true })}
-            </p>
-            <p className="font-mono my-1">
-              Condition: {String(alarm.currentValue)}{' '}
-              <span className="font-bold">{alarm.originalRuleDetails?.condition}</span>{' '}
-              {String(alarm.originalRuleDetails?.thresholdValue)}
-            </p>
-            <p className="text-muted-foreground text-[11px]">Rule Node ID: {alarm.originalRuleDetails?.nodeId}</p>
+        </div>
+        <div className="flex items-center">
+            {unacknowledgedAlarms.length > 1 && (
+                <span className="text-sm mr-4">(and {unacknowledgedAlarms.length - 1} more)</span>
+            )}
             <Button
-              size="sm"
-              variant="outline"
-              className="mt-2 w-full text-xs h-8 border-gray-400 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700"
-              onClick={() => handleAcknowledge(alarm)}
+                size="sm"
+                variant="outline"
+                className="bg-white/20 hover:bg-white/30 text-white border-white/50"
+                onClick={() => handleAcknowledge(mostSevereAlarm)}
             >
-              <CheckCheck className="mr-1.5 h-3.5 w-3.5" /> Acknowledge
+                <CheckCheck className="mr-2 h-4 w-4" /> Acknowledge
             </Button>
-          </CardContent>
-        </Card>
-      ))}
+            <Button size="sm" variant="ghost" className="ml-2 hover:bg-white/20" onClick={() => toast.dismiss(`alarm-${mostSevereAlarm.id}`)}>
+                <X className="h-5 w-5" />
+            </Button>
+        </div>
     </div>
   );
 };

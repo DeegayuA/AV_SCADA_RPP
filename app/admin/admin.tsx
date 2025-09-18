@@ -6,11 +6,17 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { NotificationConfigModal } from '@/components/admin/NotificationConfigModal'; // Verify path
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { ShieldCheck, BellRing, Users, ScrollText, AlertTriangle, Settings, SlidersHorizontal, BarChart3, LockKeyhole } from 'lucide-react';
+import { ShieldCheck, BellRing, Users, ScrollText, AlertTriangle, Settings, SlidersHorizontal, BarChart3, LockKeyhole, Mail, MessageSquare } from 'lucide-react';
 import { UserRole, User } from '@/types/auth';
 import { useAppStore } from '@/stores/appStore';
 import { cn } from '@/lib/utils'; // For conditional class names
 import { APP_AUTHOR } from '@/config/constants';
+import { ManualNotificationModal } from '@/components/admin/ManualNotificationModal';
+import { SystemLogsModal } from '@/components/admin/SystemLogsModal';
+import { SettingsModal } from '@/components/admin/SettingsModal';
+import { SmtpSettingsModal } from '@/components/admin/SmtpSettingsModal';
+import { ScheduledEmailModal } from '@/components/admin/ScheduledEmailModal';
+import { EmailLogModal } from '@/components/admin/EmailLogModal';
 
 const pageVariants = {
   initial: { opacity: 0, scale: 0.98, y: 10 },
@@ -121,6 +127,12 @@ const AdminActionCard: React.FC<AdminCardProps> = ({ title, description, icon: I
 const AdminPage: React.FC = () => {
     const router = useRouter();
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isManualNotifyModalOpen, setIsManualNotifyModalOpen] = useState(false);
+    const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [isSmtpModalOpen, setIsSmtpModalOpen] = useState(false);
+    const [isScheduledEmailModalOpen, setIsScheduledEmailModalOpen] = useState(false);
+    const [isEmailLogModalOpen, setIsEmailLogModalOpen] = useState(false);
     const currentUser = useAppStore((state) => state.currentUser);
 
     if (currentUser?.role !== UserRole.ADMIN) {
@@ -166,6 +178,46 @@ const AdminPage: React.FC = () => {
         colorClass: "sky", // Just the color name
       },
       {
+        title: "Notification Settings",
+        description: "Configure recipient email and SMS for notifications.",
+        icon: Mail,
+        buttonText: "Configure Recipients",
+        onClick: () => setIsSettingsModalOpen(true),
+        colorClass: "blue",
+      },
+      {
+        title: "SMTP Settings",
+        description: "Configure the SMTP server for sending emails.",
+        icon: Settings,
+        buttonText: "Configure SMTP",
+        onClick: () => setIsSmtpModalOpen(true),
+        colorClass: "orange",
+      },
+      {
+        title: "Scheduled Reports",
+        description: "Configure and manage time-based email reports.",
+        icon: Briefcase,
+        buttonText: "Manage Reports",
+        onClick: () => setIsScheduledEmailModalOpen(true),
+        colorClass: "purple",
+      },
+      {
+        title: "Email Log & Queue",
+        description: "View the status of sent and pending emails.",
+        icon: Mail,
+        buttonText: "View Logs",
+        onClick: () => setIsEmailLogModalOpen(true),
+        colorClass: "teal",
+      },
+      {
+        title: "Manual Notification",
+        description: "Send a one-time email or SMS to configured recipients.",
+        icon: MessageSquare,
+        buttonText: "Send Message",
+        onClick: () => setIsManualNotifyModalOpen(true),
+        colorClass: "green",
+      },
+      {
         title: "User Management",
         description: "View, manage user accounts, roles, and permissions across the platform.",
         icon: Users,
@@ -178,7 +230,7 @@ const AdminPage: React.FC = () => {
         description: "Access and review detailed system operational logs and event histories.",
         icon: ScrollText, // Or your chosen icon
         buttonText: "View Logs",
-        onClick: () => router.push('/admin/system-logs'), // Navigate to the new page
+        onClick: () => setIsLogsModalOpen(true),
         disabled: false, // Enable the card
         colorClass: "emerald", // Or your chosen color
       },
@@ -265,6 +317,36 @@ const AdminPage: React.FC = () => {
                 <NotificationConfigModal
                     isOpen={isModalOpen}
                     onClose={() => setIsModalOpen(false)}
+                />
+
+                <ManualNotificationModal
+                    isOpen={isManualNotifyModalOpen}
+                    onClose={() => setIsManualNotifyModalOpen(false)}
+                />
+
+                <SystemLogsModal
+                    isOpen={isLogsModalOpen}
+                    onClose={() => setIsLogsModalOpen(false)}
+                />
+
+                <SettingsModal
+                    isOpen={isSettingsModalOpen}
+                    onClose={() => setIsSettingsModalOpen(false)}
+                />
+
+                <SmtpSettingsModal
+                    isOpen={isSmtpModalOpen}
+                    onClose={() => setIsSmtpModalOpen(false)}
+                />
+
+                <ScheduledEmailModal
+                    isOpen={isScheduledEmailModalOpen}
+                    onClose={() => setIsScheduledEmailModalOpen(false)}
+                />
+
+                <EmailLogModal
+                    isOpen={isEmailLogModalOpen}
+                    onClose={() => setIsEmailLogModalOpen(false)}
                 />
             </div>
              <footer className="py-10 text-center">
