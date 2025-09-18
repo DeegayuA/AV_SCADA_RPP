@@ -11,6 +11,7 @@ export const plantConfigSchema = z.object({
   opcUaEndpointOnlineIP: z.string().ip({ version: "v4", message: "Invalid IPv4 address" }).optional().or(z.literal('')),
   opcUaEndpointOnlinePort: z.coerce.number().min(1024).max(65535).optional(),
   appName: z.string().optional(),
+  selectedPlant: z.string().optional(),
 });
 
 export type PlantConfigFormData = z.infer<typeof plantConfigSchema>;

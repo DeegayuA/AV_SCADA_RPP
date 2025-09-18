@@ -31,6 +31,9 @@ export interface OnboardingConfigData {
   configuredDataPoints?: DataPointConfig[];
 }
 
+import { BackupFileContent, restoreFromBackupContent } from '@/lib/restore';
+import { useWebSocket } from '@/hooks/useWebSocketListener';
+
 export interface OnboardingContextType {
   currentStep: OnboardingStep;
   nextStep: () => void;
@@ -38,7 +41,10 @@ export interface OnboardingContextType {
   goToStep: (step: number) => void;
   saveStatus: SaveStatus;
   completeOnboarding: () => Promise<void>;
+  restoreAndCompleteOnboarding: (logout: () => void) => Promise<void>;
   resetOnboardingData: () => Promise<void>;
+  backupDataToRestore: BackupFileContent | null;
+  setBackupDataToRestore: (data: BackupFileContent | null) => void;
   configData: OnboardingConfigData;
   updateConfigData: (partialData: Partial<OnboardingConfigData>) => void;
   isLoading: boolean;
@@ -62,6 +68,9 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
   const [currentStep, setCurrentStep] = useState<OnboardingStep>(0);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [isStepLoading, setIsStepLoading] = useState(false);
+  const [backupDataToRestore, setBackupDataToRestore] = useState<BackupFileContent | null>(null);
+  const webSocket = useWebSocket();
+
 
   const [onboardingData, setOnboardingData] = useState<PartialOnboardingData>({
     plantName: initialPlantNameFromConst,
@@ -169,9 +178,31 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [totalSteps]);
 
+  const restoreAndCompleteOnboarding = useCallback(async (logout: () => void) => {
+    if (!backupDataToRestore) {
+      toast.error("Restore failed: No backup data found in context.");
+      return;
+    }
+    toast.info("Restoring settings from template backup...");
+    try {
+      await restoreFromBackupContent(backupDataToRestore, webSocket, logout);
+      // The restore function handles the final success toast and reload, so we might not need to call completeOnboarding here
+      // as it will cause a double redirect/reload.
+      // However, if restoreFromBackupContent is modified to NOT reload, then we would call completeOnboarding.
+      // For now, we assume restoreFromBackupContent completes the process.
+      setSaveStatus('success');
+    } catch (error) {
+      toast.error("Failed to restore from backup.", { description: (error as Error).message });
+      setSaveStatus('error');
+    }
+  }, [backupDataToRestore, webSocket]);
+
   const contextValue = useMemo(() => ({
     currentStep,
     setCurrentStep,
+    backupDataToRestore,
+    setBackupDataToRestore,
+    restoreAndCompleteOnboarding,
     onboardingData,
     updateOnboardingData,
     totalSteps,

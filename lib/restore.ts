@@ -1,6 +1,7 @@
 import { SLDLayout, AppOnboardingData as ExpectedAppOnboardingData } from '@/types/index';
 import { toast } from 'sonner';
 import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as clearIdbBeforeImport } from '@/lib/idb-store';
+import { initDB, closeDB, DB_NAME } from '@/lib/db';
 import { PLANT_NAME } from '@/config/constants';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
@@ -40,7 +41,7 @@ export interface BackupFileContent {
   backupType?: 'manual' | 'auto-backup';
   application: { name: string; version: string };
   plant: { name: string; location: string; capacity: string };
-  configurations?: { dataPointDefinitions?: any[] };
+  configurations?: Record<string, string>;
   userSettings?: { dashboardLayout?: any };
   browserStorage: {
     indexedDB?: { onboardingData?: ExpectedAppOnboardingData; };
@@ -53,6 +54,7 @@ export interface RestoreSelection {
   ui: boolean;
   appSettings: boolean;
   sldLayouts: boolean;
+  configurations: boolean;
 }
 
 export async function restoreFromBackupContent(
@@ -68,6 +70,7 @@ export async function restoreFromBackupContent(
     ui: !!backupData.browserStorage?.localStorage,
     appSettings: !!backupData.browserStorage?.indexedDB,
     sldLayouts: !!backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0,
+    configurations: !!backupData.configurations,
   };
 
   const finalSelection = selection || fullSelection;
@@ -78,8 +81,31 @@ export async function restoreFromBackupContent(
     return;
   }
 
-
   try {
+    // ---!! NEW: WIPE AND RECREATE DATABASE TO AVOID VERSION CONFLICTS !!---
+    setProgress?.("Preparing database...");
+    await closeDB(); // Ensure any existing connection is closed
+    await new Promise<void>((resolve, reject) => {
+        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
+        deleteRequest.onsuccess = () => {
+            console.log(`Database "${DB_NAME}" deleted successfully.`);
+            resolve();
+        };
+        deleteRequest.onerror = (event) => {
+            console.error(`Error deleting database "${DB_NAME}":`, event);
+            reject(new Error("Could not delete existing database."));
+        };
+        deleteRequest.onblocked = () => {
+            console.error(`Database "${DB_NAME}" delete blocked. Close other tabs.`);
+            toast.error("Database Restore Blocked", { description: "Please close all other tabs with this application open and try again." });
+            reject(new Error("Database delete operation was blocked."));
+        };
+    });
+
+    await initDB(); // Re-initialize with the latest schema
+    toast.info("Database reset successfully.", { id: importToastId });
+    // ---!! END NEW LOGIC !!---
+
     if (finalSelection.ui && backupData.browserStorage.localStorage) {
       setProgress?.("Restoring UI & Preferences...");
       await new Promise(res => setTimeout(res, 200));
@@ -124,6 +150,30 @@ export async function restoreFromBackupContent(
       } catch (error) {
         console.error("Failed to restore SLD layouts to localStorage:", error);
         toast.error("SLD Restore Failed", { id: importToastId, description: "Could not save SLD layouts to local storage." });
+      }
+    }
+
+    if (finalSelection.configurations && backupData.configurations) {
+      setProgress?.("Restoring All Plant Configurations...");
+      await new Promise(res => setTimeout(res, 200));
+      try {
+        const response = await fetch('/api/plant-configs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(backupData.configurations),
+        });
+
+        if (!response.ok) {
+          const errorResult = await response.json();
+          throw new Error(errorResult.message || 'Failed to restore plant configuration files.');
+        }
+
+        toast.info("All plant configurations restored.", { id: importToastId });
+      } catch (error) {
+        console.error("Failed to restore plant configuration files:", error);
+        toast.error("Plant Configuration Restore Failed", { id: importToastId, description: (error as Error).message });
       }
     }
 

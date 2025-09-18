@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import {
   Building2, MapPin, Tag, Bolt, Globe, Settings2, Share2, Server, WifiOff, FileText,
-  Loader2, CheckCircle2, XCircle, RefreshCw, AlertCircle, ShieldQuestion,
+  Loader2, CheckCircle2, XCircle, RefreshCw, AlertCircle, ShieldQuestion, DownloadCloud,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -16,6 +16,7 @@ import { plantConfigSchema, PlantConfigFormData } from '@/lib/schema';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useOnboarding } from './OnboardingContext';
 import { APP_NAME, PLANT_CAPACITY, PLANT_LOCATION, PLANT_NAME, PLANT_TYPE } from '@/config/constants';
 import { cn } from '@/lib/utils';
@@ -72,7 +73,33 @@ interface TestState {
 }
 
 export default function PlantConfigStep() {
-  const { onboardingData, updateOnboardingData } = useOnboarding();
+  const { onboardingData, updateOnboardingData, setBackupDataToRestore } = useOnboarding();
+  const [plants, setPlants] = useState<{name: string, path: string}[]>([]);
+  const [isLoadingPlants, setIsLoadingPlants] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPlants = async () => {
+      try {
+        setIsLoadingPlants(true);
+        setError(null);
+        const response = await fetch('https://api.github.com/repos/DeegayuA/AV_SCADA_Configs/contents/');
+        if (!response.ok) {
+          throw new Error(`Failed to fetch plant list from GitHub: ${response.statusText}`);
+        }
+        const data = await response.json();
+        const plantFolders = data.filter((item: any) => item.type === 'dir').map((item: any) => ({ name: item.name, path: item.path }));
+        setPlants(plantFolders);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : 'An unknown error occurred.');
+        toast.error("Could not load remote configurations", { description: e instanceof Error ? e.message : 'Please check your internet connection or proceed with offline mode.' });
+      } finally {
+        setIsLoadingPlants(false);
+      }
+    };
+
+    fetchPlants();
+  }, []);
 
   const form = useForm<PlantConfigFormData>({
     resolver: zodResolver(plantConfigSchema) as any,
@@ -90,7 +117,99 @@ export default function PlantConfigStep() {
     },
   });
 
-  const { getValues, formState, watch, trigger } = form;
+  const { getValues, formState, watch, trigger, reset } = form;
+  const [isFetchingConfig, setIsFetchingConfig] = useState(false);
+
+  const selectedPlantPath = watch('selectedPlant');
+
+  useEffect(() => {
+    if (!selectedPlantPath) return;
+
+    const fetchAndApplyConfig = async () => {
+      setIsFetchingConfig(true);
+      toast.info("Fetching configuration for selected plant...", { description: selectedPlantPath });
+      try {
+        // 1. Get the file list for the selected plant
+        const response = await fetch(`https://api.github.com/repos/DeegayuA/AV_SCADA_Configs/contents/${selectedPlantPath}`);
+        if (!response.ok) throw new Error(`Failed to list files for plant: ${response.statusText}`);
+        const files = await response.json();
+
+        const constantsFile = files.find((f: any) => f.name === 'constants.ts');
+        const dataPointsFile = files.find((f: any) => f.name === 'dataPoints.ts');
+
+        if (!constantsFile || !dataPointsFile) {
+          throw new Error("Required configuration files (constants.ts, dataPoints.ts) not found in the repository for this plant.");
+        }
+
+        // 2. Fetch the content of the files
+        const [constantsResponse, dataPointsResponse] = await Promise.all([
+          fetch(constantsFile.download_url),
+          fetch(dataPointsFile.download_url)
+        ]);
+
+        if (!constantsResponse.ok) throw new Error('Failed to download constants.ts');
+        if (!dataPointsResponse.ok) throw new Error('Failed to download dataPoints.ts');
+
+        const constantsContent = await constantsResponse.text();
+        const dataPointsContent = await dataPointsResponse.text();
+
+        // 3. POST the content to our backend to be saved as a new template
+        const importResponse = await fetch('/api/onboarding/import-plant-template', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            plantName: selectedPlantPath,
+            constantsContent,
+            dataPointsContent
+          })
+        });
+
+        if (!importResponse.ok) {
+          const errorBody = await importResponse.json();
+          throw new Error(`Failed to import configuration on server: ${errorBody.message}`);
+        }
+
+        toast.success("Successfully imported remote configuration.", { description: "Form has been updated with the new values." });
+
+        // 4. Parse constants.ts content and pre-fill the form
+        const plantNameMatch = constantsContent.match(/export const PLANT_NAME\s*=\s*['"`](.*?)['"`]/);
+        const plantLocationMatch = constantsContent.match(/export const PLANT_LOCATION\s*=\s*['"`](.*?)['"`]/);
+        const plantTypeMatch = constantsContent.match(/export const PLANT_TYPE\s*=\s*['"`](.*?)['"`]/);
+        const plantCapacityMatch = constantsContent.match(/export const PLANT_CAPACITY\s*=\s*['"`](.*?)['"`]/);
+        const appNameMatch = constantsContent.match(/export const APP_NAME\s*=\s*['"`](.*?)['"`]/);
+        const offlineEndpointMatch = constantsContent.match(/export const OPC_UA_ENDPOINT_OFFLINE\s*=\s*['"`]opc\.tcp:\/\/(.*):(\d+)['"`]/);
+        const onlineEndpointMatch = constantsContent.match(/export const OPC_UA_ENDPOINT_ONLINE\s*=\s*['"`]opc\.tcp:\/\/(.*):(\d+)['"`]/);
+
+        const newValues: Partial<PlantConfigFormData> = {};
+        if (plantNameMatch) newValues.plantName = plantNameMatch[1];
+        if (plantLocationMatch) newValues.plantLocation = plantLocationMatch[1];
+        if (plantTypeMatch) newValues.plantType = plantTypeMatch[1];
+        if (plantCapacityMatch) newValues.plantCapacity = plantCapacityMatch[1];
+        if (appNameMatch) newValues.appName = appNameMatch[1];
+        if (offlineEndpointMatch) {
+            newValues.opcUaEndpointOfflineIP = offlineEndpointMatch[1];
+            newValues.opcUaEndpointOfflinePort = parseInt(offlineEndpointMatch[2], 10);
+        }
+        if (onlineEndpointMatch) {
+            newValues.opcUaEndpointOnlineIP = onlineEndpointMatch[1];
+            newValues.opcUaEndpointOnlinePort = parseInt(onlineEndpointMatch[2], 10);
+        }
+
+        reset(newValues);
+
+
+      } catch (e) {
+        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+        setError(errorMessage);
+        toast.error("Failed to apply remote configuration", { description: errorMessage });
+      } finally {
+        setIsFetchingConfig(false);
+      }
+    };
+
+    fetchAndApplyConfig();
+  }, [selectedPlantPath, reset]);
+
 
   const [testStates, setTestStates] = useState<Record<'offline' | 'online', TestState>>({
     offline: { status: 'idle', buttonLabel: 'Test Local PLC', resultMessage: 'Awaiting test for local endpoint.' , resultIcon: ShieldQuestion },
@@ -292,6 +411,112 @@ export default function PlantConfigStep() {
     >
       <Form {...form}>
         <form onSubmit={form.handleSubmit(formSubmitHandler)} className="space-y-10">
+
+          <motion.section variants={itemVariants}>
+            <motion.div variants={sectionTitleVariants} className="flex items-center gap-3 mb-6 sm:mb-7">
+              <DownloadCloud className="h-6 w-6 sm:h-7 sm:w-7 text-primary shrink-0" />
+              <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
+                Load Configuration from Template
+              </h2>
+            </motion.div>
+            {isLoadingPlants && (
+              <div className="flex items-center justify-center p-4 bg-muted/50 rounded-lg">
+                <Loader2 className="h-5 w-5 animate-spin mr-3" />
+                <span className="text-muted-foreground">Loading remote configurations...</span>
+              </div>
+            )}
+            {error && !isLoadingPlants && (
+               <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive">
+                 <div className="flex items-center">
+                    <AlertCircle className="h-5 w-5 mr-3 shrink-0" />
+                    <h3 className="font-semibold">Failed to Load Remote Configurations</h3>
+                 </div>
+                 <p className="text-xs mt-2 ml-8">{error}</p>
+                 <p className="text-xs mt-2 ml-8">You can proceed by filling the form manually below.</p>
+               </div>
+            )}
+            {!isLoadingPlants && !error && plants.length > 0 && (
+              <FormField
+                name="selectedPlant"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Select a Plant Template</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value ?? undefined} disabled={isFetchingConfig}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a plant configuration to load..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {plants.map(plant => (
+                          <SelectItem key={plant.path} value={plant.path}>
+                            {plant.name.replace(/_/g, ' ')}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      This will fetch the configuration from the remote repository and pre-fill the form below.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {error && !isLoadingPlants && (
+              <div className="mt-6">
+                <motion.div variants={sectionTitleVariants} className="flex items-center gap-3 mb-4">
+                  <FileText className="h-6 w-6 sm:h-7 sm:w-7 text-amber-500 shrink-0" />
+                  <h2 className="text-xl sm:text-2xl font-semibold text-gray-800 dark:text-gray-100">
+                    Manual Configuration Upload
+                  </h2>
+                </motion.div>
+                <div className="p-4 border border-dashed border-amber-500/40 rounded-lg bg-amber-500/5 space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Since remote templates could not be loaded, you can upload your configuration files manually.
+                  </p>
+                  <ManualUploadForm
+                    onApply={async (contents) => {
+                      setIsFetchingConfig(true);
+                      toast.info("Importing manual configuration...");
+                      try {
+                        const importResponse = await fetch('/api/onboarding/import-plant-template', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            plantName: contents.plantName,
+                            constantsContent: contents.constants,
+                            dataPointsContent: contents.dataPoints,
+                          })
+                        });
+                        if (!importResponse.ok) {
+                          const errorBody = await importResponse.json();
+                          throw new Error(`Failed to import configuration on server: ${errorBody.message}`);
+                        }
+                        toast.success("Successfully imported manual configuration.");
+
+                        // Pre-fill form from constants file
+                        const plantNameMatch = contents.constants.match(/export const PLANT_NAME\s*=\s*['"`](.*?)['"`]/);
+                        const plantLocationMatch = contents.constants.match(/export const PLANT_LOCATION\s*=\s*['"`](.*?)['"`]/);
+                        const newValues: Partial<PlantConfigFormData> = {};
+                        if (plantNameMatch) newValues.plantName = plantNameMatch[1];
+                        if (plantLocationMatch) newValues.plantLocation = plantLocationMatch[1];
+                        reset(newValues);
+
+                      } catch (e) {
+                        const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
+                        toast.error("Failed to apply manual configuration", { description: errorMessage });
+                      } finally {
+                        setIsFetchingConfig(false);
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </motion.section>
           
           <motion.section variants={itemVariants}>
             <motion.div variants={sectionTitleVariants} className="flex items-center gap-3 mb-6 sm:mb-7">
@@ -478,6 +703,70 @@ export default function PlantConfigStep() {
 // --- Reusable FormFieldItem Component ---
 import { Control } from 'react-hook-form';
 
+interface ManualUploadFormProps {
+  onApply: (contents: { plantName: string; constants: string; dataPoints: string; backup?: string }) => void;
+}
+
+function ManualUploadForm({ onApply }: ManualUploadFormProps) {
+  const [plantName, setPlantName] = useState('');
+  const [constantsFile, setConstantsFile] = useState<File | null>(null);
+  const [dataPointsFile, setDataPointsFile] = useState<File | null>(null);
+  const [isReading, setIsReading] = useState(false);
+
+  const handleFileRead = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result as string);
+      reader.onerror = (e) => reject(new Error(`Failed to read file: ${file.name}`));
+      reader.readAsText(file);
+    });
+  };
+
+  const handleApplyClick = async () => {
+    if (!plantName || !constantsFile || !dataPointsFile) {
+      toast.error("Required fields missing", { description: "Please provide a plant name and select both configuration files." });
+      return;
+    }
+    setIsReading(true);
+    try {
+      const constants = await handleFileRead(constantsFile);
+      const dataPoints = await handleFileRead(dataPointsFile);
+      onApply({ plantName, constants, dataPoints });
+    } catch (error) {
+      toast.error("Error reading files", { description: (error as Error).message });
+    } finally {
+      setIsReading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <FormLabel htmlFor="plant-name-upload">New Plant Name</FormLabel>
+        <Input id="plant-name-upload" type="text" placeholder="e.g., MyCustomPlant" value={plantName} onChange={(e) => setPlantName(e.target.value)} className="mt-1" />
+        <FormDescription className="text-xs mt-1">Provide a unique name for this configuration (no spaces or special characters).</FormDescription>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <FormLabel htmlFor="constants-upload">constants.ts</FormLabel>
+          <Input id="constants-upload" type="file" accept=".ts" onChange={(e) => setConstantsFile(e.target.files?.[0] || null)} className="mt-1" />
+        </div>
+        <div>
+          <FormLabel htmlFor="datapoints-upload">dataPoints.ts</FormLabel>
+          <Input id="datapoints-upload" type="file" accept=".ts" onChange={(e) => setDataPointsFile(e.target.files?.[0] || null)} className="mt-1" />
+        </div>
+      </div>
+      <div className="text-right pt-2">
+        <Button onClick={handleApplyClick} disabled={isReading}>
+          {isReading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+          Apply Manual Files
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+
 interface FormFieldItemProps {
   control: Control<PlantConfigFormData>; 
   name: keyof PlantConfigFormData;
@@ -507,7 +796,7 @@ const FormFieldItem: React.FC<FormFieldItemProps> = ({ control, name, label, pla
                 type={type} 
                 placeholder={placeholder} 
                 {...field} 
-                value={field.value ?? ''}
+                value={String(field.value ?? '')}
                 onChange={(e) => {
                     if (type === 'number') {
                         const val = e.target.value;

@@ -70,7 +70,7 @@ interface SolarDB extends DBSchema {
   };
 }
 
-const DB_NAME = 'solar-minigrid';
+export const DB_NAME = 'solar-minigrid';
 const DB_VERSION = 3; // Incremented version due to new object stores
 const APP_CONFIG_KEY = 'mainConfiguration'; // Key for the single config object
 
@@ -153,6 +153,15 @@ export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
     }
   })();
   return dbPromise;
+}
+
+export async function closeDB() {
+    if (dbPromise) {
+        const db = await dbPromise;
+        db?.close();
+        dbPromise = null;
+        console.log("Database connection closed.");
+    }
 }
 
 // --- App Configuration Functions ---
