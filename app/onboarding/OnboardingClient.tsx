@@ -8,7 +8,7 @@ import { AnimatePresence, motion, Variants } from 'framer-motion';
 import { Loader2, CheckCircle, XOctagon, Sparkles, UserCog, AlertTriangle, ArrowLeft, ArrowRight, Sun, Moon } from 'lucide-react';
 import { toast } from 'sonner';
 
-import { isOnboardingComplete, clearOnboardingData as clearIdbOnboardingDataOnly } from '@/lib/idb-store';
+import { isOnboardingComplete, clearOnboardingData as clearIdbOnboardingDataOnly } from '@/lib/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';

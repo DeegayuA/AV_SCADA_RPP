@@ -21,13 +21,11 @@ import { SLDLayout, AppOnboardingData as ExpectedAppOnboardingData } from '@/typ
 import { UserRole } from '@/types/auth';
 import { toast } from 'sonner';
 
-import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as clearIdbBeforeImport } from '@/lib/idb-store';
 import { PLANT_NAME } from '@/config/constants';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
+import { importDataFromBackup, BackupFileContent, RestoreSelection } from '@/lib/backup-restore';
 
 const EXPECTED_BACKUP_SCHEMA_VERSION = "2.0.0";
-
-import { BackupFileContent, restoreFromBackupContent, RestoreSelection } from '@/lib/restore';
 
 type ImportStage = 'idle' | 'fileSelected' | 'validating' | 'confirmation' | 'importing' | 'completed' | 'error';
 type ValidationStatus = 'pending' | 'valid' | 'invalid' | 'warning';
@@ -52,13 +50,6 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
   const [validationIssues, setValidationIssues] = useState<string[]>([]);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [importProgressMessage, setImportProgressMessage] = useState('');
-  const [restoreSelection, setRestoreSelection] = useState<RestoreSelection>({
-    ui: true,
-    appSettings: true,
-    sldLayouts: true,
-    configurations: true,
-  });
-
   useEffect(() => {
     setIsLoadingAuth(true);
     if (currentUser) {
@@ -180,14 +171,12 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
     setImportStage('importing'); setShowConfirmDialog(false);
 
     try {
-      await restoreFromBackupContent(
-        parsedBackupData,
-        { isConnected, connect: connectWebSocket, sendJsonMessage },
-        logoutUser,
-        setImportProgressMessage,
-        restoreSelection
-      );
+      await importDataFromBackup(parsedBackupData);
       setImportStage('completed');
+      toast.success("Import Complete! Reloading...", {
+        id: 'import-toast', duration: 3000,
+        onAutoClose: () => window.location.reload(), onDismiss: () => window.location.reload(),
+      });
     } catch (error) {
       setImportStage('error');
       setValidationIssues(prev => [...prev, `Runtime import error: ${(error as Error).message}`]);
@@ -196,65 +185,6 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
 
   const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.05 }}};
   const itemVariants = { hidden: { opacity: 0, y: 8 }, visible: { opacity: 1, y: 0 }};
-
-  const BackupSummaryDisplay = () => {
-    if (!parsedBackupData) return null;
-
-    const availableComponents = {
-      ui: parsedBackupData.browserStorage?.localStorage && Object.keys(parsedBackupData.browserStorage.localStorage).length > 0,
-      appSettings: !!parsedBackupData.browserStorage?.indexedDB?.onboardingData,
-      sldLayouts: parsedBackupData.sldLayouts && Object.keys(parsedBackupData.sldLayouts).length > 0,
-      configurations: !!parsedBackupData.configurations && Object.keys(parsedBackupData.configurations).length > 0,
-    };
-
-    const restoreItems = [
-      { id: 'ui', label: 'User Interface & Preferences', icon: Brush, available: availableComponents.ui },
-      { id: 'appSettings', label: 'Application Settings (IndexedDB)', icon: Database, available: availableComponents.appSettings },
-      { id: 'sldLayouts', label: 'SLD Network Diagram Layouts', icon: Network, available: availableComponents.sldLayouts },
-      { id: 'configurations', label: 'All Plant Configurations', icon: Settings, available: availableComponents.configurations },
-    ];
-
-    return (
-      <Card className="bg-muted/30">
-        <CardHeader className="pb-4">
-          <CardTitle className="text-base">Backup Contents</CardTitle>
-          <CardDescription className="text-xs">
-            Created at {new Date(parsedBackupData.createdAt).toLocaleString()}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm font-medium">Select components to restore:</p>
-          {restoreItems.map(item => (
-            <div
-              key={item.id}
-              className={`flex items-center space-x-3 p-2.5 rounded-md transition-all ${!item.available ? 'opacity-50' : ''}`}
-            >
-              <Checkbox
-                id={`restore-${item.id}`}
-                checked={item.available && restoreSelection[item.id as keyof RestoreSelection]}
-                onCheckedChange={(checked) =>
-                  setRestoreSelection(prev => ({...prev, [item.id]: !!checked}))
-                }
-                disabled={!item.available}
-              />
-              <label
-                htmlFor={`restore-${item.id}`}
-                className={`flex items-center text-sm font-medium leading-none ${!item.available ? 'cursor-not-allowed' : 'cursor-pointer'}`}
-              >
-                <item.icon className="w-4 h-4 mr-2" />
-                {item.label}
-              </label>
-            </div>
-          ))}
-          {validationStatus === 'warning' && validationIssues.find(iss => iss.includes("Schema version mismatch")) && (
-               <p className="text-yellow-700 dark:text-yellow-400 text-[11px] mt-1.5 p-1.5 bg-yellow-500/10 rounded-md border border-yellow-500/30">
-                  <AlertTriangle className="inline h-3 w-3 mr-1" /> Schema version mismatch. Use with caution.
-               </p>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
   
   if (isLoadingAuth) {
     return (<div className="flex items-center justify-center min-h-[250px] py-8"> <Loader2 className="h-8 w-8 animate-spin text-primary" /></div>);
@@ -330,7 +260,6 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
               </ul>
               </div>
           )}
-          {validationStatus !== 'invalid' && <BackupSummaryDisplay />}
           <div className="mt-3 flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-border/60">
               <Button variant="outline" size="sm" onClick={resetState} className="text-xs px-3 py-1 h-auto">Cancel/New</Button>
               <Button size="sm" onClick={() => setShowConfirmDialog(true)} disabled={validationStatus === 'invalid'}
@@ -377,11 +306,6 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
               <code className="bg-muted px-1 py-0.5 rounded text-[10px] mx-1 break-all">{uploadedFile?.name || "backup file"}</code>? This is irreversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
-           { parsedBackupData && validationStatus !== 'invalid' && (
-               <div className="text-xs max-h-[150px] overflow-y-auto my-1 custom-scrollbar-thin pr-1"> {/* pr for scrollbar space */}
-                  <BackupSummaryDisplay />
-               </div>
-           )}
           <AlertDialogFooter className="mt-1">
             <AlertDialogCancel onClick={() => setShowConfirmDialog(false)} disabled={importStage === 'importing'} className="px-2.5 py-1 h-auto text-xs">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleImportData} disabled={importStage === 'importing'}

@@ -16,8 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Edit3, Trash2, FlaskConical, AlertTriangle, InfoIcon, ShieldAlert } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { Edit3, Trash2, FlaskConical, CheckCircle, XCircle, AlertTriangle, InfoIcon, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NotificationRulesListProps {
@@ -25,8 +24,6 @@ interface NotificationRulesListProps {
   onEdit: (rule: NotificationRule) => void;
   onDelete: (ruleId: string) => void;
   onTestRule?: (rule: NotificationRule) => void;
-  nodeValues: { [nodeId: string]: any };
-  onToggleRule: (rule: NotificationRule, enabled: boolean) => void;
 }
 
 // FIX: Add explicit 'Variants' type
@@ -68,8 +65,6 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
   onEdit,
   onDelete,
   onTestRule,
-  nodeValues,
-  onToggleRule,
 }) => {
   if (rules.length === 0) {
     return (
@@ -79,6 +74,8 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
     );
   }
 
+  const isDevelopment = !!onTestRule;
+
   return (
     <TooltipProvider delayDuration={100}>
       <div className="border rounded-lg overflow-hidden dark:border-slate-700 shadow-sm">
@@ -87,7 +84,6 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
             <TableRow className="border-b dark:border-slate-600/70">
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300 w-[25%]">Name & Message</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Data Point</TableHead>
-              <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Live Value</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Condition</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300">Severity</TableHead>
               <TableHead className="py-3 px-4 font-semibold text-slate-600 dark:text-slate-300 text-center">Status</TableHead>
@@ -115,9 +111,6 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
                   </p>
                 </TableCell>
                 <TableCell className="py-3 px-4 align-top text-sm text-slate-600 dark:text-slate-300">{rule.dataPointKey}</TableCell>
-                <TableCell className="py-3 px-4 align-top text-sm text-slate-600 dark:text-slate-300">
-                    <span className="font-bold text-primary">{rule.nodeId && nodeValues[rule.nodeId] !== undefined ? String(nodeValues[rule.nodeId]) : 'N/A'}</span>
-                </TableCell>
                 <TableCell className="py-3 px-4 align-top">
                   <Badge variant="outline" className="text-xs font-mono border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                     {rule.condition} {String(rule.thresholdValue)}
@@ -130,15 +123,24 @@ export const NotificationRulesList: React.FC<NotificationRulesListProps> = ({
                   </Badge>
                 </TableCell>
                 <TableCell className="py-3 px-4 align-top text-center">
-                  <Switch
-                    checked={rule.enabled}
-                    onCheckedChange={(enabled) => onToggleRule(rule, enabled)}
-                    aria-label={rule.enabled ? 'Disable Rule' : 'Enable Rule'}
-                  />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        {rule.enabled ? (
+                          <CheckCircle className="h-5 w-5 text-green-500 dark:text-green-400 inline-block" />
+                        ) : (
+                          <XCircle className="h-5 w-5 text-red-500 dark:text-red-400 inline-block" />
+                        )}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent className="bg-slate-800 text-white dark:bg-slate-200 dark:text-slate-900 border-none shadow-lg">
+                      <p>{rule.enabled ? 'Enabled' : 'Disabled'}</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </TableCell>
                 <TableCell className="py-3 px-4 align-top text-right">
                   <div className="flex justify-end space-x-1.5">
-                    {onTestRule && (
+                    {isDevelopment && onTestRule && (
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button

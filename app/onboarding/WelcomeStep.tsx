@@ -12,7 +12,7 @@ import { APP_LOGO, APP_NAME } from '@/config/constants';
 import { useCurrentUser, useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
-import { restoreFromBackupContent, BackupFileContent } from '@/lib/restore';
+import { importDataFromBackup, BackupFileContent } from '@/lib/backup-restore';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWebSocket } from '@/hooks/useWebSocketListener';
@@ -118,8 +118,12 @@ export default function WelcomeStep() {
       if (!response.ok) throw new Error('Failed to fetch backup file from server.');
       
       const backupData: BackupFileContent = await response.json();
-      await restoreFromBackupContent(backupData, { isConnected, connect: connectWebSocket, sendJsonMessage }, logoutUser);
-      // The page will reload after restore, no need to setIsRestoring(false)
+      await importDataFromBackup(backupData);
+      logoutUser();
+      toast.success("Import Complete! Reloading...", {
+        id: 'import-toast', duration: 3000,
+        onAutoClose: () => window.location.reload(), onDismiss: () => window.location.reload(),
+      });
     } catch (error) {
       toast.error('Failed to restore backup', { description: (error as Error).message });
       setIsRestoring(false);

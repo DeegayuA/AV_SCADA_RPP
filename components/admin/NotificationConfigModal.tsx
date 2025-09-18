@@ -25,11 +25,9 @@ import {
 import { NotificationRule } from '@/types/notifications';
 import { dataPoints as allPossibleDataPoints, DataPoint } from '@/config/dataPoints';
 import { toast } from 'sonner';
-import { PlusCircle, BellRing, ArrowLeft, Inbox, Loader2, Edit3, Trash2, FlaskConical, Upload, Download } from 'lucide-react';
+import { PlusCircle, BellRing, ArrowLeft, Inbox, Loader2, Edit3, Trash2, FlaskConical } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { saveAs } from 'file-saver';
-import { useAppStore } from '@/stores/appStore';
 import { Badge } from '@/components/ui/badge';
 
 interface NotificationConfigModalProps {
@@ -61,7 +59,6 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
   const [showForm, setShowForm] = useState(false);
   const [isFormSubmitting, setIsFormSubmitting] = useState(false);
   const [isListLoading, setIsListLoading] = useState(true);
-  const opcUaNodeValues = useAppStore((state) => state.opcUaNodeValues);
 
   const fetchRules = useCallback(async () => {
     setIsListLoading(true);
@@ -122,17 +119,6 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
     });
   };
 
-  const handleToggleRule = async (rule: NotificationRule, enabled: boolean) => {
-    try {
-      await updateNotificationRule({ ...rule, enabled });
-      toast.success(`Rule "${rule.name}" ${enabled ? 'enabled' : 'disabled'}.`);
-      fetchRules(); // Refresh the list
-    } catch (error) {
-      console.error('Failed to toggle rule:', error);
-      toast.error('Failed to update rule status.');
-    }
-  };
-
   const handleSubmitForm = async (
     data: Omit<NotificationRule, 'id' | 'createdAt' | 'updatedAt' | 'thresholdValue'> & { thresholdValue: number | string | boolean }
   ) => {
@@ -162,105 +148,12 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
   };
 
   const handleTestRule = (rule: NotificationRule) => {
-    toast.info(`Sending test notification for rule: "${rule.name}"`);
-    fetch('/api/notify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ rule, currentValue: 'TEST_VALUE' }),
-    }).catch(error => {
-      console.error('[NotificationSystem] Error sending test notification:', error);
-      toast.error('Failed to send test notification.');
+    console.log("Testing Rule:", rule);
+    toast.info(`Simulating test for rule: "${rule.name}"`, {
+      description: `Condition: ${rule.dataPointKey} ${rule.condition} ${String(rule.thresholdValue)}.\nSeverity: ${rule.severity}. Message: "${rule.message}".`,
+      duration: 8000,
+      icon: <FlaskConical className="text-blue-500" />
     });
-  };
-
-  const handleExport = async () => {
-    try {
-      const allRules = await getAllNotificationRules();
-      const recipients = await fetch('/api/settings/recipients').then(res => res.json());
-      const smtp = await fetch('/api/settings/smtp').then(res => res.json());
-
-      const backupData = {
-        notificationRules: allRules,
-        recipientSettings: recipients,
-        smtpSettings: smtp,
-      };
-
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json;charset=utf-8" });
-      saveAs(blob, `notification_config_backup_${new Date().toISOString()}.json`);
-      toast.success("Configuration exported successfully.");
-    } catch (error) {
-      console.error('Failed to export configuration:', error);
-      toast.error('Failed to export configuration.');
-    }
-  };
-
-  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      try {
-        const content = e.target?.result;
-        if (typeof content !== 'string') throw new Error("File content is not a string");
-        const backupData = JSON.parse(content);
-
-        // Import recipient settings
-        if (backupData.recipientSettings) {
-          await fetch('/api/settings/recipients', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(backupData.recipientSettings),
-          });
-        }
-
-        // Import SMTP settings
-        if (backupData.smtpSettings) {
-          await fetch('/api/settings/smtp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(backupData.smtpSettings),
-          });
-        }
-
-        // Import notification rules
-        if (Array.isArray(backupData.notificationRules)) {
-          let successCount = 0;
-          let errorCount = 0;
-
-          for (const rule of backupData.notificationRules) {
-            try {
-              if (rule.name && rule.dataPointKey && rule.condition && rule.severity) {
-                await addNotificationRule({
-                  ...rule,
-                  id: undefined,
-                  createdAt: undefined,
-                  updatedAt: undefined,
-                });
-                successCount++;
-              } else {
-                errorCount++;
-              }
-            } catch (error) {
-              console.error('Error importing rule:', rule.name, error);
-              errorCount++;
-            }
-          }
-          toast.success(`${successCount} rules imported successfully.`, {
-            description: errorCount > 0 ? `${errorCount} rules failed to import.` : undefined,
-          });
-          fetchRules(); // Refresh the list
-        }
-
-        toast.success("Configuration imported successfully.");
-      } catch (error) {
-        console.error('Failed to import rules:', error);
-        toast.error('Failed to import rules.', { description: String(error) });
-      }
-    };
-    reader.readAsText(file);
   };
 
 
@@ -328,18 +221,9 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
                 exit="exit"
                 className="absolute inset-0 flex flex-col"
               >
-                <div className="px-6 pt-6 pb-4 flex items-center gap-2">
+                <div className="px-6 pt-6 pb-4">
                   <Button onClick={handleAddNew} variant="default" className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground group">
                     <PlusCircle className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform" /> Add New Rule
-                  </Button>
-                  <Button onClick={handleExport} variant="outline" className="w-full sm:w-auto">
-                    <Download className="mr-2 h-4 w-4" /> Export Rules
-                  </Button>
-                  <Button asChild variant="outline" className="w-full sm:w-auto">
-                    <label>
-                      <Upload className="mr-2 h-4 w-4" /> Import Rules
-                      <input type="file" accept=".json" className="hidden" onChange={handleImport} />
-                    </label>
                   </Button>
                 </div>
                 
@@ -366,9 +250,7 @@ export const NotificationConfigModal: React.FC<NotificationConfigModalProps> = (
                       rules={rules}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
-                      onTestRule={handleTestRule}
-                      nodeValues={opcUaNodeValues}
-                      onToggleRule={handleToggleRule}
+                      onTestRule={IS_DEVELOPMENT ? handleTestRule : undefined}
                     />
                   )}
                 </ScrollArea>

@@ -25,7 +25,6 @@ import {
 import NotificationSystemProvider from '@/components/NotificationSystemProvider';
 import ActiveAlarmsDisplay from '@/components/ActiveAlarmsDisplay';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
-import { useScheduler } from '@/hooks/useScheduler';
 import { useAppStore } from '@/stores/appStore';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -36,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const currentUserRole = useAppStore((state) => state.currentUser?.role);
 
   useWebSocket(); 
-  useScheduler();
 
   useEffect(() => {
     const hasLoadedBefore = sessionStorage.getItem('hasLoadedBefore');

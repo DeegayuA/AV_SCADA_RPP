@@ -30,8 +30,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
-import { exportIdbData, clearOnboardingData } from '@/lib/idb-store';
-import { restoreFromBackupContent, BackupFileContent, RestoreSelection } from '@/lib/restore';
+import { clearOnboardingData } from '@/lib/db';
+import { exportAllDataForBackup, importDataFromBackup, BackupFileContent, RestoreSelection } from '@/lib/backup-restore';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
 import * as appConstants from '@/config/constants';
 import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
@@ -144,7 +144,7 @@ ActionSection.displayName = "ActionSection";
 
 
 // --- ServerRestoreSection (Correctly Integrated) ---
-const ServerRestoreSection = ({ setShowImportDialog, onBackupFetched }: { setShowImportDialog: (show: boolean) => void, onBackupFetched: (data: BackupFileContent) => void }) => {
+const ServerRestoreSection = ({ setShowImportDialog }: { setShowImportDialog: (show: boolean) => void }) => {
     const [serverBackups, setServerBackups] = useState<ServerBackup[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
@@ -186,7 +186,7 @@ const ServerRestoreSection = ({ setShowImportDialog, onBackupFetched }: { setSho
         }
         const backupData: BackupFileContent = await response.json();
         toast.success("Backup file fetched!", { id: fetchToastId });
-        onBackupFetched(backupData); // Pass data to parent to open selection modal
+        await importDataFromBackup(backupData);
 
       } catch (error) {
         console.error("Server backup fetch failed:", error);
@@ -275,40 +275,7 @@ export default function ResetApplicationPage() {
   const [backupDownloaded, setBackupDownloaded] = useState(false);
   const [showResetConfirmDialog, setShowResetConfirmDialog] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [showRestoreSelectionDialog, setShowRestoreSelectionDialog] = useState(false);
-  const [selectedBackupData, setSelectedBackupData] = useState<BackupFileContent | null>(null);
-  const [backupSelection, setBackupSelection] = useState({
-    configurations: true,
-    ui: true,
-    appSettings: true,
-    sldLayouts: true,
-  });
-
   // --- LOGIC HOOKS ---
-
-  const getAllSldLayoutsFromStorage = useCallback((): Record<string, SLDLayout> => {
-    const allLayouts: Record<string, SLDLayout> = JSON.parse(JSON.stringify(constantSldLayouts));
-    const sldStoragePrefix = 'sldLayout_';
-
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith(sldStoragePrefix)) {
-        try {
-          const rawLayout = localStorage.getItem(key);
-          if (rawLayout) {
-            const parsedLayout = JSON.parse(rawLayout) as SLDLayout;
-            if (parsedLayout?.layoutId) {
-              // Overwrite constant layout with user-saved version
-              allLayouts[parsedLayout.layoutId] = parsedLayout;
-            }
-          }
-        } catch (error) {
-          console.warn(`Could not parse SLD layout from localStorage for key: ${key}`, error);
-        }
-      }
-    }
-    return allLayouts;
-  }, []);
 
   useEffect(() => {
     if (!storeHasHydrated) {
@@ -333,60 +300,11 @@ export default function ResetApplicationPage() {
 
 
   const handleDownloadBackup = async () => {
-    if (Object.values(backupSelection).every(v => !v)) {
-      toast.warning("No components selected", { description: "Please select at least one component to back up." });
-      return;
-    }
-
     setIsBackupInProgress(true);
     const backupToastId = toast.loading("Creating system backup...", { description: "Please remain on this page." });
 
     try {
-      const now = new Date();
-      const localTime = getFormattedTimestamp();
-      let backupData: Partial<BackupFileContent> & { backupSchemaVersion: string, createdAt: string, createdBy: string, application: object, plant: object, backupType: string, localTime: string } = {
-        backupSchemaVersion: "2.0.0",
-        createdAt: now.toISOString(),
-        createdBy: currentUserForUI?.name || 'Unknown Admin',
-        localTime: localTime,
-        application: { name: appConstants.APP_NAME, version: appConstants.VERSION },
-        plant: { name: appConstants.PLANT_NAME, location: appConstants.PLANT_LOCATION, capacity: appConstants.PLANT_CAPACITY },
-        browserStorage: { localStorage: {} },
-        backupType: 'manual',
-      };
-
-      if (backupSelection.configurations) {
-        toast.info("Packaging configurations...", { id: backupToastId });
-        backupData.configurations = { dataPointDefinitions: JSON.stringify(rawDataPointsDefinitions) };
-      }
-
-      if (backupSelection.ui) {
-        toast.info("Packaging UI settings...", { id: backupToastId });
-        const localStorageData: Record<string, any> = {};
-        APP_LOCAL_STORAGE_KEYS.forEach(key => {
-            const item = localStorage.getItem(key);
-            if (item !== null) {
-                try { localStorageData[key] = JSON.parse(item); } catch { localStorageData[key] = item; }
-            }
-        });
-        if (!backupData.browserStorage) {
-          backupData.browserStorage = { localStorage: {} };
-        }
-        backupData.browserStorage.localStorage = localStorageData;
-      }
-
-      if (backupSelection.appSettings) {
-        toast.info("Packaging application settings (IDB)...", { id: backupToastId });
-        const idbData = await exportIdbData();
-        if (!backupData.browserStorage) backupData.browserStorage = { localStorage: {} };
-        backupData.browserStorage.indexedDB = idbData;
-      }
-
-      if (backupSelection.sldLayouts) {
-        toast.info("Packaging SLD layouts...", { id: backupToastId });
-        backupData.sldLayouts = getAllSldLayoutsFromStorage();
-      }
-
+      const backupData = await exportAllDataForBackup();
       const jsonData = JSON.stringify(backupData, null, 2);
 
       // Save to server
@@ -405,7 +323,7 @@ export default function ResetApplicationPage() {
 
       // Save to client machine
       const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8' });
-      saveAs(blob, `manual_backup_${localTime}_${(currentUserForUI?.name || 'system').replace(/\s+/g, '_')}.json`);
+      saveAs(blob, `manual_backup_${backupData.localTime}_${(currentUserForUI?.name || 'system').replace(/\s+/g, '_')}.json`);
 
       toast.success("Backup Download Started!", { id: backupToastId, duration: 6000, description: "Check your browser downloads." });
       setBackupDownloaded(true);
@@ -474,17 +392,6 @@ export default function ResetApplicationPage() {
     );
   }
 
-  const backupItems = [
-    { id: 'configurations', label: 'Core Data Point Definitions', icon: Settings },
-    { id: 'ui', label: 'User Interface & Preferences', icon: Brush },
-    { id: 'appSettings', label: 'Application Settings (IndexedDB)', icon: Database },
-    { id: 'sldLayouts', label: 'SLD Network Diagram Layouts', icon: Network },
-  ];
-
-  const handleBackupSelectionChange = (id: keyof typeof backupSelection) => {
-    setBackupSelection(prev => ({ ...prev, [id]: !prev[id] }));
-  };
-
   return (
     <motion.div
       variants={pageVariants}
@@ -525,44 +432,14 @@ export default function ResetApplicationPage() {
                   className="border-gray-200/80 dark:border-neutral-700/70"
               >
                   <div className="mt-5 space-y-6">
-                    <div className="p-4 border rounded-xl bg-gray-50/70 dark:bg-neutral-900/50">
-                        <h4 className="font-semibold text-gray-700 dark:text-gray-200 flex items-center gap-2.5 mb-4">
-                            <ListChecks className="w-5 h-5 text-sky-500" />
-                            Select Backup Components
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {backupItems.map((item) => (
-                            <motion.div
-                              key={item.id}
-                              variants={interactiveElementVariants}
-                              whileHover="hover"
-                              className="flex items-center space-x-3 p-3 rounded-lg transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                            >
-                              <Checkbox
-                                id={item.id}
-                                checked={backupSelection[item.id as keyof typeof backupSelection]}
-                                onCheckedChange={() => handleBackupSelectionChange(item.id as keyof typeof backupSelection)}
-                                className="w-5 h-5"
-                              />
-                              <label
-                                htmlFor={item.id}
-                                className="flex items-center text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                              >
-                                <item.icon className="w-5 h-5 mr-2 text-gray-500" />
-                                {item.label}
-                              </label>
-                            </motion.div>
-                          ))}
-                        </div>
-                    </div>
                     <motion.div variants={interactiveElementVariants} whileHover="hover" whileTap="tap">
                         <Button
                             onClick={handleDownloadBackup}
-                            disabled={isBackupInProgress || Object.values(backupSelection).every(v => !v)}
+                            disabled={isBackupInProgress}
                             className="w-full text-lg py-7 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
                         >
                         {isBackupInProgress ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Download className="mr-2 h-5 w-5" />}
-                        {isBackupInProgress ? 'Creating Backup...' : 'Download Selected Backup'}
+                        {isBackupInProgress ? 'Creating Backup...' : 'Download Full System Backup'}
                         </Button>
                     </motion.div>
                   </div>
@@ -589,10 +466,6 @@ export default function ResetApplicationPage() {
                   </motion.div>
                  <ServerRestoreSection
                     setShowImportDialog={setShowImportDialog}
-                    onBackupFetched={(data) => {
-                      setSelectedBackupData(data);
-                      setShowRestoreSelectionDialog(true);
-                    }}
                   />
               </ActionSection>
             </TabsContent>
@@ -683,91 +556,7 @@ export default function ResetApplicationPage() {
           </DialogContent>
       </Dialog>
 
-      <RestoreSelectionDialog
-        open={showRestoreSelectionDialog}
-        onOpenChange={setShowRestoreSelectionDialog}
-        backupData={selectedBackupData}
-        onConfirm={async (selection) => {
-          if (!selectedBackupData) return;
-          setShowRestoreSelectionDialog(false);
-          await restoreFromBackupContent(
-            selectedBackupData,
-            { isConnected, connect: connectWebSocket, sendJsonMessage },
-            logoutUser,
-            (message) => toast.info(message),
-            selection
-          );
-        }}
-      />
     </motion.div>
-  );
-}
-
-function RestoreSelectionDialog({ open, onOpenChange, backupData, onConfirm }: {
-  open: boolean,
-  onOpenChange: (open: boolean) => void,
-  backupData: BackupFileContent | null,
-  onConfirm: (selection: RestoreSelection) => void
-}) {
-  if (!backupData) return null;
-
-  const [selection, setSelection] = useState<RestoreSelection>({
-    ui: true,
-    appSettings: true,
-    sldLayouts: true,
-    configurations: true,
-  });
-
-  const availableComponents = {
-    ui: backupData.browserStorage?.localStorage && Object.keys(backupData.browserStorage.localStorage).length > 0,
-    appSettings: !!backupData.browserStorage?.indexedDB?.onboardingData,
-    sldLayouts: backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0,
-  };
-
-  const restoreItems = [
-    { id: 'ui', label: 'User Interface & Preferences', icon: Brush, available: availableComponents.ui },
-    { id: 'appSettings', label: 'Application Settings (IndexedDB)', icon: Database, available: availableComponents.appSettings },
-    { id: 'sldLayouts', label: 'SLD Network Diagram Layouts', icon: Network, available: availableComponents.sldLayouts },
-  ];
-
-  const handleConfirm = () => {
-    onConfirm(selection);
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Select Components to Restore</DialogTitle>
-          <DialogDescription>
-            This backup file contains the following components. Choose which ones you'd like to restore.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3 py-4">
-          {restoreItems.map(item => (
-            <div key={item.id} className={`flex items-center space-x-3 p-2.5 rounded-md transition-all ${!item.available ? 'opacity-50' : ''}`}>
-              <Checkbox
-                id={`server-restore-${item.id}`}
-                checked={item.available && selection[item.id as keyof RestoreSelection]}
-                onCheckedChange={(checked) => setSelection(prev => ({ ...prev, [item.id]: !!checked }))}
-                disabled={!item.available}
-              />
-              <label htmlFor={`server-restore-${item.id}`} className={`flex items-center text-sm font-medium leading-none ${!item.available ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                <item.icon className="w-4 h-4 mr-2" />
-                {item.label}
-              </label>
-            </div>
-          ))}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleConfirm} disabled={Object.values(selection).every(v => !v)}>
-            <RotateCw className="mr-2 h-4 w-4" />
-            Restore Selected
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

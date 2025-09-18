@@ -1,7 +1,6 @@
 // lib/activityLog.ts
 import { useAppStore } from '@/stores/appStore';
 import { User } from '@/types/auth';
-import { LOG_LEVEL } from '@/config/appConfig';
 
 // Defines the structure of a log entry
 export interface ActivityLogEntry {
@@ -19,8 +18,8 @@ export interface ActivityLogEntry {
   // encryptedPayload?: string; // Field to hold encrypted data if individual entries are encrypted
 }
 
-// No longer using in-memory storage
-// const LOG_STORAGE: ActivityLogEntry[] = [];
+// Placeholder for where logs would be stored or sent
+const LOG_STORAGE: ActivityLogEntry[] = []; // Temporary in-memory storage
 
 // --- Encryption Configuration (Conceptual) ---
 // const ENCRYPTION_KEY = process.env.LOG_ENCRYPTION_KEY; // Example: Loaded from environment variables on server
@@ -76,19 +75,8 @@ function decrypt(text: string): string {
 export function logActivity(
   actionType: string,
   details: Record<string, any>,
-  pageUrl?: string,
-  level: 'info' | 'warn' | 'error' = 'info'
+  pageUrl?: string
 ): void {
-  const logLevels = {
-    info: 0,
-    warn: 1,
-    error: 2,
-  };
-
-  if (logLevels[level] < logLevels[LOG_LEVEL as 'info' | 'warn' | 'error']) {
-    return;
-  }
-
   const currentUser = useAppStore.getState().currentUser;
   const currentPath = typeof window !== 'undefined' ? window.location.pathname : undefined;
 
@@ -119,35 +107,43 @@ export function logActivity(
   // }
 
 
-  // Send the log entry to the new API route
-  fetch('/api/logs/write', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(entry),
-  }).catch(error => {
-    console.error('Failed to send log to server:', error);
-  });
+  // Current behavior: Send to a hypothetical API or store in-memory
+  // fetch('/api/log-activity', { method: 'POST', body: JSON.stringify(entry) }); // API would handle file write & server-side encryption
 
+  LOG_STORAGE.push(entry);
   if (process.env.NODE_ENV === 'development') {
     console.log('[Activity Log]', entry);
   }
 }
 
 export async function getActivityLogs(): Promise<ActivityLogEntry[]> {
-  const response = await fetch('/api/logs/read');
-  if (!response.ok) {
-    throw new Error('Failed to fetch logs');
-  }
-  return response.json();
+  // **Decryption Point (Conceptual)**
+  // If logs were fetched from a server API that returns encrypted logs:
+  // 1. The API (`/api/admin/logs`) would read the encrypted file.
+  // 2. For each log line/entry, it would decrypt it using a server-side decrypt function.
+  // 3. The API would return the decrypted logs.
+  // If decryption were to happen client-side (e.g., admin provides a key):
+  //    const fetchedEncryptedLogs = await fetch('/api/admin/logs').then(res => res.json());
+  //    return fetchedEncryptedLogs.map(log => {
+  //      if (log.encryptedPayload) {
+  //        try {
+  //          log.details = JSON.parse(decrypt(log.encryptedPayload));
+  //          delete log.encryptedPayload;
+  //        } catch (e) { console.error('Failed to decrypt log entry', e); log.details = { error: 'decryption_failed' }; }
+  //      }
+  //      return log;
+  //    });
+
+  await new Promise(resolve => setTimeout(resolve, 50));
+  return [...LOG_STORAGE].map(log => ({ ...log })); // Return copies
 }
 
 export async function clearActivityLogs_ONLY_FOR_DEMO(): Promise<void> {
-    // This function is now more complex as it would need to interact with the backend.
-    // For now, we will leave it as a no-op in the context of file-based logging,
-    // as clearing logs should be a deliberate server-side action.
-    console.warn("clearActivityLogs_ONLY_FOR_DEMO is not implemented for file-based logging.");
+    LOG_STORAGE.length = 0;
+    if (process.env.NODE_ENV === 'development') {
+        console.log('[Activity Log] Demo logs cleared.');
+    }
+    await new Promise(resolve => setTimeout(resolve, 50));
 }
 
 // Conceptual API route examples (already commented in the file, ensure they reflect these ideas)

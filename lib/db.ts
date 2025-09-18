@@ -1,7 +1,7 @@
 // lib/db.ts
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { DataPoint } from '@/config/dataPoints'; // Assuming this is used elsewhere or for future plans
-import { toast } from 'sonner'; // Import toast for notifications
+import { DataPoint, DataPointConfig } from '@/config/dataPoints';
+import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationRule, ActiveAlarm } from '../types';
 
@@ -10,13 +10,25 @@ import {
   VERSION, PLANT_NAME, PLANT_LOCATION, PLANT_TYPE, PLANT_CAPACITY,
   APP_NAME, APP_URL, APP_KEYWORDS, APP_DESCRIPTION, APP_FAVICON,
   APP_AUTHOR, APP_AUTHOR_URL, APP_COPYRIGHT, APP_COPYRIGHT_URL,
-  APP_PRIVACY_POLICY, APP_TERMS_OF_SERVICE, AVAILABLE_SLD_LAYOUT_IDS, USER
-  // Note: WS_PORT, WS_URL, OPC_UA_ENDPOINT_OFFLINE, OPC_UA_ENDPOINT_ONLINE are typically
-  // environment-dependent or dynamically calculated, so storing their initial values might
-  // not be ideal. APP_LOGO and APP_LOGO2 are module imports, not simple strings suitable for IDB.
+  APP_PRIVACY_POLICY, APP_TERMS_OF_SERVICE, AVAILABLE_SLD_LAYOUT_IDS, USER,
+  OPC_UA_ENDPOINT_OFFLINE
 } from '@/config/constants';
 
-// Interface for the application configuration data
+// --- Merged Interfaces from idb-store.ts ---
+export interface AppOnboardingData {
+  plantName: string;
+  plantLocation: string;
+  plantType: string;
+  plantCapacity: string;
+  opcUaEndpointOffline: string;
+  opcUaEndpointOnline?: string;
+  appName?: string;
+  configuredDataPoints: DataPointConfig[];
+  onboardingCompleted: boolean;
+  version: string;
+}
+
+// --- Main Database Schema ---
 interface AppConfigValue {
   VERSION: string;
   PLANT_NAME: string;
@@ -39,43 +51,6 @@ interface AppConfigValue {
 }
 
 interface SolarDB extends DBSchema {
-  emailQueue: {
-    key: string; // id
-    value: {
-        id: string;
-        email: any; // The email object to be sent
-        status: 'pending' | 'sending' | 'failed';
-        retryCount: number;
-        lastAttempt: number;
-    };
-    indexes: { status: 'string' };
-  };
-  emailLog: {
-    key: string; // YYYY-MM-DD
-    value: {
-        date: string;
-        status: 'sent' | 'failed' | 'pending';
-        lastAttempt: number;
-    };
-  };
-  scheduledEmails: {
-    key: string; // id
-    value: {
-      id: string;
-      subject: string;
-      message: string;
-      rate: number;
-      currency: string;
-      roles: string[];
-    };
-  };
-  dailyGeneration: {
-    key: string; // YYYY-MM-DD
-    value: {
-      totalGeneration: number;
-      lastTimestamp: number;
-    };
-  };
   dataPoints: {
     key: string;
     value: {
@@ -91,8 +66,8 @@ interface SolarDB extends DBSchema {
       timestamp: number;
     };
   };
-  appConfig: { // New object store for application configuration
-    key: string; // We'll use a single key like 'mainConfiguration'
+  appConfig: {
+    key: string;
     value: AppConfigValue;
   };
   notificationRules: {
@@ -105,18 +80,21 @@ interface SolarDB extends DBSchema {
     value: ActiveAlarm;
     indexes: { ruleId: 'string'; acknowledged: 'boolean' };
   };
+  onboardingData: { // <-- New store, merged from idb-store.ts
+    key: string;
+    value: AppOnboardingData;
+  };
 }
 
-export const DB_NAME = 'solar-minigrid';
-const DB_VERSION = 7; // Incremented version due to new object stores
-const APP_CONFIG_KEY = 'mainConfiguration'; // Key for the single config object
+const DB_NAME = 'solar-minigrid'; // Single DB name
+const DB_VERSION = 4; // Incremented version for schema change
+const APP_CONFIG_KEY = 'mainConfiguration';
+const ONBOARDING_CONFIG_KEY = 'onboardingData'; // Key for the onboarding data
 
 let dbPromise: Promise<IDBPDatabase<SolarDB> | null> | null = null;
 
 export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
   if (typeof window === 'undefined') {
-    console.error("IndexedDB is not available on the server.");
-    // toast.error("Offline Storage Unavailable", { description: "Cannot initialize local database on server." }); // Toast won't work on server
     return null;
   }
 
@@ -126,120 +104,133 @@ export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
 
   dbPromise = (async () => {
     try {
-      console.log("Initializing database...");
+      console.log(`Initializing database '${DB_NAME}' version '${DB_VERSION}'...`);
       const db = await openDB<SolarDB>(DB_NAME, DB_VERSION, {
         upgrade(dbInstance, oldVersion, newVersion, transaction) {
           console.log(`Upgrading database from version ${oldVersion} to ${newVersion}...`);
-          
-          // Create 'dataPoints' store if it doesn't exist (from version < 1)
-          if (oldVersion < 1) {
-            if (!dbInstance.objectStoreNames.contains('dataPoints')) {
-              dbInstance.createObjectStore('dataPoints');
-              console.log("Created 'dataPoints' object store.");
-            }
-            if (!dbInstance.objectStoreNames.contains('controlQueue')) {
-              dbInstance.createObjectStore('controlQueue');
-              console.log("Created 'controlQueue' object store.");
-            }
-          }
 
-          // Create 'appConfig' store if it doesn't exist (from version < 2)
+          if (oldVersion < 1) {
+            dbInstance.createObjectStore('dataPoints');
+            dbInstance.createObjectStore('controlQueue');
+          }
           if (oldVersion < 2) {
-            if (!dbInstance.objectStoreNames.contains('appConfig')) {
-              dbInstance.createObjectStore('appConfig');
-              console.log("Created 'appConfig' object store.");
-            }
+            dbInstance.createObjectStore('appConfig');
           }
-          // Create notificationRules and activeAlarms stores if they don't exist (from version < 3)
           if (oldVersion < 3) {
-            if (!dbInstance.objectStoreNames.contains('notificationRules')) {
-              const notificationRulesStore = dbInstance.createObjectStore('notificationRules', { keyPath: 'id' });
-              notificationRulesStore.createIndex('isEnabled', 'isEnabled', { unique: false });
-              console.log("Created 'notificationRules' object store and 'isEnabled' index.");
-            }
-            if (!dbInstance.objectStoreNames.contains('activeAlarms')) {
-              const activeAlarmsStore = dbInstance.createObjectStore('activeAlarms', { keyPath: 'id' });
-              activeAlarmsStore.createIndex('ruleId', 'ruleId', { unique: false });
-              activeAlarmsStore.createIndex('acknowledged', 'acknowledged', { unique: false });
-              console.log("Created 'activeAlarms' object store and 'ruleId', 'acknowledged' indexes.");
-            }
+            const notificationRulesStore = dbInstance.createObjectStore('notificationRules', { keyPath: 'id' });
+            notificationRulesStore.createIndex('isEnabled', 'isEnabled', { unique: false });
+
+            const activeAlarmsStore = dbInstance.createObjectStore('activeAlarms', { keyPath: 'id' });
+            activeAlarmsStore.createIndex('ruleId', 'ruleId', { unique: false });
+            activeAlarmsStore.createIndex('acknowledged', 'acknowledged', { unique: false });
           }
-          if (oldVersion < 4) {
-            if (!dbInstance.objectStoreNames.contains('dailyGeneration')) {
-              dbInstance.createObjectStore('dailyGeneration');
-              console.log("Created 'dailyGeneration' object store.");
-            }
-          }
-          if (oldVersion < 5) {
-            if (!dbInstance.objectStoreNames.contains('scheduledEmails')) {
-              dbInstance.createObjectStore('scheduledEmails', { keyPath: 'id' });
-              console.log("Created 'scheduledEmails' object store.");
-            }
-          }
-          if (oldVersion < 6) {
-            if (!dbInstance.objectStoreNames.contains('emailLog')) {
-              dbInstance.createObjectStore('emailLog', { keyPath: 'date' });
-              console.log("Created 'emailLog' object store.");
-            }
-          }
-          if (oldVersion < 7) {
-            if (!dbInstance.objectStoreNames.contains('emailQueue')) {
-                const emailQueueStore = dbInstance.createObjectStore('emailQueue', { keyPath: 'id' });
-                emailQueueStore.createIndex('status', 'status', { unique: false });
-                console.log("Created 'emailQueue' object store.");
+          if (oldVersion < 4) { // <-- Add the new object store
+            if (!dbInstance.objectStoreNames.contains('onboardingData')) {
+              dbInstance.createObjectStore('onboardingData');
+              console.log("Created 'onboardingData' object store.");
             }
           }
         },
         blocked() {
-          console.error('IndexedDB blocked. Please close other tabs using this database.');
-          toast.error("Database Blocked", { description: "Please close other instances of this app and refresh."});
+          console.error('IndexedDB blocked.');
+          toast.error("Database Blocked", { description: "Please close other instances of this app." });
         },
         blocking() {
-          console.warn('IndexedDB blocking. Other tabs might be outdated.');
-          toast.warning("Database Update Pending", { description: "A new version of the app needs to update the database. Please refresh other open tabs."});
+          console.warn('IndexedDB blocking.');
+          toast.warning("Database Update Pending", { description: "Please refresh other open tabs." });
         },
         terminated() {
-          console.error('IndexedDB connection terminated unexpectedly.');
-          toast.error("Database Connection Lost", { description: "Local storage connection was terminated."});
-          dbPromise = null; // Reset promise to allow re-initialization
+          console.error('IndexedDB connection terminated.');
+          toast.error("Database Connection Lost");
+          dbPromise = null;
         },
       });
       console.log("Database initialized successfully");
-      toast.success("Local Storage Ready", { description: "Offline capabilities enabled."});
       return db;
     } catch (error) {
       console.error("Error initializing the database:", error);
       toast.error("Database Initialization Failed", { description: error instanceof Error ? error.message : "Could not initialize local storage." });
-      dbPromise = null; // Reset promise on error
-      return null; 
+      dbPromise = null;
+      return null;
     }
   })();
   return dbPromise;
 }
 
-export async function closeDB() {
-    if (dbPromise) {
-        const db = await dbPromise;
-        db?.close();
-        dbPromise = null;
-        console.log("Database connection closed.");
-    }
+// --- Onboarding Data Functions (from idb-store.ts) ---
+
+export async function saveOnboardingData(data: Omit<AppOnboardingData, 'onboardingCompleted' | 'version'>): Promise<void> {
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Cannot save onboarding data." });
+    return;
+  }
+  const fullData: AppOnboardingData = {
+    ...data,
+    onboardingCompleted: true,
+    version: VERSION,
+  };
+  try {
+    await db.put('onboardingData', fullData, ONBOARDING_CONFIG_KEY);
+    toast.success("Onboarding Data Saved");
+  } catch (error) {
+    console.error('Error saving onboarding data:', error);
+    toast.error("Onboarding Save Failed", { description: String(error) });
+    throw error;
+  }
 }
+
+export async function getOnboardingData(): Promise<AppOnboardingData | null> {
+  const db = await initDB();
+  if (!db) return null;
+  try {
+    const data = await db.get('onboardingData', ONBOARDING_CONFIG_KEY);
+    return data || null;
+  } catch (error) {
+    console.error('Error fetching onboarding data:', error);
+    toast.error("Onboarding Fetch Failed", { description: String(error) });
+    return null;
+  }
+}
+
+export async function clearOnboardingData(): Promise<void> {
+  const db = await initDB();
+  if (!db) return;
+  try {
+    await db.delete('onboardingData', ONBOARDING_CONFIG_KEY);
+    toast.info("Onboarding Data Cleared");
+  } catch (error) {
+    console.error('Error clearing onboarding data:', error);
+    toast.error("Onboarding Clear Failed", { description: String(error) });
+    throw error;
+  }
+}
+
+export async function isOnboardingComplete(): Promise<boolean> {
+  const data = await getOnboardingData();
+  return !!data?.onboardingCompleted;
+}
+
+export async function exportIdbData(): Promise<Record<string, any>> {
+  try {
+    const data = await getOnboardingData();
+    if (data) {
+      return { [ONBOARDING_CONFIG_KEY]: data };
+    }
+    return {};
+  } catch (error) {
+    console.error("Error preparing IndexedDB data for export:", error);
+    return {};
+  }
+}
+
 
 // --- App Configuration Functions ---
 
 export async function saveAppConfig() {
-  if (typeof window === 'undefined') {
-    // This might be called during SSR or pre-rendering where window is not available.
-    // console.warn("Cannot save app config: IndexedDB is not available on the server.");
-    return;
-  }
-
+  if (typeof window === 'undefined') return;
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Failed to save app configuration." });
-    return;
-  }
+  if (!db) return;
 
   const configData: AppConfigValue = {
     VERSION, PLANT_NAME, PLANT_LOCATION, PLANT_TYPE, PLANT_CAPACITY,
@@ -250,200 +241,107 @@ export async function saveAppConfig() {
 
   try {
     await db.put('appConfig', configData, APP_CONFIG_KEY);
-    toast.success("App Configuration Saved", { description: `Version ${VERSION} settings stored locally.`});
-    console.log("App configuration saved to IndexedDB:", configData);
   } catch (error) {
     console.error("Error saving app configuration:", error);
-    toast.error("Configuration Save Failed", { description: error instanceof Error ? error.message : String(error) });
   }
 }
 
 export async function getAppConfig(): Promise<AppConfigValue | null> {
-   if (typeof window === 'undefined') {
-    console.warn("Cannot get app config: IndexedDB is not available on the server.");
-    return null;
-  }
+   if (typeof window === 'undefined') return null;
   const db = await initDB();
-  if (!db) {
-    // Not showing toast here as this might be called frequently or on startup.
-    console.error("Database not ready, cannot retrieve app configuration.");
-    return null;
-  }
+  if (!db) return null;
 
   try {
     const config = await db.get('appConfig', APP_CONFIG_KEY);
-    if (config) {
-      console.log("App configuration loaded from IndexedDB:", config);
-      toast.info("App configuration loaded locally."); // Potentially too verbose
-      return config;
-    } else {
-      console.warn("No app configuration found in IndexedDB.");
-      toast.warning("Local Configuration Missing", { description: "No app settings found in local storage." });
-      return null;
-    }
+    return config || null;
   } catch (error) {
     console.error("Error retrieving app configuration:", error);
-    toast.error("Configuration Load Failed", { description: error instanceof Error ? error.message : String(error) });
     return null;
   }
 }
 
-
-// --- Existing Functions (modified for consistency with initDB pattern) ---
+// --- DataPoint and Control Queue Functions ---
 
 export async function updateDataPoint(nodeId: string, value: number | boolean) {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot update data point." });
-    return;
-  }
+  if (!db) return;
   try {
-    await db.put('dataPoints', {
-      timestamp: Date.now(),
-      value,
-    }, nodeId);
-    // console.log(`DataPoint ${nodeId} updated in IDB.`);
+    await db.put('dataPoints', { timestamp: Date.now(), value }, nodeId);
   } catch (error) {
     console.error(`Error updating DataPoint ${nodeId} in IDB:`, error);
-    toast.error("Data Point Update Failed", { description: `Could not save ${nodeId} locally.`});
   }
 }
 
-// Update getDataPoint in /lib/db.ts - This function doesn't use IndexedDB
-// It seems to be a WebSocket fetcher. Keep as is.
 export const getDataPoint = async (nodeId: string): Promise<{ value: any, timestamp?: number } | { value: string, error?: any }> => {
   return new Promise((resolve, reject) => {
     if (typeof window === 'undefined') {
-      // Handle server-side or WebSocket unavailable scenarios
-      console.warn('WebSocket is not available in this environment.');
       return reject({ value: 'Error Fetching Data', error: 'WebSocket unavailable' });
     }
-    // Note: window.location.port might not be correct if your WS server is on a different port than HTTP server.
-    // Assuming WS_PORT from constants is more reliable for the actual WebSocket server.
-    // If the WS server runs on the same port as HTTP, window.location.port is fine.
-    // Using a fixed WS_PORT here or dynamically figuring out the right port is crucial.
-    // For now, sticking to user's code.
-    const wsUrl = `ws://${window.location.hostname}:${window.location.port}/opcua/data`; 
-    // Consider using WS_URL from constants if it's configured correctly for your setup.
-
+    const wsUrl = `ws://${window.location.hostname}:${window.location.port}/opcua/data`;
     let ws: WebSocket;
     try {
        ws = new WebSocket(wsUrl);
     } catch (e) {
-        console.error('WebSocket connection failed to initialize:', e);
         return reject({ value: 'Error Fetching Data', error: 'WebSocket initialization failed' });
     }
     
     const timeout = setTimeout(() => {
-        if (ws.readyState !== WebSocket.OPEN && ws.readyState !== WebSocket.CLOSING) {
-            console.error('WebSocket connection timed out for', nodeId);
-            ws.close(); // Attempt to close before rejecting
-            reject({ value: 'Error Fetching Data', error: 'Connection timeout' });
-        }
-    }, 5000); // 5-second timeout
+      ws.close();
+      reject({ value: 'Error Fetching Data', error: 'Connection timeout' });
+    }, 5000);
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ nodeId }));
-    };
-
+    ws.onopen = () => ws.send(JSON.stringify({ nodeId }));
     ws.onmessage = (event) => {
       clearTimeout(timeout);
       try {
         const data = JSON.parse(event.data as string);
-        if (data.error) {
-          console.error(`WebSocket error for ${nodeId}:`, data.error);
-          reject({ value: 'Error Fetching Data', error: data.error });
-        } else {
-          resolve(data);
-        }
+        if (data.error) reject({ value: 'Error Fetching Data', error: data.error });
+        else resolve(data);
       } catch (e) {
-        console.error(`Error parsing WebSocket message for ${nodeId}:`, e);
         reject({ value: 'Error Fetching Data', error: 'Invalid data format' });
       } finally {
-        if (ws.readyState === WebSocket.OPEN) ws.close();
+        ws.close();
       }
     };
-
     ws.onerror = (error) => {
       clearTimeout(timeout);
-      console.error(`WebSocket error for ${nodeId}:`, error);
       reject({ value: 'Error Fetching Data', error });
-       if (ws.readyState !== WebSocket.CLOSED) ws.close();
-    };
-
-    ws.onclose = (event) => {
-        clearTimeout(timeout);
-        console.log(`WebSocket connection closed for ${nodeId}. Code: ${event.code}, Reason: ${event.reason}`);
-        // Rejection/resolution should have happened in onmessage/onerror typically
+      ws.close();
     };
   });
 };
 
 export async function queueControlAction(nodeId: string, value: number | boolean) {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot queue control action." });
-    return;
-  }
+  if (!db) return;
   const actionKey = `${nodeId}-${Date.now()}`;
   try {
-    await db.put('controlQueue', {
-      nodeId,
-      value,
-      timestamp: Date.now(),
-    }, actionKey);
-    toast.info("Control Action Queued", { description: `${nodeId} will be set to ${value} when online.`});
+    await db.put('controlQueue', { nodeId, value, timestamp: Date.now() }, actionKey);
+    toast.info("Control Action Queued");
   } catch (error) {
-     console.error(`Error queuing control action ${actionKey} in IDB:`, error);
-    toast.error("Control Action Queue Failed", { description: `Could not queue ${nodeId}.`});
+     console.error(`Error queuing control action ${actionKey}:`, error);
   }
 }
 
 export async function getControlQueue() {
   const db = await initDB();
-  if (!db) {
-    console.error("Database not ready, cannot retrieve control queue.");
-    return [];
-  }
+  if (!db) return [];
   try {
     return await db.getAll('controlQueue');
   } catch (error) {
-    console.error(`Error retrieving control queue from IDB:`, error);
-    toast.error("Failed to Get Control Queue", { description: error instanceof Error ? error.message : String(error) });
+    console.error(`Error retrieving control queue:`, error);
     return [];
   }
 }
 
 export async function clearControlQueue() {
   const db = await initDB();
-  if (!db) {
-    console.error("Database not ready, cannot clear control queue.");
-    return;
-  }
+  if (!db) return;
   try {
     await db.clear('controlQueue');
-    toast.success("Control Queue Cleared", { description: "All pending offline actions have been removed."});
+    toast.success("Control Queue Cleared");
   } catch (error) {
-    console.error(`Error clearing control queue in IDB:`, error);
-    toast.error("Failed to Clear Control Queue", { description: error instanceof Error ? error.message : String(error) });
-  }
-}
-
-// Optional: A function to call on app startup to ensure config is saved
-// You might want to call this in your main _app.tsx or a layout component useEffect.
-export async function ensureAppConfigIsSaved() {
-  if (typeof window === 'undefined') return;
-
-  const storedConfig = await getAppConfig();
-  if (!storedConfig || storedConfig.VERSION !== VERSION) {
-    console.log(
-      !storedConfig 
-        ? "No local app configuration found, saving current." 
-        : `Local app configuration version (${storedConfig.VERSION}) outdated, updating to ${VERSION}.`
-    );
-    await saveAppConfig();
-  } else {
-    console.log("Local app configuration is up-to-date.");
+    console.error(`Error clearing control queue:`, error);
   }
 }
 
@@ -451,356 +349,88 @@ export async function ensureAppConfigIsSaved() {
 
 export async function addNotificationRule(rule: Omit<NotificationRule, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<string> {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot add notification rule." });
-    throw new Error("Database not initialized");
-  }
+  if (!db) throw new Error("Database not initialized");
   const now = new Date();
-  const newRule: NotificationRule = {
-    ...rule,
-    id: rule.id || uuidv4(),
-    createdAt: now,
-    updatedAt: now,
-  };
-  try {
-    await db.add('notificationRules', newRule);
-    toast.success("Notification Rule Added", { description: `Rule "${newRule.name}" saved.` });
-    return newRule.id;
-  } catch (error) {
-    console.error("Error adding notification rule:", error);
-    toast.error("Notification Rule Add Failed", { description: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  const newRule: NotificationRule = { ...rule, id: rule.id || uuidv4(), createdAt: now, updatedAt: now };
+  await db.add('notificationRules', newRule);
+  toast.success("Notification Rule Added");
+  return newRule.id;
 }
-
-// --- Daily Generation Functions ---
-
-export async function updateDailyGeneration(generationNodeId: string, currentValue: number) {
-    const db = await initDB();
-    if (!db) return;
-
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const now = Date.now();
-
-    const tx = db.transaction('dailyGeneration', 'readwrite');
-    const store = tx.objectStore('dailyGeneration');
-
-    let todayData = await store.get(today);
-
-    if (!todayData) {
-        todayData = { totalGeneration: 0, lastTimestamp: now };
-    }
-
-    // This logic assumes currentValue is a cumulative meter reading.
-    // If it's a value for a time period, the logic would be simpler (just add it).
-    // For a cumulative meter, we calculate the delta.
-    const lastValue = (await db.get('dataPoints', generationNodeId))?.value as number | undefined;
-    if (typeof lastValue === 'number' && currentValue >= lastValue) {
-        const delta = currentValue - lastValue;
-        todayData.totalGeneration += delta;
-    }
-
-    todayData.lastTimestamp = now;
-
-    await store.put(todayData, today);
-    await tx.done;
-}
-
-export async function getDailyGeneration(date: string): Promise<number | null> {
-    const db = await initDB();
-    if (!db) return null;
-
-    const data = await db.get('dailyGeneration', date);
-    return data?.totalGeneration ?? null;
-}
-
-// --- Email Log Functions ---
-
-export async function getEmailLog(date: string) {
-    const db = await initDB();
-    if (!db) return null;
-    return db.get('emailLog', date);
-}
-
-export async function addEmailLog(log: { date: string; status: 'sent' | 'failed' | 'pending'; lastAttempt: number }) {
-    const db = await initDB();
-    if (!db) return;
-    return db.put('emailLog', log);
-}
-
-export async function getAllEmailLogs() {
-    const db = await initDB();
-    if (!db) return [];
-    return db.getAll('emailLog');
-}
-
-// --- Scheduled Email Functions ---
-
-export async function getAllScheduledEmails() {
-    const db = await initDB();
-    if (!db) return [];
-    return db.getAll('scheduledEmails');
-}
-
-// --- Email Queue Functions ---
-
-export async function addEmailToQueue(email: any) {
-    const db = await initDB();
-    if (!db) return;
-    const job = {
-        id: uuidv4(),
-        email,
-        status: 'pending',
-        retryCount: 0,
-        lastAttempt: 0,
-    };
-    return db.add('emailQueue', job);
-}
-
-export async function getPendingEmails() {
-    const db = await initDB();
-    if (!db) return [];
-    return db.getAllFromIndex('emailQueue', 'status', 'pending');
-}
-
-export async function updateEmailJob(job: any) {
-    const db = await initDB();
-    if (!db) return;
-    return db.put('emailQueue', job);
-}
-
-export async function deleteEmailJob(id: string) {
-    const db = await initDB();
-    if (!db) return;
-    return db.delete('emailQueue', id);
-}
-
 
 export async function getNotificationRule(id: string): Promise<NotificationRule | undefined> {
   const db = await initDB();
-  if (!db) {
-    // No toast, might be called frequently or internally
-    console.error("Database not ready, cannot get notification rule.");
-    return undefined;
-  }
-  try {
-    return await db.get('notificationRules', id);
-  } catch (error) {
-    console.error(`Error getting notification rule ${id}:`, error);
-    toast.error("Notification Rule Fetch Failed", { description: error instanceof Error ? error.message : String(error) });
-    return undefined;
-  }
+  if (!db) return undefined;
+  return await db.get('notificationRules', id);
 }
 
 export async function getAllNotificationRules(): Promise<NotificationRule[]> {
   const db = await initDB();
-  if (!db) {
-    console.error("Database not ready, cannot get all notification rules.");
-    return [];
-  }
-  try {
-    return await db.getAll('notificationRules');
-  } catch (error) {
-    console.error("Error getting all notification rules:", error);
-    toast.error("Failed to Fetch Notification Rules", { description: error instanceof Error ? error.message : String(error) });
-    return [];
-  }
-}
-
-export async function getEnabledNotificationRules(): Promise<NotificationRule[]> {
-  const db = await initDB();
-  if (!db) {
-    console.error("Database not ready, cannot get enabled notification rules.");
-    return [];
-  }
-  try {
-    return await db.getAllFromIndex('notificationRules', 'isEnabled', IDBKeyRange.only(1)); // Convert boolean true to number 1
-  } catch (error) {
-    console.error("Error getting enabled notification rules:", error);
-    toast.error("Failed to Fetch Enabled Rules", { description: error instanceof Error ? error.message : String(error) });
-    return [];
-  }
+  if (!db) return [];
+  return await db.getAll('notificationRules');
 }
 
 export async function updateNotificationRule(ruleUpdate: Partial<NotificationRule> & { id: string }): Promise<void> {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot update notification rule." });
-    throw new Error("Database not initialized");
-  }
-  try {
-    const existingRule = await db.get('notificationRules', ruleUpdate.id);
-    if (!existingRule) {
-      throw new Error(`Notification rule with id ${ruleUpdate.id} not found.`);
-    }
-    const updatedRule = {
-      ...existingRule,
-      ...ruleUpdate,
-      updatedAt: new Date(),
-    };
-    await db.put('notificationRules', updatedRule);
-    toast.success("Notification Rule Updated", { description: `Rule "${updatedRule.name}" updated.` });
-  } catch (error) {
-    console.error("Error updating notification rule:", error);
-    toast.error("Notification Rule Update Failed", { description: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  if (!db) throw new Error("Database not initialized");
+  const existingRule = await db.get('notificationRules', ruleUpdate.id);
+  if (!existingRule) throw new Error(`Rule ${ruleUpdate.id} not found.`);
+  const updatedRule = { ...existingRule, ...ruleUpdate, updatedAt: new Date() };
+  await db.put('notificationRules', updatedRule);
+  toast.success("Notification Rule Updated");
 }
 
 export async function deleteNotificationRule(id: string): Promise<void> {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot delete notification rule." });
-    throw new Error("Database not initialized");
-  }
-  try {
-    await db.delete('notificationRules', id);
-    // Also delete associated active alarms
-    await deleteActiveAlarmsByRuleId(id);
-    toast.success("Notification Rule Deleted", { description: `Rule ${id} and associated alarms deleted.` });
-  } catch (error) {
-    console.error(`Error deleting notification rule ${id}:`, error);
-    toast.error("Notification Rule Delete Failed", { description: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  if (!db) throw new Error("Database not initialized");
+  await db.delete('notificationRules', id);
+  await deleteActiveAlarmsByRuleId(id);
+  toast.success("Notification Rule Deleted");
 }
 
 // --- ActiveAlarm CRUD Functions ---
 
 export async function addActiveAlarm(alarm: Omit<ActiveAlarm, 'id' | 'triggeredAt' | 'lastNotifiedAt'> & { id?: string }): Promise<string> {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot add active alarm." });
-    throw new Error("Database not initialized");
-  }
+  if (!db) throw new Error("Database not initialized");
   const now = new Date();
-  const newAlarm: ActiveAlarm = {
-    ...alarm,
-    id: alarm.id || uuidv4(),
-    triggeredAt: now,
-    lastNotifiedAt: now,
-  };
-  try {
-    await db.add('activeAlarms', newAlarm);
-    toast.info("New Active Alarm", { description: `Alarm for rule ${newAlarm.ruleId} triggered.` });
-    return newAlarm.id;
-  } catch (error) {
-    console.error("Error adding active alarm:", error);
-    toast.error("Active Alarm Add Failed", { description: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
-}
-
-export async function getActiveAlarm(id: string): Promise<ActiveAlarm | undefined> {
-  const db = await initDB();
-  if (!db) {
-    console.error("Database not ready, cannot get active alarm.");
-    return undefined;
-  }
-  try {
-    return await db.get('activeAlarms', id);
-  } catch (error) {
-    console.error(`Error getting active alarm ${id}:`, error);
-    toast.error("Active Alarm Fetch Failed", { description: error instanceof Error ? error.message : String(error) });
-    return undefined;
-  }
+  const newAlarm: ActiveAlarm = { ...alarm, id: alarm.id || uuidv4(), triggeredAt: now, lastNotifiedAt: now };
+  await db.add('activeAlarms', newAlarm);
+  toast.info("New Active Alarm");
+  return newAlarm.id;
 }
 
 export async function getAllActiveAlarms(): Promise<ActiveAlarm[]> {
   const db = await initDB();
-  if (!db) {
-    console.error("Database not ready, cannot get all active alarms.");
-    return [];
-  }
-  try {
-    return await db.getAll('activeAlarms');
-  } catch (error) {
-    console.error("Error getting all active alarms:", error);
-    toast.error("Failed to Fetch Active Alarms", { description: error instanceof Error ? error.message : String(error) });
-    return [];
-  }
-}
-
-export async function getUnacknowledgedActiveAlarms(): Promise<ActiveAlarm[]> {
-  const db = await initDB();
-  if (!db) {
-    console.error("Database not ready, cannot get unacknowledged active alarms.");
-    return [];
-  }
-  try {
-    return await db.getAllFromIndex('activeAlarms', 'acknowledged', IDBKeyRange.only(0)); // Convert boolean false to number 0
-  } catch (error) {
-    console.error("Error getting unacknowledged active alarms:", error);
-    toast.error("Failed to Fetch Unacknowledged Alarms", { description: error instanceof Error ? error.message : String(error) });
-    return [];
-  }
+  if (!db) return [];
+  return await db.getAll('activeAlarms');
 }
 
 export async function updateActiveAlarm(alarmUpdate: Partial<ActiveAlarm> & { id: string }): Promise<void> {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot update active alarm." });
-    throw new Error("Database not initialized");
-  }
-  try {
-    const existingAlarm = await db.get('activeAlarms', alarmUpdate.id);
-    if (!existingAlarm) {
-      throw new Error(`Active alarm with id ${alarmUpdate.id} not found.`);
-    }
-    const updatedAlarm = {
-      ...existingAlarm,
-      ...alarmUpdate,
-      // lastNotifiedAt could be updated here if the update is for a re-notification
-    };
-    await db.put('activeAlarms', updatedAlarm);
-    toast.success("Active Alarm Updated", { description: `Alarm ${updatedAlarm.id} updated.` });
-  } catch (error) {
-    console.error("Error updating active alarm:", error);
-    toast.error("Active Alarm Update Failed", { description: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  if (!db) throw new Error("Database not initialized");
+  const existingAlarm = await db.get('activeAlarms', alarmUpdate.id);
+  if (!existingAlarm) throw new Error(`Alarm ${alarmUpdate.id} not found.`);
+  const updatedAlarm = { ...existingAlarm, ...alarmUpdate };
+  await db.put('activeAlarms', updatedAlarm);
+  toast.success("Active Alarm Updated");
 }
 
 export async function deleteActiveAlarm(id: string): Promise<void> {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot delete active alarm." });
-    throw new Error("Database not initialized");
-  }
-  try {
-    await db.delete('activeAlarms', id);
-    toast.success("Active Alarm Deleted", { description: `Alarm ${id} removed.` });
-  } catch (error) {
-    console.error(`Error deleting active alarm ${id}:`, error);
-    toast.error("Active Alarm Delete Failed", { description: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  if (!db) throw new Error("Database not initialized");
+  await db.delete('activeAlarms', id);
+  toast.success("Active Alarm Deleted");
 }
 
 export async function deleteActiveAlarmsByRuleId(ruleId: string): Promise<void> {
   const db = await initDB();
-  if (!db) {
-    toast.error("Database Not Ready", { description: "Cannot delete active alarms by rule ID." });
-    throw new Error("Database not initialized");
+  if (!db) throw new Error("Database not initialized");
+  const tx = db.transaction('activeAlarms', 'readwrite');
+  const index = tx.store.index('ruleId');
+  let cursor = await index.openCursor(IDBKeyRange.only(ruleId));
+  while (cursor) {
+    await cursor.delete();
+    cursor = await cursor.continue();
   }
-  try {
-    const tx = db.transaction('activeAlarms', 'readwrite');
-    const index = tx.store.index('ruleId');
-    let cursor = await index.openCursor(IDBKeyRange.only(ruleId));
-    let deleteCount = 0;
-    while (cursor) {
-      await cursor.delete();
-      deleteCount++;
-      cursor = await cursor.continue();
-    }
-    await tx.done;
-    if (deleteCount > 0) {
-      toast.info("Associated Alarms Cleared", { description: `${deleteCount} active alarms for rule ${ruleId} deleted.` });
-    }
-    console.log(`Deleted ${deleteCount} active alarms for ruleId ${ruleId}`);
-  } catch (error) {
-    console.error(`Error deleting active alarms for ruleId ${ruleId}:`, error);
-    toast.error("Failed to Delete Associated Alarms", { description: error instanceof Error ? error.message : String(error) });
-    throw error;
-  }
+  await tx.done;
 }

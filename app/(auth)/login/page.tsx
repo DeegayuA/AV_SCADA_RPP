@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon, Zap, LucideProps, Settings2, ShieldCheck, KeyRound, CircleDotDashed, CheckCircle } from 'lucide-react'; // Added CircleDotDashed, CheckCircle
 import { useTheme } from 'next-themes';
 
-import { isOnboardingComplete } from '@/lib/idb-store';
+import { isOnboardingComplete } from '@/lib/db';
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
 import { User, UserRole } from '@/types/auth';
@@ -201,8 +201,7 @@ export default function LoginPage() {
       logActivity(
         'LOGIN_SUCCESS',
         { email: user.email, role: user.role },
-        '/login',
-        'info'
+        '/login'
       );
 
       setCurrentUserInStore(user); // Store user immediately
@@ -238,12 +237,6 @@ export default function LoginPage() {
     } else {
       const msg = 'Invalid credentials. Please review your email and password.';
       toast.error("Login Failed", { description: msg });
-      logActivity(
-        'LOGIN_FAILURE',
-        { error: msg, attemptedEmail: values.email },
-        '/login',
-        'warn'
-      );
       setLoginError(msg);
       if (isAdminSetupLogin) {
         adminSetupForm.setError("root.serverError", { message: msg });

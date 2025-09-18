@@ -2,7 +2,6 @@
 import { useAppStore } from '@/stores/appStore';
 import { WEBSOCKET_CUSTOM_URL_KEY } from '@/config/constants';
 import { useState, useEffect, useCallback } from 'react';
-import { updateDailyGeneration } from '@/lib/db';
 import { toast } from 'sonner';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -107,10 +106,6 @@ export const useWebSocket = () => {
 
                 if (message.type === 'opc-ua-data' && message.payload) {
                     updateOpcUaNodeValues(message.payload);
-                    const generationNodeId = 'ns=4;i=44'; // e-day-daily-power-generation
-                    if (message.payload[generationNodeId] !== undefined) {
-                        updateDailyGeneration(generationNodeId, message.payload[generationNodeId]);
-                    }
                 } else if (message.type === 'response' && message.requestId) {
                     const resolve = connectionManager.pendingRequests.get(message.requestId);
                     if (resolve) {

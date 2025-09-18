@@ -1,7 +1,7 @@
 // app/onboarding/OnboardingContext.tsx
 'use client';
 import React, { createContext, useContext, useState, ReactNode, Dispatch, SetStateAction, useCallback, useMemo } from 'react';
-import { AppOnboardingData, saveOnboardingData as saveToIDB, clearOnboardingData as clearFromIDB } from '@/lib/idb-store';
+import { AppOnboardingData, saveOnboardingData as saveToIDB, clearOnboardingData as clearFromIDB } from '@/lib/db';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { DataPointConfig, dataPoints as actualDefaultDataPointsFromConfig } from '@/config/dataPoints';
@@ -31,7 +31,7 @@ export interface OnboardingConfigData {
   configuredDataPoints?: DataPointConfig[];
 }
 
-import { BackupFileContent, restoreFromBackupContent } from '@/lib/restore';
+import { BackupFileContent, importDataFromBackup } from '@/lib/backup-restore';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 
 export interface OnboardingContextType {
@@ -185,17 +185,18 @@ export const OnboardingProvider = ({ children }: { children: ReactNode }) => {
     }
     toast.info("Restoring settings from template backup...");
     try {
-      await restoreFromBackupContent(backupDataToRestore, webSocket, logout);
-      // The restore function handles the final success toast and reload, so we might not need to call completeOnboarding here
-      // as it will cause a double redirect/reload.
-      // However, if restoreFromBackupContent is modified to NOT reload, then we would call completeOnboarding.
-      // For now, we assume restoreFromBackupContent completes the process.
+      await importDataFromBackup(backupDataToRestore);
       setSaveStatus('success');
+      logout();
+      toast.success("Import Complete! Reloading...", {
+        id: 'import-toast', duration: 3000,
+        onAutoClose: () => window.location.reload(), onDismiss: () => window.location.reload(),
+      });
     } catch (error) {
       toast.error("Failed to restore from backup.", { description: (error as Error).message });
       setSaveStatus('error');
     }
-  }, [backupDataToRestore, webSocket]);
+  }, [backupDataToRestore]);
 
   const contextValue = useMemo(() => ({
     currentStep,

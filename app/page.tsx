@@ -4,7 +4,7 @@ import { useEffect, useState }  from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // CardContent is not used for the WelcomeExperience card anymore
-import { clearOnboardingData } from '@/lib/idb-store'; // For the reset button
+import { clearOnboardingData } from '@/lib/db'; // For the reset button
 import { toast } from 'sonner';
 import WelcomeExperience from './WelcomeExperience';
 
