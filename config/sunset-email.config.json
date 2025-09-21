@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "subject": "Daily Sunset Report",
+  "message": "Hello,\\n\\nHere is your daily summary:\\n\\n- Todays Generation: {{generationValue}} kWh\\n- Estimated Earnings: {{earnings}} {{currency}}\\n\\nThank you!",
+  "currency": "USD",
+  "rate": 0.15
+}

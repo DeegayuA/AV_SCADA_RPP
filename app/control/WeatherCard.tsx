@@ -484,7 +484,7 @@ AnimatedValue.displayName = 'AnimatedValue';
 function usePrevious<T>(value: T): T | undefined { const ref = useRef<T | undefined>(undefined); useEffect(() => { ref.current = value; }); return ref.current; }
 
 // --- Default Configuration ---
-const defaultConfig: WeatherCardConfig = {
+export const defaultConfig: WeatherCardConfig = {
   opcUaItems: STANDARD_WEATHER_ITEM_DEFINITIONS.map(def => ({
     definitionId: def.id, opcUaNodeId: undefined, label: def.defaultLabel, unit: def.defaultUnit,
     ...(def.id === 'custom1' && { iconName: 'Package' as keyof typeof AVAILABLE_CUSTOM_ICONS })
@@ -635,7 +635,7 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
     return () => clearInterval(intervalId);
   }, [resolvedCoordinates, config.forecastApiKey, config.showForecast, config.showHourlyForecast, config.showDailySummary, config.showAirPollution, errorGeocoding]);
 
-  const handleDialogSave = () => { setIsConfigDialogOpen(false); const newConfig = JSON.parse(JSON.stringify(localConfig)); setConfig(newConfig); onConfigChange(newConfig); if (typeof window !== 'undefined') localStorage.setItem(WEATHER_CARD_CONFIG_KEY, JSON.stringify(newConfig)); };
+  const handleDialogSave = () => { setIsConfigDialogOpen(false); const newConfig = JSON.parse(JSON.stringify(localConfig)); setConfig(newConfig); onConfigChange(newConfig); };
   const handleEditClick = () => { setLocalConfig(JSON.parse(JSON.stringify(config))); setIsConfigDialogOpen(true); };
   const handleDialogOnOpenChange = (open: boolean) => { setIsConfigDialogOpen(open); if (open) setLocalConfig(JSON.parse(JSON.stringify(config))); else setSearchTerm({}); };
   const getOpcUaRawValue = (nodeId?: string): string | number | undefined => { if (!nodeId || !opcUaData || opcUaData[nodeId] === undefined || opcUaData[nodeId] === null) return undefined; const value = opcUaData[nodeId]; return typeof value === 'boolean' ? (value ? 1 : 0) : value; };
@@ -1051,45 +1051,5 @@ const WeatherCard: React.FC<WeatherCardProps> = ({ initialConfig, opcUaData, all
 // --- Animation Props ---
 const contentFadeProps: MotionProps = { initial: { opacity: 0, y: 5 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: -5 }, transition: { duration: 0.25, ease: "easeInOut" } };
 
-// --- Config Storage ---
-export const loadWeatherCardConfigFromStorage = (): WeatherCardConfig => {
-  if (typeof window === 'undefined') return JSON.parse(JSON.stringify(defaultConfig));
-  const storedConfig = localStorage.getItem(WEATHER_CARD_CONFIG_KEY);
-  // console.log(`WeatherCard: Loading config from key "${WEATHER_CARD_CONFIG_KEY}"`, storedConfig);
-  if (storedConfig) {
-    try {
-      const parsed = JSON.parse(storedConfig) as Partial<WeatherCardConfig>;
-      console.log('WeatherCard: Parsed stored config:', parsed);
-      const mergedConfig = JSON.parse(JSON.stringify(defaultConfig));
-      if (parsed.forecastApiKey !== undefined) mergedConfig.forecastApiKey = parsed.forecastApiKey;
-      mergedConfig.forecastCityName = parsed.forecastCityName || defaultConfig.forecastCityName;
-      if (parsed.showForecast !== undefined) mergedConfig.showForecast = parsed.showForecast;
-      if (parsed.showHourlyForecast !== undefined) mergedConfig.showHourlyForecast = parsed.showHourlyForecast;
-      if (parsed.showDailySummary !== undefined) mergedConfig.showDailySummary = parsed.showDailySummary;
-      if (parsed.showAirPollution !== undefined) mergedConfig.showAirPollution = parsed.showAirPollution;
-      mergedConfig.numOpcSensorsToShow = parsed.numOpcSensorsToShow || defaultConfig.numOpcSensorsToShow;
-      mergedConfig.numHourlyForecastsToShow = parsed.numHourlyForecastsToShow || defaultConfig.numHourlyForecastsToShow;
-      mergedConfig.numDailyForecastsToShow = parsed.numDailyForecastsToShow || defaultConfig.numDailyForecastsToShow;
-      if (parsed.opcUaItems && Array.isArray(parsed.opcUaItems)) {
-        mergedConfig.opcUaItems = defaultConfig.opcUaItems.map(dfI => {
-          const stI = parsed.opcUaItems?.find(si => si.definitionId === dfI.definitionId);
-          const definition = STANDARD_WEATHER_ITEM_DEFINITIONS.find(d => d.id === dfI.definitionId);
-          if (stI) {
-            return {
-              ...dfI,
-              ...stI,
-              label: stI.label || dfI.label,
-              unit: stI.unit || definition?.defaultUnit || dfI.unit,
-              iconName: stI.iconName || (dfI.definitionId === 'custom1' ? 'Package' : undefined)
-            };
-          }
-          return dfI;
-        });
-      }
-      return mergedConfig;
-    } catch (e) { console.error(`WeatherCard (${WEATHER_CARD_CONFIG_KEY}): Parse error. Defaulting.`, e); }
-  }
-  return JSON.parse(JSON.stringify(defaultConfig));
-};
 
 export default WeatherCard;

@@ -67,7 +67,7 @@ import PowerTimelineGraph, { TimeScale } from './PowerTimelineGraph';
 import PowerTimelineGraphConfigurator, { PowerTimelineGraphConfig, TimelineSeries } from './PowerTimelineGraphConfigurator';
 import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appStore';
 import { logActivity } from '@/lib/activityLog';
-import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
+import WeatherCard, { WeatherCardConfig, defaultConfig as defaultWeatherConfig } from './WeatherCard';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
 
 interface DashboardHeaderControlProps {
@@ -578,7 +578,20 @@ const UnifiedDashboardPage: React.FC = () => {
     setIsWsConfigModalOpen(true);
   }, [webSocketUrl]);
 
-  const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
+  const handleWeatherConfigChange = useCallback(async (newConfig: WeatherCardConfig) => {
+    setWeatherCardConfig(newConfig);
+    try {
+      await fetch('/api/settings/weather', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newConfig),
+      });
+      logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath);
+    } catch (error) {
+      console.error('Failed to save weather settings:', error);
+      toast.error('Failed to save weather settings');
+    }
+  }, [currentPath]);
   const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
 
   useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
@@ -697,7 +710,27 @@ const UnifiedDashboardPage: React.FC = () => {
     }
   }, [powerGraphConfig, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
+  useEffect(() => {
+    if (authCheckComplete) {
+      const fetchWeatherConfig = async () => {
+        try {
+          const response = await fetch('/api/settings/weather');
+          if (response.ok) {
+            const config = await response.json();
+            setWeatherCardConfig(config);
+          } else {
+            console.error('Failed to fetch weather config');
+            // Load default or handle error
+            setWeatherCardConfig(defaultWeatherConfig);
+          }
+        } catch (error) {
+          console.error('Error fetching weather config:', error);
+          setWeatherCardConfig(defaultWeatherConfig);
+        }
+      };
+      fetchWeatherConfig();
+    }
+  }, [authCheckComplete]);
 
   useEffect(() => {
     const fetchStatus = async () => {

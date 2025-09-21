@@ -15,6 +15,7 @@ import { ManualNotificationModal } from '@/components/admin/ManualNotificationMo
 import { SystemLogsModal } from '@/components/admin/SystemLogsModal';
 import { SettingsModal } from '@/components/admin/SettingsModal';
 import { SmtpSettingsModal } from '@/components/admin/SmtpSettingsModal';
+import { SunsetEmailConfigModal } from '@/components/admin/SunsetEmailConfigModal';
 
 const pageVariants = {
   initial: { opacity: 0, scale: 0.98, y: 10 },
@@ -129,6 +130,7 @@ const AdminPage: React.FC = () => {
     const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isSmtpModalOpen, setIsSmtpModalOpen] = useState(false);
+    const [isSunsetEmailModalOpen, setIsSunsetEmailModalOpen] = useState(false);
     const currentUser = useAppStore((state) => state.currentUser);
 
     if (currentUser?.role !== UserRole.ADMIN) {
@@ -239,6 +241,14 @@ const AdminPage: React.FC = () => {
         colorClass: "amber",
       },
       {
+        title: "Sunset Email",
+        description: "Configure the automated daily email sent after sunset.",
+        icon: Mail,
+        buttonText: "Configure Sunset Email",
+        onClick: () => setIsSunsetEmailModalOpen(true),
+        colorClass: "yellow",
+      },
+      {
         title: "Reset Configuration",
         description: "Reset the current configuration to the default state and start the setup process again.",
         icon: Settings,
@@ -317,6 +327,11 @@ const AdminPage: React.FC = () => {
                 <SmtpSettingsModal
                     isOpen={isSmtpModalOpen}
                     onClose={() => setIsSmtpModalOpen(false)}
+                />
+
+                <SunsetEmailConfigModal
+                    isOpen={isSunsetEmailModalOpen}
+                    onClose={() => setIsSunsetEmailModalOpen(false)}
                 />
             </div>
              <footer className="py-10 text-center">
