@@ -54,3 +54,9 @@ config/constants.ts
 config/constants.ts
 /backups
 system.log.json
+
+# Maintenance feature
+/public/maintain_image/
+/public/maintain_image_preview/
+/logs/
+/config/maintenance.json

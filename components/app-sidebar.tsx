@@ -22,6 +22,7 @@ import {
   // ChevronsRight, 
   // Dot, 
   ServerCog, // Added for API Monitoring
+  Wrench,
 } from "lucide-react";
 
 import { NavMain, NavMainItemProps } from "@/components/nav-main";
@@ -99,6 +100,7 @@ const navDataConfig = {
     { title: "Dashboard", url: "/dashboard", icon: Bot, sectionId: "Dashboard", colorKey: "dashboard" },
     { title: "Circuit Layouts", url: "/circuit", icon: BookOpen, sectionId: "Circuit Layouts", colorKey: "circuit" },
   ] as NavMainItemProps[],
+  maintenanceNavItem: { title: "Maintained", url: "/maintained", icon: Wrench, sectionId: "Maintained", colorKey: "red" } as NavMainItemProps,
   adminNavItem: { title: "Administration", url: "/admin", icon: ShieldCheck, sectionId: "Administration", colorKey: "admin" } as NavMainItemProps,
   adminSettingsNavItem: { title: "Mobile Config", url: "/mobile-config", icon: Settings2, sectionId: "Settings", colorKey: "settings" } as NavMainItemProps,
   apiMonitoringNavItem: { title: "API Monitoring", url: "/system/api-monitoring", icon: ServerCog, sectionId: "API Monitoring", colorKey: "system" } as NavMainItemProps,
@@ -150,6 +152,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     // Add API Monitoring for all users
     items.push(navDataConfig.apiMonitoringNavItem);
     
+    if (currentUser && (currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.OPERATOR)) {
+      items.push(navDataConfig.maintenanceNavItem);
+    }
     if (currentUser && currentUser.role === UserRole.ADMIN) {
       items.push(navDataConfig.adminNavItem);
       items.push(navDataConfig.adminSettingsNavItem);
