@@ -56,7 +56,7 @@ config/constants.ts
 system.log.json
 
 # Maintenance feature
-/public/maintain_image/
-/public/maintain_image_preview/
+/public/maintenance_image/
+/public/maintenance_image_preview/
 /logs/
 /config/maintenance.json

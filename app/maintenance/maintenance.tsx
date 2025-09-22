@@ -11,7 +11,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
@@ -215,9 +214,9 @@ const AdminStatusView = ({ items }) => {
       // This is still a simplification and may not be robust for all cases.
       if (uploadHour >= timeSlotHour -1 && uploadHour < timeSlotHour + 2) { // Check within a 3-hour window
         if (uploadHour > timeSlotHour) {
-          return { status: 'Delayed', imageUrl: `/maintain_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${log.filename}` };
+          return { status: 'Delayed', imageUrl: `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${log.filename}` };
         }
-        return { status: 'Yes', imageUrl: `/maintain_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${log.filename}` };
+        return { status: 'Yes', imageUrl: `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${log.filename}` };
       }
     }
 
@@ -388,7 +387,7 @@ const OperatorView = ({ items }) => {
   );
 };
 
-const MaintainedPage = () => {
+const MaintenancePage = () => {
   const [items, setItems] = useState<MaintenanceItem[]>([]);
   const currentUser = useAppStore((state) => state.currentUser);
 
@@ -418,4 +417,4 @@ const MaintainedPage = () => {
   );
 };
 
-export default MaintainedPage;
+export default MaintenancePage;

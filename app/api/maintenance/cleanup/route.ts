@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Date is required.' }, { status: 400 });
   }
 
-  const fullResDir = path.join(process.cwd(), 'public', 'maintain_image', date);
+  const fullResDir = path.join(process.cwd(), 'public', 'maintenance_image', date);
 
   try {
     await fs.access(fullResDir);

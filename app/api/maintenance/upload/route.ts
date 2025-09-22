@@ -40,8 +40,8 @@ export async function POST(request: Request) {
     const dateString = format(date, 'yyyy-MM-dd');
     const dateTimeString = format(date, 'yyyyMMdd_HHmmss');
 
-    const fullResDir = path.join(process.cwd(), 'public', 'maintain_image', dateString);
-    const previewDir = path.join(process.cwd(), 'public', 'maintain_image_preview', dateString);
+    const fullResDir = path.join(process.cwd(), 'public', 'maintenance_image', dateString);
+    const previewDir = path.join(process.cwd(), 'public', 'maintenance_image_preview', dateString);
     const logDir = path.join(process.cwd(), 'logs', 'maintenance');
 
     await fs.mkdir(fullResDir, { recursive: true });
