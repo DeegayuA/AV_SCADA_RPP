@@ -60,3 +60,4 @@ system.log.json
 /public/maintenance_image_preview/
 /logs/
 /config/maintenance.json
+config/maintenance.key

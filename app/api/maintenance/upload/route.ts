@@ -2,16 +2,16 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { format } from 'date-fns';
-import { v4 as uuidv4 } from 'uuid';
 import sharp from 'sharp';
 import crypto from 'crypto';
+import { PLANT_LOCATION } from '@/config/constants';
+import { getEncryptionKey } from '@/lib/maintenance-crypto';
 
-const location = process.env.MAINTENANCE_LOCATION || 'DefaultLocation';
 const IV_LENGTH = 16;
 
-function encrypt(text: string, key: string) {
+function encrypt(text: string, key: Buffer) {
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
   let encrypted = cipher.update(text);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
   return iv.toString('hex') + ':' + encrypted.toString('hex');
@@ -21,9 +21,9 @@ export async function POST(request: Request) {
   // NOTE: This file-based approach for logging is a simplification for this task and is not suitable for a production environment.
   // In a production environment, a more robust logging solution or a database should be used.
   try {
-    const ENCRYPTION_KEY = process.env.MAINTENANCE_ENCRYPTION_KEY;
-    if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
-      return NextResponse.json({ message: 'MAINTENANCE_ENCRYPTION_KEY is not configured correctly on the server.' }, { status: 500 });
+    const encryptionKey = await getEncryptionKey();
+    if (!encryptionKey) {
+      return NextResponse.json({ message: 'Encryption key is not set up on the server.' }, { status: 500 });
     }
 
     const formData = await request.formData();
@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     await fs.mkdir(previewDir, { recursive: true });
     await fs.mkdir(logDir, { recursive: true });
 
-    const filename = `${location}_${itemName.replace(/ /g, '_')}_${itemNumber}_${dateTimeString}_${username}.jpg`;
+    const filename = `${PLANT_LOCATION}_${itemName.replace(/ /g, '_')}_${itemNumber}_${dateTimeString}_${username}.jpg`;
 
     const fullResPath = path.join(fullResDir, filename);
     const previewPath = path.join(previewDir, filename);
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       filename,
     };
 
-    const encryptedLogData = encrypt(JSON.stringify(logData), ENCRYPTION_KEY);
+    const encryptedLogData = encrypt(JSON.stringify(logData), encryptionKey);
     await fs.appendFile(logFilePath, encryptedLogData + '\n');
 
     return NextResponse.json({ message: 'File uploaded successfully.', filename });

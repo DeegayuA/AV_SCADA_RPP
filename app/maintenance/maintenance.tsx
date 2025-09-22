@@ -17,14 +17,46 @@ import { UserRole } from '@/types/auth';
 import { MaintenanceItem } from '@/types/maintenance';
 import { saveMaintenanceConfig, getMaintenanceConfig } from '@/lib/db';
 
-import { Loader2 } from "lucide-react";
+import { Loader2, KeyRound } from "lucide-react";
 
 const AdminView = ({ items, setItems }) => {
   const [isSaving, setIsSaving] = useState(false);
+  const [keyExists, setKeyExists] = useState<boolean | null>(null);
+  const [isGeneratingKey, setIsGeneratingKey] = useState(false);
   const [itemName, setItemName] = useState('');
   const [itemQuantity, setItemQuantity] = useState(1);
   const [timesPerDay, setTimesPerDay] = useState(1);
   const [timeFrames, setTimeFrames] = useState('');
+
+  useEffect(() => {
+    const checkKeyStatus = async () => {
+      try {
+        const response = await fetch('/api/maintenance/key');
+        const data = await response.json();
+        setKeyExists(data.keyExists);
+      } catch (error) {
+        toast.error("Failed to check encryption key status.");
+      }
+    };
+    checkKeyStatus();
+  }, []);
+
+  const handleGenerateKey = async () => {
+    setIsGeneratingKey(true);
+    try {
+      const response = await fetch('/api/maintenance/key', { method: 'POST' });
+      if (response.ok) {
+        toast.success("New encryption key generated successfully.");
+        setKeyExists(true);
+      } else {
+        toast.error("Failed to generate encryption key.");
+      }
+    } catch (error) {
+      toast.error("An error occurred while generating the key.");
+    } finally {
+      setIsGeneratingKey(false);
+    }
+  };
 
   const handleAddItem = () => {
     if (itemName.trim() === '') return;
@@ -59,6 +91,25 @@ const AdminView = ({ items, setItems }) => {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Maintenance Configuration</h1>
+
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle>Log Encryption Key</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {keyExists === null ? (
+            <p>Checking key status...</p>
+          ) : keyExists ? (
+            <p className="text-green-500">Encryption key is set on the server.</p>
+          ) : (
+            <p className="text-red-500">Encryption key is not set. Please generate a key.</p>
+          )}
+          <Button onClick={handleGenerateKey} disabled={isGeneratingKey} className="mt-2">
+            {isGeneratingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isGeneratingKey ? 'Generating...' : 'Generate New Key'}
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card className="mb-4">
         <CardHeader>

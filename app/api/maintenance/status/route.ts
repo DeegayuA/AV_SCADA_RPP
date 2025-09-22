@@ -3,23 +3,26 @@ import fs from 'fs/promises';
 import path from 'path';
 import { format } from 'date-fns';
 import crypto from 'crypto';
+import { getEncryptionKey } from '@/lib/maintenance-crypto';
 
 const IV_LENGTH = 16;
 
-function decrypt(text: string, key: string) {
+function decrypt(text: string, key: Buffer) {
   const textParts = text.split(':');
   const iv = Buffer.from(textParts.shift()!, 'hex');
   const encryptedText = Buffer.from(textParts.join(':'), 'hex');
-  const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key), iv);
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
   let decrypted = decipher.update(encryptedText);
   decrypted = Buffer.concat([decrypted, decipher.final()]);
   return decrypted.toString();
 }
 
 export async function GET(request: Request) {
-  const ENCRYPTION_KEY = process.env.MAINTENANCE_ENCRYPTION_KEY;
-  if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
-    return NextResponse.json({ message: 'MAINTENANCE_ENCRYPTION_KEY is not configured correctly on the server.' }, { status: 500 });
+  const encryptionKey = await getEncryptionKey();
+  if (!encryptionKey) {
+    // If no key, there are no logs to decrypt, so return empty array.
+    // The UI will show a message to generate the key.
+    return NextResponse.json([]);
   }
 
   const { searchParams } = new URL(request.url);
@@ -34,7 +37,7 @@ export async function GET(request: Request) {
     const lines = fileContent.trim().split('\n');
     const decryptedLogs = lines.map(line => {
       try {
-        return JSON.parse(decrypt(line, ENCRYPTION_KEY));
+        return JSON.parse(decrypt(line, encryptionKey));
       } catch (error) {
         console.error('Failed to decrypt or parse log line:', error);
         return null;
