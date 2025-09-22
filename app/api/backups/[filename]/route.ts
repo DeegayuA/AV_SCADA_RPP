@@ -4,9 +4,9 @@ import path from 'path';
 
 export async function GET(
   request: Request,
-  context: any
+  { params }: { params: { filename: string } }
 ) {
-  const filename = context.params.filename;
+  const { filename } = params;
   try {
     // Basic security check to prevent directory traversal
     if (filename.includes('..')) {

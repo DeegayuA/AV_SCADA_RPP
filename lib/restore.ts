@@ -4,8 +4,11 @@ import { saveOnboardingData as saveIdbOnboardingData, clearOnboardingData as cle
 import { initDB, closeDB, DB_NAME } from '@/lib/db';
 import { PLANT_NAME } from '@/config/constants';
 
+const IDB_STORE_DB_NAME = 'SolarMinigridDB'; // From lib/idb-store.ts
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 import { WEATHER_CARD_CONFIG_KEY, WEBSOCKET_CUSTOM_URL_KEY, GRAPH_SERIES_CONFIG_KEY } from '@/config/constants';
+
+const CURRENT_BACKUP_SCHEMA_VERSION = "2.1.0";
 
 // Define legacy graph keys here to avoid circular dependency
 const PAGE_SLUG_FOR_GRAPH = 'control_dashboard';
@@ -69,6 +72,12 @@ export async function restoreFromBackupContent(
 ) {
   const importToastId = toast.loading("Starting restore...");
 
+  if (backupData.backupSchemaVersion < CURRENT_BACKUP_SCHEMA_VERSION) {
+    toast.warning("Older Backup Version", {
+      description: `You are restoring a backup from an older version (v${backupData.backupSchemaVersion}). Some new features may not be restored.`,
+    });
+  }
+
   const fullSelection: RestoreSelection = {
     ui: !!backupData.browserStorage?.localStorage,
     appSettings: !!backupData.browserStorage?.indexedDB,
@@ -89,22 +98,27 @@ export async function restoreFromBackupContent(
     // ---!! NEW: WIPE AND RECREATE DATABASE TO AVOID VERSION CONFLICTS !!---
     setProgress?.("Preparing database...");
     await closeDB(); // Ensure any existing connection is closed
-    await new Promise<void>((resolve, reject) => {
-        const deleteRequest = indexedDB.deleteDatabase(DB_NAME);
-        deleteRequest.onsuccess = () => {
-            console.log(`Database "${DB_NAME}" deleted successfully.`);
-            resolve();
-        };
-        deleteRequest.onerror = (event) => {
-            console.error(`Error deleting database "${DB_NAME}":`, event);
-            reject(new Error("Could not delete existing database."));
-        };
-        deleteRequest.onblocked = () => {
-            console.error(`Database "${DB_NAME}" delete blocked. Close other tabs.`);
-            toast.error("Database Restore Blocked", { description: "Please close all other tabs with this application open and try again." });
-            reject(new Error("Database delete operation was blocked."));
-        };
-    });
+
+    // Delete both databases
+    const dbNames = [DB_NAME, IDB_STORE_DB_NAME];
+    for (const dbName of dbNames) {
+      await new Promise<void>((resolve, reject) => {
+          const deleteRequest = indexedDB.deleteDatabase(dbName);
+          deleteRequest.onsuccess = () => {
+              console.log(`Database "${dbName}" deleted successfully.`);
+              resolve();
+          };
+          deleteRequest.onerror = (event) => {
+              console.error(`Error deleting database "${dbName}":`, event);
+              reject(new Error(`Could not delete existing database: ${dbName}.`));
+          };
+          deleteRequest.onblocked = () => {
+              console.error(`Database "${dbName}" delete blocked. Close other tabs.`);
+              toast.error("Database Restore Blocked", { description: "Please close all other tabs with this application open and try again." });
+              reject(new Error("Database delete operation was blocked."));
+          };
+      });
+    }
 
     await initDB(); // Re-initialize with the latest schema
     toast.info("Database reset successfully.", { id: importToastId });
