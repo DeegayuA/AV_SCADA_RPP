@@ -15,12 +15,18 @@ import {
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { MaintenanceItem } from '@/types/maintenance';
-import { Loader2, KeyRound } from "lucide-react";
+import { Loader2, KeyRound, Settings } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import { Dispatch, SetStateAction } from 'react';
 
 interface AdminViewProps {
   items: MaintenanceItem[];
   setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
+  uploadLogs: Log[];
 }
 
 const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
@@ -113,127 +119,140 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Maintenance Configuration</h1>
-
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>Log Encryption Key</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {keyExists === null ? (
-            <p>Checking key status...</p>
-          ) : keyExists ? (
-            <p className="text-green-500">Encryption key is set on the server.</p>
-          ) : (
-            <p className="text-red-500">Encryption key is not set. Please generate a key.</p>
-          )}
-          <Button onClick={handleGenerateKey} disabled={isGeneratingKey} className="mt-2">
-            {isGeneratingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isGeneratingKey ? 'Generating...' : 'Generate New Key'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle>Add New Item</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-            <div>
-              <Label htmlFor="itemName">Item Name</Label>
-              <Input
-                id="itemName"
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                placeholder="e.g., Inverter"
-              />
-            </div>
-            <div>
-              <Label htmlFor="itemQuantity">Quantity</Label>
-              <Input
-                id="itemQuantity"
-                type="number"
-                value={itemQuantity}
-                onChange={(e) => setItemQuantity(parseInt(e.target.value, 10))}
-                min="1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="timesPerDay">Times per Day</Label>
-              <Input
-                id="timesPerDay"
-                type="number"
-                value={timesPerDay}
-                onChange={(e) => setTimesPerDay(parseInt(e.target.value, 10))}
-                min="1"
-              />
-            </div>
-            <div>
-              <Label htmlFor="timeFrames">Time Frames</Label>
-              <Input
-                id="timeFrames"
-                value={timeFrames}
-                onChange={(e) => setTimeFrames(e.target.value)}
-                placeholder="e.g., 9am, 1pm, 5pm"
-              />
-            </div>
-            <div>
-              <Label htmlFor="itemColor">Color</Label>
-              <Input
-                id="itemColor"
-                type="color"
-                value={itemColor}
-                onChange={(e) => setItemColor(e.target.value)}
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleAddItem} className="w-full">Add Item</Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Configured Items</CardTitle>
-          {items.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handleClearConfiguration}>Clear All</Button>
-          )}
-        </CardHeader>
-        <CardContent>
-          {items.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
-              <p>No maintenance items configured yet.</p>
-              <p className="text-sm">Use the form above to add items to the maintenance schedule.</p>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {items.map(item => (
-                <li key={item.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <div className="flex items-center">
-                    <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                    <div>
-                      <span className="font-bold">{item.name}</span> (x{item.quantity})
-                      <p className="text-sm text-gray-500">
-                        {item.timesPerDay} times per day ({item.timeFrames})
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
-
-      <div className="mt-4">
-        <Button size="lg" onClick={handleSaveConfiguration} disabled={isSaving}>
-          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {isSaving ? 'Saving...' : 'Save Configuration'}
-        </Button>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-2xl font-bold">Maintenance Dashboard</h1>
       </div>
+
+      <Collapsible className="mb-4">
+        <CollapsibleTrigger asChild>
+          <Button variant="outline">
+            <Settings className="mr-2 h-4 w-4" />
+            Show Setup & Configuration
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-4 space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Log Encryption Key</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {keyExists === null ? (
+                <p>Checking key status...</p>
+              ) : keyExists ? (
+                <p className="text-green-500">Encryption key is set on the server.</p>
+              ) : (
+                <p className="text-red-500">Encryption key is not set. Please generate a key.</p>
+              )}
+              <Button onClick={handleGenerateKey} disabled={isGeneratingKey} className="mt-2">
+                {isGeneratingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                {isGeneratingKey ? 'Generating...' : 'Generate New Key'}
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Add New Item</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <div>
+                  <Label htmlFor="itemName">Item Name</Label>
+                  <Input
+                    id="itemName"
+                    value={itemName}
+                    onChange={(e) => setItemName(e.target.value)}
+                    placeholder="e.g., Inverter"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="itemQuantity">Quantity</Label>
+                  <Input
+                    id="itemQuantity"
+                    type="number"
+                    value={itemQuantity}
+                    onChange={(e) => setItemQuantity(parseInt(e.target.value, 10))}
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="timesPerDay">Times per Day</Label>
+                  <Input
+                    id="timesPerDay"
+                    type="number"
+                    value={timesPerDay}
+                    onChange={(e) => setTimesPerDay(parseInt(e.target.value, 10))}
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="timeFrames">Time Frames</Label>
+                  <Input
+                    id="timeFrames"
+                    value={timeFrames}
+                    onChange={(e) => setTimeFrames(e.target.value)}
+                    placeholder="e.g., 9am, 1pm, 5pm"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="itemColor">Color</Label>
+                  <Input
+                    id="itemColor"
+                    type="color"
+                    value={itemColor}
+                    onChange={(e) => setItemColor(e.target.value)}
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button onClick={handleAddItem} className="w-full">Add Item</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Configured Items</CardTitle>
+              {items.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handleClearConfiguration}>Clear All</Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              {items.length === 0 ? (
+                <div className="text-center text-gray-500 py-8">
+                  <p>No maintenance items configured yet.</p>
+                  <p className="text-sm">Use the form above to add items to the maintenance schedule.</p>
+                </div>
+              ) : (
+                <ul className="space-y-2">
+                  {items.map(item => (
+                    <li key={item.id} className="flex items-center justify-between p-2 border rounded-md">
+                      <div className="flex items-center">
+                        <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                        <div>
+                          <span className="font-bold">{item.name}</span> (x{item.quantity})
+                          <p className="text-sm text-gray-500">
+                            {item.timesPerDay} times per day ({item.timeFrames})
+                          </p>
+                        </div>
+                      </div>
+                      <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardContent>
+          </Card>
+
+          <div className="mt-4">
+            <Button size="lg" onClick={handleSaveConfiguration} disabled={isSaving}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isSaving ? 'Saving...' : 'Save Configuration'}
+            </Button>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+
 
       <AdminStatusView items={items} uploadLogs={uploadLogs} />
     </div>
@@ -243,7 +262,7 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { format, isToday } from "date-fns";
+import { format, isToday, getDaysInMonth, startOfMonth } from "date-fns";
 import {
   Table,
   TableBody,
@@ -537,18 +556,34 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
 
           <TabsContent value="monthly">
             <Card>
-              <CardContent className="p-0">
-                <Calendar
-                  mode="single"
-                  required
-                  selected={date}
-                  onSelect={setDate}
-                  month={currentMonth}
-                  onMonthChange={setCurrentMonth}
-                  modifiers={modifiers}
-                  modifiersClassNames={modifiersClassNames}
-                  className="p-4"
-                />
+              <CardContent className="p-4">
+                <div className="flex justify-center mb-4">
+                  <Button variant="outline" onClick={() => setCurrentMonth(prev => new Date(prev.setMonth(prev.getMonth() - 1)))}>
+                    {"<"}
+                  </Button>
+                  <h3 className="text-xl font-bold mx-4">{format(currentMonth, "MMMM yyyy")}</h3>
+                  <Button variant="outline" onClick={() => setCurrentMonth(prev => new Date(prev.setMonth(prev.getMonth() + 1)))}>
+                    {">"}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-7 gap-2">
+                  {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => i + 1).map(day => {
+                    const dayDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+                    const dateStr = format(dayDate, 'yyyy-MM-dd');
+                    const completed = completedDays[dateStr] && completedDays[dateStr].size >= totalChecks;
+                    const partiallyCompleted = completedDays[dateStr] && completedDays[dateStr].size < totalChecks;
+
+                    let bgColor = 'bg-gray-200'; // Missed
+                    if (completed) bgColor = 'bg-green-500';
+                    else if (partiallyCompleted) bgColor = 'bg-yellow-500';
+
+                    return (
+                      <div key={day} className={`h-12 w-12 flex items-center justify-center rounded-md text-white font-bold ${bgColor}`}>
+                        {day}
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -663,9 +698,42 @@ type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
 
 const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess }) => {
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
+  const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
 
   useEffect(() => {
+    const fetchServerTime = async () => {
+      try {
+        const response = await fetch('/api/time');
+        const data = await response.json();
+        setServerTime(new Date(data.time));
+      } catch (error) {
+        console.error("Failed to fetch server time, using client time as fallback.", error);
+        setServerTime(new Date());
+      }
+    };
+    fetchServerTime();
+  }, []);
+
+  const isWithinTimeSlot = (timeFrames: string, serverTime: Date): boolean => {
+    if (!timeFrames) return false;
+    const now = serverTime;
+    const currentHour = now.getHours();
+
+    const slots = timeFrames.split(',').map(t => t.trim());
+    return slots.some(slot => {
+      const hour = parseInt(slot.replace(/(am|pm)/i, ''));
+      const isPM = /pm/i.test(slot);
+      let slotHour = isPM && hour < 12 ? hour + 12 : hour;
+      if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
+
+      // Check if current hour is within the -1/+1 hour window
+      return currentHour >= slotHour - 1 && currentHour <= slotHour + 1;
+    });
+  };
+
+  useEffect(() => {
+    if (!serverTime) return;
     const initialStatuses: Record<string, UploadStatus> = {};
     items.forEach(item => {
       for (let i = 1; i <= item.quantity; i++) {
@@ -675,11 +743,15 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
           log.itemName === item.name &&
           log.itemNumber === i.toString()
         );
-        initialStatuses[uploadKey] = todaysLog ? 'success' : 'pending';
+        if (todaysLog) {
+          initialStatuses[uploadKey] = 'success';
+        } else {
+          initialStatuses[uploadKey] = isWithinTimeSlot(item.timeFrames, serverTime) ? 'pending' : 'error';
+        }
       }
     });
     setStatuses(initialStatuses);
-  }, [items, uploadLogs]);
+  }, [items, uploadLogs, serverTime]);
 
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number) => {
@@ -728,16 +800,30 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
             Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
               const uploadKey = `${item.name}-${number}`;
               const status = statuses[uploadKey] || 'pending';
+              const isTimeSlotActive = serverTime ? isWithinTimeSlot(item.timeFrames, serverTime) : false;
+
               const statusInfo = {
                 pending: { icon: Clock, color: 'text-gray-500', text: 'Pending' },
                 uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
-                success: { icon: CheckCircle, color: 'text-green-500', text: 'Uploaded' },
-                error: { icon: XCircle, color: 'text-red-500', text: 'Error' },
+                success: { icon: CheckCircle, color: 'text-green-500', text: 'Uploaded Today' },
+                error: { icon: XCircle, color: 'text-red-500', text: 'Upload Failed' },
+                missed: { icon: XCircle, color: 'text-orange-500', text: 'Time Slot Missed' },
               };
-              const CurrentIcon = statusInfo[status].icon;
+
+              let displayStatus = status;
+              if (status === 'pending' && !isTimeSlotActive && serverTime) {
+                displayStatus = 'missed';
+              }
+              if (status === 'error' && !isTimeSlotActive && serverTime) {
+                displayStatus = 'missed';
+              }
+
+
+              const currentStatusInfo = statusInfo[displayStatus as keyof typeof statusInfo];
+              const CurrentIcon = currentStatusInfo.icon;
 
               return (
-                <Card key={`${item.id}-${number}`} className={`flex flex-col border-2 ${status === 'success' ? 'border-green-500' : 'border-transparent'}`}>
+                <Card key={`${item.id}-${number}`} className={`flex flex-col border-2 ${displayStatus === 'success' ? 'border-green-500' : 'border-transparent'}`}>
                   <CardHeader>
                     <CardTitle className="flex items-center">
                       <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
@@ -745,8 +831,8 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="flex-grow flex flex-col items-center justify-center text-center">
-                    <CurrentIcon className={`h-12 w-12 ${statusInfo[status].color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
-                    <p className={`mt-2 font-semibold ${statusInfo[status].color}`}>{statusInfo[status].text}</p>
+                    <CurrentIcon className={`h-12 w-12 ${currentStatusInfo.color} ${displayStatus === 'uploading' ? 'animate-spin' : ''}`} />
+                    <p className={`mt-2 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
                     <Input
                       type="file"
                       accept="image/*"
@@ -754,12 +840,12 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                       onChange={(e) => handleFileChange(e, item.name, number)}
                       className="hidden"
                       id={`${item.id}-${number}`}
-                      disabled={status === 'uploading' || status === 'success'}
+                      disabled={displayStatus !== 'pending'}
                     />
                     <Label htmlFor={`${item.id}-${number}`} className="cursor-pointer w-full mt-4">
-                      <Button asChild disabled={status === 'uploading' || status === 'success'} className="w-full">
+                      <Button asChild disabled={displayStatus !== 'pending'} className="w-full">
                         <span>
-                          {status === 'success' ? 'Upload Again' : 'Upload Picture'}
+                          {displayStatus === 'success' ? 'Uploaded' : 'Upload Picture'}
                         </span>
                       </Button>
                     </Label>
