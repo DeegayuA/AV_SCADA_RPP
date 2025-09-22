@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { cleanupBackups } from '@/lib/cleanup';
-import glob from 'glob';
+import { glob } from 'glob';
 
 async function getMaintenanceFiles() {
   const maintenanceFiles: any = {

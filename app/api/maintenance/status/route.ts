@@ -17,7 +17,7 @@ function decrypt(text: string, key: Buffer) {
   return decrypted.toString();
 }
 
-import glob from 'glob';
+import { glob } from 'glob';
 
 export async function GET(request: Request) {
   const encryptionKey = await getEncryptionKey();

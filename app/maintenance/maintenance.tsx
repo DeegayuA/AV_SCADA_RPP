@@ -18,8 +18,14 @@ import { MaintenanceItem } from '@/types/maintenance';
 import { saveMaintenanceConfig, getMaintenanceConfig } from '@/lib/db';
 
 import { Loader2, KeyRound } from "lucide-react";
+import { Dispatch, SetStateAction } from 'react';
 
-const AdminView = ({ items, setItems }) => {
+interface AdminViewProps {
+  items: MaintenanceItem[];
+  setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
+}
+
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [keyExists, setKeyExists] = useState<boolean | null>(null);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
@@ -233,17 +239,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DateRange } from "react-day-picker";
-import { addDays } from "date-fns";
+import { DateRange, DayProps } from "react-day-picker";
+import { addDays, startOfMonth, endOfMonth } from "date-fns";
 import { saveAs } from "file-saver";
 
-const AdminStatusView = ({ items }) => {
+interface AdminStatusViewProps {
+  items: MaintenanceItem[];
+}
+
+interface Log {
+  timestamp: string;
+  itemName: string;
+  itemNumber: string;
+  username: string;
+  filename: string;
+}
+
+const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
   // NOTE: This component relies on a file-based data persistence strategy, which is not suitable for a production environment.
   // In a production environment, a database should be used to store and retrieve status data.
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dailyStatusData, setDailyStatusData] = useState([]);
-  const [monthlyStatusData, setMonthlyStatusData] = useState([]);
+  const [dailyStatusData, setDailyStatusData] = useState<Log[]>([]);
+  const [monthlyStatusData, setMonthlyStatusData] = useState<Log[]>([]);
   const [date, setDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>({
@@ -303,15 +321,19 @@ const AdminStatusView = ({ items }) => {
       toast.success("CSV export downloaded successfully.");
 
     } catch (error) {
-      toast.error(error.message);
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("An unknown error occurred during export.");
+      }
     } finally {
       setIsExporting(false);
     }
   };
 
-  const processLogData = (items, logs) => {
-    const statusGrid = {};
-    const parseTime = (timeStr) => {
+  const processLogData = (items: MaintenanceItem[], logs: any[]) => {
+    const statusGrid: { [key: string]: { [key: string]: { status: string; imageUrl: string | null } } } = {};
+    const parseTime = (timeStr: string) => {
       const hour = parseInt(timeStr.replace(/(am|pm)/i, ''));
       const isPM = /pm/i.test(timeStr);
       if (isPM && hour < 12) return hour + 12;
@@ -319,7 +341,7 @@ const AdminStatusView = ({ items }) => {
       return hour;
     };
 
-    const sortedLogs = [...logs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    const sortedLogs = [...logs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     for (const item of items) {
       for (let i = 1; i <= item.quantity; i++) {
@@ -366,7 +388,7 @@ const AdminStatusView = ({ items }) => {
     }
   };
 
-  const timeSlots = items.reduce((acc, item) => {
+  const timeSlots = items.reduce((acc: string[], item) => {
     const itemTimeSlots = item.timeFrames.split(',').map(t => t.trim());
     itemTimeSlots.forEach(ts => {
       if (!acc.includes(ts)) {
@@ -376,23 +398,31 @@ const AdminStatusView = ({ items }) => {
     return acc;
   }, []);
 
-  const DayWithStatus = ({ date, ...props }) => {
-    const day = date.getDate();
-    const logsForDay = monthlyStatusData.filter(log => new Date(log.timestamp).getDate() === day);
-    const totalChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
-    const completedChecks = new Set(logsForDay.map(log => `${log.itemName}-${log.itemNumber}`)).size;
-
-    let statusColor = 'bg-gray-200';
-    if (completedChecks > 0) {
-      statusColor = completedChecks === totalChecks ? 'bg-green-500' : 'bg-yellow-500';
+  const completedDays = monthlyStatusData.reduce((acc: { [key: string]: Set<string> }, log) => {
+    const date = format(new Date(log.timestamp), 'yyyy-MM-dd');
+    if (!acc[date]) {
+      acc[date] = new Set();
     }
+    acc[date].add(`${log.itemName}-${log.itemNumber}`);
+    return acc;
+  }, {});
 
-    return (
-      <div {...props} className="relative">
-        {day}
-        {logsForDay.length > 0 && <div className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ${statusColor}`} />}
-      </div>
-    );
+  const totalChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
+
+  const modifiers = {
+    completed: (day: Date) => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      return completedDays[dateStr] && completedDays[dateStr].size >= totalChecks;
+    },
+    partiallyCompleted: (day: Date) => {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      return completedDays[dateStr] && completedDays[dateStr].size < totalChecks;
+    },
+  };
+
+  const modifiersClassNames = {
+    completed: 'bg-green-500 text-white',
+    partiallyCompleted: 'bg-yellow-500 text-white',
   };
 
   return (
@@ -420,6 +450,7 @@ const AdminStatusView = ({ items }) => {
                 <PopoverContent className="w-auto p-0">
                   <Calendar
                     mode="single"
+                    required
                     selected={date}
                     onSelect={setDate}
                     initialFocus
@@ -486,13 +517,13 @@ const AdminStatusView = ({ items }) => {
               <CardContent className="p-0">
                 <Calendar
                   mode="single"
+                  required
                   selected={date}
                   onSelect={setDate}
                   month={currentMonth}
                   onMonthChange={setCurrentMonth}
-                  components={{
-                    Day: DayWithStatus
-                  }}
+                  modifiers={modifiers}
+                  modifiersClassNames={modifiersClassNames}
                   className="p-4"
                 />
               </CardContent>
@@ -562,7 +593,11 @@ const AdminStatusView = ({ items }) => {
   );
 };
 
-const OperatorView = ({ items }) => {
+interface OperatorViewProps {
+  items: MaintenanceItem[];
+}
+
+const OperatorView: React.FC<OperatorViewProps> = ({ items }) => {
   const [uploading, setUploading] = useState<string | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
 

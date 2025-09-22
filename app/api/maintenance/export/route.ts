@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import glob from 'glob';
+import { glob } from 'glob';
 import { getEncryptionKey } from '@/lib/maintenance-crypto';
 import Papa from 'papaparse';
 import { startOfMonth, endOfMonth, eachDayOfInterval, format } from 'date-fns';
