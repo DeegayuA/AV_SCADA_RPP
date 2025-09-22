@@ -4,6 +4,7 @@ import { DataPoint } from '@/config/dataPoints'; // Assuming this is used elsewh
 import { toast } from 'sonner'; // Import toast for notifications
 import { v4 as uuidv4 } from 'uuid';
 import { NotificationRule, ActiveAlarm } from '../types';
+import { MaintenanceItem } from '@/types/maintenance'; // Assuming a new type definition file
 
 // Import constants to be saved
 import {
@@ -39,6 +40,10 @@ interface AppConfigValue {
 }
 
 interface SolarDB extends DBSchema {
+  maintenanceConfig: {
+    key: string;
+    value: MaintenanceItem[];
+  };
   dataPoints: {
     key: string;
     value: {
@@ -71,8 +76,9 @@ interface SolarDB extends DBSchema {
 }
 
 export const DB_NAME = 'solar-minigrid';
-const DB_VERSION = 3; // Incremented version due to new object stores
+const DB_VERSION = 4; // Incremented version due to new object stores
 const APP_CONFIG_KEY = 'mainConfiguration'; // Key for the single config object
+const MAINTENANCE_CONFIG_KEY = 'maintenanceConfiguration'; // Key for the maintenance config
 
 let dbPromise: Promise<IDBPDatabase<SolarDB> | null> | null = null;
 
@@ -125,6 +131,13 @@ export async function initDB(): Promise<IDBPDatabase<SolarDB> | null> {
               activeAlarmsStore.createIndex('ruleId', 'ruleId', { unique: false });
               activeAlarmsStore.createIndex('acknowledged', 'acknowledged', { unique: false });
               console.log("Created 'activeAlarms' object store and 'ruleId', 'acknowledged' indexes.");
+            }
+          }
+           // Create maintenanceConfig store if it doesn't exist (from version < 4)
+           if (oldVersion < 4) {
+            if (!dbInstance.objectStoreNames.contains('maintenanceConfig')) {
+              dbInstance.createObjectStore('maintenanceConfig');
+              console.log("Created 'maintenanceConfig' object store.");
             }
           }
         },
@@ -193,6 +206,41 @@ export async function saveAppConfig() {
   } catch (error) {
     console.error("Error saving app configuration:", error);
     toast.error("Configuration Save Failed", { description: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+// --- Maintenance Configuration Functions ---
+
+export async function saveMaintenanceConfig(config: MaintenanceItem[]) {
+  if (typeof window === 'undefined') return;
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Failed to save maintenance configuration." });
+    return;
+  }
+  try {
+    await db.put('maintenanceConfig', config, MAINTENANCE_CONFIG_KEY);
+    toast.success("Maintenance Configuration Saved", { description: "Settings stored locally."});
+  } catch (error) {
+    console.error("Error saving maintenance configuration:", error);
+    toast.error("Maintenance Config Save Failed", { description: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+export async function getMaintenanceConfig(): Promise<MaintenanceItem[]> {
+  if (typeof window === 'undefined') return [];
+  const db = await initDB();
+  if (!db) {
+    console.error("Database not ready, cannot retrieve maintenance configuration.");
+    return [];
+  }
+  try {
+    const config = await db.get('maintenanceConfig', MAINTENANCE_CONFIG_KEY);
+    return config || [];
+  } catch (error) {
+    console.error("Error retrieving maintenance configuration:", error);
+    toast.error("Maintenance Config Load Failed", { description: error instanceof Error ? error.message : String(error) });
+    return [];
   }
 }
 

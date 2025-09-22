@@ -6,6 +6,7 @@ import { GRAPH_SERIES_CONFIG_KEY } from '@/config/constants';
 import { SLDLayout } from '@/types/sld';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/appStore';
+import { getMaintenanceConfig } from '@/lib/db';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${appConstants.PLANT_NAME || 'defaultPlant'}`;
@@ -60,12 +61,13 @@ export async function getBackupData(): Promise<any> {
   });
 
   const sldDataForBackup = getAllSldLayoutsFromStorage();
+  const maintenanceConfig = await getMaintenanceConfig();
 
   const now = new Date();
   const localTimeForFilename = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
 
   const backupData = {
-    backupSchemaVersion: "2.0.0",
+    backupSchemaVersion: "2.1.0", // Incremented version for new data
     createdAt: now.toISOString(),
     createdBy: currentUser?.name || 'System', // Default to 'System' for periodic backups
     localTime: localTimeForFilename,
@@ -74,6 +76,9 @@ export async function getBackupData(): Promise<any> {
     configurations: { dataPointDefinitions: rawDataPointsDefinitions },
     browserStorage: { indexedDB: idbData, localStorage: localStorageData },
     sldLayouts: sldDataForBackup,
+    maintenanceData: {
+      config: maintenanceConfig,
+    },
   };
 
   return backupData;

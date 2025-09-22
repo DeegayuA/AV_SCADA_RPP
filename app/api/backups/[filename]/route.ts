@@ -4,9 +4,10 @@ import path from 'path';
 
 export async function GET(
   request: Request,
-  context: any
+  { params }: { params: Promise<{ filename: string }> }
 ) {
-  const filename = context.params.filename;
+  const resolvedParams = await params;
+  const filename = resolvedParams.filename;
   try {
     // Basic security check to prevent directory traversal
     if (filename.includes('..')) {

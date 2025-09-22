@@ -633,3 +633,13 @@
     border-radius: 4px;
   }
 }
+
+.bg-green-500 {
+  background-color: #22c55e !important;
+}
+.bg-yellow-500 {
+  background-color: #eab308 !important;
+}
+.text-white {
+  color: #ffffff !important;
+}
