@@ -7,16 +7,11 @@ import sharp from 'sharp';
 import crypto from 'crypto';
 
 const location = process.env.MAINTENANCE_LOCATION || 'DefaultLocation';
-const ENCRYPTION_KEY = process.env.MAINTENANCE_ENCRYPTION_KEY;
 const IV_LENGTH = 16;
 
-if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
-  throw new Error('MAINTENANCE_ENCRYPTION_KEY must be defined and be 32 bytes long.');
-}
-
-function encrypt(text: string) {
+function encrypt(text: string, key: string) {
   const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY!), iv);
+  const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key), iv);
   let encrypted = cipher.update(text);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
   return iv.toString('hex') + ':' + encrypted.toString('hex');
@@ -26,6 +21,11 @@ export async function POST(request: Request) {
   // NOTE: This file-based approach for logging is a simplification for this task and is not suitable for a production environment.
   // In a production environment, a more robust logging solution or a database should be used.
   try {
+    const ENCRYPTION_KEY = process.env.MAINTENANCE_ENCRYPTION_KEY;
+    if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 32) {
+      return NextResponse.json({ message: 'MAINTENANCE_ENCRYPTION_KEY is not configured correctly on the server.' }, { status: 500 });
+    }
+
     const formData = await request.formData();
     const file = formData.get('file') as File;
     const itemName = formData.get('itemName') as string;
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
       filename,
     };
 
-    const encryptedLogData = encrypt(JSON.stringify(logData));
+    const encryptedLogData = encrypt(JSON.stringify(logData), ENCRYPTION_KEY);
     await fs.appendFile(logFilePath, encryptedLogData + '\n');
 
     return NextResponse.json({ message: 'File uploaded successfully.', filename });
