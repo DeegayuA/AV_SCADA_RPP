@@ -15,7 +15,7 @@ import {
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { MaintenanceItem } from '@/types/maintenance';
-import { Loader2, KeyRound, Settings } from "lucide-react";
+import { Loader2, KeyRound, Settings, ArrowUp, ArrowDown } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -89,6 +89,22 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
 
   const handleRemoveItem = (id: string) => {
     setItems(items.filter(item => item.id !== id));
+  };
+
+  const handleMoveItem = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === items.length - 1)
+    ) {
+      return;
+    }
+
+    const newItems = [...items];
+    const item = newItems[index];
+    const swapIndex = direction === 'up' ? index - 1 : index + 1;
+    newItems[index] = newItems[swapIndex];
+    newItems[swapIndex] = item;
+    setItems(newItems);
   };
 
   const handleSaveConfiguration = async () => {
@@ -225,7 +241,7 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
                 </div>
               ) : (
                 <ul className="space-y-2">
-                  {items.map(item => (
+              {items.map((item, index) => (
                     <li key={item.id} className="flex items-center justify-between p-2 border rounded-md">
                       <div className="flex items-center">
                         <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
@@ -236,7 +252,15 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
                           </p>
                         </div>
                       </div>
-                      <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
+                  <div className="flex items-center space-x-1">
+                    <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'up')} disabled={index === 0}>
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'down')} disabled={index === items.length - 1}>
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
+                  </div>
                     </li>
                   ))}
                 </ul>
@@ -263,6 +287,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format, isToday, getDaysInMonth, startOfMonth } from "date-fns";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -302,6 +333,19 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
     to: endOfMonth(new Date()),
   });
   const [isExporting, setIsExporting] = useState(false);
+  const [logPageSize, setLogPageSize] = useState(31);
+  const [logCurrentPage, setLogCurrentPage] = useState(1);
+  const [selectedLogDate, setSelectedLogDate] = useState<Date | null>(null);
+  const [activeTab, setActiveTab] = useState('daily');
+
+  const filteredLogs = selectedLogDate
+    ? uploadLogs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === format(selectedLogDate, 'yyyy-MM-dd'))
+    : uploadLogs;
+
+  const paginatedLogs = filteredLogs.slice(
+    (logCurrentPage - 1) * logPageSize,
+    logCurrentPage * logPageSize
+  );
 
   useEffect(() => {
     const fetchDailyStatus = async () => {
@@ -465,7 +509,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <div className="mt-8">
-        <Tabs defaultValue="daily">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-bold">Maintenance Status</h2>
             <TabsList>
@@ -589,7 +633,14 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                     else if (partiallyCompleted) bgColor = 'bg-yellow-500';
 
                     return (
-                      <div key={day} className={`h-12 w-12 flex items-center justify-center rounded-md text-white font-bold ${bgColor}`}>
+                      <div
+                        key={day}
+                        className={`h-12 w-12 flex items-center justify-center rounded-md text-white font-bold cursor-pointer ${bgColor}`}
+                        onClick={() => {
+                          setSelectedLogDate(dayDate);
+                          setActiveTab('upload-log');
+                        }}
+                      >
                         {day}
                       </div>
                     );
@@ -601,8 +652,13 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
 
           <TabsContent value="upload-log">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Image Upload Log</CardTitle>
+                {selectedLogDate && (
+                  <Button variant="outline" size="sm" onClick={() => setSelectedLogDate(null)}>
+                    Clear Filter (Showing logs for {format(selectedLogDate, "PPP")})
+                  </Button>
+                )}
               </CardHeader>
               <CardContent>
                 <Table>
@@ -615,7 +671,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {uploadLogs.map((log, index) => (
+                    {paginatedLogs.map((log, index) => (
                       <TableRow key={index}>
                         <TableCell>{format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss")}</TableCell>
                         <TableCell>{log.itemName} #{log.itemNumber}</TableCell>
@@ -632,6 +688,38 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                     ))}
                   </TableBody>
                 </Table>
+                <div className="flex items-center justify-between mt-4">
+                  <div className="flex items-center space-x-2">
+                    <Select value={logPageSize.toString()} onValueChange={(value) => setLogPageSize(parseInt(value))}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Items per page" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="31">31 per page</SelectItem>
+                        <SelectItem value="62">62 per page</SelectItem>
+                        <SelectItem value="92">92 per page</SelectItem>
+                        <SelectItem value="155">155 per page</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setLogCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={logCurrentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <span>Page {logCurrentPage} of {Math.ceil(uploadLogs.length / logPageSize)}</span>
+                    <Button
+                      variant="outline"
+                      onClick={() => setLogCurrentPage(prev => Math.min(prev + 1, Math.ceil(uploadLogs.length / logPageSize)))}
+                      disabled={logCurrentPage === Math.ceil(uploadLogs.length / logPageSize)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
