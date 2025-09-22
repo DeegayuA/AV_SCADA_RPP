@@ -4,4 +4,5 @@ export interface MaintenanceItem {
   quantity: number;
   timesPerDay: number;
   timeFrames: string;
+  color?: string;
 }

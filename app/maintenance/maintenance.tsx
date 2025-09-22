@@ -27,6 +27,7 @@ const AdminView = ({ items, setItems }) => {
   const [itemQuantity, setItemQuantity] = useState(1);
   const [timesPerDay, setTimesPerDay] = useState(1);
   const [timeFrames, setTimeFrames] = useState('');
+  const [itemColor, setItemColor] = useState('#000000');
 
   useEffect(() => {
     const checkKeyStatus = async () => {
@@ -66,12 +67,14 @@ const AdminView = ({ items, setItems }) => {
       quantity: itemQuantity,
       timesPerDay: timesPerDay,
       timeFrames: timeFrames,
+      color: itemColor,
     };
     setItems([...items, newItem]);
     setItemName('');
     setItemQuantity(1);
     setTimesPerDay(1);
     setTimeFrames('');
+    setItemColor('#000000');
   };
 
   const handleRemoveItem = (id: string) => {
@@ -116,7 +119,7 @@ const AdminView = ({ items, setItems }) => {
           <CardTitle>Add New Item</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div>
               <Label htmlFor="itemName">Item Name</Label>
               <Input
@@ -155,6 +158,15 @@ const AdminView = ({ items, setItems }) => {
                 placeholder="e.g., 9am, 1pm, 5pm"
               />
             </div>
+            <div>
+              <Label htmlFor="itemColor">Color</Label>
+              <Input
+                id="itemColor"
+                type="color"
+                value={itemColor}
+                onChange={(e) => setItemColor(e.target.value)}
+              />
+            </div>
             <div className="flex items-end">
               <Button onClick={handleAddItem} className="w-full">Add Item</Button>
             </div>
@@ -179,11 +191,14 @@ const AdminView = ({ items, setItems }) => {
             <ul className="space-y-2">
               {items.map(item => (
                 <li key={item.id} className="flex items-center justify-between p-2 border rounded-md">
-                  <div>
-                    <span className="font-bold">{item.name}</span> (x{item.quantity})
-                    <p className="text-sm text-gray-500">
-                      {item.timesPerDay} times per day ({item.timeFrames})
-                    </p>
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                    <div>
+                      <span className="font-bold">{item.name}</span> (x{item.quantity})
+                      <p className="text-sm text-gray-500">
+                        {item.timesPerDay} times per day ({item.timeFrames})
+                      </p>
+                    </div>
                   </div>
                   <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
                 </li>
@@ -431,7 +446,10 @@ const AdminStatusView = ({ items }) => {
                         {items.map(item => (
                           Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
                             <TableRow key={`${item.id}-${number}`}>
-                              <TableCell>{item.name} #{number}</TableCell>
+                          <TableCell className="flex items-center">
+                            <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                            {item.name} #{number}
+                          </TableCell>
                               {timeSlots.map(ts => {
                                 const itemInstanceId = `${item.name}-${number}`;
                                 const cellData = statusGrid[itemInstanceId]?.[ts];
@@ -582,6 +600,7 @@ const OperatorView = ({ items }) => {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Maintenance Checks</h1>
+      <p className="text-lg text-gray-500 mb-4">Welcome, {currentUser?.name || 'Operator'}!</p>
       {items.length === 0 ? (
         <p>No maintenance items configured.</p>
       ) : (
@@ -589,7 +608,10 @@ const OperatorView = ({ items }) => {
           {items.map(item => (
             <Card key={item.id}>
               <CardHeader>
-                <CardTitle>{item.name}</CardTitle>
+                <CardTitle className="flex items-center">
+                  <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                  {item.name}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-2">
