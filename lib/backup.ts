@@ -6,6 +6,10 @@ import { GRAPH_SERIES_CONFIG_KEY } from '@/config/constants';
 import { SLDLayout } from '@/types/sld';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/appStore';
+import { getMaintenanceConfig } from '@/lib/db';
+import fs from 'fs/promises';
+import path from 'path';
+import glob from 'glob';
 
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${appConstants.PLANT_NAME || 'defaultPlant'}`;
@@ -44,6 +48,39 @@ function getAllSldLayoutsFromStorage(): Record<string, SLDLayout> {
 }
 
 
+async function getMaintenanceDataForBackup() {
+  const maintenanceData: any = {
+    config: await getMaintenanceConfig(),
+    logs: {},
+    images: {},
+    previews: {},
+  };
+
+  const logDir = path.join(process.cwd(), 'logs', 'maintenance');
+  const imageDir = path.join(process.cwd(), 'public', 'maintenance_image');
+  const previewDir = path.join(process.cwd(), 'public', 'maintenance_image_preview');
+
+  const logFiles = glob.sync(`${logDir}/**/*.json.log`);
+  for (const file of logFiles) {
+    const date = path.basename(file, '.json.log');
+    maintenanceData.logs[date] = await fs.readFile(file, 'utf-8');
+  }
+
+  const imageFiles = glob.sync(`${imageDir}/**/*.jpg`);
+  for (const file of imageFiles) {
+    const relativePath = path.relative(imageDir, file);
+    maintenanceData.images[relativePath] = await fs.readFile(file, 'base64');
+  }
+
+  const previewFiles = glob.sync(`${previewDir}/**/*.jpg`);
+  for (const file of previewFiles) {
+    const relativePath = path.relative(previewDir, file);
+    maintenanceData.previews[relativePath] = await fs.readFile(file, 'base64');
+  }
+
+  return maintenanceData;
+}
+
 export async function getBackupData(): Promise<any> {
   const { currentUser } = useAppStore.getState();
   const idbData = await exportIdbData();
@@ -60,12 +97,13 @@ export async function getBackupData(): Promise<any> {
   });
 
   const sldDataForBackup = getAllSldLayoutsFromStorage();
+  const maintenanceData = await getMaintenanceDataForBackup();
 
   const now = new Date();
   const localTimeForFilename = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
 
   const backupData = {
-    backupSchemaVersion: "2.0.0",
+    backupSchemaVersion: "2.1.0", // Incremented version for new data
     createdAt: now.toISOString(),
     createdBy: currentUser?.name || 'System', // Default to 'System' for periodic backups
     localTime: localTimeForFilename,
@@ -74,6 +112,7 @@ export async function getBackupData(): Promise<any> {
     configurations: { dataPointDefinitions: rawDataPointsDefinitions },
     browserStorage: { indexedDB: idbData, localStorage: localStorageData },
     sldLayouts: sldDataForBackup,
+    maintenanceData: maintenanceData,
   };
 
   return backupData;

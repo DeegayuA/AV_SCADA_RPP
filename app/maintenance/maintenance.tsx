@@ -14,16 +14,13 @@ import {
 } from "@/components/ui/dialog";
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
+import { MaintenanceItem } from '@/types/maintenance';
+import { saveMaintenanceConfig, getMaintenanceConfig } from '@/lib/db';
 
-interface MaintenanceItem {
-  id: string;
-  name:string;
-  quantity: number;
-  timesPerDay: number;
-  timeFrames: string;
-}
+import { Loader2 } from "lucide-react";
 
 const AdminView = ({ items, setItems }) => {
+  const [isSaving, setIsSaving] = useState(false);
   const [itemName, setItemName] = useState('');
   const [itemQuantity, setItemQuantity] = useState(1);
   const [timesPerDay, setTimesPerDay] = useState(1);
@@ -50,23 +47,13 @@ const AdminView = ({ items, setItems }) => {
   };
 
   const handleSaveConfiguration = async () => {
-    try {
-      const response = await fetch('/api/maintenance/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(items),
-      });
+    setIsSaving(true);
+    await saveMaintenanceConfig(items);
+    setIsSaving(false);
+  };
 
-      if (response.ok) {
-        toast.success('Configuration saved successfully.');
-      } else {
-        toast.error('Failed to save configuration.');
-      }
-    } catch (error) {
-      toast.error('An error occurred while saving the configuration.');
-    }
+  const handleClearConfiguration = () => {
+    setItems([]);
   };
 
   return (
@@ -125,12 +112,18 @@ const AdminView = ({ items, setItems }) => {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Configured Items</CardTitle>
+          {items.length > 0 && (
+            <Button variant="outline" size="sm" onClick={handleClearConfiguration}>Clear All</Button>
+          )}
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (
-            <p>No items configured yet.</p>
+            <div className="text-center text-gray-500 py-8">
+              <p>No maintenance items configured yet.</p>
+              <p className="text-sm">Use the form above to add items to the maintenance schedule.</p>
+            </div>
           ) : (
             <ul className="space-y-2">
               {items.map(item => (
@@ -150,7 +143,10 @@ const AdminView = ({ items, setItems }) => {
       </Card>
 
       <div className="mt-4">
-        <Button size="lg" onClick={handleSaveConfiguration}>Save Configuration</Button>
+        <Button size="lg" onClick={handleSaveConfiguration} disabled={isSaving}>
+          {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isSaving ? 'Saving...' : 'Save Configuration'}
+        </Button>
       </div>
 
       <AdminStatusView items={items} />
@@ -264,42 +260,50 @@ const AdminStatusView = ({ items }) => {
         </div>
         <Card>
           <CardContent className="pt-4">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Item</TableHead>
-                  {timeSlots.map(ts => <TableHead key={ts} className="text-center">{ts}</TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map(item => (
-                  Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
-                    <TableRow key={`${item.id}-${number}`}>
-                      <TableCell>{item.name} #{number}</TableCell>
-                      {timeSlots.map(ts => {
-                        const itemTimeSlots = item.timeFrames.split(',').map(t => t.trim());
-                        if (!itemTimeSlots.includes(ts)) {
-                          return <TableCell key={ts} className="text-center bg-gray-100">-</TableCell>;
-                        }
-                        const { status, imageUrl } = getStatusForCheck(item, number, ts);
-                        return (
-                          <TableCell key={ts} className="text-center">
-                            <div
-                              className="cursor-pointer"
-                              onClick={() => handleStatusClick(imageUrl)}
-                            >
-                              <p className={`font-bold ${status === 'Yes' ? 'text-green-500' : status === 'Delayed' ? 'text-yellow-500' : 'text-red-500'}`}>
-                                {status}
-                              </p>
-                            </div>
-                          </TableCell>
-                        );
-                      })}
+            {items.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <p>No items configured to display status.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Item</TableHead>
+                      {timeSlots.map(ts => <TableHead key={ts} className="text-center">{ts}</TableHead>)}
                     </TableRow>
-                  ))
-                ))}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map(item => (
+                      Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
+                        <TableRow key={`${item.id}-${number}`}>
+                          <TableCell>{item.name} #{number}</TableCell>
+                          {timeSlots.map(ts => {
+                            const itemTimeSlots = item.timeFrames.split(',').map(t => t.trim());
+                            if (!itemTimeSlots.includes(ts)) {
+                              return <TableCell key={ts} className="text-center bg-gray-100">-</TableCell>;
+                            }
+                            const { status, imageUrl } = getStatusForCheck(item, number, ts);
+                            return (
+                              <TableCell key={ts} className="text-center">
+                                <div
+                                  className="cursor-pointer"
+                                  onClick={() => handleStatusClick(imageUrl)}
+                                >
+                                  <p className={`font-bold ${status === 'Yes' ? 'text-green-500' : status === 'Delayed' ? 'text-yellow-500' : 'text-red-500'}`}>
+                                    {status}
+                                  </p>
+                                </div>
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -317,11 +321,15 @@ const AdminStatusView = ({ items }) => {
 };
 
 const OperatorView = ({ items }) => {
+  const [uploading, setUploading] = useState<string | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number) => {
     const file = event.target.files?.[0];
     if (!file) return;
+
+    const uploadKey = `${itemName}-${itemNumber}`;
+    setUploading(uploadKey);
 
     const formData = new FormData();
     formData.append('file', file);
@@ -342,6 +350,8 @@ const OperatorView = ({ items }) => {
       }
     } catch (error) {
       toast.error('An error occurred while uploading the image.');
+    } finally {
+      setUploading(null);
     }
   };
 
@@ -371,8 +381,11 @@ const OperatorView = ({ items }) => {
                         id={`${item.id}-${number}`}
                       />
                       <Label htmlFor={`${item.id}-${number}`} className="cursor-pointer">
-                        <Button asChild>
-                          <span>Upload Picture</span>
+                        <Button asChild disabled={uploading === `${item.name}-${number}`}>
+                          <span>
+                            {uploading === `${item.name}-${number}` && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            {uploading === `${item.name}-${number}` ? 'Uploading...' : 'Upload Picture'}
+                          </span>
                         </Button>
                       </Label>
                     </li>
@@ -393,15 +406,8 @@ const MaintenancePage = () => {
 
   useEffect(() => {
     const fetchConfig = async () => {
-      try {
-        const response = await fetch('/api/maintenance/config');
-        if (response.ok) {
-          const data = await response.json();
-          setItems(data);
-        }
-      } catch (error) {
-        toast.error('Failed to fetch maintenance configuration.');
-      }
+      const config = await getMaintenanceConfig();
+      setItems(config);
     };
     fetchConfig();
   }, []);

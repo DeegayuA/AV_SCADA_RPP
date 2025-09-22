@@ -50,15 +50,18 @@ export interface BackupFileContent {
   sldLayouts?: Record<string, SLDLayout | null>;
 }
 
+import { MaintenanceItem } from '@/types/maintenance';
+
 export interface RestoreSelection {
   ui: boolean;
   appSettings: boolean;
   sldLayouts: boolean;
   configurations: boolean;
+  maintenanceData?: boolean;
 }
 
 export async function restoreFromBackupContent(
-  backupData: BackupFileContent,
+  backupData: BackupFileContent & { maintenanceData?: { config: MaintenanceItem[], logs: any, images: any, previews: any } },
   webSocket: { isConnected: boolean; connect: () => void; sendJsonMessage: (message: any) => void },
   logout: () => void,
   setProgress?: (message: string) => void,
@@ -71,6 +74,7 @@ export async function restoreFromBackupContent(
     appSettings: !!backupData.browserStorage?.indexedDB,
     sldLayouts: !!backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0,
     configurations: !!backupData.configurations,
+    maintenanceData: !!backupData.maintenanceData,
   };
 
   const finalSelection = selection || fullSelection;
@@ -174,6 +178,30 @@ export async function restoreFromBackupContent(
       } catch (error) {
         console.error("Failed to restore plant configuration files:", error);
         toast.error("Plant Configuration Restore Failed", { id: importToastId, description: (error as Error).message });
+      }
+    }
+
+    if (finalSelection.maintenanceData && backupData.maintenanceData) {
+      setProgress?.("Restoring Maintenance Data...");
+      await new Promise(res => setTimeout(res, 200));
+      try {
+        const response = await fetch('/api/maintenance/restore', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(backupData.maintenanceData),
+        });
+
+        if (!response.ok) {
+          const errorResult = await response.json();
+          throw new Error(errorResult.message || 'Failed to restore maintenance data.');
+        }
+
+        toast.info("Maintenance data restored.", { id: importToastId });
+      } catch (error) {
+        console.error("Failed to restore maintenance data:", error);
+        toast.error("Maintenance Data Restore Failed", { id: importToastId, description: (error as Error).message });
       }
     }
 
