@@ -235,7 +235,7 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
         </Button>
       </div>
 
-      <AdminStatusView items={items} />
+      <AdminStatusView items={items} uploadLogs={uploadLogs} />
     </div>
   );
 };
@@ -243,7 +243,7 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import {
   Table,
   TableBody,
@@ -257,9 +257,7 @@ import { DateRange, DayProps } from "react-day-picker";
 import { addDays, startOfMonth, endOfMonth } from "date-fns";
 import { saveAs } from "file-saver";
 
-interface AdminStatusViewProps {
-  items: MaintenanceItem[];
-}
+import { CheckCircle, XCircle, Clock, UploadCloud } from 'lucide-react';
 
 interface Log {
   timestamp: string;
@@ -268,8 +266,12 @@ interface Log {
   username: string;
   filename: string;
 }
+interface AdminStatusViewProps {
+  items: MaintenanceItem[];
+  uploadLogs: Log[];
+}
 
-const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
+const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) => {
   // NOTE: This component relies on a file-based data persistence strategy, which is not suitable for a production environment.
   // In a production environment, a database should be used to store and retrieve status data.
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -283,24 +285,6 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
     to: endOfMonth(new Date()),
   });
   const [isExporting, setIsExporting] = useState(false);
-  const [uploadLogs, setUploadLogs] = useState<Log[]>([]);
-
-  useEffect(() => {
-    const fetchUploadLogs = async () => {
-      try {
-        const response = await fetch('/api/maintenance/logs');
-        if (response.ok) {
-          const data = await response.json();
-          setUploadLogs(data);
-        } else {
-          toast.error('Failed to fetch upload logs.');
-        }
-      } catch (error) {
-        toast.error('An error occurred while fetching upload logs.');
-      }
-    };
-    fetchUploadLogs();
-  }, []);
 
   useEffect(() => {
     const fetchDailyStatus = async () => {
@@ -521,15 +505,21 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
                                   return <TableCell key={ts} className="text-center bg-gray-100">-</TableCell>;
                                 }
                                 const { status, imageUrl } = cellData;
+                                const statusInfo = {
+                                  Yes: { icon: CheckCircle, color: 'text-green-500' },
+                                  No: { icon: XCircle, color: 'text-red-500' },
+                                  Delayed: { icon: Clock, color: 'text-yellow-500' },
+                                };
+                                const CurrentIcon = statusInfo[status as keyof typeof statusInfo]?.icon || 'div';
+                                const color = statusInfo[status as keyof typeof statusInfo]?.color || 'text-gray-500';
+
                                 return (
                                   <TableCell key={ts} className="text-center">
                                     <div
-                                      className="cursor-pointer"
+                                      className="cursor-pointer flex justify-center"
                                       onClick={() => handleStatusClick(imageUrl)}
                                     >
-                                      <p className={`font-bold ${status === 'Yes' ? 'text-green-500' : status === 'Delayed' ? 'text-yellow-500' : 'text-red-500'}`}>
-                                        {status}
-                                      </p>
+                                      <CurrentIcon className={`h-6 w-6 ${color}`} />
                                     </div>
                                   </TableCell>
                                 );
@@ -665,18 +655,39 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
 
 interface OperatorViewProps {
   items: MaintenanceItem[];
+  uploadLogs: Log[];
+  onUploadSuccess: (log: Log) => void;
 }
 
-const OperatorView: React.FC<OperatorViewProps> = ({ items }) => {
-  const [uploading, setUploading] = useState<string | null>(null);
+type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
+
+const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess }) => {
+  const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
   const currentUser = useAppStore((state) => state.currentUser);
+
+  useEffect(() => {
+    const initialStatuses: Record<string, UploadStatus> = {};
+    items.forEach(item => {
+      for (let i = 1; i <= item.quantity; i++) {
+        const uploadKey = `${item.name}-${i}`;
+        const todaysLog = uploadLogs.find(log =>
+          isToday(new Date(log.timestamp)) &&
+          log.itemName === item.name &&
+          log.itemNumber === i.toString()
+        );
+        initialStatuses[uploadKey] = todaysLog ? 'success' : 'pending';
+      }
+    });
+    setStatuses(initialStatuses);
+  }, [items, uploadLogs]);
+
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const uploadKey = `${itemName}-${itemNumber}`;
-    setUploading(uploadKey);
+    setStatuses(prev => ({ ...prev, [uploadKey]: 'uploading' }));
 
     const formData = new FormData();
     formData.append('file', file);
@@ -691,14 +702,17 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items }) => {
       });
 
       if (response.ok) {
+        const newLog = await response.json();
         toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
+        setStatuses(prev => ({ ...prev, [uploadKey]: 'success' }));
+        onUploadSuccess(newLog);
       } else {
         toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
+        setStatuses(prev => ({ ...prev, [uploadKey]: 'error' }));
       }
     } catch (error) {
       toast.error('An error occurred while uploading the image.');
-    } finally {
-      setUploading(null);
+      setStatuses(prev => ({ ...prev, [uploadKey]: 'error' }));
     }
   };
 
@@ -709,42 +723,51 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items }) => {
       {items.length === 0 ? (
         <p>No maintenance items configured.</p>
       ) : (
-        <div className="space-y-4">
-          {items.map(item => (
-            <Card key={item.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center">
-                  <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                  {item.name}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
-                  {Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
-                    <li key={number} className="flex items-center justify-between p-2 border rounded-md">
-                      <span>{item.name} #{number}</span>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        capture="environment"
-                        onChange={(e) => handleFileChange(e, item.name, number)}
-                        className="hidden"
-                        id={`${item.id}-${number}`}
-                      />
-                      <Label htmlFor={`${item.id}-${number}`} className="cursor-pointer">
-                        <Button asChild disabled={uploading === `${item.name}-${number}`}>
-                          <span>
-                            {uploading === `${item.name}-${number}` && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            {uploading === `${item.name}-${number}` ? 'Uploading...' : 'Upload Picture'}
-                          </span>
-                        </Button>
-                      </Label>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {items.flatMap(item =>
+            Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
+              const uploadKey = `${item.name}-${number}`;
+              const status = statuses[uploadKey] || 'pending';
+              const statusInfo = {
+                pending: { icon: Clock, color: 'text-gray-500', text: 'Pending' },
+                uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
+                success: { icon: CheckCircle, color: 'text-green-500', text: 'Uploaded' },
+                error: { icon: XCircle, color: 'text-red-500', text: 'Error' },
+              };
+              const CurrentIcon = statusInfo[status].icon;
+
+              return (
+                <Card key={`${item.id}-${number}`} className={`flex flex-col border-2 ${status === 'success' ? 'border-green-500' : 'border-transparent'}`}>
+                  <CardHeader>
+                    <CardTitle className="flex items-center">
+                      <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                      {item.name} #{number}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow flex flex-col items-center justify-center text-center">
+                    <CurrentIcon className={`h-12 w-12 ${statusInfo[status].color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
+                    <p className={`mt-2 font-semibold ${statusInfo[status].color}`}>{statusInfo[status].text}</p>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      onChange={(e) => handleFileChange(e, item.name, number)}
+                      className="hidden"
+                      id={`${item.id}-${number}`}
+                      disabled={status === 'uploading' || status === 'success'}
+                    />
+                    <Label htmlFor={`${item.id}-${number}`} className="cursor-pointer w-full mt-4">
+                      <Button asChild disabled={status === 'uploading' || status === 'success'} className="w-full">
+                        <span>
+                          {status === 'success' ? 'Upload Again' : 'Upload Picture'}
+                        </span>
+                      </Button>
+                    </Label>
+                  </CardContent>
+                </Card>
+              );
+            })
+          )}
         </div>
       )}
     </div>
@@ -753,6 +776,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items }) => {
 
 const MaintenancePage = () => {
   const [items, setItems] = useState<MaintenanceItem[]>([]);
+  const [uploadLogs, setUploadLogs] = useState<Log[]>([]);
   const currentUser = useAppStore((state) => state.currentUser);
 
   useEffect(() => {
@@ -769,17 +793,37 @@ const MaintenancePage = () => {
         toast.error("An error occurred while fetching the configuration.");
       }
     };
+
+    const fetchUploadLogs = async () => {
+      try {
+        const response = await fetch('/api/maintenance/logs');
+        if (response.ok) {
+          const data = await response.json();
+          setUploadLogs(data);
+        } else {
+          toast.error('Failed to fetch upload logs.');
+        }
+      } catch (error) {
+        toast.error('An error occurred while fetching upload logs.');
+      }
+    };
+
     fetchConfig();
+    fetchUploadLogs();
   }, []);
+
+  const handleUploadSuccess = (newLog: Log) => {
+    setUploadLogs(prevLogs => [...prevLogs, newLog]);
+  };
 
   if (!currentUser) {
     return <div>Loading...</div>;
   }
 
   return currentUser.role === UserRole.ADMIN ? (
-    <AdminView items={items} setItems={setItems} />
+    <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} />
   ) : (
-    <OperatorView items={items} />
+    <OperatorView items={items} uploadLogs={uploadLogs} onUploadSuccess={handleUploadSuccess} />
   );
 };
 
