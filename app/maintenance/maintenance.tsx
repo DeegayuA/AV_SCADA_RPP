@@ -29,7 +29,7 @@ interface AdminViewProps {
   uploadLogs: Log[];
 }
 
-const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [keyExists, setKeyExists] = useState<boolean | null>(null);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
@@ -286,7 +286,7 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { format, isToday, getDaysInMonth, startOfMonth } from "date-fns";
+import { format, isToday, getDaysInMonth, startOfMonth, addDays, endOfMonth } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -304,7 +304,6 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRange, DayProps } from "react-day-picker";
-import { addDays, startOfMonth, endOfMonth } from "date-fns";
 import { saveAs } from "file-saver";
 
 import { CheckCircle, XCircle, Clock, UploadCloud } from 'lucide-react';
@@ -793,7 +792,7 @@ interface OperatorViewProps {
   onUploadSuccess: (log: Log) => void;
 }
 
-type UploadStatus = 'pending' | 'uploading' | 'success' | 'error';
+type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
 const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess }) => {
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
