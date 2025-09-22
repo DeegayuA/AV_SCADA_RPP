@@ -291,8 +291,6 @@ interface AdminStatusViewProps {
 }
 
 const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) => {
-  // NOTE: This component relies on a file-based data persistence strategy, which is not suitable for a production environment.
-  // In a production environment, a database should be used to store and retrieve status data.
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [dailyStatusData, setDailyStatusData] = useState<Log[]>([]);
@@ -444,6 +442,10 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
 
   const totalChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
 
+  const earliestItemDate = items.length > 0
+    ? new Date(Math.min(...items.map(item => new Date(item.id).getTime())))
+    : null;
+
   const modifiers = {
     completed: (day: Date) => {
       const dateStr = format(day, 'yyyy-MM-dd');
@@ -570,10 +572,19 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                   {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => i + 1).map(day => {
                     const dayDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
                     const dateStr = format(dayDate, 'yyyy-MM-dd');
+
+                    if (earliestItemDate && dayDate < earliestItemDate) {
+                      return (
+                        <div key={day} className="h-12 w-12 flex items-center justify-center rounded-md bg-gray-100 text-gray-400 text-xs text-center">
+                          N/A
+                        </div>
+                      );
+                    }
+
                     const completed = completedDays[dateStr] && completedDays[dateStr].size >= totalChecks;
                     const partiallyCompleted = completedDays[dateStr] && completedDays[dateStr].size < totalChecks;
 
-                    let bgColor = 'bg-gray-200'; // Missed
+                    let bgColor = 'bg-red-500'; // Missed
                     if (completed) bgColor = 'bg-green-500';
                     else if (partiallyCompleted) bgColor = 'bg-yellow-500';
 
