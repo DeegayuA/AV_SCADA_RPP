@@ -17,6 +17,8 @@ function decrypt(text: string, key: Buffer) {
   return decrypted.toString();
 }
 
+import glob from 'glob';
+
 export async function GET(request: Request) {
   const encryptionKey = await getEncryptionKey();
   if (!encryptionKey) {
@@ -26,15 +28,33 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const date = searchParams.get('date') || format(new Date(), 'yyyy-MM-dd');
+  const date = searchParams.get('date');
+  const month = searchParams.get('month'); // e.g., '2025-09'
 
   const logDir = path.join(process.cwd(), 'logs', 'maintenance');
-  const logFilePath = path.join(logDir, `${date}.json.log`);
+  let logFiles: string[] = [];
+
+  if (month) {
+    logFiles = glob.sync(`${logDir}/${month}-*.json.log`);
+  } else {
+    const targetDate = date || format(new Date(), 'yyyy-MM-dd');
+    const logFilePath = path.join(logDir, `${targetDate}.json.log`);
+    try {
+      await fs.access(logFilePath);
+      logFiles.push(logFilePath);
+    } catch (error) {
+      // File doesn't exist, logFiles remains empty, which is fine.
+    }
+  }
 
   try {
-    await fs.access(logFilePath);
-    const fileContent = await fs.readFile(logFilePath, 'utf-8');
-    const lines = fileContent.trim().split('\n');
+    let allLines: string[] = [];
+    for (const file of logFiles) {
+      const fileContent = await fs.readFile(file, 'utf-8');
+      allLines = allLines.concat(fileContent.trim().split('\n'));
+    }
+
+    const lines = allLines.filter(line => line); // Filter out empty lines
     const decryptedLogs = lines.map(line => {
       try {
         return JSON.parse(decrypt(line, encryptionKey));
@@ -46,7 +66,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json(decryptedLogs);
   } catch (error) {
-    // If the file doesn't exist, return an empty array.
-    return NextResponse.json([]);
+    console.error('Failed to read log files:', error);
+    return NextResponse.json({ message: 'Failed to read logs.' }, { status: 500 });
   }
 }

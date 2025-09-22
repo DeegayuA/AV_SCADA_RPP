@@ -217,58 +217,132 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRange } from "react-day-picker";
+import { addDays } from "date-fns";
+import { saveAs } from "file-saver";
 
 const AdminStatusView = ({ items }) => {
   // NOTE: This component relies on a file-based data persistence strategy, which is not suitable for a production environment.
   // In a production environment, a database should be used to store and retrieve status data.
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [statusData, setStatusData] = useState([]);
+  const [dailyStatusData, setDailyStatusData] = useState([]);
+  const [monthlyStatusData, setMonthlyStatusData] = useState([]);
   const [date, setDate] = useState<Date>(new Date());
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
-    const fetchStatus = async () => {
+    const fetchDailyStatus = async () => {
       try {
         const response = await fetch(`/api/maintenance/status?date=${format(date, 'yyyy-MM-dd')}`);
         if (response.ok) {
           const data = await response.json();
-          setStatusData(data);
+          setDailyStatusData(data);
         }
       } catch (error) {
-        toast.error('Failed to fetch maintenance status.');
+        toast.error('Failed to fetch daily maintenance status.');
       }
     };
-    fetchStatus();
+    fetchDailyStatus();
   }, [date, items]);
 
-  const getStatusForCheck = (item, itemNumber, timeSlot) => {
-    const logsForItemInstance = statusData.filter(log => log.itemName === item.name && log.itemNumber === itemNumber);
+  useEffect(() => {
+    const fetchMonthlyStatus = async () => {
+      try {
+        const response = await fetch(`/api/maintenance/status?month=${format(currentMonth, 'yyyy-MM')}`);
+        if (response.ok) {
+          const data = await response.json();
+          setMonthlyStatusData(data);
+        }
+      } catch (error) {
+        toast.error('Failed to fetch monthly maintenance status.');
+      }
+    };
+    fetchMonthlyStatus();
+  }, [currentMonth, items]);
 
-    // This is a very simplified time parsing.
+  const handleExport = async () => {
+    if (!exportDateRange?.from || !exportDateRange?.to) {
+      toast.error("Please select a date range for the export.");
+      return;
+    }
+    setIsExporting(true);
+    try {
+      const startDate = format(exportDateRange.from, 'yyyy-MM-dd');
+      const endDate = format(exportDateRange.to, 'yyyy-MM-dd');
+      const response = await fetch(`/api/maintenance/export?startDate=${startDate}&endDate=${endDate}`);
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to export data.");
+      }
+
+      const blob = await response.blob();
+      saveAs(blob, `maintenance_logs_${startDate}_to_${endDate}.csv`);
+      toast.success("CSV export downloaded successfully.");
+
+    } catch (error) {
+      toast.error(error.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const processLogData = (items, logs) => {
+    const statusGrid = {};
     const parseTime = (timeStr) => {
-      const hour = parseInt(timeStr.replace(/(am|pm)/, ''));
-      const isPM = timeStr.includes('pm');
-      return isPM && hour < 12 ? hour + 12 : hour;
+      const hour = parseInt(timeStr.replace(/(am|pm)/i, ''));
+      const isPM = /pm/i.test(timeStr);
+      if (isPM && hour < 12) return hour + 12;
+      if (!isPM && hour === 12) return 0; // 12am is midnight
+      return hour;
     };
 
-    const timeSlotHour = parseTime(timeSlot);
+    const sortedLogs = [...logs].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-    for (const log of logsForItemInstance) {
-      const uploadTime = new Date(log.timestamp);
-      const uploadHour = uploadTime.getHours();
+    for (const item of items) {
+      for (let i = 1; i <= item.quantity; i++) {
+        const itemInstanceId = `${item.name}-${i}`;
+        statusGrid[itemInstanceId] = {};
+        const timeSlots = item.timeFrames.split(',').map(t => t.trim());
+        let instanceLogs = sortedLogs.filter(log => log.itemName === item.name && log.itemNumber == i);
 
-      // This logic assumes that an upload corresponds to the *earliest possible* time slot it could belong to.
-      // This is still a simplification and may not be robust for all cases.
-      if (uploadHour >= timeSlotHour -1 && uploadHour < timeSlotHour + 2) { // Check within a 3-hour window
-        if (uploadHour > timeSlotHour) {
-          return { status: 'Delayed', imageUrl: `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${log.filename}` };
+        for (const timeSlot of timeSlots) {
+          const timeSlotHour = parseTime(timeSlot);
+          let foundLog = null;
+
+          // Find the first available log for this instance
+          if (instanceLogs.length > 0) {
+            foundLog = instanceLogs.shift();
+          }
+
+          if (foundLog) {
+            const uploadTime = new Date(foundLog.timestamp);
+            const uploadHour = uploadTime.getHours();
+            const imageUrl = `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${foundLog.filename}`;
+
+            // Check if within the -1/+1 hour window
+            if (uploadHour >= timeSlotHour - 1 && uploadHour <= timeSlotHour + 1) {
+              statusGrid[itemInstanceId][timeSlot] = { status: 'Yes', imageUrl };
+            } else {
+              statusGrid[itemInstanceId][timeSlot] = { status: 'Delayed', imageUrl };
+            }
+          } else {
+            statusGrid[itemInstanceId][timeSlot] = { status: 'No', imageUrl: null };
+          }
         }
-        return { status: 'Yes', imageUrl: `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${log.filename}` };
       }
     }
-
-    return { status: 'No', imageUrl: null };
+    return statusGrid;
   };
+
+  const statusGrid = processLogData(items, dailyStatusData);
 
   const handleStatusClick = (imageUrl: string | null) => {
     if (imageUrl) {
@@ -287,76 +361,175 @@ const AdminStatusView = ({ items }) => {
     return acc;
   }, []);
 
+  const DayWithStatus = ({ date, ...props }) => {
+    const day = date.getDate();
+    const logsForDay = monthlyStatusData.filter(log => new Date(log.timestamp).getDate() === day);
+    const totalChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
+    const completedChecks = new Set(logsForDay.map(log => `${log.itemName}-${log.itemNumber}`)).size;
+
+    let statusColor = 'bg-gray-200';
+    if (completedChecks > 0) {
+      statusColor = completedChecks === totalChecks ? 'bg-green-500' : 'bg-yellow-500';
+    }
+
+    return (
+      <div {...props} className="relative">
+        {day}
+        {logsForDay.length > 0 && <div className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ${statusColor}`} />}
+      </div>
+    );
+  };
+
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <div className="mt-8">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Daily Status</h2>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant={"outline"}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {format(date, "PPP")}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
-        <Card>
-          <CardContent className="pt-4">
-            {items.length === 0 ? (
-              <div className="text-center text-gray-500 py-8">
-                <p>No items configured to display status.</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      {timeSlots.map(ts => <TableHead key={ts} className="text-center">{ts}</TableHead>)}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {items.map(item => (
-                      Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
-                        <TableRow key={`${item.id}-${number}`}>
-                          <TableCell>{item.name} #{number}</TableCell>
-                          {timeSlots.map(ts => {
-                            const itemTimeSlots = item.timeFrames.split(',').map(t => t.trim());
-                            if (!itemTimeSlots.includes(ts)) {
-                              return <TableCell key={ts} className="text-center bg-gray-100">-</TableCell>;
-                            }
-                            const { status, imageUrl } = getStatusForCheck(item, number, ts);
-                            return (
-                              <TableCell key={ts} className="text-center">
-                                <div
-                                  className="cursor-pointer"
-                                  onClick={() => handleStatusClick(imageUrl)}
-                                >
-                                  <p className={`font-bold ${status === 'Yes' ? 'text-green-500' : status === 'Delayed' ? 'text-yellow-500' : 'text-red-500'}`}>
-                                    {status}
-                                  </p>
-                                </div>
-                              </TableCell>
-                            );
-                          })}
+        <Tabs defaultValue="daily">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-bold">Maintenance Status</h2>
+            <TabsList>
+              <TabsTrigger value="daily">Daily</TabsTrigger>
+              <TabsTrigger value="monthly">Monthly</TabsTrigger>
+              <TabsTrigger value="export">Export</TabsTrigger>
+            </TabsList>
+          </div>
+
+          <TabsContent value="daily">
+            <div className="flex justify-end mb-4">
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant={"outline"}>
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(date, "PPP")}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={date}
+                    onSelect={setDate}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <Card>
+              <CardContent className="pt-4">
+                {items.length === 0 ? (
+                  <div className="text-center text-gray-500 py-8">
+                    <p>No items configured to display status.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Item</TableHead>
+                          {timeSlots.map(ts => <TableHead key={ts} className="text-center">{ts}</TableHead>)}
                         </TableRow>
-                      ))
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                      </TableHeader>
+                      <TableBody>
+                        {items.map(item => (
+                          Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
+                            <TableRow key={`${item.id}-${number}`}>
+                              <TableCell>{item.name} #{number}</TableCell>
+                              {timeSlots.map(ts => {
+                                const itemInstanceId = `${item.name}-${number}`;
+                                const cellData = statusGrid[itemInstanceId]?.[ts];
+                                if (!cellData) {
+                                  return <TableCell key={ts} className="text-center bg-gray-100">-</TableCell>;
+                                }
+                                const { status, imageUrl } = cellData;
+                                return (
+                                  <TableCell key={ts} className="text-center">
+                                    <div
+                                      className="cursor-pointer"
+                                      onClick={() => handleStatusClick(imageUrl)}
+                                    >
+                                      <p className={`font-bold ${status === 'Yes' ? 'text-green-500' : status === 'Delayed' ? 'text-yellow-500' : 'text-red-500'}`}>
+                                        {status}
+                                      </p>
+                                    </div>
+                                  </TableCell>
+                                );
+                              })}
+                            </TableRow>
+                          ))
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="monthly">
+            <Card>
+              <CardContent className="p-0">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  month={currentMonth}
+                  onMonthChange={setCurrentMonth}
+                  components={{
+                    Day: DayWithStatus
+                  }}
+                  className="p-4"
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="export">
+            <Card>
+              <CardHeader>
+                <CardTitle>Export Maintenance Logs</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-2">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date"
+                        variant={"outline"}
+                        className="w-full justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {exportDateRange?.from ? (
+                          exportDateRange.to ? (
+                            <>
+                              {format(exportDateRange.from, "LLL dd, y")} -{" "}
+                              {format(exportDateRange.to, "LLL dd, y")}
+                            </>
+                          ) : (
+                            format(exportDateRange.from, "LLL dd, y")
+                          )
+                        ) : (
+                          <span>Pick a date range</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={exportDateRange?.from}
+                        selected={exportDateRange}
+                        onSelect={setExportDateRange}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Button onClick={handleExport} disabled={isExporting}>
+                    {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Export CSV
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
 
       {selectedImage && (
