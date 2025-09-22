@@ -15,8 +15,6 @@ import {
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { MaintenanceItem } from '@/types/maintenance';
-import { saveMaintenanceConfig, getMaintenanceConfig } from '@/lib/db';
-
 import { Loader2, KeyRound } from "lucide-react";
 import { Dispatch, SetStateAction } from 'react';
 
@@ -89,8 +87,24 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems }) => {
 
   const handleSaveConfiguration = async () => {
     setIsSaving(true);
-    await saveMaintenanceConfig(items);
-    setIsSaving(false);
+    try {
+      const response = await fetch('/api/maintenance/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(items),
+      });
+      if (response.ok) {
+        toast.success("Configuration saved successfully.");
+      } else {
+        toast.error("Failed to save configuration.");
+      }
+    } catch (error) {
+      toast.error("An error occurred while saving the configuration.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleClearConfiguration = () => {
@@ -269,6 +283,24 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
     to: endOfMonth(new Date()),
   });
   const [isExporting, setIsExporting] = useState(false);
+  const [uploadLogs, setUploadLogs] = useState<Log[]>([]);
+
+  useEffect(() => {
+    const fetchUploadLogs = async () => {
+      try {
+        const response = await fetch('/api/maintenance/logs');
+        if (response.ok) {
+          const data = await response.json();
+          setUploadLogs(data);
+        } else {
+          toast.error('Failed to fetch upload logs.');
+        }
+      } catch (error) {
+        toast.error('An error occurred while fetching upload logs.');
+      }
+    };
+    fetchUploadLogs();
+  }, []);
 
   useEffect(() => {
     const fetchDailyStatus = async () => {
@@ -434,6 +466,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
             <TabsList>
               <TabsTrigger value="daily">Daily</TabsTrigger>
               <TabsTrigger value="monthly">Monthly</TabsTrigger>
+              <TabsTrigger value="upload-log">Upload Log</TabsTrigger>
               <TabsTrigger value="export">Export</TabsTrigger>
             </TabsList>
           </div>
@@ -526,6 +559,43 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items }) => {
                   modifiersClassNames={modifiersClassNames}
                   className="p-4"
                 />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="upload-log">
+            <Card>
+              <CardHeader>
+                <CardTitle>Image Upload Log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Timestamp</TableHead>
+                      <TableHead>Item</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Thumbnail</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {uploadLogs.map((log, index) => (
+                      <TableRow key={index}>
+                        <TableCell>{format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss")}</TableCell>
+                        <TableCell>{log.itemName} #{log.itemNumber}</TableCell>
+                        <TableCell>{log.username}</TableCell>
+                        <TableCell>
+                          <img
+                            src={`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`}
+                            alt="thumbnail"
+                            className="w-16 h-16 object-cover cursor-pointer"
+                            onClick={() => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`)}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
@@ -687,8 +757,17 @@ const MaintenancePage = () => {
 
   useEffect(() => {
     const fetchConfig = async () => {
-      const config = await getMaintenanceConfig();
-      setItems(config);
+      try {
+        const response = await fetch('/api/maintenance/config');
+        if (response.ok) {
+          const config = await response.json();
+          setItems(config);
+        } else {
+          toast.error("Failed to fetch maintenance configuration.");
+        }
+      } catch (error) {
+        toast.error("An error occurred while fetching the configuration.");
+      }
     };
     fetchConfig();
   }, []);
