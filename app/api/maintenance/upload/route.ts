@@ -82,3 +82,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'File upload failed.' }, { status: 500 });
   }
 }
+
+export async function GET() {
+  return NextResponse.json({ message: 'Method not allowed. Please use POST to upload files.' }, { status: 405 });
+}
