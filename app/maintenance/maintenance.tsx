@@ -718,7 +718,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   const [previewDate, setPreviewDate] = useState<Date | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  const users = Array.from(new Set(uploadLogs.map(log => log.username)));
+  const users = [...new Set(uploadLogs.map(log => log.username))];
 
   const filteredLogs = uploadLogs.filter(log => {
     const logDate = new Date(log.timestamp);
@@ -1392,7 +1392,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
 
                 const currentStatusInfo = statusInfo[status];
                 const CurrentIcon = currentStatusInfo.icon;
-                const isButtonDisabled = status !== 'pending' || !isTimeSlotActive;
+                const isButtonDisabled = !((status === 'pending' || status === 'error') && isTimeSlotActive);
 
                 return (
                   <motion.div
@@ -1429,6 +1429,11 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                             asChild={false}
                             disabled={isButtonDisabled}
                             className="w-full"
+                            onClick={() => {
+                                if (!isButtonDisabled) {
+                                    document.getElementById(`${uploadKey}-${slotTime}`)?.click();
+                                }
+                            }}
                           >
                             Upload Picture
                           </Button>
