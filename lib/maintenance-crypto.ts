@@ -31,14 +31,22 @@ export async function getEncryptionKey(): Promise<Buffer | null> {
 export function decrypt(text: string, key: Buffer): string | null {
     try {
         const textParts = text.split(':');
+        if (textParts.length < 2) return null; // Not a valid format
+
         const iv = Buffer.from(textParts.shift()!, 'hex');
+        if (iv.length !== IV_LENGTH) return null; // Invalid IV length
+
         const encryptedText = Buffer.from(textParts.join(':'), 'hex');
         const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
         let decrypted = decipher.update(encryptedText);
         decrypted = Buffer.concat([decrypted, decipher.final()]);
         return decrypted.toString();
-    } catch (error) {
-        console.error("Decryption failed:", error);
+    } catch (error: any) {
+        // Suppress common 'bad decrypt' errors which can happen with malformed log lines.
+        // Log other, unexpected errors.
+        if (error.code !== 'ERR_OSSL_BAD_DECRYPT') {
+            console.error("An unexpected decryption error occurred:", error);
+        }
         return null;
     }
 }

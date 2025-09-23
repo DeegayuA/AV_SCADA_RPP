@@ -718,7 +718,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   const [previewDate, setPreviewDate] = useState<Date | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  const users = Array.from(new Set(uploadLogs.map(log => log.username)));
+  const users = [...new Set(uploadLogs.map(log => log.username))];
 
   const filteredLogs = uploadLogs.filter(log => {
     const logDate = new Date(log.timestamp);
