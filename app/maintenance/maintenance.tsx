@@ -1013,7 +1013,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         if (todaysLog) {
           initialStatuses[uploadKey] = 'success';
         } else {
-          initialStatuses[uploadKey] = isWithinTimeSlot(item.timeFrames, item.timeWindow, serverTime) ? 'pending' : 'error';
+          initialStatuses[uploadKey] = 'pending';
         }
       }
     });
@@ -1067,7 +1067,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
             Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
               const uploadKey = `${item.name}-${number}`;
               const status = statuses[uploadKey] || 'pending';
-              const isTimeSlotActive = serverTime ? isWithinTimeSlot(item.timeFrames, serverTime) : false;
+              const isTimeSlotActive = serverTime ? isWithinTimeSlot(item.timeFrames, item.timeWindow || 60, serverTime) : false;
 
               const statusInfo = {
                 pending: { icon: Clock, color: 'text-gray-500', text: 'Pending' },
@@ -1097,13 +1097,14 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
 
               return (
                 <motion.div
+                  key={`${item.id}-${number}`}
                   variants={cardVariants}
                   initial="hidden"
                   animate={displayStatus === 'error' ? 'error' : 'visible'}
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <Card key={`${item.id}-${number}`} className={`flex flex-col border-2 ${displayStatus === 'success' ? 'border-green-500' : 'border-transparent'}`}>
+                  <Card className={`flex flex-col border-2 ${displayStatus === 'success' ? 'border-green-500' : 'border-transparent'}`}>
                     <CardHeader>
                       <CardTitle className="flex items-center">
                       <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
@@ -1134,7 +1135,8 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                       </>
                     )}
                   </CardContent>
-                </Card>
+                  </Card>
+                </motion.div>
               );
             })
           )}
