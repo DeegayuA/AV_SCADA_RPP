@@ -691,6 +691,9 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                 </p>
             </CardContent>
         </Card>
+        <div className="mb-4">
+            <DailyChecklist items={items} uploadLogs={uploadLogs} />
+        </div>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">Monthly Status & Logs</h2>
@@ -922,6 +925,85 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   );
 };
 
+interface DailyChecklistProps {
+    items: MaintenanceItem[];
+    uploadLogs: Log[];
+}
+
+const DailyChecklist: React.FC<DailyChecklistProps> = ({ items, uploadLogs }) => {
+    const allChecks = items.flatMap(item => {
+        const checks = [];
+        for (let i = 1; i <= item.quantity; i++) {
+            for (let j = 1; j <= item.timesPerDay; j++) {
+                checks.push({
+                    id: `${item.id}-${i}-${j}`,
+                    name: `${item.name} #${i} (Check ${j})`,
+                    itemName: item.name,
+                    itemNumber: i.toString(),
+                });
+            }
+        }
+        return checks;
+    });
+
+    const todaysLogs = uploadLogs.filter(log => isToday(new Date(log.timestamp)));
+
+    const checkStatus = allChecks.map(check => {
+        const isCompleted = todaysLogs.some(log => log.itemName === check.itemName && log.itemNumber === check.itemNumber);
+        return { ...check, completed: isCompleted };
+    });
+
+    // This is a simplified logic. A real implementation would need to handle multiple checks per item per day more robustly.
+    // For now, we assume any upload for an item instance counts for one of its daily checks.
+    const completedChecks = new Set(todaysLogs.map(log => `${log.itemName}-${log.itemNumber}`));
+
+    const detailedChecklist = items.flatMap(item =>
+        Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
+            const instanceId = `${item.name}-${number}`;
+            const completedCount = todaysLogs.filter(log => log.itemName === item.name && log.itemNumber === number.toString()).length;
+            const requiredCount = item.timesPerDay;
+            const isFullyCompleted = completedCount >= requiredCount;
+
+            return {
+                id: instanceId,
+                name: `${item.name} #${number}`,
+                completed: isFullyCompleted,
+                statusText: `${completedCount} / ${requiredCount} completed`,
+                color: item.color,
+            };
+        })
+    );
+
+
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle>Detailed Daily Checklist</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <ul className="space-y-2">
+                    {detailedChecklist.map(check => (
+                        <li key={check.id} className="flex items-center justify-between p-2 border rounded-md">
+                            <div className="flex items-center">
+                                <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: check.color || '#000000' }} />
+                                <span>{check.name}</span>
+                            </div>
+                            <div className="flex items-center">
+                                {check.completed ? (
+                                    <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                                ) : (
+                                    <XCircle className="h-5 w-5 text-red-500 mr-2" />
+                                )}
+                                <span className="text-sm text-muted-foreground">{check.statusText}</span>
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            </CardContent>
+        </Card>
+    );
+};
+
 interface OperatorViewProps extends ProgressProps {
   items: MaintenanceItem[];
   uploadLogs: Log[];
@@ -1065,6 +1147,10 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         </CardContent>
       </Card>
 
+      <div className="mb-4">
+        <DailyChecklist items={items} uploadLogs={uploadLogs} />
+      </div>
+
       {items.length === 0 ? (
         <p>No maintenance items configured.</p>
       ) : (
@@ -1179,6 +1265,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
 const MaintenancePage = () => {
   const [items, setItems] = useState<MaintenanceItem[]>([]);
   const [uploadLogs, setUploadLogs] = useState<Log[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const currentUser = useAppStore((state) => state.currentUser);
 
   // State for header
@@ -1209,36 +1296,35 @@ const MaintenancePage = () => {
   }, []);
 
   useEffect(() => {
-    const fetchConfig = async () => {
+    const fetchAllData = async () => {
+      setIsLoading(true);
       try {
-        const response = await fetch('/api/maintenance/config');
-        if (response.ok) {
-          const config = await response.json();
+        const [configResponse, logsResponse] = await Promise.all([
+          fetch('/api/maintenance/config'),
+          fetch('/api/maintenance/logs')
+        ]);
+
+        if (configResponse.ok) {
+          const config = await configResponse.json();
           setItems(config);
         } else {
           toast.error("Failed to fetch maintenance configuration.");
         }
-      } catch (error) {
-        toast.error("An error occurred while fetching the configuration.");
-      }
-    };
 
-    const fetchUploadLogs = async () => {
-      try {
-        const response = await fetch('/api/maintenance/logs');
-        if (response.ok) {
-          const data = await response.json();
+        if (logsResponse.ok) {
+          const data = await logsResponse.json();
           setUploadLogs(data);
         } else {
           toast.error('Failed to fetch upload logs.');
         }
       } catch (error) {
-        toast.error('An error occurred while fetching upload logs.');
+        toast.error('An error occurred while fetching maintenance data.');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchConfig();
-    fetchUploadLogs();
+    fetchAllData();
     checkPlcConnection();
     const plcI = setInterval(checkPlcConnection, 15000);
     return () => clearInterval(plcI);
@@ -1272,7 +1358,7 @@ const MaintenancePage = () => {
   const totalDailyChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
   const todaysCompletedChecks = uploadLogs.filter(log => isToday(new Date(log.timestamp))).length;
 
-  if (!currentUser) {
+  if (!currentUser || isLoading) {
     return <div className="flex flex-col items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin" /><p className="mt-4">Loading Maintenance Module...</p></div>;
   }
 
