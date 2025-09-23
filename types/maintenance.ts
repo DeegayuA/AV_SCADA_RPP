@@ -5,4 +5,5 @@ export interface MaintenanceItem {
   timesPerDay: number;
   timeFrames: string;
   color?: string;
+  timeWindow: number; // in minutes
 }
