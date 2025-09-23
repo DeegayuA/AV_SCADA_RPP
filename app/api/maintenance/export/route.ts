@@ -28,6 +28,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const startDateStr = searchParams.get('startDate');
   const endDateStr = searchParams.get('endDate');
+  const user = searchParams.get('user');
 
   if (!startDateStr || !endDateStr) {
     return NextResponse.json({ message: 'startDate and endDate are required.' }, { status: 400 });
@@ -61,11 +62,16 @@ export async function GET(request: Request) {
     }
   }
 
-  if (allLogs.length === 0) {
-    return NextResponse.json({ message: 'No logs found for the selected date range.' }, { status: 404 });
+  let filteredLogs = allLogs;
+  if (user) {
+    filteredLogs = allLogs.filter(log => log.username === user);
   }
 
-  const csv = Papa.unparse(allLogs);
+  if (filteredLogs.length === 0) {
+    return NextResponse.json({ message: 'No logs found for the selected criteria.' }, { status: 404 });
+  }
+
+  const csv = Papa.unparse(filteredLogs);
 
   return new NextResponse(csv, {
     status: 200,

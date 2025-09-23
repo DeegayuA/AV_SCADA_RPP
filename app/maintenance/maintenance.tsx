@@ -127,7 +127,7 @@ const getTimeSlotInfo = (timeFrames: string, timeWindow: number, serverTime: Dat
     const activeSlot = slotDetails.find(s => now >= s.start && now <= s.end);
     const nextSlot = slotDetails.find(s => now < s.start);
 
-    return { activeSlot, nextSlot };
+    return { activeSlot, nextSlot, allSlots: slotDetails };
 };
 
 const processDailyStatus = (
@@ -714,12 +714,18 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   const [isExporting, setIsExporting] = useState(false);
   const [logPageSize, setLogPageSize] = useState(31);
   const [logCurrentPage, setLogCurrentPage] = useState(1);
-  const [selectedLogDate, setSelectedLogDate] = useState<Date | null>(null);
   const [activeTab, setActiveTab] = useState('monthly');
+  const [previewDate, setPreviewDate] = useState<Date | null>(null);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  const filteredLogs = selectedLogDate
-    ? uploadLogs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === format(selectedLogDate, 'yyyy-MM-dd'))
-    : uploadLogs;
+  const users = [...new Set(uploadLogs.map(log => log.username))];
+
+  const filteredLogs = uploadLogs.filter(log => {
+    const logDate = new Date(log.timestamp);
+    const isDateMatch = exportDateRange?.from && exportDateRange?.to ? (logDate >= exportDateRange.from && logDate <= exportDateRange.to) : true;
+    const isUserMatch = selectedUser ? log.username === selectedUser : true;
+    return isDateMatch && isUserMatch;
+  });
 
   const paginatedLogs = filteredLogs.slice(
     (logCurrentPage - 1) * logPageSize,
@@ -750,7 +756,11 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
     try {
       const startDate = format(exportDateRange.from, 'yyyy-MM-dd');
       const endDate = format(exportDateRange.to, 'yyyy-MM-dd');
-      const response = await fetch(`/api/maintenance/export?startDate=${startDate}&endDate=${endDate}`);
+      let url = `/api/maintenance/export?startDate=${startDate}&endDate=${endDate}`;
+      if (selectedUser) {
+        url += `&user=${encodeURIComponent(selectedUser)}`;
+      }
+      const response = await fetch(url);
 
       if (!response.ok) {
         const error = await response.json();
@@ -829,7 +839,6 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
             <TabsList>
               <TabsTrigger value="monthly">Monthly Calendar</TabsTrigger>
               <TabsTrigger value="upload-log">Image Upload Log</TabsTrigger>
-              <TabsTrigger value="export">Export</TabsTrigger>
             </TabsList>
           </div>
 
@@ -892,10 +901,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                       <motion.div
                         key={day}
                         className={`h-20 sm:h-24 flex flex-col items-center justify-center rounded-md cursor-pointer border-2 ${bgColor} ${textColor} ${borderColor} transition-all hover:shadow-md hover:scale-105`}
-                        onClick={() => {
-                          setSelectedLogDate(dayDate);
-                          setActiveTab('upload-log');
-                        }}
+                        onClick={() => setPreviewDate(dayDate)}
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: day * 0.02 }}
@@ -918,13 +924,69 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Image Upload Log</CardTitle>
-                {selectedLogDate && (
-                  <Button variant="outline" size="sm" onClick={() => setSelectedLogDate(null)}>
-                    Clear Filter (Showing logs for {format(selectedLogDate, "PPP")})
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {exportDateRange && (
+                    <Button variant="outline" size="sm" onClick={() => setExportDateRange({from: undefined, to: undefined})}>
+                      Clear Date Filter
+                    </Button>
+                  )}
+                  {selectedUser && (
+                    <Button variant="outline" size="sm" onClick={() => setSelectedUser(null)}>
+                      Clear User Filter
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
+                <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="date"
+                          variant={"outline"}
+                          className="w-full sm:w-auto justify-start text-left font-normal"
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {exportDateRange?.from ? (
+                            exportDateRange.to ? (
+                              <>
+                                {format(exportDateRange.from, "LLL dd, y")} -{" "}
+                                {format(exportDateRange.to, "LLL dd, y")}
+                              </>
+                            ) : (
+                              format(exportDateRange.from, "LLL dd, y")
+                            )
+                          ) : (
+                            <span>Pick a date range</span>
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          initialFocus
+                          mode="range"
+                          defaultMonth={exportDateRange?.from}
+                          selected={exportDateRange}
+                          onSelect={setExportDateRange}
+                          numberOfMonths={2}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Select value={selectedUser || ''} onValueChange={(value) => setSelectedUser(value)}>
+                        <SelectTrigger className="w-full sm:w-[180px]">
+                            <SelectValue placeholder="Filter by user" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {users.map(user => (
+                                <SelectItem key={user} value={user}>{user}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button onClick={handleExport} disabled={isExporting} className="w-full sm:w-auto">
+                      {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Export CSV
+                    </Button>
+                </div>
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -992,53 +1054,6 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
               </CardContent>
             </Card>
           </TabsContent>
-
-          <TabsContent value="export">
-            <Card>
-              <CardHeader>
-                <CardTitle>Export Maintenance Logs</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col sm:flex-row items-center gap-4">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="date"
-                        variant={"outline"}
-                        className="w-full sm:w-auto justify-start text-left font-normal"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {exportDateRange?.from ? (
-                          exportDateRange.to ? (
-                            <>
-                              {format(exportDateRange.from, "LLL dd, y")} -{" "}
-                              {format(exportDateRange.to, "LLL dd, y")}
-                            </>
-                          ) : (
-                            format(exportDateRange.from, "LLL dd, y")
-                          )
-                        ) : (
-                          <span>Pick a date range</span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={exportDateRange?.from}
-                        selected={exportDateRange}
-                        onSelect={setExportDateRange}
-                        numberOfMonths={2}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Button onClick={handleExport} disabled={isExporting} className="w-full sm:w-auto">
-                    {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Export CSV
-                  </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
       </div>
 
@@ -1049,6 +1064,29 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
           </DialogHeader>
           <img src={selectedImage} alt="Maintenance Check" className="w-full h-auto" />
         </DialogContent>
+      )}
+
+      {previewDate && (
+        <Dialog open={!!previewDate} onOpenChange={() => setPreviewDate(null)}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Daily Preview for {format(previewDate, "PPP")}</DialogTitle>
+            </DialogHeader>
+            <DailyStatusGrid
+              data={processDailyStatus(items, uploadLogs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === format(previewDate, 'yyyy-MM-dd')), previewDate)}
+              onSlotClick={(log) => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`)}
+            />
+            <div className="flex justify-end mt-4">
+                <Button onClick={() => {
+                    if (previewDate) {
+                        setExportDateRange({ from: previewDate, to: previewDate });
+                    }
+                    setActiveTab('upload-log');
+                    setPreviewDate(null);
+                }}>View Logs</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </Dialog>
   );
@@ -1156,7 +1194,7 @@ const TimeStatus: React.FC<{item: MaintenanceItem, serverTime: Date | null}> = (
         )
     }
 
-    if (nextSlot) {
+    if (nextSlot && nextSlot.start > serverTime) {
         return (
             <div className="text-sm text-center p-2">
                 <p>Next check at <strong className="font-bold">{nextSlot.time}</strong> in:</p>
@@ -1172,10 +1210,16 @@ const TimeStatus: React.FC<{item: MaintenanceItem, serverTime: Date | null}> = (
 
 
 const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
-  const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
+  const [statuses, setStatuses] = useState<Record<string, Record<string, UploadStatus>>>({});
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
   const [showInstructions, setShowInstructions] = useState(true);
+
+  const isWithinTimeSlot = (timeFrames: string, timeWindow: number, serverTime: Date): boolean => {
+    if (!timeFrames) return false;
+    const { activeSlot } = getTimeSlotInfo(timeFrames, timeWindow, serverTime);
+    return !!activeSlot;
+  };
 
   useEffect(() => {
     const fetchServerTime = async () => {
@@ -1193,40 +1237,48 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
     return () => clearInterval(interval);
   }, []);
 
-  const isWithinTimeSlot = (timeFrames: string, timeWindow: number, serverTime: Date): boolean => {
-    if (!timeFrames) return false;
-    const { activeSlot } = getTimeSlotInfo(timeFrames, timeWindow, serverTime);
-    return !!activeSlot;
-  };
-
   useEffect(() => {
     if (!serverTime) return;
-    const initialStatuses: Record<string, UploadStatus> = {};
+    const newStatuses: Record<string, Record<string, UploadStatus>> = {};
     items.forEach(item => {
-      for (let i = 1; i <= item.quantity; i++) {
-        const uploadKey = `${item.name}-${i}`;
-        const todaysLog = uploadLogs.find(log =>
-          isToday(new Date(log.timestamp)) &&
-          log.itemName === item.name &&
-          log.itemNumber === i.toString()
-        );
-        if (todaysLog) {
-          initialStatuses[uploadKey] = 'success';
-        } else {
-          initialStatuses[uploadKey] = 'pending';
+        const { allSlots } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
+        for (let i = 1; i <= item.quantity; i++) {
+            const uploadKey = `${item.name}-${i}`;
+            newStatuses[uploadKey] = {};
+            allSlots.forEach(slot => {
+                const hasLog = uploadLogs.some(log => {
+                    const logTime = new Date(log.timestamp);
+                    return log.itemName === item.name &&
+                           log.itemNumber === i.toString() &&
+                           logTime >= slot.start &&
+                           logTime <= slot.end;
+                });
+                if (hasLog) {
+                    newStatuses[uploadKey][slot.time] = 'success';
+                } else if (serverTime > slot.end) {
+                    newStatuses[uploadKey][slot.time] = 'missed';
+                } else {
+                    newStatuses[uploadKey][slot.time] = 'pending';
+                }
+            });
         }
-      }
     });
-    setStatuses(initialStatuses);
+    setStatuses(newStatuses);
   }, [items, uploadLogs, serverTime]);
 
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number, slotTime: string) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const uploadKey = `${itemName}-${itemNumber}`;
-    setStatuses(prev => ({ ...prev, [uploadKey]: 'uploading' }));
+    setStatuses(prev => ({
+        ...prev,
+        [uploadKey]: {
+            ...prev[uploadKey],
+            [slotTime]: 'uploading'
+        }
+    }));
 
     const formData = new FormData();
     formData.append('file', file);
@@ -1243,15 +1295,33 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
       if (response.ok) {
         const newLog = await response.json();
         toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
-        setStatuses(prev => ({ ...prev, [uploadKey]: 'success' }));
+        setStatuses(prev => ({
+            ...prev,
+            [uploadKey]: {
+                ...prev[uploadKey],
+                [slotTime]: 'success'
+            }
+        }));
         onUploadSuccess(newLog);
       } else {
         toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
-        setStatuses(prev => ({ ...prev, [uploadKey]: 'error' }));
+        setStatuses(prev => ({
+            ...prev,
+            [uploadKey]: {
+                ...prev[uploadKey],
+                [slotTime]: 'error'
+            }
+        }));
       }
     } catch (error) {
       toast.error('An error occurred while uploading the image.');
-      setStatuses(prev => ({ ...prev, [uploadKey]: 'error' }));
+      setStatuses(prev => ({
+        ...prev,
+        [uploadKey]: {
+            ...prev[uploadKey],
+            [slotTime]: 'error'
+        }
+      }));
     }
   };
 
@@ -1305,105 +1375,69 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
           {items.flatMap(item =>
             Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
               const uploadKey = `${item.name}-${number}`;
-              const status = statuses[uploadKey] || 'pending';
-              const isTimeSlotActive = serverTime ? isWithinTimeSlot(item.timeFrames, item.timeWindow || 60, serverTime) : false;
+              const itemSlots = (item.timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
 
-              const statusInfo = {
-                pending: { icon: Clock, color: 'text-gray-500', text: 'Pending Upload' },
-                uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
-                success: { icon: CheckCircle, color: 'text-green-500', text: 'Uploaded Today' },
-                error: { icon: XCircle, color: 'text-red-500', text: 'Upload Failed' },
-                missed: { icon: XCircle, color: 'text-orange-500', text: 'Time Slot Missed' },
-              };
+              return itemSlots.map(slotTime => {
+                const status = statuses[uploadKey]?.[slotTime] || 'pending';
+                const { activeSlot } = serverTime ? getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime) : { activeSlot: null };
+                const isTimeSlotActive = activeSlot?.time === slotTime;
 
-              let displayStatus = status;
-              if (status === 'pending' && !isTimeSlotActive && serverTime) {
-                displayStatus = 'missed';
-              }
-              if (status === 'error' && !isTimeSlotActive && serverTime) {
-                displayStatus = 'missed';
-              }
+                const statusInfo = {
+                  pending: { icon: Clock, color: 'text-gray-500', text: 'Pending' },
+                  uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
+                  success: { icon: CheckCircle, color: 'text-green-500', text: 'Completed' },
+                  error: { icon: XCircle, color: 'text-red-500', text: 'Failed' },
+                  missed: { icon: XCircle, color: 'text-orange-500', text: 'Missed' },
+                };
 
-              const currentStatusInfo = statusInfo[displayStatus as keyof typeof statusInfo];
-              const CurrentIcon = currentStatusInfo.icon;
+                const currentStatusInfo = statusInfo[status];
+                const CurrentIcon = currentStatusInfo.icon;
+                const isButtonDisabled = status !== 'pending' || !isTimeSlotActive;
 
-              const isButtonDisabled = displayStatus !== 'pending' || !isTimeSlotActive;
-              const buttonVariants: { [key: string]: string } = {
-                pending: 'bg-primary hover:bg-primary/90',
-                uploading: 'bg-blue-500 hover:bg-blue-600',
-                success: 'bg-green-600 hover:bg-green-700',
-                error: 'bg-red-600 hover:bg-red-700',
-                missed: 'bg-gray-400 cursor-not-allowed',
-              };
-              const buttonText: { [key: string]: string } = {
-                  pending: 'Upload Picture',
-                  uploading: 'Uploading...',
-                  success: 'Completed',
-                  error: 'Retry Upload',
-                  missed: 'Time Slot Missed'
-              }
-
-              const cardVariants = {
-                hidden: { opacity: 0, y: 20 },
-                visible: { opacity: 1, y: 0 },
-                error: { x: [-5, 5, -5, 5, 0], transition: { duration: 0.3 } },
-              };
-
-              return (
-                <motion.div
-                  key={`${item.id}-${number}`}
-                  variants={cardVariants}
-                  initial="hidden"
-                  animate={displayStatus === 'error' ? 'error' : 'visible'}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Card className={`flex flex-col border-2 ${displayStatus === 'success' ? 'border-green-500' : 'border-transparent'}`}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                      <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                      {item.name} #{number}
-                    </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-grow flex flex-col items-center justify-center text-center">
-                      <TimeStatus item={item} serverTime={serverTime} />
-                      <div className="my-4">
-                        <CurrentIcon className={`h-12 w-12 ${currentStatusInfo.color} ${displayStatus === 'uploading' ? 'animate-spin' : ''}`} />
-                        <p className={`mt-2 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
-                      </div>
-                      {currentUser && (
-                        <>
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={(e) => handleFileChange(e, item.name, number)}
-                            className="hidden"
-                            id={`${item.id}-${number}`}
-                            disabled={isButtonDisabled && displayStatus !== 'error'}
-                          />
-                          <Label htmlFor={`${item.id}-${number}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                            <Button
-                              asChild={false}
-                              disabled={isButtonDisabled && displayStatus !== 'error'}
-                              className={`w-full text-white ${buttonVariants[displayStatus] || buttonVariants.pending}`}
-                              onClick={() => {
-                                  if (!isButtonDisabled || displayStatus === 'error') {
-                                      document.getElementById(`${item.id}-${number}`)?.click();
-                                  }
-                              }}
-                            >
-                              <span>
-                                {buttonText[displayStatus]}
-                              </span>
-                            </Button>
-                          </Label>
-                        </>
-                      )}
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
+                return (
+                  <motion.div
+                    key={`${uploadKey}-${slotTime}`}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <Card className={`border-2 ${status === 'success' ? 'border-green-500' : 'border-transparent'}`}>
+                      <CardHeader>
+                        <CardTitle className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                            {item.name} #{number}
+                          </div>
+                          <span className="text-sm font-semibold px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700">{slotTime}</span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="flex flex-col items-center justify-center text-center">
+                        <div className="my-4">
+                          <CurrentIcon className={`h-10 w-10 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
+                          <p className={`mt-2 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
+                        </div>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={(e) => handleFileChange(e, item.name, number, slotTime)}
+                          className="hidden"
+                          id={`${uploadKey}-${slotTime}`}
+                          disabled={isButtonDisabled}
+                        />
+                        <Label htmlFor={`${uploadKey}-${slotTime}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <Button
+                            asChild={false}
+                            disabled={isButtonDisabled}
+                            className="w-full"
+                          >
+                            Upload Picture
+                          </Button>
+                        </Label>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                );
+              });
             })
           )}
         </div>
