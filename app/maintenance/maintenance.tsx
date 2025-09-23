@@ -67,6 +67,69 @@ interface Log {
   filename: string;
 }
 
+const useCountdown = (targetDate: Date | null) => {
+    const [timeLeft, setTimeLeft] = useState({
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0,
+    });
+
+    useEffect(() => {
+        if (!targetDate) return;
+
+        const interval = setInterval(() => {
+            const now = new Date();
+            const difference = targetDate.getTime() - now.getTime();
+
+            if (difference > 0) {
+                setTimeLeft({
+                    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+                    hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+                    minutes: Math.floor((difference / 1000 / 60) % 60),
+                    seconds: Math.floor((difference / 1000) % 60),
+                });
+            } else {
+                setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+                clearInterval(interval);
+            }
+        }, 1000);
+
+        return () => clearInterval(interval);
+    }, [targetDate]);
+
+    return timeLeft;
+};
+
+
+const getTimeSlotInfo = (timeFrames: string, timeWindow: number, serverTime: Date) => {
+    const now = serverTime;
+    const slots = (timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
+
+    const slotDetails = slots.map(slot => {
+        const hour = parseInt(slot.replace(/(am|pm)/i, ''));
+        const isPM = /pm/i.test(slot);
+        let slotHour = isPM && hour < 12 ? hour + 12 : hour;
+        if (!isPM && hour === 12) slotHour = 0;
+
+        const halfWindow = (timeWindow || 60) / 2;
+        const slotCenter = new Date(now);
+        slotCenter.setHours(slotHour, 0, 0, 0);
+
+        const slotStart = new Date(slotCenter.getTime() - halfWindow * 60000);
+        const slotEnd = new Date(slotCenter.getTime() + halfWindow * 60000);
+
+        return { time: slot, start: slotStart, end: slotEnd };
+    });
+
+    slotDetails.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+    const activeSlot = slotDetails.find(s => now >= s.start && now <= s.end);
+    const nextSlot = slotDetails.find(s => now < s.start);
+
+    return { activeSlot, nextSlot };
+};
+
 const processDailyStatus = (
     items: MaintenanceItem[],
     uploadLogs: Log[],
@@ -1054,6 +1117,41 @@ interface OperatorViewProps extends ProgressProps {
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
+const TimeStatus: React.FC<{item: MaintenanceItem, serverTime: Date | null}> = ({ item, serverTime }) => {
+    if (!serverTime) return null;
+
+    const { activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
+
+    const activeCountdown = useCountdown(activeSlot?.end || null);
+    const nextCountdown = useCountdown(nextSlot?.start || null);
+
+    if (activeSlot) {
+        const isLowTime = (activeCountdown.minutes < 5 && activeCountdown.hours === 0 && activeCountdown.days === 0);
+        return (
+            <div className="text-sm text-center bg-blue-100 dark:bg-blue-900/50 p-2 rounded-md">
+                <p>Time slot <strong className="font-bold">{activeSlot.time}</strong> is active!</p>
+                <p className={`font-bold text-lg ${isLowTime ? 'text-red-500 animate-pulse' : 'text-blue-600 dark:text-blue-300'}`}>
+                    {String(activeCountdown.minutes).padStart(2, '0')}:{String(activeCountdown.seconds).padStart(2, '0')} remaining
+                </p>
+            </div>
+        )
+    }
+
+    if (nextSlot) {
+        return (
+            <div className="text-sm text-center p-2">
+                <p>Next check at <strong className="font-bold">{nextSlot.time}</strong> in:</p>
+                <p className="font-bold text-lg text-muted-foreground">
+                    {String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')}
+                </p>
+            </div>
+        )
+    }
+
+    return <div className="text-sm text-center p-2 text-muted-foreground">No upcoming checks for today.</div>;
+}
+
+
 const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
   const [serverTime, setServerTime] = useState<Date | null>(null);
@@ -1072,24 +1170,14 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
       }
     };
     fetchServerTime();
+    const interval = setInterval(fetchServerTime, 1000); // Fetch every second for real-time countdown
+    return () => clearInterval(interval);
   }, []);
 
   const isWithinTimeSlot = (timeFrames: string, timeWindow: number, serverTime: Date): boolean => {
     if (!timeFrames) return false;
-    const now = serverTime;
-    const nowMinutes = now.getHours() * 60 + now.getMinutes();
-
-    const slots = timeFrames.split(',').map(t => t.trim());
-    return slots.some(slot => {
-      const hour = parseInt(slot.replace(/(am|pm)/i, ''));
-      const isPM = /pm/i.test(slot);
-      let slotHour = isPM && hour < 12 ? hour + 12 : hour;
-      if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
-      const slotMinutes = slotHour * 60;
-
-      const halfWindow = timeWindow / 2;
-      return nowMinutes >= slotMinutes - halfWindow && nowMinutes <= slotMinutes + halfWindow;
-    });
+    const { activeSlot } = getTimeSlotInfo(timeFrames, timeWindow, serverTime);
+    return !!activeSlot;
   };
 
   useEffect(() => {
@@ -1261,40 +1349,43 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                       <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
                       {item.name} #{number}
                     </CardTitle>
-                  </CardHeader>
-                  <CardContent className="flex-grow flex flex-col items-center justify-center text-center">
-                    <CurrentIcon className={`h-12 w-12 ${currentStatusInfo.color} ${displayStatus === 'uploading' ? 'animate-spin' : ''}`} />
-                    <p className={`mt-2 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
-                    {currentUser && (
-                      <>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={(e) => handleFileChange(e, item.name, number)}
-                          className="hidden"
-                          id={`${item.id}-${number}`}
-                          disabled={isButtonDisabled && displayStatus !== 'error'}
-                        />
-                        <Label htmlFor={`${item.id}-${number}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                          <Button
-                            asChild={false}
+                    </CardHeader>
+                    <CardContent className="flex-grow flex flex-col items-center justify-center text-center">
+                      <TimeStatus item={item} serverTime={serverTime} />
+                      <div className="my-4">
+                        <CurrentIcon className={`h-12 w-12 ${currentStatusInfo.color} ${displayStatus === 'uploading' ? 'animate-spin' : ''}`} />
+                        <p className={`mt-2 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
+                      </div>
+                      {currentUser && (
+                        <>
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => handleFileChange(e, item.name, number)}
+                            className="hidden"
+                            id={`${item.id}-${number}`}
                             disabled={isButtonDisabled && displayStatus !== 'error'}
-                            className={`w-full text-white ${buttonVariants[displayStatus] || buttonVariants.pending}`}
-                            onClick={() => {
-                                if (!isButtonDisabled || displayStatus === 'error') {
-                                    document.getElementById(`${item.id}-${number}`)?.click();
-                                }
-                            }}
-                          >
-                            <span>
-                              {buttonText[displayStatus]}
-                            </span>
-                          </Button>
-                        </Label>
-                      </>
-                    )}
-                  </CardContent>
+                          />
+                          <Label htmlFor={`${item.id}-${number}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <Button
+                              asChild={false}
+                              disabled={isButtonDisabled && displayStatus !== 'error'}
+                              className={`w-full text-white ${buttonVariants[displayStatus] || buttonVariants.pending}`}
+                              onClick={() => {
+                                  if (!isButtonDisabled || displayStatus === 'error') {
+                                      document.getElementById(`${item.id}-${number}`)?.click();
+                                  }
+                              }}
+                            >
+                              <span>
+                                {buttonText[displayStatus]}
+                              </span>
+                            </Button>
+                          </Label>
+                        </>
+                      )}
+                    </CardContent>
                   </Card>
                 </motion.div>
               );
@@ -1387,7 +1478,7 @@ const MaintenancePage = () => {
       }
     };
     fetchServerTime();
-    const interval = setInterval(fetchServerTime, 60000); // Re-sync server time every minute
+    const interval = setInterval(fetchServerTime, 1000);
     return () => clearInterval(interval);
   }, []);
 
@@ -1425,8 +1516,6 @@ const MaintenancePage = () => {
   }
 
   const handleWsStatusClick = () => {
-    // In the future, this could open the WS config modal, but that's a lot of state to port over.
-    // For now, a simple reconnect attempt is sufficient.
     if (!isConnected) {
       connectWebSocket();
     }
