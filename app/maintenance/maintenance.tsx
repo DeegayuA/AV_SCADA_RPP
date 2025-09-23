@@ -168,9 +168,11 @@ const processDailyStatus = (
                      logTime <= slotEnd;
           });
 
-          let status: 'completed' | 'missed' | 'pending' = 'pending';
+          let status: 'completed' | 'missed' | 'pending' | 'active' = 'pending';
           if (logInSlot) {
               status = 'completed';
+          } else if (now >= slotStart && now <= slotEnd) {
+              status = 'active';
           } else if (now > slotEnd) {
               status = 'missed';
           }
@@ -815,7 +817,10 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
         </Card>
 
         <div className="my-6">
-            <DailyStatusGrid data={dailyStatusGridData} />
+            <DailyStatusGrid
+                data={dailyStatusGridData}
+                onSlotClick={(log) => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`)}
+            />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -1049,7 +1054,10 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   );
 };
 
-const DailyStatusGrid: React.FC<{ data: ReturnType<typeof processDailyStatus> }> = ({ data }) => {
+const DailyStatusGrid: React.FC<{
+    data: ReturnType<typeof processDailyStatus>;
+    onSlotClick?: (log: Log) => void;
+}> = ({ data, onSlotClick }) => {
     if (data.length === 0) {
         return (
             <Card>
@@ -1061,9 +1069,10 @@ const DailyStatusGrid: React.FC<{ data: ReturnType<typeof processDailyStatus> }>
     }
 
     const statusStyles: { [key: string]: string } = {
-        completed: 'bg-green-500 text-white',
+        completed: 'bg-green-500 text-white cursor-pointer hover:bg-green-600',
         missed: 'bg-red-500 text-white',
-        pending: 'bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
+        active: 'bg-yellow-400 text-yellow-900',
+        pending: 'bg-blue-200 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300',
     };
 
     return (
@@ -1079,23 +1088,33 @@ const DailyStatusGrid: React.FC<{ data: ReturnType<typeof processDailyStatus> }>
                         </CardHeader>
                         <CardContent>
                             <div className="flex flex-wrap gap-2">
-                                {item.slots.map((slot: any) => (
-                                    <TooltipProvider key={slot.time}>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <div className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusStyles[slot.status]}`}>
-                                                    {slot.time}
-                                                </div>
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p><strong>Status:</strong> <span className="capitalize">{slot.status}</span></p>
-                                                {slot.log && (
-                                                    <p><strong>Uploaded:</strong> {format(new Date(slot.log.timestamp), "HH:mm:ss")}</p>
-                                                )}
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                ))}
+                                {item.slots.map((slot: any) => {
+                                    const isClickable = onSlotClick && slot.status === 'completed' && slot.log;
+                                    const slotElement = (
+                                        <div
+                                            className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusStyles[slot.status]} ${isClickable ? 'cursor-pointer' : ''}`}
+                                            onClick={() => isClickable && onSlotClick(slot.log)}
+                                        >
+                                            {slot.time}
+                                        </div>
+                                    );
+
+                                    return (
+                                        <TooltipProvider key={slot.time}>
+                                            <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                    {slotElement}
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p><strong>Status:</strong> <span className="capitalize">{slot.status}</span></p>
+                                                    {slot.log && (
+                                                        <p><strong>Uploaded:</strong> {format(new Date(slot.log.timestamp), "HH:mm:ss")}</p>
+                                                    )}
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    )
+                                })}
                                 {item.slots.length === 0 && (
                                     <p className="text-sm text-muted-foreground">No time slots configured.</p>
                                 )}
@@ -1277,10 +1296,6 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         </CardContent>
       </Card>
 
-      <div className="my-6">
-        <h2 className="text-2xl font-bold mb-4">Daily Time-Slot Status</h2>
-        <DailyStatusGrid data={dailyStatusGridData} />
-      </div>
 
       <h2 className="text-2xl font-bold mt-6 mb-4">Upload Controls</h2>
       {items.length === 0 ? (
