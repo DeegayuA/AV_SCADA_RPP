@@ -17,6 +17,117 @@ import {
   ChevronLeft, ChevronRight
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAppStore } from '@/stores/appStore';
+import { UserRole } from '@/types/auth';
+import { MaintenanceItem } from '@/types/maintenance';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { Slider } from "@/components/ui/slider";
+import { Dispatch, SetStateAction } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, isToday, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRange } from "react-day-picker";
+import { saveAs } from "file-saver";
+
+interface Log {
+  timestamp: string;
+  itemName: string;
+  itemNumber: string;
+  username: string;
+  filename: string;
+}
+
+const processDailyStatus = (
+    items: MaintenanceItem[],
+    uploadLogs: Log[],
+    serverTime: Date | null
+) => {
+    if (!serverTime) return [];
+
+    const now = serverTime;
+    const todaysLogs = uploadLogs.filter(log => isToday(new Date(log.timestamp)));
+
+    return items.flatMap(item =>
+      Array.from({ length: item.quantity }, (_, i) => {
+        const itemNumber = i + 1;
+        const instanceId = `${item.id}-${itemNumber}`;
+
+        const timeSlots = (item.timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
+
+        const slotDetails = timeSlots.map(slot => {
+          const hour = parseInt(slot.replace(/(am|pm)/i, ''));
+          const isPM = /pm/i.test(slot);
+          let slotHour = isPM && hour < 12 ? hour + 12 : hour;
+          if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
+
+          const timeWindow = item.timeWindow || 60;
+          const halfWindow = timeWindow / 2;
+          const slotStart = new Date(now);
+          slotStart.setHours(slotHour, -halfWindow, 0, 0);
+          const slotEnd = new Date(now);
+          slotEnd.setHours(slotHour, halfWindow, 0, 0);
+
+          const logInSlot = todaysLogs.find(log => {
+              const logTime = new Date(log.timestamp);
+              return log.itemName === item.name &&
+                     log.itemNumber === itemNumber.toString() &&
+                     logTime >= slotStart &&
+                     logTime <= slotEnd;
+          });
+
+          let status: 'completed' | 'missed' | 'pending' = 'pending';
+          if (logInSlot) {
+              status = 'completed';
+          } else if (now > slotEnd) {
+              status = 'missed';
+          }
+
+          return {
+              time: slot,
+              status,
+              log: logInSlot || null
+          };
+        });
+
+        return {
+          id: instanceId,
+          name: `${item.name} #${itemNumber}`,
+          color: item.color,
+          slots: slotDetails
+        };
+      })
+    );
+};
 
 const DashboardHeaderControl = React.memo(
   ({
@@ -89,54 +200,6 @@ const DashboardHeaderControl = React.memo(
       </>
     );
   });
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { useAppStore } from '@/stores/appStore';
-import { UserRole } from '@/types/auth';
-import { MaintenanceItem } from '@/types/maintenance';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from "@/components/ui/resizable"
-import { useIsMobile } from "@/hooks/use-mobile";
-import { Slider } from "@/components/ui/slider";
-import { Dispatch, SetStateAction } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { format, isToday, getDaysInMonth, startOfMonth } from "date-fns";
-import { Progress } from "@/components/ui/progress";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DateRange, DayProps } from "react-day-picker";
-import { addDays, endOfMonth } from "date-fns";
-import { saveAs } from "file-saver";
 
 interface ProgressProps {
   totalDailyChecks: number;
@@ -146,15 +209,17 @@ interface ProgressProps {
 interface AdminStatusViewProps extends ProgressProps {
   items: MaintenanceItem[];
   uploadLogs: Log[];
+  dailyStatusGridData: ReturnType<typeof processDailyStatus>;
 }
 
 interface AdminViewProps extends ProgressProps {
   items: MaintenanceItem[];
   setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
   uploadLogs: Log[];
+  dailyStatusGridData: ReturnType<typeof processDailyStatus>;
 }
 
-const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks }) => {
+const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
@@ -163,6 +228,7 @@ const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDa
         uploadLogs={uploadLogs}
         totalDailyChecks={totalDailyChecks}
         todaysCompletedChecks={todaysCompletedChecks}
+        dailyStatusGridData={dailyStatusGridData}
       />
     </div>
   );
@@ -524,7 +590,7 @@ const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items
   );
 };
 
-const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, totalDailyChecks, todaysCompletedChecks }) => {
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
   const currentUser = useAppStore((state) => state.currentUser);
   const [showHelp, setShowHelp] = useState(true);
 
@@ -564,21 +630,14 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, tota
             uploadLogs={uploadLogs}
             totalDailyChecks={totalDailyChecks}
             todaysCompletedChecks={todaysCompletedChecks}
+            dailyStatusGridData={dailyStatusGridData}
         />
       </div>
     </motion.div>
   );
 };
 
-interface Log {
-  timestamp: string;
-  itemName: string;
-  itemNumber: string;
-  username: string;
-  filename: string;
-}
-
-const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks }) => {
+const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [monthlyStatusData, setMonthlyStatusData] = useState<Log[]>([]);
@@ -691,9 +750,11 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                 </p>
             </CardContent>
         </Card>
-        <div className="mb-4">
-            <DailyChecklist items={items} uploadLogs={uploadLogs} />
+
+        <div className="my-6">
+            <DailyStatusGrid data={dailyStatusGridData} />
         </div>
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">Monthly Status & Logs</h2>
@@ -925,82 +986,62 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   );
 };
 
-interface DailyChecklistProps {
-    items: MaintenanceItem[];
-    uploadLogs: Log[];
-}
+const DailyStatusGrid: React.FC<{ data: ReturnType<typeof processDailyStatus> }> = ({ data }) => {
+    if (data.length === 0) {
+        return (
+            <Card>
+                <CardContent className="p-6 text-center text-muted-foreground">
+                    No maintenance items with time slots are configured for today.
+                </CardContent>
+            </Card>
+        );
+    }
 
-const DailyChecklist: React.FC<DailyChecklistProps> = ({ items, uploadLogs }) => {
-    const allChecks = items.flatMap(item => {
-        const checks = [];
-        for (let i = 1; i <= item.quantity; i++) {
-            for (let j = 1; j <= item.timesPerDay; j++) {
-                checks.push({
-                    id: `${item.id}-${i}-${j}`,
-                    name: `${item.name} #${i} (Check ${j})`,
-                    itemName: item.name,
-                    itemNumber: i.toString(),
-                });
-            }
-        }
-        return checks;
-    });
-
-    const todaysLogs = uploadLogs.filter(log => isToday(new Date(log.timestamp)));
-
-    const checkStatus = allChecks.map(check => {
-        const isCompleted = todaysLogs.some(log => log.itemName === check.itemName && log.itemNumber === check.itemNumber);
-        return { ...check, completed: isCompleted };
-    });
-
-    // This is a simplified logic. A real implementation would need to handle multiple checks per item per day more robustly.
-    // For now, we assume any upload for an item instance counts for one of its daily checks.
-    const completedChecks = new Set(todaysLogs.map(log => `${log.itemName}-${log.itemNumber}`));
-
-    const detailedChecklist = items.flatMap(item =>
-        Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
-            const instanceId = `${item.name}-${number}`;
-            const completedCount = todaysLogs.filter(log => log.itemName === item.name && log.itemNumber === number.toString()).length;
-            const requiredCount = item.timesPerDay;
-            const isFullyCompleted = completedCount >= requiredCount;
-
-            return {
-                id: instanceId,
-                name: `${item.name} #${number}`,
-                completed: isFullyCompleted,
-                statusText: `${completedCount} / ${requiredCount} completed`,
-                color: item.color,
-            };
-        })
-    );
-
+    const statusStyles: { [key: string]: string } = {
+        completed: 'bg-green-500 text-white',
+        missed: 'bg-red-500 text-white',
+        pending: 'bg-gray-300 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
+    };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Detailed Daily Checklist</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <ul className="space-y-2">
-                    {detailedChecklist.map(check => (
-                        <li key={check.id} className="flex items-center justify-between p-2 border rounded-md">
-                            <div className="flex items-center">
-                                <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: check.color || '#000000' }} />
-                                <span>{check.name}</span>
-                            </div>
-                            <div className="flex items-center">
-                                {check.completed ? (
-                                    <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                                ) : (
-                                    <XCircle className="h-5 w-5 text-red-500 mr-2" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {data.map((item: any) => (
+                <motion.div key={item.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center">
+                                <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                                {item.name}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex flex-wrap gap-2">
+                                {item.slots.map((slot: any) => (
+                                    <TooltipProvider key={slot.time}>
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <div className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusStyles[slot.status]}`}>
+                                                    {slot.time}
+                                                </div>
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p><strong>Status:</strong> <span className="capitalize">{slot.status}</span></p>
+                                                {slot.log && (
+                                                    <p><strong>Uploaded:</strong> {format(new Date(slot.log.timestamp), "HH:mm:ss")}</p>
+                                                )}
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                ))}
+                                {item.slots.length === 0 && (
+                                    <p className="text-sm text-muted-foreground">No time slots configured.</p>
                                 )}
-                                <span className="text-sm text-muted-foreground">{check.statusText}</span>
                             </div>
-                        </li>
-                    ))}
-                </ul>
-            </CardContent>
-        </Card>
+                        </CardContent>
+                    </Card>
+                </motion.div>
+            ))}
+        </div>
     );
 };
 
@@ -1008,11 +1049,12 @@ interface OperatorViewProps extends ProgressProps {
   items: MaintenanceItem[];
   uploadLogs: Log[];
   onUploadSuccess: (log: Log) => void;
+  dailyStatusGridData: ReturnType<typeof processDailyStatus>;
 }
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
-const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks }) => {
+const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
@@ -1147,10 +1189,12 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         </CardContent>
       </Card>
 
-      <div className="mb-4">
-        <DailyChecklist items={items} uploadLogs={uploadLogs} />
+      <div className="my-6">
+        <h2 className="text-2xl font-bold mb-4">Daily Time-Slot Status</h2>
+        <DailyStatusGrid data={dailyStatusGridData} />
       </div>
 
+      <h2 className="text-2xl font-bold mt-6 mb-4">Upload Controls</h2>
       {items.length === 0 ? (
         <p>No maintenance items configured.</p>
       ) : (
@@ -1275,6 +1319,7 @@ const MaintenancePage = () => {
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
+  const [serverTime, setServerTime] = useState<Date | null>(null);
 
   const checkPlcConnection = useCallback(async () => {
     try {
@@ -1331,6 +1376,22 @@ const MaintenancePage = () => {
   }, [checkPlcConnection]);
 
   useEffect(() => {
+    const fetchServerTime = async () => {
+      try {
+        const response = await fetch('/api/time');
+        const data = await response.json();
+        setServerTime(new Date(data.time));
+      } catch (error) {
+        console.error("Failed to fetch server time, using client time as fallback.", error);
+        setServerTime(new Date());
+      }
+    };
+    fetchServerTime();
+    const interval = setInterval(fetchServerTime, 60000); // Re-sync server time every minute
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (Object.keys(nodeValues).length > 0) {
       setLastUpdateTime(Date.now());
     }
@@ -1355,6 +1416,7 @@ const MaintenancePage = () => {
     setUploadLogs(prevLogs => [...prevLogs, newLog]);
   };
 
+  const dailyStatusGridData = processDailyStatus(items, uploadLogs, serverTime);
   const totalDailyChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
   const todaysCompletedChecks = uploadLogs.filter(log => isToday(new Date(log.timestamp))).length;
 
@@ -1387,13 +1449,19 @@ const MaintenancePage = () => {
         version={VERSION}
       />
       {currentUser.role === UserRole.ADMIN && (
-        <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} {...progressProps} />
+        <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} />
       )}
       {currentUser.role === UserRole.VIEWER && (
-        <ViewerView items={items} uploadLogs={uploadLogs} {...progressProps} />
+        <ViewerView items={items} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} />
       )}
       {currentUser.role === UserRole.OPERATOR && (
-        <OperatorView items={items} uploadLogs={uploadLogs} onUploadSuccess={handleUploadSuccess} {...progressProps} />
+        <OperatorView
+            items={items}
+            uploadLogs={uploadLogs}
+            onUploadSuccess={handleUploadSuccess}
+            {...progressProps}
+            dailyStatusGridData={dailyStatusGridData}
+        />
       )}
     </div>
   );
