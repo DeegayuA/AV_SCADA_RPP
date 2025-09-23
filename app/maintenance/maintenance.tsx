@@ -1174,51 +1174,6 @@ interface OperatorViewProps extends ProgressProps {
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
-const SlotCountdown: React.FC<{
-  slot: { start: Date; end: Date };
-  nextSlot: { start: Date; end: Date } | undefined;
-  serverTime: Date;
-  status: UploadStatus;
-}> = ({ slot, nextSlot, serverTime, status }) => {
-    const activeCountdown = useCountdown(slot.end);
-    const nextCountdown = useCountdown(nextSlot?.start || null);
-    const futureCountdown = useCountdown(slot.start);
-
-    const formatCountdown = (countdown: any) => `${String(countdown.hours).padStart(2, '0')}:${String(countdown.minutes).padStart(2, '0')}:${String(countdown.seconds).padStart(2, '0')}`;
-
-    if (serverTime >= slot.start && serverTime <= slot.end) {
-        return (
-            <div className="text-sm text-center">
-                <p>Time Left:</p>
-                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(activeCountdown.minutes).padStart(2, '0')}:{String(activeCountdown.seconds).padStart(2, '0')}</p>
-            </div>
-        );
-    }
-
-    if (status === 'missed' || status === 'success') {
-        if (nextSlot) {
-            return (
-                <div className="text-sm text-center">
-                    <p>Next check in:</p>
-                    <p className="font-bold text-lg text-muted-foreground">{formatCountdown(nextCountdown)}</p>
-                </div>
-            );
-        }
-        return <div className="text-sm text-center p-2 text-muted-foreground">No more checks today.</div>;
-    }
-
-    if (serverTime < slot.start) {
-        return (
-            <div className="text-sm text-center">
-                <p>Starts in:</p>
-                <p className="font-bold text-lg text-muted-foreground">{formatCountdown(futureCountdown)}</p>
-            </div>
-        );
-    }
-
-    return null;
-};
-
 const TimeStatus: React.FC<{item: MaintenanceItem, serverTime: Date | null}> = ({ item, serverTime }) => {
     if (!serverTime) return null;
 
@@ -1420,76 +1375,121 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
           {items.flatMap(item =>
             Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
               const uploadKey = `${item.name}-${number}`;
-              const { allSlots } = serverTime ? getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime) : { allSlots: [] };
 
-              return allSlots.map((slot, index) => {
-                const slotTime = slot.time;
-                const status = statuses[uploadKey]?.[slotTime] || 'pending';
-                const { activeSlot } = serverTime ? getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime) : { activeSlot: null };
-                const isTimeSlotActive = activeSlot?.time === slotTime;
+              if (!serverTime) return null;
 
-                const statusInfo = {
-                  pending: { icon: Clock, color: 'text-gray-500', text: 'Pending' },
-                  uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
-                  success: { icon: CheckCircle, color: 'text-green-500', text: 'Completed' },
-                  error: { icon: XCircle, color: 'text-red-500', text: 'Failed' },
-                  missed: { icon: XCircle, color: 'text-orange-500', text: 'Missed' },
-                };
+              const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
 
-                const currentStatusInfo = statusInfo[status];
-                const CurrentIcon = currentStatusInfo.icon;
-                const isButtonDisabled = !((status === 'pending' || status === 'error') && isTimeSlotActive);
+              let relevantSlot = activeSlot;
+              let displayMode: 'active' | 'next' | 'missed' | 'completed' | 'none' = 'none';
 
-                return (
-                  <motion.div
-                    key={`${uploadKey}-${slotTime}`}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                  >
-                    <Card className={`border-2 ${status === 'success' ? 'border-green-500' : 'border-transparent'}`}>
-                      <CardHeader>
-                        <CardTitle className="flex items-center justify-between">
-                          <div className="flex items-center">
-                            <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                            {item.name} #{number}
-                          </div>
-                          <span className="text-sm font-semibold px-2 py-1 rounded-full bg-gray-200 dark:bg-gray-700">{slotTime}</span>
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="flex flex-col items-center justify-center text-center">
-                        {serverTime && <SlotCountdown slot={slot} nextSlot={allSlots[index + 1]} serverTime={serverTime} status={status} />}
-                        <div className="my-2">
-                          <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
-                          <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
-                        </div>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          capture="environment"
-                          onChange={(e) => handleFileChange(e, item.name, number, slotTime)}
-                          className="hidden"
-                          id={`${uploadKey}-${slotTime}`}
-                          disabled={isButtonDisabled}
-                        />
-                        <Label htmlFor={`${uploadKey}-${slotTime}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                          <Button
-                            asChild={false}
-                            disabled={isButtonDisabled}
-                            className="w-full"
-                            onClick={() => {
-                                if (!isButtonDisabled) {
-                                    document.getElementById(`${uploadKey}-${slotTime}`)?.click();
-                                }
-                            }}
-                          >
-                            Upload Picture
-                          </Button>
-                        </Label>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                );
-              });
+              if (activeSlot) {
+                displayMode = 'active';
+              } else if (nextSlot) {
+                displayMode = 'next';
+              }
+
+              const allLogsForToday = uploadLogs.filter(log => isToday(new Date(log.timestamp)) && log.itemName === item.name && log.itemNumber === number.toString());
+
+              if (allLogsForToday.length >= allSlots.length && allSlots.length > 0) {
+                displayMode = 'completed';
+              } else if (!activeSlot && !nextSlot) {
+                // Find last slot that is not completed
+                const lastUncompletedPastSlot = [...allSlots].reverse().find(s => {
+                    const now = serverTime;
+                    const hasLog = allLogsForToday.some(log => {
+                        const logTime = new Date(log.timestamp);
+                        return logTime >= s.start && logTime <= s.end;
+                    });
+                    return now > s.end && !hasLog;
+                });
+                if(lastUncompletedPastSlot) {
+                    relevantSlot = lastUncompletedPastSlot;
+                    displayMode = 'missed';
+                }
+              }
+
+              const slotForCountdown = displayMode === 'active' ? activeSlot : nextSlot;
+              const countdown = useCountdown(slotForCountdown?.end ?? null);
+              const nextCountdown = useCountdown(slotForCountdown?.start ?? null);
+
+              const status = relevantSlot ? (statuses[uploadKey]?.[relevantSlot.time] || 'pending') : 'pending';
+
+              const statusInfo = {
+                pending: { icon: Clock, color: 'text-gray-500', text: `Next check at ${relevantSlot?.time}` },
+                uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
+                success: { icon: CheckCircle, color: 'text-green-500', text: 'Completed' },
+                error: { icon: XCircle, color: 'text-red-500', text: 'Failed' },
+                missed: { icon: XCircle, color: 'text-orange-500', text: `Missed check at ${relevantSlot?.time}` },
+              };
+
+              const isButtonDisabled = displayMode !== 'active';
+              const currentStatusInfo = displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot.time}` } : statusInfo[status];
+              const CurrentIcon = currentStatusInfo.icon;
+
+
+              return (
+                <motion.div
+                  key={`${item.id}-${number}`}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Card className={`border-2 ${displayMode === 'completed' ? 'border-green-500' : 'border-transparent'}`}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
+                        <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                        {item.name} #{number}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center justify-center text-center">
+                        {displayMode === 'completed' ? (
+                            <>
+                                <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
+                                <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
+                            </>
+                        ) : relevantSlot ? (
+                            <>
+                                <div className="my-2">
+                                  <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
+                                  <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
+                                </div>
+                                {displayMode === 'active' && (
+                                    <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
+                                )}
+                                {displayMode === 'next' && (
+                                     <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
+                                )}
+                                <Input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  onChange={(e) => handleFileChange(e, item.name, number, relevantSlot!.time)}
+                                  className="hidden"
+                                  id={`${uploadKey}-${relevantSlot!.time}`}
+                                  disabled={isButtonDisabled}
+                                />
+                                <Label htmlFor={`${uploadKey}-${relevantSlot!.time}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                                  <Button
+                                    asChild={false}
+                                    disabled={isButtonDisabled}
+                                    className="w-full"
+                                    onClick={() => {
+                                        if (!isButtonDisabled) {
+                                            document.getElementById(`${uploadKey}-${relevantSlot!.time}`)?.click();
+                                        }
+                                    }}
+                                  >
+                                    Upload Picture
+                                  </Button>
+                                </Label>
+                            </>
+                        ) : (
+                            <p>No checks scheduled for today.</p>
+                        )}
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
             })
           )}
         </div>
