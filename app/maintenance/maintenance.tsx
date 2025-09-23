@@ -29,6 +29,15 @@ interface AdminViewProps {
   uploadLogs: Log[];
 }
 
+const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) => {
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
+      <AdminStatusView items={items} uploadLogs={uploadLogs} />
+    </div>
+  );
+};
+
 const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [keyExists, setKeyExists] = useState<boolean | null>(null);
@@ -935,22 +944,26 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                   <CardContent className="flex-grow flex flex-col items-center justify-center text-center">
                     <CurrentIcon className={`h-12 w-12 ${currentStatusInfo.color} ${displayStatus === 'uploading' ? 'animate-spin' : ''}`} />
                     <p className={`mt-2 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
-                    <Input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      onChange={(e) => handleFileChange(e, item.name, number)}
-                      className="hidden"
-                      id={`${item.id}-${number}`}
-                      disabled={displayStatus !== 'pending'}
-                    />
-                    <Label htmlFor={`${item.id}-${number}`} className="cursor-pointer w-full mt-4">
-                      <Button asChild disabled={displayStatus !== 'pending'} className="w-full">
-                        <span>
-                          {displayStatus === 'success' ? 'Uploaded' : 'Upload Picture'}
-                        </span>
-                      </Button>
-                    </Label>
+                    {currentUser && (
+                      <>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          onChange={(e) => handleFileChange(e, item.name, number)}
+                          className="hidden"
+                          id={`${item.id}-${number}`}
+                          disabled={displayStatus !== 'pending'}
+                        />
+                        <Label htmlFor={`${item.id}-${number}`} className="cursor-pointer w-full mt-4">
+                          <Button asChild disabled={displayStatus !== 'pending'} className="w-full">
+                            <span>
+                              {displayStatus === 'success' ? 'Uploaded' : 'Upload Picture'}
+                            </span>
+                          </Button>
+                        </Label>
+                      </>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -1008,11 +1021,15 @@ const MaintenancePage = () => {
     return <div>Loading...</div>;
   }
 
-  return currentUser.role === UserRole.ADMIN ? (
-    <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} />
-  ) : (
-    <OperatorView items={items} uploadLogs={uploadLogs} onUploadSuccess={handleUploadSuccess} />
-  );
+  if (currentUser.role === UserRole.ADMIN) {
+    return <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} />;
+  }
+
+  if (currentUser.role === UserRole.VIEWER) {
+    return <ViewerView items={items} uploadLogs={uploadLogs} />;
+  }
+
+  return <OperatorView items={items} uploadLogs={uploadLogs} onUploadSuccess={handleUploadSuccess} />;
 };
 
 export default MaintenancePage;
