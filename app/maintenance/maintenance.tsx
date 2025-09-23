@@ -16,11 +16,18 @@ import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { MaintenanceItem } from '@/types/maintenance';
 import { Loader2, KeyRound, Settings, ArrowUp, ArrowDown, Pencil } from "lucide-react";
+import { motion } from "framer-motion";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from "@/components/ui/resizable"
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Dispatch, SetStateAction } from 'react';
 
 interface AdminViewProps {
@@ -357,19 +364,44 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
 
 const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) => {
   const currentUser = useAppStore((state) => state.currentUser);
+  const isMobile = useIsMobile();
+  const [showHelp, setShowHelp] = useState(true);
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h1 className="text-2xl font-bold">Maintenance Dashboard</h1>
-      </div>
-
-      {currentUser?.role === UserRole.ADMIN && (
-        <AdminConfigurationPanel items={items} setItems={setItems} uploadLogs={uploadLogs} />
-      )}
-
-      <AdminStatusView items={items} uploadLogs={uploadLogs} />
-    </div>
+    <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="h-full">
+      <ResizablePanel defaultSize={60}>
+        <div className="p-4 h-full overflow-y-auto">
+          <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
+          <AdminStatusView items={items} uploadLogs={uploadLogs} />
+        </div>
+      </ResizablePanel>
+      <ResizableHandle withHandle />
+      <ResizablePanel defaultSize={40}>
+        <div className="p-4 h-full overflow-y-auto">
+          <h1 className="text-2xl font-bold mb-4">Setup & Logs</h1>
+          {currentUser?.role === UserRole.ADMIN && (
+            <>
+              {showHelp && (
+                <Card className="mb-4 bg-blue-50 border-blue-200">
+                  <CardHeader>
+                    <CardTitle className="text-blue-800">How to Use This Dashboard</CardTitle>
+                    <Button variant="ghost" size="sm" className="absolute top-2 right-2" onClick={() => setShowHelp(false)}>X</Button>
+                  </CardHeader>
+                  <CardContent className="text-blue-700">
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>Use the tabs in the main panel to switch between daily, monthly, and log views.</li>
+                      <li>Click on a day in the monthly view to filter the logs for that day.</li>
+                      <li>Use the "Setup & Configuration" button to add, edit, or remove maintenance items.</li>
+                    </ul>
+                  </CardContent>
+                </Card>
+              )}
+              <AdminConfigurationPanel items={items} setItems={setItems} uploadLogs={uploadLogs} />
+            </>
+          )}
+        </div>
+      </ResizablePanel>
+    </ResizablePanelGroup>
   );
 };
 
@@ -712,29 +744,38 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
 
                     if (earliestItemDate && dayDate < earliestItemDate) {
                       return (
-                        <div key={day} className="h-12 w-12 flex items-center justify-center rounded-md bg-gray-100 text-gray-400 text-xs text-center">
-                          N/A
+                        <div key={day} className="h-16 w-16 flex flex-col items-center justify-center rounded-md bg-gray-100 text-gray-400 text-xs text-center">
+                          <div>{day}</div>
+                          <div>N/A</div>
                         </div>
                       );
                     }
 
-                    const completed = completedDays[dateStr] && completedDays[dateStr].size >= totalChecks;
-                    const partiallyCompleted = completedDays[dateStr] && completedDays[dateStr].size < totalChecks;
+                    const completedCount = completedDays[dateStr]?.size || 0;
+                    const completed = completedCount >= totalChecks;
+                    const partiallyCompleted = completedCount > 0 && completedCount < totalChecks;
 
-                    let bgColor = 'bg-red-500'; // Missed
-                    if (completed) bgColor = 'bg-green-500';
-                    else if (partiallyCompleted) bgColor = 'bg-yellow-500';
+                    let bgColor = 'bg-red-100'; // Missed
+                    let textColor = 'text-red-800';
+                    if (completed) {
+                      bgColor = 'bg-green-100';
+                      textColor = 'text-green-800';
+                    } else if (partiallyCompleted) {
+                      bgColor = 'bg-yellow-100';
+                      textColor = 'text-yellow-800';
+                    }
 
                     return (
                       <div
                         key={day}
-                        className={`h-12 w-12 flex items-center justify-center rounded-md text-white font-bold cursor-pointer ${bgColor}`}
+                        className={`h-16 w-16 flex flex-col items-center justify-center rounded-md cursor-pointer ${bgColor} ${textColor}`}
                         onClick={() => {
                           setSelectedLogDate(dayDate);
                           setActiveTab('upload-log');
                         }}
                       >
-                        {day}
+                        <div className="font-bold">{day}</div>
+                        <div className="text-xs">{completedCount}/{totalChecks}</div>
                       </div>
                     );
                   })}
@@ -1014,10 +1055,23 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
               const currentStatusInfo = statusInfo[displayStatus as keyof typeof statusInfo];
               const CurrentIcon = currentStatusInfo.icon;
 
+              const cardVariants = {
+                hidden: { opacity: 0, y: 20 },
+                visible: { opacity: 1, y: 0 },
+                error: { x: [-5, 5, -5, 5, 0], transition: { duration: 0.3 } },
+              };
+
               return (
-                <Card key={`${item.id}-${number}`} className={`flex flex-col border-2 ${displayStatus === 'success' ? 'border-green-500' : 'border-transparent'}`}>
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
+                <motion.div
+                  variants={cardVariants}
+                  initial="hidden"
+                  animate={displayStatus === 'error' ? 'error' : 'visible'}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Card key={`${item.id}-${number}`} className={`flex flex-col border-2 ${displayStatus === 'success' ? 'border-green-500' : 'border-transparent'}`}>
+                    <CardHeader>
+                      <CardTitle className="flex items-center">
                       <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
                       {item.name} #{number}
                     </CardTitle>
