@@ -5,57 +5,36 @@ import { format } from 'date-fns';
 import crypto from 'crypto';
 import { getEncryptionKey } from '@/lib/maintenance-crypto';
 
-const IV_LENGTH = 16; // 16 bytes for AES
-const IV_HEX_LENGTH = IV_LENGTH * 2; // 32 hex characters
+const IV_LENGTH = 16;
 
-/**
- * Decrypts a string that was encrypted in the format 'iv:ciphertext'.
- * This function is robust against malformed input.
- * @param text The encrypted string.
- * @param key The 32-byte encryption key.
- * @returns The decrypted string, or null if decryption fails.
- */
 function decrypt(text: string, key: Buffer): string | null {
-  // 1. Basic format check
-  if (!text || !text.includes(':')) {
-    return null;
-  }
-
-  // 2. Split IV and ciphertext
-  const textParts = text.split(':');
-  const ivHex = textParts.shift()!;
-  const encryptedTextHex = textParts.join(':');
-
-  // 3. Validate parts
-  // IV must be 16 bytes, which is 32 hex characters.
-  if (ivHex.length !== IV_HEX_LENGTH || !/^[0-9a-fA-F]*$/.test(ivHex)) {
-      return null;
-  }
-  // The encrypted text must be a valid hex string.
-  if (!/^[0-9a-fA-F]*$/.test(encryptedTextHex)) {
-      return null;
-  }
-
   try {
+    const textParts = text.split(':');
+    if (textParts.length !== 2) {
+      console.warn(`Malformed encrypted data (incorrect parts): "${text}"`);
+      return null;
+    }
+
+    const ivHex = textParts[0];
+    const encryptedTextHex = textParts[1];
+
+    if (!ivHex || !encryptedTextHex || ivHex.length !== IV_LENGTH * 2) {
+      console.warn(`Malformed encrypted data (invalid iv or text): "${text}"`);
+      return null;
+    }
+
     const iv = Buffer.from(ivHex, 'hex');
     const encryptedText = Buffer.from(encryptedTextHex, 'hex');
-
-    // The ciphertext length must be a multiple of the AES block size (16 bytes).
-    if (encryptedText.length % 16 !== 0) {
-        return null;
-    }
 
     const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
     let decrypted = decipher.update(encryptedText);
     decrypted = Buffer.concat([decrypted, decipher.final()]);
     return decrypted.toString();
   } catch (error) {
-    // This will catch errors from Buffer.from if hex is invalid,
-    // or from decipher.final() if the key is wrong ('bad decrypt').
+    console.error(`Decryption failed for text: "${text}". Error:`, error);
     return null;
   }
 }
-
 
 import { glob } from 'glob';
 
@@ -95,26 +74,18 @@ export async function GET(request: Request) {
     }
 
     const lines = allLines.filter(line => line); // Filter out empty lines
-    let decryptionFailures = 0;
-
     const decryptedLogs = lines.map(line => {
       const decryptedLine = decrypt(line, encryptionKey);
-      if (decryptedLine === null) {
-        decryptionFailures++;
-        return null;
+      if (decryptedLine) {
+        try {
+          return JSON.parse(decryptedLine);
+        } catch (error) {
+          console.error('Failed to parse decrypted log line:', error);
+          return null;
+        }
       }
-      try {
-        // We still need to parse the JSON, which could also fail.
-        return JSON.parse(decryptedLine);
-      } catch {
-        decryptionFailures++;
-        return null;
-      }
+      return null;
     }).filter(log => log !== null);
-
-    if (decryptionFailures > 0) {
-      console.warn(`[Maintenance Logs] Skipped ${decryptionFailures} log entr(ies) due to decryption or parsing failure. This is expected if the encryption key has been changed, as old logs cannot be read with the new key.`);
-    }
 
     return NextResponse.json(decryptedLogs);
   } catch (error) {

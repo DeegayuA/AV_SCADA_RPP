@@ -209,6 +209,40 @@ export async function saveAppConfig() {
   }
 }
 
+// --- Maintenance Configuration Functions ---
+
+export async function saveMaintenanceConfig(config: MaintenanceItem[]) {
+  if (typeof window === 'undefined') return;
+  const db = await initDB();
+  if (!db) {
+    toast.error("Database Not Ready", { description: "Failed to save maintenance configuration." });
+    return;
+  }
+  try {
+    await db.put('maintenanceConfig', config, MAINTENANCE_CONFIG_KEY);
+    toast.success("Maintenance Configuration Saved", { description: "Settings stored locally."});
+  } catch (error) {
+    console.error("Error saving maintenance configuration:", error);
+    toast.error("Maintenance Config Save Failed", { description: error instanceof Error ? error.message : String(error) });
+  }
+}
+
+export async function getMaintenanceConfig(): Promise<MaintenanceItem[]> {
+  if (typeof window === 'undefined') return [];
+  const db = await initDB();
+  if (!db) {
+    console.error("Database not ready, cannot retrieve maintenance configuration.");
+    return [];
+  }
+  try {
+    const config = await db.get('maintenanceConfig', MAINTENANCE_CONFIG_KEY);
+    return config || [];
+  } catch (error) {
+    console.error("Error retrieving maintenance configuration:", error);
+    toast.error("Maintenance Config Load Failed", { description: error instanceof Error ? error.message : String(error) });
+    return [];
+  }
+}
 
 export async function getAppConfig(): Promise<AppConfigValue | null> {
    if (typeof window === 'undefined') {
