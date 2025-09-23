@@ -15,7 +15,7 @@ import {
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { MaintenanceItem } from '@/types/maintenance';
-import { Loader2, KeyRound, Settings, ArrowUp, ArrowDown } from "lucide-react";
+import { Loader2, KeyRound, Settings, ArrowUp, ArrowDown, Pencil } from "lucide-react";
 import {
   Collapsible,
   CollapsibleContent,
@@ -38,6 +38,61 @@ const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) => {
   );
 };
 
+interface EditItemDialogProps {
+  item: MaintenanceItem;
+  onSave: (updatedItem: MaintenanceItem) => void;
+  onClose: () => void;
+}
+
+const EditItemDialog: React.FC<EditItemDialogProps> = ({ item, onSave, onClose }) => {
+  const [name, setName] = useState(item.name);
+  const [quantity, setQuantity] = useState(item.quantity);
+  const [timesPerDay, setTimesPerDay] = useState(item.timesPerDay);
+  const [timeFrames, setTimeFrames] = useState(item.timeFrames);
+  const [color, setColor] = useState(item.color);
+
+  const handleSave = () => {
+    onSave({ ...item, name, quantity, timesPerDay, timeFrames, color });
+    onClose();
+  };
+
+  return (
+    <Dialog open onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Edit Item</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="edit-name">Item Name</Label>
+            <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="edit-quantity">Quantity</Label>
+            <Input id="edit-quantity" type="number" value={quantity} onChange={(e) => setQuantity(parseInt(e.target.value, 10))} />
+          </div>
+          <div>
+            <Label htmlFor="edit-timesPerDay">Times per Day</Label>
+            <Input id="edit-timesPerDay" type="number" value={timesPerDay} onChange={(e) => setTimesPerDay(parseInt(e.target.value, 10))} />
+          </div>
+          <div>
+            <Label htmlFor="edit-timeFrames">Time Frames</Label>
+            <Input id="edit-timeFrames" value={timeFrames} onChange={(e) => setTimeFrames(e.target.value)} />
+          </div>
+          <div>
+            <Label htmlFor="edit-color">Color</Label>
+            <Input id="edit-color" type="color" value={color} onChange={(e) => setColor(e.target.value)} />
+          </div>
+          <div className="flex justify-end space-x-2">
+            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button onClick={handleSave}>Save</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
 const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [keyExists, setKeyExists] = useState<boolean | null>(null);
@@ -47,6 +102,7 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
   const [timesPerDay, setTimesPerDay] = useState(1);
   const [timeFrames, setTimeFrames] = useState('');
   const [itemColor, setItemColor] = useState('#000000');
+  const [editingItem, setEditingItem] = useState<MaintenanceItem | null>(null);
 
   useEffect(() => {
     const checkKeyStatus = async () => {
@@ -100,6 +156,29 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
     setItems(items.filter(item => item.id !== id));
   };
 
+  const handleSaveConfiguration = async (updatedItems: MaintenanceItem[]) => {
+    setIsSaving(true);
+    try {
+      const response = await fetch('/api/maintenance/config', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(updatedItems),
+      });
+      if (response.ok) {
+        toast.success("Configuration saved successfully.");
+        setItems(updatedItems);
+      } else {
+        toast.error("Failed to save configuration.");
+      }
+    } catch (error) {
+      toast.error("An error occurred while saving the configuration.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleMoveItem = (index: number, direction: 'up' | 'down') => {
     if (
       (direction === 'up' && index === 0) ||
@@ -113,29 +192,12 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
     const swapIndex = direction === 'up' ? index - 1 : index + 1;
     newItems[index] = newItems[swapIndex];
     newItems[swapIndex] = item;
-    setItems(newItems);
+    handleSaveConfiguration(newItems);
   };
 
-  const handleSaveConfiguration = async () => {
-    setIsSaving(true);
-    try {
-      const response = await fetch('/api/maintenance/config', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(items),
-      });
-      if (response.ok) {
-        toast.success("Configuration saved successfully.");
-      } else {
-        toast.error("Failed to save configuration.");
-      }
-    } catch (error) {
-      toast.error("An error occurred while saving the configuration.");
-    } finally {
-      setIsSaving(false);
-    }
+  const handleUpdateItem = (updatedItem: MaintenanceItem) => {
+    const newItems = items.map(i => i.id === updatedItem.id ? updatedItem : i);
+    handleSaveConfiguration(newItems);
   };
 
   const handleClearConfiguration = () => {
@@ -263,6 +325,9 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
                   <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'down')} disabled={index === items.length - 1}>
                     <ArrowDown className="h-4 w-4" />
                   </Button>
+                  <Button variant="outline" size="sm" onClick={() => setEditingItem(item)}>
+                    <Pencil className="h-4 w-4" />
+                  </Button>
                   <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
                 </div>
                   </li>
@@ -273,12 +338,19 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
         </Card>
 
         <div className="mt-4">
-          <Button size="lg" onClick={handleSaveConfiguration} disabled={isSaving}>
+          <Button size="lg" onClick={() => handleSaveConfiguration(items)} disabled={isSaving}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isSaving ? 'Saving...' : 'Save Configuration'}
           </Button>
         </div>
       </CollapsibleContent>
+      {editingItem && (
+        <EditItemDialog
+          item={editingItem}
+          onSave={handleUpdateItem}
+          onClose={() => setEditingItem(null)}
+        />
+      )}
     </Collapsible>
   );
 };
