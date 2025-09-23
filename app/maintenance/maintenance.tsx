@@ -1,8 +1,94 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
+import { usePathname, useRouter } from 'next/navigation';
+import { motion } from "framer-motion";
+import { PLANT_NAME, VERSION } from '@/config/constants';
+import PlcConnectionStatus from '@/app/DashboardData/PlcConnectionStatus';
+import WebSocketStatus from '@/app/DashboardData/WebSocketStatus';
+import SoundToggle from '@/app/DashboardData/SoundToggle';
+import ThemeToggle from '@/app/DashboardData/ThemeToggle';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useWebSocket } from '@/hooks/useWebSocketListener';
+import {
+  Loader2, KeyRound, Settings, ArrowUp, ArrowDown, Pencil,
+  Clock, CheckCircle, XCircle, UploadCloud, Calendar as CalendarIcon,
+  ChevronLeft, ChevronRight
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const DashboardHeaderControl = React.memo(
+  ({
+    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
+    version,
+  }: {
+    plcStatus: "online" | "offline" | "disconnected";
+    isConnected: boolean;
+    connectWebSocket: () => void;
+    onClickWsStatus: () => void;
+    currentTime: string;
+    delay: number;
+    version: string;
+  }) => {
+    const router = useRouter();
+    const headerTitle = "Maintenance";
+
+    return (
+      <>
+        <motion.div
+          className="flex flex-col sm:flex-row justify-between items-center mb-2 md:mb-4 gap-4 pt-3"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        >
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left">
+            {PLANT_NAME} {headerTitle}
+          </h1>
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
+            <motion.div><PlcConnectionStatus status={plcStatus} /></motion.div>
+            <motion.div>
+              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} delay={delay} />
+            </motion.div>
+            <motion.div><SoundToggle /></motion.div>
+            <motion.div><ThemeToggle /></motion.div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="text-xs text-muted-foreground mb-4 flex flex-col sm:flex-row justify-between items-center gap-2"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.5 }}
+        >
+          <div className="flex items-center gap-2">
+            <Clock className="h-3 w-3" />
+            <span>{currentTime}</span>
+            {isConnected ? (
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
+                      : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
+                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
+                    }>
+                      {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Last data received {delay} ms ago</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
+                (reconnect)
+              </Button>
+            )}
+          </div>
+          <span className='font-mono'>{version || '?.?.?'}</span>
+        </motion.div>
+      </>
+    );
+  });
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,8 +101,6 @@ import {
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
 import { MaintenanceItem } from '@/types/maintenance';
-import { Loader2, KeyRound, Settings, ArrowUp, ArrowDown, Pencil } from "lucide-react";
-import { motion } from "framer-motion";
 import {
   Collapsible,
   CollapsibleContent,
@@ -30,18 +114,56 @@ import {
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Slider } from "@/components/ui/slider";
 import { Dispatch, SetStateAction } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format, isToday, getDaysInMonth, startOfMonth } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DateRange, DayProps } from "react-day-picker";
+import { addDays, endOfMonth } from "date-fns";
+import { saveAs } from "file-saver";
 
-interface AdminViewProps {
+interface ProgressProps {
+  totalDailyChecks: number;
+  todaysCompletedChecks: number;
+}
+
+interface AdminStatusViewProps extends ProgressProps {
+  items: MaintenanceItem[];
+  uploadLogs: Log[];
+}
+
+interface AdminViewProps extends ProgressProps {
   items: MaintenanceItem[];
   setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
   uploadLogs: Log[];
 }
 
-const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) => {
+const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks }) => {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
-      <AdminStatusView items={items} uploadLogs={uploadLogs} />
+      <AdminStatusView
+        items={items}
+        uploadLogs={uploadLogs}
+        totalDailyChecks={totalDailyChecks}
+        todaysCompletedChecks={todaysCompletedChecks}
+      />
     </div>
   );
 };
@@ -114,7 +236,12 @@ const EditItemDialog: React.FC<EditItemDialogProps> = ({ item, onSave, onClose }
   );
 };
 
-const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) => {
+interface AdminConfigurationPanelProps {
+  items: MaintenanceItem[];
+  setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
+}
+
+const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items, setItems }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [keyExists, setKeyExists] = useState<boolean | null>(null);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
@@ -343,12 +470,19 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
             ) : (
               <ul className="space-y-2">
             {items.map((item, index) => (
-                  <li key={item.id} className="flex items-center justify-between p-2 border rounded-md">
+                  <motion.li
+                    key={item.id}
+                    className="flex items-center justify-between p-2 border rounded-md"
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                  >
                     <div className="flex items-center">
                       <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
                       <div>
                         <span className="font-bold">{item.name}</span> (x{item.quantity})
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           {item.timesPerDay} times per day ({item.timeFrames})
                         </p>
                       </div>
@@ -365,7 +499,7 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
                   </Button>
                   <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
                 </div>
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             )}
@@ -390,74 +524,51 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
   );
 };
 
-const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) => {
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, totalDailyChecks, todaysCompletedChecks }) => {
   const currentUser = useAppStore((state) => state.currentUser);
-  const isMobile = useIsMobile();
   const [showHelp, setShowHelp] = useState(true);
 
   return (
-    <ResizablePanelGroup direction={isMobile ? "vertical" : "horizontal"} className="h-full">
-      <ResizablePanel defaultSize={60}>
-        <div className="p-4 h-full overflow-y-auto">
-          <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
-          <AdminStatusView items={items} uploadLogs={uploadLogs} />
-        </div>
-      </ResizablePanel>
-      <ResizableHandle withHandle />
-      <ResizablePanel defaultSize={40}>
-        <div className="p-4 h-full overflow-y-auto">
-          <h1 className="text-2xl font-bold mb-4">Setup & Logs</h1>
-          {currentUser?.role === UserRole.ADMIN && (
-            <>
-              {showHelp && (
-                <Card className="mb-4 bg-blue-50 border-blue-200">
-                  <CardHeader>
-                    <CardTitle className="text-blue-800">How to Use This Dashboard</CardTitle>
-                    <Button variant="ghost" size="sm" className="absolute top-2 right-2" onClick={() => setShowHelp(false)}>X</Button>
-                  </CardHeader>
-                  <CardContent className="text-blue-700">
-                    <ul className="list-disc pl-5 space-y-1">
-                      <li>Use the tabs in the main panel to switch between daily, monthly, and log views.</li>
-                      <li>Click on a day in the monthly view to filter the logs for that day.</li>
-                      <li>Use the "Setup & Configuration" button to add, edit, or remove maintenance items.</li>
-                    </ul>
-                  </CardContent>
-                </Card>
-              )}
-              <AdminConfigurationPanel items={items} setItems={setItems} uploadLogs={uploadLogs} />
-            </>
-          )}
-        </div>
-      </ResizablePanel>
-    </ResizablePanelGroup>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className="p-4">
+        <h1 className="text-3xl font-bold mb-2">Maintenance Dashboard</h1>
+        <p className="text-muted-foreground mb-4">
+          Welcome, {currentUser?.name}. Here you can configure maintenance schedules and view logs.
+        </p>
+
+        {currentUser?.role === UserRole.ADMIN && (
+          <>
+            {showHelp && (
+              <Card className="mb-4 bg-blue-50 border-blue-200 dark:bg-blue-900/30 dark:border-blue-700">
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle className="text-blue-800 dark:text-blue-300">How to Use This Dashboard</CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setShowHelp(false)}>X</Button>
+                </CardHeader>
+                <CardContent className="text-blue-700 dark:text-blue-400">
+                  <ul className="list-disc pl-5 space-y-1">
+                    <li>Use the <strong>Setup & Configuration</strong> section below to add, edit, or remove maintenance items.</li>
+                    <li>The <strong>Monthly Calendar</strong> provides an at-a-glance overview of completion status.</li>
+                    <li>Click on any day in the calendar to see the detailed logs for that date in the <strong>Image Upload Log</strong> tab.</li>
+                    <li>Use the <strong>Export</strong> tab to download logs as a CSV file.</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            )}
+            <AdminConfigurationPanel items={items} setItems={setItems} />
+          </>
+        )}
+      </div>
+      <div className="p-4">
+        <AdminStatusView
+            items={items}
+            uploadLogs={uploadLogs}
+            totalDailyChecks={totalDailyChecks}
+            todaysCompletedChecks={todaysCompletedChecks}
+        />
+      </div>
+    </motion.div>
   );
 };
-
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { Calendar as CalendarIcon } from "lucide-react";
-import { format, isToday, getDaysInMonth, startOfMonth } from "date-fns";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { DateRange, DayProps } from "react-day-picker";
-import { addDays, endOfMonth } from "date-fns";
-import { saveAs } from "file-saver";
-
-import { CheckCircle, XCircle, Clock, UploadCloud } from 'lucide-react';
 
 interface Log {
   timestamp: string;
@@ -466,17 +577,11 @@ interface Log {
   username: string;
   filename: string;
 }
-interface AdminStatusViewProps {
-  items: MaintenanceItem[];
-  uploadLogs: Log[];
-}
 
-const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) => {
+const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dailyStatusData, setDailyStatusData] = useState<Log[]>([]);
   const [monthlyStatusData, setMonthlyStatusData] = useState<Log[]>([]);
-  const [date, setDate] = useState<Date>(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -486,7 +591,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
   const [logPageSize, setLogPageSize] = useState(31);
   const [logCurrentPage, setLogCurrentPage] = useState(1);
   const [selectedLogDate, setSelectedLogDate] = useState<Date | null>(null);
-  const [activeTab, setActiveTab] = useState('daily');
+  const [activeTab, setActiveTab] = useState('monthly');
 
   const filteredLogs = selectedLogDate
     ? uploadLogs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === format(selectedLogDate, 'yyyy-MM-dd'))
@@ -496,21 +601,6 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
     (logCurrentPage - 1) * logPageSize,
     logCurrentPage * logPageSize
   );
-
-  useEffect(() => {
-    const fetchDailyStatus = async () => {
-      try {
-        const response = await fetch(`/api/maintenance/status?date=${format(date, 'yyyy-MM-dd')}`);
-        if (response.ok) {
-          const data = await response.json();
-          setDailyStatusData(data);
-        }
-      } catch (error) {
-        toast.error('Failed to fetch daily maintenance status.');
-      }
-    };
-    fetchDailyStatus();
-  }, [date, items, uploadLogs]);
 
   useEffect(() => {
     const fetchMonthlyStatus = async () => {
@@ -558,80 +648,12 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
     }
   };
 
-  const processLogData = (items: MaintenanceItem[], logs: any[]) => {
-    const statusGrid: { [key: string]: { [key: string]: { status: string; imageUrl: string | null } } } = {};
-    const parseTime = (timeStr: string) => {
-      const hour = parseInt(timeStr.replace(/(am|pm)/i, ''));
-      const isPM = /pm/i.test(timeStr);
-      let slotHour = isPM && hour < 12 ? hour + 12 : hour;
-      if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
-      return slotHour;
-    };
-
-    for (const item of items) {
-      for (let i = 1; i <= item.quantity; i++) {
-        const itemInstanceId = `${item.name}-${i}`;
-        statusGrid[itemInstanceId] = {};
-        const timeSlots = item.timeFrames.split(',').map(t => t.trim());
-        let availableLogs = logs.filter(log => log.itemName === item.name && log.itemNumber == i);
-
-        for (const timeSlot of timeSlots) {
-          const timeSlotHour = parseTime(timeSlot);
-          const timeWindow = item.timeWindow || 60; // Default to 60 minutes
-          const halfWindow = timeWindow / 2;
-          let bestMatch: any = null;
-          let bestMatchIndex = -1;
-
-          // Find the best matching log for this time slot
-          for(let j=0; j<availableLogs.length; j++) {
-            const log = availableLogs[j];
-            const uploadTime = new Date(log.timestamp);
-            const uploadMinutes = uploadTime.getHours() * 60 + uploadTime.getMinutes();
-            const slotMinutes = timeSlotHour * 60;
-
-            if (Math.abs(uploadMinutes - slotMinutes) <= halfWindow) {
-              bestMatch = log;
-              bestMatchIndex = j;
-              break; // Found a good match
-            }
-          }
-
-          if (bestMatch) {
-            const uploadTime = new Date(bestMatch.timestamp);
-            const uploadMinutes = uploadTime.getHours() * 60 + uploadTime.getMinutes();
-            const slotMinutes = timeSlotHour * 60;
-            const imageUrl = `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${bestMatch.filename}`;
-            const status = Math.abs(uploadMinutes - slotMinutes) <= halfWindow ? 'Yes' : 'Delayed';
-            statusGrid[itemInstanceId][timeSlot] = { status, imageUrl };
-            // Remove the matched log from available logs
-            availableLogs.splice(bestMatchIndex, 1);
-          } else {
-            statusGrid[itemInstanceId][timeSlot] = { status: 'No', imageUrl: null };
-          }
-        }
-      }
-    }
-    return statusGrid;
-  };
-
-  const statusGrid = processLogData(items, dailyStatusData);
-
   const handleStatusClick = (imageUrl: string | null) => {
     if (imageUrl) {
       setSelectedImage(imageUrl);
       setIsDialogOpen(true);
     }
   };
-
-  const timeSlots = items.reduce((acc: string[], item) => {
-    const itemTimeSlots = item.timeFrames.split(',').map(t => t.trim());
-    itemTimeSlots.forEach(ts => {
-      if (!acc.includes(ts)) {
-        acc.push(ts);
-      }
-    });
-    return acc;
-  }, []);
 
   const completedDays = monthlyStatusData.reduce((acc: { [key: string]: Set<string> }, log) => {
     const date = format(new Date(log.timestamp), 'yyyy-MM-dd');
@@ -648,168 +670,111 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
     ? new Date(Math.min(...items.map(item => new Date(item.id).getTime())))
     : null;
 
-  const modifiers = {
-    completed: (day: Date) => {
-      const dateStr = format(day, 'yyyy-MM-dd');
-      return completedDays[dateStr] && completedDays[dateStr].size >= totalChecks;
-    },
-    partiallyCompleted: (day: Date) => {
-      const dateStr = format(day, 'yyyy-MM-dd');
-      return completedDays[dateStr] && completedDays[dateStr].size < totalChecks;
-    },
-  };
-
-  const modifiersClassNames = {
-    completed: 'bg-green-500 text-white',
-    partiallyCompleted: 'bg-yellow-500 text-white',
-  };
+  const progressValue = totalDailyChecks > 0 ? (todaysCompletedChecks / totalDailyChecks) * 100 : 0;
 
   return (
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-      <div className="mt-8">
+      <div className="mt-4">
+        <Card className="mb-4">
+            <CardHeader>
+                <CardTitle>Today's Progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex items-center gap-4">
+                    <Progress value={progressValue} className="w-full" />
+                    <span className="font-bold text-lg whitespace-nowrap">
+                        {todaysCompletedChecks} / {totalDailyChecks}
+                    </span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-2">
+                    {Math.round(progressValue)}% of daily maintenance checks completed.
+                </p>
+            </CardContent>
+        </Card>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Maintenance Status</h2>
+            <h2 className="text-2xl font-bold">Monthly Status & Logs</h2>
             <TabsList>
-              <TabsTrigger value="daily">Daily</TabsTrigger>
-              <TabsTrigger value="monthly">Monthly</TabsTrigger>
-              <TabsTrigger value="upload-log">Upload Log</TabsTrigger>
+              <TabsTrigger value="monthly">Monthly Calendar</TabsTrigger>
+              <TabsTrigger value="upload-log">Image Upload Log</TabsTrigger>
               <TabsTrigger value="export">Export</TabsTrigger>
             </TabsList>
           </div>
 
-          <TabsContent value="daily">
-            <div className="flex justify-end mb-4">
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant={"outline"}>
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(date, "PPP")}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    required
-                    selected={date}
-                    onSelect={setDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-            <Card>
-              <CardContent className="pt-4">
-                {items.length === 0 ? (
-                  <div className="text-center text-gray-500 py-8">
-                    <p>No items configured to display status.</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Item</TableHead>
-                          {timeSlots.map(ts => <TableHead key={ts} className="text-center">{ts}</TableHead>)}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {items.map(item => (
-                          Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
-                            <TableRow key={`${item.id}-${number}`}>
-                          <TableCell className="flex items-center">
-                            <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                            {item.name} #{number}
-                          </TableCell>
-                              {timeSlots.map(ts => {
-                                const itemInstanceId = `${item.name}-${number}`;
-                                const cellData = statusGrid[itemInstanceId]?.[ts];
-                                if (!cellData) {
-                                  return <TableCell key={ts} className="text-center bg-gray-100">-</TableCell>;
-                                }
-                                const { status, imageUrl } = cellData;
-                                const statusInfo = {
-                                  Yes: { icon: CheckCircle, color: 'text-green-500' },
-                                  No: { icon: XCircle, color: 'text-red-500' },
-                                  Delayed: { icon: Clock, color: 'text-yellow-500' },
-                                };
-                                const CurrentIcon = statusInfo[status as keyof typeof statusInfo]?.icon || 'div';
-                                const color = statusInfo[status as keyof typeof statusInfo]?.color || 'text-gray-500';
-
-                                return (
-                                  <TableCell key={ts} className="text-center">
-                                    <div
-                                      className="cursor-pointer flex justify-center"
-                                      onClick={() => handleStatusClick(imageUrl)}
-                                    >
-                                      <CurrentIcon className={`h-6 w-6 ${color}`} />
-                                    </div>
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
-                          ))
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="monthly">
             <Card>
+              <CardHeader>
+                <CardTitle>Monthly Completion Overview</CardTitle>
+              </CardHeader>
               <CardContent className="p-4">
-                <div className="flex justify-center mb-4">
-                  <Button variant="outline" onClick={() => setCurrentMonth(prev => new Date(prev.setMonth(prev.getMonth() - 1)))}>
-                    {"<"}
+                <div className="flex justify-center items-center mb-4">
+                  <Button variant="outline" size="icon" onClick={() => setCurrentMonth(prev => new Date(prev.setMonth(prev.getMonth() - 1)))}>
+                    <ChevronLeft className="h-4 w-4" />
                   </Button>
-                  <h3 className="text-xl font-bold mx-4">{format(currentMonth, "MMMM yyyy")}</h3>
-                  <Button variant="outline" onClick={() => setCurrentMonth(prev => new Date(prev.setMonth(prev.getMonth() + 1)))}>
-                    {">"}
+                  <h3 className="text-xl font-bold mx-4 text-center w-48">{format(currentMonth, "MMMM yyyy")}</h3>
+                  <Button variant="outline" size="icon" onClick={() => setCurrentMonth(prev => new Date(prev.setMonth(prev.getMonth() + 1)))}>
+                    <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="grid grid-cols-7 gap-2">
+                <div className="grid grid-cols-7 gap-1 sm:gap-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center font-semibold text-muted-foreground text-sm">{day}</div>
+                  ))}
                   {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => i + 1).map(day => {
                     const dayDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
                     const dateStr = format(dayDate, 'yyyy-MM-dd');
 
                     if (earliestItemDate && dayDate < earliestItemDate) {
                       return (
-                        <div key={day} className="h-16 w-16 flex flex-col items-center justify-center rounded-md bg-gray-100 text-gray-400 text-xs text-center">
-                          <div>{day}</div>
+                        <motion.div
+                            key={day}
+                            className="h-20 sm:h-24 flex flex-col items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-xs text-center p-1"
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ delay: day * 0.02 }}
+                        >
+                          <div className="font-bold text-lg">{day}</div>
                           <div>N/A</div>
-                        </div>
+                        </motion.div>
                       );
                     }
 
                     const completedCount = completedDays[dateStr]?.size || 0;
-                    const completed = completedCount >= totalChecks;
-                    const partiallyCompleted = completedCount > 0 && completedCount < totalChecks;
+                    const isComplete = completedCount >= totalChecks && totalChecks > 0;
+                    const isPartial = completedCount > 0 && completedCount < totalChecks;
 
-                    let bgColor = 'bg-red-100'; // Missed
-                    let textColor = 'text-red-800';
-                    if (completed) {
-                      bgColor = 'bg-green-100';
-                      textColor = 'text-green-800';
-                    } else if (partiallyCompleted) {
-                      bgColor = 'bg-yellow-100';
-                      textColor = 'text-yellow-800';
+                    let bgColor = 'bg-red-100 dark:bg-red-900/30';
+                    let textColor = 'text-red-800 dark:text-red-300';
+                    let borderColor = 'border-red-200 dark:border-red-800';
+                    if (isComplete) {
+                      bgColor = 'bg-green-100 dark:bg-green-900/30';
+                      textColor = 'text-green-800 dark:text-green-300';
+                      borderColor = 'border-green-200 dark:border-green-800';
+                    } else if (isPartial) {
+                      bgColor = 'bg-yellow-100 dark:bg-yellow-900/30';
+                      textColor = 'text-yellow-800 dark:text-yellow-300';
+                      borderColor = 'border-yellow-200 dark:border-yellow-800';
                     }
 
                     return (
-                      <div
+                      <motion.div
                         key={day}
-                        className={`h-16 w-16 flex flex-col items-center justify-center rounded-md cursor-pointer ${bgColor} ${textColor}`}
+                        className={`h-20 sm:h-24 flex flex-col items-center justify-center rounded-md cursor-pointer border-2 ${bgColor} ${textColor} ${borderColor} transition-all hover:shadow-md hover:scale-105`}
                         onClick={() => {
                           setSelectedLogDate(dayDate);
                           setActiveTab('upload-log');
                         }}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: day * 0.02 }}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
                       >
-                        <div className="font-bold">{day}</div>
-                        <div className="text-xs">{completedCount}/{totalChecks}</div>
-                      </div>
+                        <div className="font-bold text-lg">{day}</div>
+                        {totalChecks > 0 && (
+                           <div className="text-xs font-semibold">{completedCount}/{totalChecks}</div>
+                        )}
+                      </motion.div>
                     );
                   })}
                 </div>
@@ -839,7 +804,12 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                   </TableHeader>
                   <TableBody>
                     {paginatedLogs.map((log, index) => (
-                      <TableRow key={index}>
+                      <motion.tr
+                        key={index}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
                         <TableCell>{format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss")}</TableCell>
                         <TableCell>{log.itemName} #{log.itemNumber}</TableCell>
                         <TableCell>{log.username}</TableCell>
@@ -847,11 +817,11 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                           <img
                             src={`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`}
                             alt="thumbnail"
-                            className="w-16 h-16 object-cover cursor-pointer"
+                            className="w-16 h-16 object-cover cursor-pointer rounded-md border"
                             onClick={() => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`)}
                           />
                         </TableCell>
-                      </TableRow>
+                      </motion.tr>
                     ))}
                   </TableBody>
                 </Table>
@@ -877,11 +847,11 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                     >
                       Previous
                     </Button>
-                    <span>Page {logCurrentPage} of {Math.ceil(uploadLogs.length / logPageSize)}</span>
+                    <span>Page {logCurrentPage} of {Math.ceil(filteredLogs.length / logPageSize)}</span>
                     <Button
                       variant="outline"
-                      onClick={() => setLogCurrentPage(prev => Math.min(prev + 1, Math.ceil(uploadLogs.length / logPageSize)))}
-                      disabled={logCurrentPage === Math.ceil(uploadLogs.length / logPageSize)}
+                      onClick={() => setLogCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredLogs.length / logPageSize)))}
+                      disabled={logCurrentPage >= Math.ceil(filteredLogs.length / logPageSize)}
                     >
                       Next
                     </Button>
@@ -896,14 +866,13 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
               <CardHeader>
                 <CardTitle>Export Maintenance Logs</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid gap-2">
+              <CardContent className="flex flex-col sm:flex-row items-center gap-4">
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         id="date"
                         variant={"outline"}
-                        className="w-full justify-start text-left font-normal"
+                        className="w-full sm:w-auto justify-start text-left font-normal"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {exportDateRange?.from ? (
@@ -931,11 +900,10 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
                       />
                     </PopoverContent>
                   </Popover>
-                  <Button onClick={handleExport} disabled={isExporting}>
+                  <Button onClick={handleExport} disabled={isExporting} className="w-full sm:w-auto">
                     {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Export CSV
                   </Button>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -954,7 +922,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
   );
 };
 
-interface OperatorViewProps {
+interface OperatorViewProps extends ProgressProps {
   items: MaintenanceItem[];
   uploadLogs: Log[];
   onUploadSuccess: (log: Log) => void;
@@ -962,10 +930,11 @@ interface OperatorViewProps {
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
-const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess }) => {
+const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks }) => {
   const [statuses, setStatuses] = useState<Record<string, UploadStatus>>({});
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
+  const [showInstructions, setShowInstructions] = useState(true);
 
   useEffect(() => {
     const fetchServerTime = async () => {
@@ -1057,8 +1026,45 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Maintenance Checks</h1>
-      <p className="text-lg text-gray-500 mb-4">Welcome, {currentUser?.name || 'Operator'}!</p>
+      <div className="flex justify-between items-center mb-4">
+        <h1 className="text-3xl font-bold">Maintenance Checks</h1>
+        <div className="text-right">
+          <p className="text-lg font-semibold">{currentUser?.name || 'Operator'}</p>
+          <p className="text-sm text-muted-foreground">Operator View</p>
+        </div>
+      </div>
+
+      {showInstructions && (
+        <Card className="mb-4 bg-amber-50 border-amber-200 dark:bg-amber-900/30 dark:border-amber-700">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-amber-800 dark:text-amber-300">How to Use This Page</CardTitle>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setShowInstructions(false)}><XCircle className="h-5 w-5" /></Button>
+          </CardHeader>
+          <CardContent className="text-amber-700 dark:text-amber-400">
+            <ul className="list-disc pl-5 space-y-1">
+              <li>You can only upload photos during the designated time slots for each item.</li>
+              <li>Once a photo is uploaded, it <strong>cannot be changed or deleted</strong>. Please be careful.</li>
+              <li>A <strong className="text-green-600 dark:text-green-400">green</strong> card means the check is complete for today.</li>
+              <li>A <strong className="text-orange-600 dark:text-orange-400">red or orange</strong> card means the time slot was missed or an upload failed.</li>
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="mb-4">
+        <CardHeader>
+            <CardTitle>Today's Progress</CardTitle>
+        </CardHeader>
+        <CardContent>
+            <div className="flex items-center gap-4">
+                <Progress value={(totalDailyChecks > 0 ? (todaysCompletedChecks / totalDailyChecks) * 100 : 0)} className="w-full" />
+                <span className="font-bold text-lg whitespace-nowrap">
+                    {todaysCompletedChecks} / {totalDailyChecks}
+                </span>
+            </div>
+        </CardContent>
+      </Card>
+
       {items.length === 0 ? (
         <p>No maintenance items configured.</p>
       ) : (
@@ -1070,7 +1076,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
               const isTimeSlotActive = serverTime ? isWithinTimeSlot(item.timeFrames, item.timeWindow || 60, serverTime) : false;
 
               const statusInfo = {
-                pending: { icon: Clock, color: 'text-gray-500', text: 'Pending' },
+                pending: { icon: Clock, color: 'text-gray-500', text: 'Pending Upload' },
                 uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
                 success: { icon: CheckCircle, color: 'text-green-500', text: 'Uploaded Today' },
                 error: { icon: XCircle, color: 'text-red-500', text: 'Upload Failed' },
@@ -1085,9 +1091,24 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                 displayStatus = 'missed';
               }
 
-
               const currentStatusInfo = statusInfo[displayStatus as keyof typeof statusInfo];
               const CurrentIcon = currentStatusInfo.icon;
+
+              const isButtonDisabled = displayStatus !== 'pending' || !isTimeSlotActive;
+              const buttonVariants: { [key: string]: string } = {
+                pending: 'bg-primary hover:bg-primary/90',
+                uploading: 'bg-blue-500 hover:bg-blue-600',
+                success: 'bg-green-600 hover:bg-green-700',
+                error: 'bg-red-600 hover:bg-red-700',
+                missed: 'bg-gray-400 cursor-not-allowed',
+              };
+              const buttonText: { [key: string]: string } = {
+                  pending: 'Upload Picture',
+                  uploading: 'Uploading...',
+                  success: 'Completed',
+                  error: 'Retry Upload',
+                  missed: 'Time Slot Missed'
+              }
 
               const cardVariants = {
                 hidden: { opacity: 0, y: 20 },
@@ -1123,12 +1144,21 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                           onChange={(e) => handleFileChange(e, item.name, number)}
                           className="hidden"
                           id={`${item.id}-${number}`}
-                          disabled={displayStatus !== 'pending'}
+                          disabled={isButtonDisabled && displayStatus !== 'error'}
                         />
-                        <Label htmlFor={`${item.id}-${number}`} className="cursor-pointer w-full mt-4">
-                          <Button asChild disabled={displayStatus !== 'pending'} className="w-full">
+                        <Label htmlFor={`${item.id}-${number}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                          <Button
+                            asChild={false}
+                            disabled={isButtonDisabled && displayStatus !== 'error'}
+                            className={`w-full text-white ${buttonVariants[displayStatus] || buttonVariants.pending}`}
+                            onClick={() => {
+                                if (!isButtonDisabled || displayStatus === 'error') {
+                                    document.getElementById(`${item.id}-${number}`)?.click();
+                                }
+                            }}
+                          >
                             <span>
-                              {displayStatus === 'success' ? 'Uploaded' : 'Upload Picture'}
+                              {buttonText[displayStatus]}
                             </span>
                           </Button>
                         </Label>
@@ -1150,6 +1180,33 @@ const MaintenancePage = () => {
   const [items, setItems] = useState<MaintenanceItem[]>([]);
   const [uploadLogs, setUploadLogs] = useState<Log[]>([]);
   const currentUser = useAppStore((state) => state.currentUser);
+
+  // State for header
+  const { connect: connectWebSocket, isConnected } = useWebSocket();
+  const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
+  const [currentTime, setCurrentTime] = useState<string>('');
+  const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
+  const [delay, setDelay] = useState<number>(0);
+  const nodeValues = useAppStore(state => state.opcUaNodeValues);
+
+  const checkPlcConnection = useCallback(async () => {
+    try {
+      const r = await fetch('/api/opcua/status');
+      if (!r.ok) {
+        setPlcStatus('disconnected');
+        return;
+      }
+      const d = await r.json();
+      const nS = d.connectionStatus;
+      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
+        setPlcStatus(nS);
+      } else {
+        setPlcStatus('disconnected');
+      }
+    } catch (e) {
+      setPlcStatus('disconnected');
+    }
+  }, []);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -1182,25 +1239,78 @@ const MaintenancePage = () => {
 
     fetchConfig();
     fetchUploadLogs();
+    checkPlcConnection();
+    const plcI = setInterval(checkPlcConnection, 15000);
+    return () => clearInterval(plcI);
+  }, [checkPlcConnection]);
+
+  useEffect(() => {
+    if (Object.keys(nodeValues).length > 0) {
+      setLastUpdateTime(Date.now());
+    }
+  }, [nodeValues]);
+
+  useEffect(() => {
+    const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
+    uc();
+    const i = setInterval(uc, 1000);
+    return () => clearInterval(i);
   }, []);
+
+  useEffect(() => {
+    const lagI = setInterval(() => {
+      const cD = Date.now() - lastUpdateTime;
+      setDelay(cD);
+    }, 1000);
+    return () => clearInterval(lagI);
+  }, [lastUpdateTime]);
 
   const handleUploadSuccess = (newLog: Log) => {
     setUploadLogs(prevLogs => [...prevLogs, newLog]);
   };
 
+  const totalDailyChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
+  const todaysCompletedChecks = uploadLogs.filter(log => isToday(new Date(log.timestamp))).length;
+
   if (!currentUser) {
-    return <div>Loading...</div>;
+    return <div className="flex flex-col items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin" /><p className="mt-4">Loading Maintenance Module...</p></div>;
   }
 
-  if (currentUser.role === UserRole.ADMIN) {
-    return <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} />;
-  }
+  const handleWsStatusClick = () => {
+    // In the future, this could open the WS config modal, but that's a lot of state to port over.
+    // For now, a simple reconnect attempt is sufficient.
+    if (!isConnected) {
+      connectWebSocket();
+    }
+  };
 
-  if (currentUser.role === UserRole.VIEWER) {
-    return <ViewerView items={items} uploadLogs={uploadLogs} />;
-  }
+  const progressProps = {
+      totalDailyChecks,
+      todaysCompletedChecks
+  };
 
-  return <OperatorView items={items} uploadLogs={uploadLogs} onUploadSuccess={handleUploadSuccess} />;
+  return (
+    <div className="p-4 sm:p-6 md:p-8">
+      <DashboardHeaderControl
+        plcStatus={plcStatus}
+        isConnected={isConnected}
+        connectWebSocket={connectWebSocket}
+        onClickWsStatus={handleWsStatusClick}
+        currentTime={currentTime}
+        delay={delay}
+        version={VERSION}
+      />
+      {currentUser.role === UserRole.ADMIN && (
+        <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} {...progressProps} />
+      )}
+      {currentUser.role === UserRole.VIEWER && (
+        <ViewerView items={items} uploadLogs={uploadLogs} {...progressProps} />
+      )}
+      {currentUser.role === UserRole.OPERATOR && (
+        <OperatorView items={items} uploadLogs={uploadLogs} onUploadSuccess={handleUploadSuccess} {...progressProps} />
+      )}
+    </div>
+  );
 };
 
 export default MaintenancePage;
