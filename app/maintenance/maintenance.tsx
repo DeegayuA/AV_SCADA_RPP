@@ -286,7 +286,7 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) =>
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon } from "lucide-react";
-import { format, isToday, getDaysInMonth, startOfMonth, addDays, endOfMonth } from "date-fns";
+import { format, isToday, getDaysInMonth, startOfMonth } from "date-fns";
 import {
   Select,
   SelectContent,
@@ -304,6 +304,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRange, DayProps } from "react-day-picker";
+import { addDays, endOfMonth } from "date-fns";
 import { saveAs } from "file-saver";
 
 import { CheckCircle, XCircle, Clock, UploadCloud } from 'lucide-react';
@@ -359,7 +360,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
       }
     };
     fetchDailyStatus();
-  }, [date, items]);
+  }, [date, items, uploadLogs]);
 
   useEffect(() => {
     const fetchMonthlyStatus = async () => {
@@ -374,7 +375,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
       }
     };
     fetchMonthlyStatus();
-  }, [currentMonth, items]);
+  }, [currentMonth, items, uploadLogs]);
 
   const handleExport = async () => {
     if (!exportDateRange?.from || !exportDateRange?.to) {
@@ -412,40 +413,43 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
     const parseTime = (timeStr: string) => {
       const hour = parseInt(timeStr.replace(/(am|pm)/i, ''));
       const isPM = /pm/i.test(timeStr);
-      if (isPM && hour < 12) return hour + 12;
-      if (!isPM && hour === 12) return 0; // 12am is midnight
-      return hour;
+      let slotHour = isPM && hour < 12 ? hour + 12 : hour;
+      if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
+      return slotHour;
     };
-
-    const sortedLogs = [...logs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     for (const item of items) {
       for (let i = 1; i <= item.quantity; i++) {
         const itemInstanceId = `${item.name}-${i}`;
         statusGrid[itemInstanceId] = {};
         const timeSlots = item.timeFrames.split(',').map(t => t.trim());
-        let instanceLogs = sortedLogs.filter(log => log.itemName === item.name && log.itemNumber == i);
+        let availableLogs = logs.filter(log => log.itemName === item.name && log.itemNumber == i);
 
         for (const timeSlot of timeSlots) {
           const timeSlotHour = parseTime(timeSlot);
-          let foundLog = null;
+          let bestMatch: any = null;
+          let bestMatchIndex = -1;
 
-          // Find the first available log for this instance
-          if (instanceLogs.length > 0) {
-            foundLog = instanceLogs.shift();
+          // Find the best matching log for this time slot
+          for(let j=0; j<availableLogs.length; j++) {
+            const log = availableLogs[j];
+            const uploadTime = new Date(log.timestamp);
+            const uploadHour = uploadTime.getHours();
+            if (Math.abs(uploadHour - timeSlotHour) <= 1) {
+              bestMatch = log;
+              bestMatchIndex = j;
+              break; // Found a good match
+            }
           }
 
-          if (foundLog) {
-            const uploadTime = new Date(foundLog.timestamp);
+          if (bestMatch) {
+            const uploadTime = new Date(bestMatch.timestamp);
             const uploadHour = uploadTime.getHours();
-            const imageUrl = `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${foundLog.filename}`;
-
-            // Check if within the -1/+1 hour window
-            if (uploadHour >= timeSlotHour - 1 && uploadHour <= timeSlotHour + 1) {
-              statusGrid[itemInstanceId][timeSlot] = { status: 'Yes', imageUrl };
-            } else {
-              statusGrid[itemInstanceId][timeSlot] = { status: 'Delayed', imageUrl };
-            }
+            const imageUrl = `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${bestMatch.filename}`;
+            const status = Math.abs(uploadHour - timeSlotHour) <= 1 ? 'Yes' : 'Delayed';
+            statusGrid[itemInstanceId][timeSlot] = { status, imageUrl };
+            // Remove the matched log from available logs
+            availableLogs.splice(bestMatchIndex, 1);
           } else {
             statusGrid[itemInstanceId][timeSlot] = { status: 'No', imageUrl: null };
           }
