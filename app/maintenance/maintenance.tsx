@@ -1174,6 +1174,51 @@ interface OperatorViewProps extends ProgressProps {
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
+const SlotCountdown: React.FC<{
+  slot: { start: Date; end: Date };
+  nextSlot: { start: Date; end: Date } | undefined;
+  serverTime: Date;
+  status: UploadStatus;
+}> = ({ slot, nextSlot, serverTime, status }) => {
+    const activeCountdown = useCountdown(slot.end);
+    const nextCountdown = useCountdown(nextSlot?.start || null);
+    const futureCountdown = useCountdown(slot.start);
+
+    const formatCountdown = (countdown: any) => `${String(countdown.hours).padStart(2, '0')}:${String(countdown.minutes).padStart(2, '0')}:${String(countdown.seconds).padStart(2, '0')}`;
+
+    if (serverTime >= slot.start && serverTime <= slot.end) {
+        return (
+            <div className="text-sm text-center">
+                <p>Time Left:</p>
+                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(activeCountdown.minutes).padStart(2, '0')}:{String(activeCountdown.seconds).padStart(2, '0')}</p>
+            </div>
+        );
+    }
+
+    if (status === 'missed' || status === 'success') {
+        if (nextSlot) {
+            return (
+                <div className="text-sm text-center">
+                    <p>Next check in:</p>
+                    <p className="font-bold text-lg text-muted-foreground">{formatCountdown(nextCountdown)}</p>
+                </div>
+            );
+        }
+        return <div className="text-sm text-center p-2 text-muted-foreground">No more checks today.</div>;
+    }
+
+    if (serverTime < slot.start) {
+        return (
+            <div className="text-sm text-center">
+                <p>Starts in:</p>
+                <p className="font-bold text-lg text-muted-foreground">{formatCountdown(futureCountdown)}</p>
+            </div>
+        );
+    }
+
+    return null;
+};
+
 const TimeStatus: React.FC<{item: MaintenanceItem, serverTime: Date | null}> = ({ item, serverTime }) => {
     if (!serverTime) return null;
 
@@ -1375,9 +1420,10 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
           {items.flatMap(item =>
             Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
               const uploadKey = `${item.name}-${number}`;
-              const itemSlots = (item.timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
+              const { allSlots } = serverTime ? getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime) : { allSlots: [] };
 
-              return itemSlots.map(slotTime => {
+              return allSlots.map((slot, index) => {
+                const slotTime = slot.time;
                 const status = statuses[uploadKey]?.[slotTime] || 'pending';
                 const { activeSlot } = serverTime ? getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime) : { activeSlot: null };
                 const isTimeSlotActive = activeSlot?.time === slotTime;
@@ -1411,9 +1457,10 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="flex flex-col items-center justify-center text-center">
-                        <div className="my-4">
-                          <CurrentIcon className={`h-10 w-10 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
-                          <p className={`mt-2 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
+                        {serverTime && <SlotCountdown slot={slot} nextSlot={allSlots[index + 1]} serverTime={serverTime} status={status} />}
+                        <div className="my-2">
+                          <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
+                          <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
                         </div>
                         <Input
                           type="file"
