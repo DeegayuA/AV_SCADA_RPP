@@ -28,6 +28,7 @@ import {
   ResizableHandle,
 } from "@/components/ui/resizable"
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Slider } from "@/components/ui/slider";
 import { Dispatch, SetStateAction } from 'react';
 
 interface AdminViewProps {
@@ -57,9 +58,10 @@ const EditItemDialog: React.FC<EditItemDialogProps> = ({ item, onSave, onClose }
   const [timesPerDay, setTimesPerDay] = useState(item.timesPerDay);
   const [timeFrames, setTimeFrames] = useState(item.timeFrames);
   const [color, setColor] = useState(item.color);
+  const [timeWindow, setTimeWindow] = useState(item.timeWindow || 60);
 
   const handleSave = () => {
-    onSave({ ...item, name, quantity, timesPerDay, timeFrames, color });
+    onSave({ ...item, name, quantity, timesPerDay, timeFrames, color, timeWindow });
     onClose();
   };
 
@@ -90,6 +92,18 @@ const EditItemDialog: React.FC<EditItemDialogProps> = ({ item, onSave, onClose }
             <Label htmlFor="edit-color">Color</Label>
             <Input id="edit-color" type="color" value={color} onChange={(e) => setColor(e.target.value)} />
           </div>
+          <div>
+            <Label htmlFor="edit-timeWindow">Time Window (minutes)</Label>
+            <Slider
+              id="edit-timeWindow"
+              min={15}
+              max={120}
+              step={15}
+              value={[timeWindow]}
+              onValueChange={(value) => setTimeWindow(value[0])}
+            />
+            <div className="text-center font-bold mt-2">{timeWindow} mins</div>
+          </div>
           <div className="flex justify-end space-x-2">
             <Button variant="outline" onClick={onClose}>Cancel</Button>
             <Button onClick={handleSave}>Save</Button>
@@ -109,6 +123,7 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
   const [timesPerDay, setTimesPerDay] = useState(1);
   const [timeFrames, setTimeFrames] = useState('');
   const [itemColor, setItemColor] = useState('#000000');
+  const [timeWindow, setTimeWindow] = useState(60); // Default to 60 minutes
   const [editingItem, setEditingItem] = useState<MaintenanceItem | null>(null);
 
   useEffect(() => {
@@ -150,6 +165,7 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
       timesPerDay: timesPerDay,
       timeFrames: timeFrames,
       color: itemColor,
+      timeWindow: timeWindow,
     };
     setItems([...items, newItem]);
     setItemName('');
@@ -291,6 +307,18 @@ const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) 
                   value={itemColor}
                   onChange={(e) => setItemColor(e.target.value)}
                 />
+              </div>
+              <div>
+                <Label htmlFor="itemTimeWindow">Time Window (minutes)</Label>
+                <Slider
+                  id="itemTimeWindow"
+                  min={15}
+                  max={120}
+                  step={15}
+                  value={[timeWindow]}
+                  onValueChange={(value) => setTimeWindow(value[0])}
+                />
+                <div className="text-center font-bold mt-2">{timeWindow} mins</div>
               </div>
               <div className="flex items-end">
                 <Button onClick={handleAddItem} className="w-full">Add Item</Button>
@@ -549,6 +577,8 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
 
         for (const timeSlot of timeSlots) {
           const timeSlotHour = parseTime(timeSlot);
+          const timeWindow = item.timeWindow || 60; // Default to 60 minutes
+          const halfWindow = timeWindow / 2;
           let bestMatch: any = null;
           let bestMatchIndex = -1;
 
@@ -556,8 +586,10 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
           for(let j=0; j<availableLogs.length; j++) {
             const log = availableLogs[j];
             const uploadTime = new Date(log.timestamp);
-            const uploadHour = uploadTime.getHours();
-            if (Math.abs(uploadHour - timeSlotHour) <= 1) {
+            const uploadMinutes = uploadTime.getHours() * 60 + uploadTime.getMinutes();
+            const slotMinutes = timeSlotHour * 60;
+
+            if (Math.abs(uploadMinutes - slotMinutes) <= halfWindow) {
               bestMatch = log;
               bestMatchIndex = j;
               break; // Found a good match
@@ -566,9 +598,10 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) 
 
           if (bestMatch) {
             const uploadTime = new Date(bestMatch.timestamp);
-            const uploadHour = uploadTime.getHours();
+            const uploadMinutes = uploadTime.getHours() * 60 + uploadTime.getMinutes();
+            const slotMinutes = timeSlotHour * 60;
             const imageUrl = `/maintenance_image_preview/${format(uploadTime, 'yyyy-MM-dd')}/${bestMatch.filename}`;
-            const status = Math.abs(uploadHour - timeSlotHour) <= 1 ? 'Yes' : 'Delayed';
+            const status = Math.abs(uploadMinutes - slotMinutes) <= halfWindow ? 'Yes' : 'Delayed';
             statusGrid[itemInstanceId][timeSlot] = { status, imageUrl };
             // Remove the matched log from available logs
             availableLogs.splice(bestMatchIndex, 1);
@@ -948,10 +981,10 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
     fetchServerTime();
   }, []);
 
-  const isWithinTimeSlot = (timeFrames: string, serverTime: Date): boolean => {
+  const isWithinTimeSlot = (timeFrames: string, timeWindow: number, serverTime: Date): boolean => {
     if (!timeFrames) return false;
     const now = serverTime;
-    const currentHour = now.getHours();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
     const slots = timeFrames.split(',').map(t => t.trim());
     return slots.some(slot => {
@@ -959,9 +992,10 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
       const isPM = /pm/i.test(slot);
       let slotHour = isPM && hour < 12 ? hour + 12 : hour;
       if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
+      const slotMinutes = slotHour * 60;
 
-      // Check if current hour is within the -1/+1 hour window
-      return currentHour >= slotHour - 1 && currentHour <= slotHour + 1;
+      const halfWindow = timeWindow / 2;
+      return nowMinutes >= slotMinutes - halfWindow && nowMinutes <= slotMinutes + halfWindow;
     });
   };
 
@@ -979,7 +1013,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         if (todaysLog) {
           initialStatuses[uploadKey] = 'success';
         } else {
-          initialStatuses[uploadKey] = isWithinTimeSlot(item.timeFrames, serverTime) ? 'pending' : 'error';
+          initialStatuses[uploadKey] = isWithinTimeSlot(item.timeFrames, item.timeWindow, serverTime) ? 'pending' : 'error';
         }
       }
     });
