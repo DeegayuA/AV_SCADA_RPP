@@ -38,7 +38,7 @@ const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs }) => {
   );
 };
 
-const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) => {
+const AdminConfigurationPanel: React.FC<AdminViewProps> = ({ items, setItems }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [keyExists, setKeyExists] = useState<boolean | null>(null);
   const [isGeneratingKey, setIsGeneratingKey] = useState(false);
@@ -143,149 +143,158 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) =>
   };
 
   return (
+    <Collapsible className="mb-4">
+      <CollapsibleTrigger asChild>
+        <Button variant="outline">
+          <Settings className="mr-2 h-4 w-4" />
+          Show Setup & Configuration
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="mt-4 space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle>Log Encryption Key</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {keyExists === null ? (
+              <p>Checking key status...</p>
+            ) : keyExists ? (
+              <p className="text-green-500">Encryption key is set on the server.</p>
+            ) : (
+              <p className="text-red-500">Encryption key is not set. Please generate a key.</p>
+            )}
+            <Button onClick={handleGenerateKey} disabled={isGeneratingKey} className="mt-2">
+              {isGeneratingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isGeneratingKey ? 'Generating...' : 'Generate New Key'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Add New Item</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+              <div>
+                <Label htmlFor="itemName">Item Name</Label>
+                <Input
+                  id="itemName"
+                  value={itemName}
+                  onChange={(e) => setItemName(e.target.value)}
+                  placeholder="e.g., Inverter"
+                />
+              </div>
+              <div>
+                <Label htmlFor="itemQuantity">Quantity</Label>
+                <Input
+                  id="itemQuantity"
+                  type="number"
+                  value={itemQuantity}
+                  onChange={(e) => setItemQuantity(parseInt(e.target.value, 10))}
+                  min="1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="timesPerDay">Times per Day</Label>
+                <Input
+                  id="timesPerDay"
+                  type="number"
+                  value={timesPerDay}
+                  onChange={(e) => setTimesPerDay(parseInt(e.target.value, 10))}
+                  min="1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="timeFrames">Time Frames</Label>
+                <Input
+                  id="timeFrames"
+                  value={timeFrames}
+                  onChange={(e) => setTimeFrames(e.target.value)}
+                  placeholder="e.g., 9am, 1pm, 5pm"
+                />
+              </div>
+              <div>
+                <Label htmlFor="itemColor">Color</Label>
+                <Input
+                  id="itemColor"
+                  type="color"
+                  value={itemColor}
+                  onChange={(e) => setItemColor(e.target.value)}
+                />
+              </div>
+              <div className="flex items-end">
+                <Button onClick={handleAddItem} className="w-full">Add Item</Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Configured Items</CardTitle>
+            {items.length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleClearConfiguration}>Clear All</Button>
+            )}
+          </CardHeader>
+          <CardContent>
+            {items.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">
+                <p>No maintenance items configured yet.</p>
+                <p className="text-sm">Use the form above to add items to the maintenance schedule.</p>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+            {items.map((item, index) => (
+                  <li key={item.id} className="flex items-center justify-between p-2 border rounded-md">
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                      <div>
+                        <span className="font-bold">{item.name}</span> (x{item.quantity})
+                        <p className="text-sm text-gray-500">
+                          {item.timesPerDay} times per day ({item.timeFrames})
+                        </p>
+                      </div>
+                    </div>
+                <div className="flex items-center space-x-1">
+                  <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'up')} disabled={index === 0}>
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'down')} disabled={index === items.length - 1}>
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                  <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
+                </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="mt-4">
+          <Button size="lg" onClick={handleSaveConfiguration} disabled={isSaving}>
+            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {isSaving ? 'Saving...' : 'Save Configuration'}
+          </Button>
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  );
+};
+
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs }) => {
+  const currentUser = useAppStore((state) => state.currentUser);
+
+  return (
     <div>
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Maintenance Dashboard</h1>
       </div>
 
-      <Collapsible className="mb-4">
-        <CollapsibleTrigger asChild>
-          <Button variant="outline">
-            <Settings className="mr-2 h-4 w-4" />
-            Show Setup & Configuration
-          </Button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Log Encryption Key</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {keyExists === null ? (
-                <p>Checking key status...</p>
-              ) : keyExists ? (
-                <p className="text-green-500">Encryption key is set on the server.</p>
-              ) : (
-                <p className="text-red-500">Encryption key is not set. Please generate a key.</p>
-              )}
-              <Button onClick={handleGenerateKey} disabled={isGeneratingKey} className="mt-2">
-                {isGeneratingKey && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isGeneratingKey ? 'Generating...' : 'Generate New Key'}
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Add New Item</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                <div>
-                  <Label htmlFor="itemName">Item Name</Label>
-                  <Input
-                    id="itemName"
-                    value={itemName}
-                    onChange={(e) => setItemName(e.target.value)}
-                    placeholder="e.g., Inverter"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="itemQuantity">Quantity</Label>
-                  <Input
-                    id="itemQuantity"
-                    type="number"
-                    value={itemQuantity}
-                    onChange={(e) => setItemQuantity(parseInt(e.target.value, 10))}
-                    min="1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="timesPerDay">Times per Day</Label>
-                  <Input
-                    id="timesPerDay"
-                    type="number"
-                    value={timesPerDay}
-                    onChange={(e) => setTimesPerDay(parseInt(e.target.value, 10))}
-                    min="1"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="timeFrames">Time Frames</Label>
-                  <Input
-                    id="timeFrames"
-                    value={timeFrames}
-                    onChange={(e) => setTimeFrames(e.target.value)}
-                    placeholder="e.g., 9am, 1pm, 5pm"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="itemColor">Color</Label>
-                  <Input
-                    id="itemColor"
-                    type="color"
-                    value={itemColor}
-                    onChange={(e) => setItemColor(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={handleAddItem} className="w-full">Add Item</Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Configured Items</CardTitle>
-              {items.length > 0 && (
-                <Button variant="outline" size="sm" onClick={handleClearConfiguration}>Clear All</Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {items.length === 0 ? (
-                <div className="text-center text-gray-500 py-8">
-                  <p>No maintenance items configured yet.</p>
-                  <p className="text-sm">Use the form above to add items to the maintenance schedule.</p>
-                </div>
-              ) : (
-                <ul className="space-y-2">
-              {items.map((item, index) => (
-                    <li key={item.id} className="flex items-center justify-between p-2 border rounded-md">
-                      <div className="flex items-center">
-                        <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                        <div>
-                          <span className="font-bold">{item.name}</span> (x{item.quantity})
-                          <p className="text-sm text-gray-500">
-                            {item.timesPerDay} times per day ({item.timeFrames})
-                          </p>
-                        </div>
-                      </div>
-                  <div className="flex items-center space-x-1">
-                    <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'up')} disabled={index === 0}>
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'down')} disabled={index === items.length - 1}>
-                      <ArrowDown className="h-4 w-4" />
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
-                  </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="mt-4">
-            <Button size="lg" onClick={handleSaveConfiguration} disabled={isSaving}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isSaving ? 'Saving...' : 'Save Configuration'}
-            </Button>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-
+      {currentUser?.role === UserRole.ADMIN && (
+        <AdminConfigurationPanel items={items} setItems={setItems} uploadLogs={uploadLogs} />
+      )}
 
       <AdminStatusView items={items} uploadLogs={uploadLogs} />
     </div>
