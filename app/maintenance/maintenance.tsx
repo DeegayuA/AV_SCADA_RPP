@@ -135,7 +135,7 @@ const processDailyStatus = (
   if (!serverTime) return [];
 
   const now = serverTime;
-  const todaysLogs = uploadLogs.filter(log => isToday(new Date(log.timestamp)));
+  const dailyLogs = uploadLogs;
 
   return items.flatMap(item =>
     Array.from({ length: item.quantity }, (_, i) => {
@@ -157,7 +157,7 @@ const processDailyStatus = (
         const slotEnd = new Date(now);
         slotEnd.setHours(slotHour, halfWindow, 0, 0);
 
-        const logInSlot = todaysLogs.find(log => {
+        const logInSlot = dailyLogs.find(log => {
           const logTime = new Date(log.timestamp);
           return log.itemName === item.name &&
             log.itemNumber === itemNumber.toString() &&
