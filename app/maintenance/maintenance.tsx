@@ -858,6 +858,9 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
                     <div key={day} className="text-center font-semibold text-muted-foreground text-sm">{day}</div>
                   ))}
+                  {Array.from({ length: startOfMonth(currentMonth).getDay() }).map((_, i) => (
+                    <div key={`empty-${i}`} />
+                  ))}
                   {Array.from({ length: getDaysInMonth(currentMonth) }, (_, i) => i + 1).map(day => {
                     const dayDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
                     const dateStr = format(dayDate, 'yyyy-MM-dd');
@@ -1216,10 +1219,11 @@ const OperatorViewItem: React.FC<{
   number: number;
   serverTime: Date;
   uploadLogs: Log[];
-  statuses: Record<string, Record<string, UploadStatus>>;
-  handleFileChange: (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number, slotTime: string) => void;
-}> = ({ item, number, serverTime, uploadLogs, statuses, handleFileChange }) => {
+  onUploadSuccess: (log: Log) => void;
+}> = ({ item, number, serverTime, uploadLogs, onUploadSuccess }) => {
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const currentUser = useAppStore((state) => state.currentUser);
 
   // Call hooks unconditionally at the top level
   const countdown = useCountdown(activeSlot?.end ?? null, serverTime);
@@ -1254,8 +1258,40 @@ const OperatorViewItem: React.FC<{
     }
   }
 
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsSubmitting(true);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('itemName', itemName);
+    formData.append('itemNumber', itemNumber.toString());
+    formData.append('username', currentUser?.name || 'unknown');
+
+    try {
+      const response = await fetch('/api/maintenance/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        const newLog = await response.json();
+        toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
+        onUploadSuccess(newLog);
+      } else {
+        toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
+      }
+    } catch (error) {
+      toast.error('An error occurred while uploading the image.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const uploadKey = `${item.name}-${number}`;
-  const status = relevantSlot ? (statuses[uploadKey]?.[relevantSlot.time] || 'pending') : 'pending';
+  const status = relevantSlot ? 'pending' : 'pending';
 
   const statusInfo = {
     pending: { icon: Clock, color: 'text-gray-500', text: `Next check at ${relevantSlot?.time}` },
@@ -1265,8 +1301,8 @@ const OperatorViewItem: React.FC<{
     missed: { icon: XCircle, color: 'text-orange-500', text: `Missed check at ${relevantSlot?.time}` },
   };
 
-  const isButtonDisabled = displayMode !== 'active';
-  const currentStatusInfo = displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status];
+  const isButtonDisabled = displayMode !== 'active' || isSubmitting;
+  const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status]);
   const CurrentIcon = currentStatusInfo.icon;
 
   return (
@@ -1304,7 +1340,7 @@ const OperatorViewItem: React.FC<{
                 type="file"
                 accept="image/*"
                 capture="environment"
-                onChange={(e) => handleFileChange(e, item.name, number, relevantSlot!.time)}
+                onChange={(e) => handleFileChange(e, item.name, number)}
                 className="hidden"
                 id={`${uploadKey}-${relevantSlot!.time}`}
                 disabled={isButtonDisabled}
@@ -1320,7 +1356,7 @@ const OperatorViewItem: React.FC<{
                     }
                   }}
                 >
-                  Upload Picture
+                  {isSubmitting ? 'Uploading...' : 'Upload Picture'}
                 </Button>
               </Label>
             </>
@@ -1334,7 +1370,6 @@ const OperatorViewItem: React.FC<{
 };
 
 const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
-  const [statuses, setStatuses] = useState<Record<string, Record<string, UploadStatus>>>({});
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
   const [showInstructions, setShowInstructions] = useState(true);
@@ -1354,94 +1389,6 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
     const interval = setInterval(fetchServerTime, 1000); // Fetch every second for real-time countdown
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (!serverTime) return;
-    const newStatuses: Record<string, Record<string, UploadStatus>> = {};
-    items.forEach(item => {
-      const { allSlots } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
-      for (let i = 1; i <= item.quantity; i++) {
-        const uploadKey = `${item.name}-${i}`;
-        newStatuses[uploadKey] = {};
-        allSlots.forEach(slot => {
-          const hasLog = uploadLogs.some(log => {
-            const logTime = new Date(log.timestamp);
-            return log.itemName === item.name &&
-              log.itemNumber === i.toString() &&
-              logTime >= slot.start &&
-              logTime <= slot.end;
-          });
-          if (hasLog) {
-            newStatuses[uploadKey][slot.time] = 'success';
-          } else if (serverTime > slot.end) {
-            newStatuses[uploadKey][slot.time] = 'missed';
-          } else {
-            newStatuses[uploadKey][slot.time] = 'pending';
-          }
-        });
-      }
-    });
-    setStatuses(newStatuses);
-  }, [items, uploadLogs, serverTime]);
-
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number, slotTime: string) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const uploadKey = `${itemName}-${itemNumber}`;
-    setStatuses(prev => ({
-      ...prev,
-      [uploadKey]: {
-        ...prev[uploadKey],
-        [slotTime]: 'uploading'
-      }
-    }));
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('itemName', itemName);
-    formData.append('itemNumber', itemNumber.toString());
-    formData.append('username', currentUser?.name || 'unknown');
-
-    try {
-      const response = await fetch('/api/maintenance/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const newLog = await response.json();
-        toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
-        setStatuses(prev => ({
-          ...prev,
-          [uploadKey]: {
-            ...prev[uploadKey],
-            [slotTime]: 'success'
-          }
-        }));
-        onUploadSuccess(newLog);
-      } else {
-        toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
-        setStatuses(prev => ({
-          ...prev,
-          [uploadKey]: {
-            ...prev[uploadKey],
-            [slotTime]: 'error'
-          }
-        }));
-      }
-    } catch (error) {
-      toast.error('An error occurred while uploading the image.');
-      setStatuses(prev => ({
-        ...prev,
-        [uploadKey]: {
-          ...prev[uploadKey],
-          [slotTime]: 'error'
-        }
-      }));
-    }
-  };
 
   return (
     <div>
@@ -1498,8 +1445,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                 number={number}
                 serverTime={serverTime}
                 uploadLogs={uploadLogs}
-                statuses={statuses}
-                handleFileChange={handleFileChange}
+                onUploadSuccess={onUploadSuccess}
               />
             ))
           )}
