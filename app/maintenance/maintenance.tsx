@@ -193,10 +193,11 @@ const processDailyStatus = (
 
 const DashboardHeaderControl = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
+    plcStatus, esp32Status, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
     version,
   }: {
     plcStatus: "online" | "offline" | "disconnected";
+    esp32Status: "connected" | "disconnected";
     isConnected: boolean;
     connectWebSocket: () => void;
     onClickWsStatus: () => void;
@@ -219,7 +220,7 @@ const DashboardHeaderControl = React.memo(
             {PLANT_NAME} {headerTitle}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div><PlcConnectionStatus status={plcStatus} /></motion.div>
+            <motion.div><PlcConnectionStatus status={plcStatus} esp32Status={esp32Status} /></motion.div>
             <motion.div>
               <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} delay={delay} />
             </motion.div>
@@ -1499,8 +1500,20 @@ const MaintenancePage = () => {
   const currentUser = useAppStore((state) => state.currentUser);
 
   // State for header
-  const { connect: connectWebSocket, isConnected } = useWebSocket();
+  const { connect: connectWebSocket, isConnected } = useWebSocket((message: MessageEvent) => {
+    try {
+        const data = JSON.parse(message.data);
+        if (data.type === 'esp32-status') {
+            setEsp32Status(data.payload.status);
+        } else if (data.type === 'esp32-raw-data') {
+            console.log("ESP32 Raw Data:", data.payload);
+        }
+    } catch (error) {
+        // This is expected for the main data broadcast
+    }
+  });
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
+  const [esp32Status, setEsp32Status] = useState<'connected' | 'disconnected'>('disconnected');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
@@ -1625,6 +1638,7 @@ const MaintenancePage = () => {
     <div className="p-4 sm:p-6 md:p-8">
       <DashboardHeaderControl
         plcStatus={plcStatus}
+        esp32Status={esp32Status}
         isConnected={isConnected}
         connectWebSocket={connectWebSocket}
         onClickWsStatus={handleWsStatusClick}

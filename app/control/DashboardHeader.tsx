@@ -30,6 +30,7 @@ const itemVariants: Variants = _itemVariants as Variants;
 
 interface DashboardHeaderControlProps {
     plcStatus: "online" | "offline" | "disconnected";
+    esp32Status: "connected" | "disconnected";
     isConnected: boolean;
     connectWebSocket: () => Promise<void>;
     currentTime: string;
@@ -48,6 +49,7 @@ interface DashboardHeaderControlProps {
 const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
   ({
     plcStatus,
+    esp32Status,
     isConnected,
     connectWebSocket,
     currentTime,
@@ -91,7 +93,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
             {PLANT_NAME} {headerTitle}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
+            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} esp32Status={esp32Status} /></motion.div>
             
             <motion.div variants={itemVariants}>
               {/* This usage is now correct because WebSocketStatus.tsx is updated */}

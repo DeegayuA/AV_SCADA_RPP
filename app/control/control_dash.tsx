@@ -72,6 +72,7 @@ import { useWebSocket } from '@/hooks/useWebSocketListener';
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
+  esp32Status: "connected" | "disconnected";
   isConnected: boolean;
   connectWebSocket: () => void;
   onClickWsStatus: () => void;
@@ -89,7 +90,7 @@ interface DashboardHeaderControlProps {
 
 const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
+    plcStatus, esp32Status, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
     version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault, wsAddress
   }) => {
     const router = useRouter();
@@ -113,7 +114,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
             {PLANT_NAME} {headerTitle}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
+            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} esp32Status={esp32Status} /></motion.div>
             <motion.div variants={itemVariants}>
               <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} delay={delay} />
             </motion.div>
@@ -344,7 +345,18 @@ const UnifiedDashboardPage: React.FC = () => {
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
 
   // WebSocket connection via dedicated hook
-  const { sendJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
+  const { sendJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket((message: MessageEvent) => {
+    try {
+        const data = JSON.parse(message.data);
+        if (data.type === 'esp32-status') {
+            setEsp32Status(data.payload.status);
+        } else if (data.type === 'esp32-raw-data') {
+            console.log("ESP32 Raw Data:", data.payload);
+        }
+    } catch (error) {
+        // This is expected for the main data broadcast
+    }
+  });
 
   const currentUserRole = currentUser?.role;
 
@@ -354,6 +366,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const [opcuaConnectionStatus, setOpcuaConnectionStatus] = useState<any>(null);
   const [isStatusLoading, setIsStatusLoading] = useState<boolean>(false);
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
+  const [esp32Status, setEsp32Status] = useState<'connected' | 'disconnected'>('disconnected');
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
@@ -748,7 +761,7 @@ const UnifiedDashboardPage: React.FC = () => {
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
       <div className="max-w-screen-4xl mx-auto">
         <DashboardHeaderControl
-          plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
+          plcStatus={plcStatus} esp32Status={esp32Status} isConnected={isConnected} connectWebSocket={connectWebSocket}
           onClickWsStatus={handleWsStatusClick}
           currentTime={currentTime} delay={delay} version={VERSION}
           isEditMode={isGlobalEditMode} toggleEditMode={toggleEditModeAction}

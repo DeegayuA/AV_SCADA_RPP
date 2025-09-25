@@ -49,6 +49,11 @@ let disconnectTimeout: NodeJS.Timeout | null = null;
 
 let wsServer: WebSocketServer | null = null;
 
+const ESP32_TIMEOUT = 10000; // 10 seconds
+let esp32LastMessageTimestamp: number | null = null;
+let esp32Status: 'connected' | 'disconnected' = 'disconnected';
+let esp32CheckInterval: NodeJS.Timeout | null = null;
+
 
 // Helper function to map DataType enum values to strings
 function getDataTypeString(dataTypeEnumValue: number): string {
@@ -324,8 +329,23 @@ function sendToastToClient(ws: WebSocket, severity: 'success' | 'error' | 'warni
 }
 
 
+function checkEsp32Status() {
+    if (esp32LastMessageTimestamp && (Date.now() - esp32LastMessageTimestamp > ESP32_TIMEOUT)) {
+        if (esp32Status !== 'disconnected') {
+            esp32Status = 'disconnected';
+            console.log("ESP32 connection timed out.");
+            broadcast(JSON.stringify({ type: 'esp32-status', payload: { status: 'disconnected' } }));
+        }
+    }
+}
+
 function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
     console.log(`Initializing event handlers for WebSocketServer instance (PID: ${process.pid})`);
+
+    if (!esp32CheckInterval) {
+        esp32CheckInterval = setInterval(checkEsp32Status, ESP32_TIMEOUT / 2);
+    }
+
     serverInstance.on("connection", (ws, req) => {
         const clientIp = req?.socket?.remoteAddress || req?.headers['x-forwarded-for'] || 'unknown';
         console.log(`Client connected to WebSocket from IP: ${clientIp}`);
@@ -338,6 +358,9 @@ function initializeWebSocketEventHandlers(serverInstance: WebSocketServer) {
             try { ws.send(JSON.stringify(nodeDataCache)); }
             catch (err) { console.error("Error sending initial cache to new client:", err); }
         }
+        // Send initial ESP32 status
+        try { ws.send(JSON.stringify({ type: 'esp32-status', payload: { status: esp32Status } })); }
+        catch (err) { console.error("Error sending initial ESP32 status to new client:", err); }
 
         if (connectedClients.size === 1 && !KEEP_OPCUA_ALIVE) {
             console.log("First client connected (KEEP_OPCUA_ALIVE is false), ensuring OPC UA connection.");
@@ -1053,7 +1076,19 @@ export async function POST(req: NextRequest) {
 
     try {
         const data = await req.json();
-        console.log("Received data from ESP32:", data);
+
+        // Console log for debugging
+        console.log("ESP32 Raw Data:", data);
+
+        // Update ESP32 status
+        esp32LastMessageTimestamp = Date.now();
+        if (esp32Status !== 'connected') {
+            esp32Status = 'connected';
+            broadcast(JSON.stringify({ type: 'esp32-status', payload: { status: 'connected' } }));
+        }
+
+        // Broadcast raw data for debugging on the client-side
+        broadcast(JSON.stringify({ type: 'esp32-raw-data', payload: data }));
 
         // Update the cache
         Object.assign(nodeDataCache, data);
@@ -1074,6 +1109,7 @@ async function gracefulShutdown(signal: string) {
     if (disconnectTimeout) clearTimeout(disconnectTimeout);
 
     if (pingIntervalId) { clearInterval(pingIntervalId); console.log("Cleared WebSocket ping interval."); pingIntervalId = null;}
+    if (esp32CheckInterval) { clearInterval(esp32CheckInterval); console.log("Cleared ESP32 status check interval."); esp32CheckInterval = null; }
 
     const shutdownPromises: Promise<void>[] = [];
 
