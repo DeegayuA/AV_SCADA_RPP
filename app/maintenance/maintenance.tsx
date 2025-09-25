@@ -1223,6 +1223,7 @@ const OperatorViewItem: React.FC<{
 }> = ({ item, number, serverTime, uploadLogs, onUploadSuccess }) => {
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
   const currentUser = useAppStore((state) => state.currentUser);
 
   // Call hooks unconditionally at the top level
@@ -1280,6 +1281,10 @@ const OperatorViewItem: React.FC<{
         const newLog = await response.json();
         toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
         onUploadSuccess(newLog);
+        setUploadSuccess(true);
+        setTimeout(() => {
+          setUploadSuccess(false);
+        }, 3000);
       } else {
         toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
       }
@@ -1302,7 +1307,7 @@ const OperatorViewItem: React.FC<{
   };
 
   const isButtonDisabled = displayMode !== 'active' || isSubmitting;
-  const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status]);
+  const currentStatusInfo = isSubmitting ? statusInfo.uploading : (uploadSuccess ? statusInfo.success : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status]));
   const CurrentIcon = currentStatusInfo.icon;
 
   return (
@@ -1311,7 +1316,7 @@ const OperatorViewItem: React.FC<{
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <Card className={`border-2 ${displayMode === 'completed' ? 'border-green-500' : 'border-transparent'}`}>
+      <Card className={`border-2 ${displayMode === 'completed' || uploadSuccess ? 'border-green-500' : 'border-transparent'}`}>
         <CardHeader>
           <CardTitle className="flex items-center">
             <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
@@ -1319,7 +1324,12 @@ const OperatorViewItem: React.FC<{
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center text-center">
-          {displayMode === 'completed' ? (
+          {uploadSuccess ? (
+            <>
+              <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
+              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>Upload successful!</p>
+            </>
+          ) : displayMode === 'completed' ? (
             <>
               <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
               <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
