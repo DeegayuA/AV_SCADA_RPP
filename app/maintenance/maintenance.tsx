@@ -1068,7 +1068,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
 
       {previewDate && (
         <Dialog open={!!previewDate} onOpenChange={() => setPreviewDate(null)}>
-          <DialogContent className="max-w-4xl">
+          <DialogContent className="max-w-6xl">
             <DialogHeader>
               <DialogTitle>Daily Preview for {format(previewDate, "PPP")}</DialogTitle>
             </DialogHeader>
@@ -1223,6 +1223,10 @@ const OperatorViewItem: React.FC<{
 }> = ({ item, number, serverTime, uploadLogs, statuses, handleFileChange }) => {
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
 
+  // Call hooks unconditionally at the top level
+  const countdown = useCountdown(activeSlot?.end ?? null);
+  const nextCountdown = useCountdown(nextSlot?.start ?? null);
+
   let relevantSlot = activeSlot;
   let displayMode: 'active' | 'next' | 'missed' | 'completed' | 'none' = 'none';
 
@@ -1230,6 +1234,7 @@ const OperatorViewItem: React.FC<{
     displayMode = 'active';
   } else if (nextSlot) {
     displayMode = 'next';
+    relevantSlot = nextSlot;
   }
 
   const allLogsForToday = uploadLogs.filter(log => isToday(new Date(log.timestamp)) && log.itemName === item.name && log.itemNumber === number.toString());
@@ -1250,10 +1255,6 @@ const OperatorViewItem: React.FC<{
       displayMode = 'missed';
     }
   }
-
-  const slotForCountdown = displayMode === 'active' ? activeSlot : nextSlot;
-  const countdown = useCountdown(slotForCountdown?.end ?? null);
-  const nextCountdown = useCountdown(slotForCountdown?.start ?? null);
 
   const uploadKey = `${item.name}-${number}`;
   const status = relevantSlot ? (statuses[uploadKey]?.[relevantSlot.time] || 'pending') : 'pending';
@@ -1296,7 +1297,7 @@ const OperatorViewItem: React.FC<{
                 <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
               </div>
               {displayMode === 'active' && (
-                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
+                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
               )}
               {displayMode === 'next' && (
                 <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
