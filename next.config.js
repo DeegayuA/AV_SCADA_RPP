@@ -10,4 +10,14 @@ const nextConfig = {
   images: { unoptimized: true },
 };
 
-module.exports = nextConfig;
+module.exports = {
+  ...nextConfig,
+  async rewrites() {
+    return [
+      {
+        source: '/api/incomedata',
+        destination: '/api/opcua',
+      },
+    ];
+  },
+};
