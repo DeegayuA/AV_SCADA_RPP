@@ -1048,6 +1048,26 @@ export async function GET(req: NextRequest) {
     });
 }
 
+export async function POST(req: NextRequest) {
+    await ensureWebSocketServerInitialized();
+
+    try {
+        const data = await req.json();
+        console.log("Received data from ESP32:", data);
+
+        // Update the cache
+        Object.assign(nodeDataCache, data);
+
+        // Broadcast the new data to all connected clients
+        broadcast(JSON.stringify(data));
+
+        return NextResponse.json({ message: "Data received and broadcasted successfully." });
+    } catch (error) {
+        console.error("Error processing ESP32 data:", error);
+        return new NextResponse("Error processing request", { status: 500 });
+    }
+}
+
 
 async function gracefulShutdown(signal: string) {
     console.log(`Received ${signal}. Initiating graceful shutdown (PID: ${process.pid})...`);
