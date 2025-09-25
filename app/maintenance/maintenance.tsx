@@ -1239,9 +1239,9 @@ const OperatorViewItem: React.FC<{
     relevantSlot = nextSlot;
   }
 
-  const allLogsForToday = uploadLogs.filter(log => isToday(new Date(log.timestamp)) && log.itemName === item.name && log.itemNumber === number.toString());
+  const itemLogsForToday = uploadLogs.filter(log => isToday(new Date(log.timestamp)) && log.itemName === item.name && log.itemNumber === number.toString());
 
-  if (allLogsForToday.length >= allSlots.length && allSlots.length > 0) {
+  if (itemLogsForToday.length >= allSlots.length && allSlots.length > 0) {
     displayMode = 'completed';
   } else if (!activeSlot && !nextSlot) {
     const lastUncompletedPastSlot = [...allSlots].reverse().find(s => {
@@ -1290,14 +1290,18 @@ const OperatorViewItem: React.FC<{
     }
   };
 
-  const hasLogForActiveSlot = activeSlot ? allLogsForToday.some(log => {
-    const logTime = new Date(log.timestamp);
-    return logTime >= activeSlot.start && logTime <= activeSlot.end;
-  }) : false;
+  const completedSlots = allSlots.filter(slot => {
+    return itemLogsForToday.some(log => {
+      const logTime = new Date(log.timestamp);
+      return logTime >= slot.start && logTime <= slot.end;
+    });
+  });
 
-  if (hasLogForActiveSlot) {
+  if (completedSlots.length === allSlots.length && allSlots.length > 0) {
     displayMode = 'completed';
   }
+
+  const hasLogForActiveSlot = activeSlot ? completedSlots.some(s => s.time === activeSlot.time) : false;
 
   const uploadKey = `${item.name}-${number}`;
   const status = relevantSlot ? 'pending' : 'pending';
@@ -1310,7 +1314,7 @@ const OperatorViewItem: React.FC<{
     missed: { icon: XCircle, color: 'text-orange-500', text: `Missed check at ${relevantSlot?.time}` },
   };
 
-  const isButtonDisabled = displayMode !== 'active' || isSubmitting;
+  const isButtonDisabled = displayMode !== 'active' || isSubmitting || hasLogForActiveSlot;
   const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status]);
   const CurrentIcon = currentStatusInfo.icon;
 
@@ -1328,9 +1332,19 @@ const OperatorViewItem: React.FC<{
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center text-center">
-          {displayMode === 'completed' ? (
+          {hasLogForActiveSlot ? (
+            <div>
+              <CheckCircle className={`h-10 w-10 ${statusInfo.success.color}`} />
+              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>Uploaded</p>
+              {nextSlot && (
+                <div className="mt-2">
+                  <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
+                </div>
+              )}
+            </div>
+          ) : displayMode === 'completed' ? (
             <>
-              <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
+              <CheckCircle className={`h-10 w-10 ${statusInfo.success.color}`} />
               <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
             </>
           ) : relevantSlot ? (
