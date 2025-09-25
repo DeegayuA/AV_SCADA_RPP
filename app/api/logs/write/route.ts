@@ -7,19 +7,27 @@ const SYSTEM_LOG_FILE = path.resolve(process.cwd(), 'system.log.json');
 const ERROR_LOG_FILE = path.resolve(process.cwd(), 'error.log.json');
 
 async function appendToLog(filePath: string, entry: ActivityLogEntry) {
+  let fileHandle;
   try {
-    let logs: ActivityLogEntry[] = [];
-    try {
-      const data = await fs.readFile(filePath, 'utf-8');
-      logs = JSON.parse(data);
-    } catch (error: any) {
-      if (error.code !== 'ENOENT') throw error;
-      // File doesn't exist, it will be created with the first log
-    }
+    fileHandle = await fs.open(filePath, 'r+');
+    const data = await fileHandle.readFile('utf-8');
+    const logs: ActivityLogEntry[] = data ? JSON.parse(data) : [];
     logs.push(entry);
-    await fs.writeFile(filePath, JSON.stringify(logs, null, 2));
-  } catch (error) {
-    console.error(`Error writing to log file ${filePath}:`, error);
+    await fileHandle.truncate();
+    await fileHandle.write(JSON.stringify(logs, null, 2), 0, 'utf-8');
+  } catch (error: any) {
+    if (error.code === 'ENOENT') {
+      // File doesn't exist, create it with the first log
+      try {
+        await fs.writeFile(filePath, JSON.stringify([entry], null, 2));
+      } catch (writeError) {
+        console.error(`Error creating log file ${filePath}:`, writeError);
+      }
+    } else {
+      console.error(`Error writing to log file ${filePath}:`, error);
+    }
+  } finally {
+    await fileHandle?.close();
   }
 }
 

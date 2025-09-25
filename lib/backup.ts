@@ -6,8 +6,6 @@ import { GRAPH_SERIES_CONFIG_KEY } from '@/config/constants';
 import { SLDLayout } from '@/types/sld';
 import { toast } from 'sonner';
 import { useAppStore } from '@/stores/appStore';
-import { getMaintenanceConfig } from '@/lib/db';
-
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${appConstants.PLANT_NAME || 'defaultPlant'}`;
 
@@ -61,7 +59,17 @@ export async function getBackupData(): Promise<any> {
   });
 
   const sldDataForBackup = getAllSldLayoutsFromStorage();
-  const maintenanceConfig = await getMaintenanceConfig();
+  let maintenanceConfig = [];
+  try {
+    const response = await fetch('/api/maintenance/config');
+    if (response.ok) {
+      maintenanceConfig = await response.json();
+    } else {
+      console.warn("Could not fetch maintenance config for backup.");
+    }
+  } catch (error) {
+    console.error("Error fetching maintenance config for backup:", error);
+  }
 
   const now = new Date();
   const localTimeForFilename = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}-${String(now.getMinutes()).padStart(2, '0')}`;
