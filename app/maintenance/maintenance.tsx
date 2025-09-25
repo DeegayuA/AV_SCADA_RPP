@@ -1290,6 +1290,15 @@ const OperatorViewItem: React.FC<{
     }
   };
 
+  const hasLogForActiveSlot = activeSlot ? allLogsForToday.some(log => {
+    const logTime = new Date(log.timestamp);
+    return logTime >= activeSlot.start && logTime <= activeSlot.end;
+  }) : false;
+
+  if (hasLogForActiveSlot) {
+    displayMode = 'completed';
+  }
+
   const uploadKey = `${item.name}-${number}`;
   const status = relevantSlot ? 'pending' : 'pending';
 
