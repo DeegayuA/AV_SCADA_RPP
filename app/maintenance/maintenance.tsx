@@ -1220,7 +1220,8 @@ const OperatorViewItem: React.FC<{
   serverTime: Date;
   uploadLogs: Log[];
   onUploadSuccess: (log: Log) => void;
-}> = ({ item, number, serverTime, uploadLogs, onUploadSuccess }) => {
+  onServerTimeUpdate: (time: Date) => void;
+}> = ({ item, number, serverTime, uploadLogs, onUploadSuccess, onServerTimeUpdate }) => {
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const currentUser = useAppStore((state) => state.currentUser);
@@ -1279,7 +1280,18 @@ const OperatorViewItem: React.FC<{
       if (response.ok) {
         const newLog = await response.json();
         toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
+        
+        // Update the upload logs immediately
         onUploadSuccess(newLog);
+        
+        // Update server time to trigger re-calculation of time slots and status
+        try {
+          const timeResponse = await fetch('/api/time');
+          const timeData = await timeResponse.json();
+          onServerTimeUpdate(new Date(timeData.time));
+        } catch (error) {
+          console.error('Failed to update server time:', error);
+        }
       } else {
         toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
       }
@@ -1459,16 +1471,20 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {serverTime && items.flatMap(item =>
-            Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
-              <OperatorViewItem
-                key={`${item.id}-${number}`}
-                item={item}
-                number={number}
-                serverTime={serverTime}
-                uploadLogs={uploadLogs}
-                onUploadSuccess={onUploadSuccess}
-              />
-            ))
+            Array.from({ length: item.quantity }, (_, i) => {
+              const number = i + 1;
+              return (
+                <OperatorViewItem
+                  key={`${item.id}-${number}`}
+                  item={item}
+                  number={number}
+                  serverTime={serverTime}
+                  uploadLogs={uploadLogs}
+                  onUploadSuccess={onUploadSuccess}
+                  onServerTimeUpdate={setServerTime}
+                />
+              );
+            })
           )}
         </div>
       )}
