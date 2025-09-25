@@ -1175,12 +1175,16 @@ interface OperatorViewProps extends ProgressProps {
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
 const TimeStatus: React.FC<{ item: MaintenanceItem, serverTime: Date | null }> = ({ item, serverTime }) => {
-  if (!serverTime) return null;
-
-  const { activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
+  const { activeSlot, nextSlot } = serverTime
+    ? getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime)
+    : { activeSlot: null, nextSlot: null };
 
   const activeCountdown = useCountdown(activeSlot?.end || null);
   const nextCountdown = useCountdown(nextSlot?.start || null);
+
+  if (!serverTime) {
+    return null;
+  }
 
   if (activeSlot) {
     const isLowTime = (activeCountdown.minutes < 5 && activeCountdown.hours === 0 && activeCountdown.days === 0);
@@ -1209,17 +1213,132 @@ const TimeStatus: React.FC<{ item: MaintenanceItem, serverTime: Date | null }> =
 }
 
 
+const OperatorViewItem: React.FC<{
+  item: MaintenanceItem;
+  number: number;
+  serverTime: Date;
+  uploadLogs: Log[];
+  statuses: Record<string, Record<string, UploadStatus>>;
+  handleFileChange: (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number, slotTime: string) => void;
+}> = ({ item, number, serverTime, uploadLogs, statuses, handleFileChange }) => {
+  const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
+
+  let relevantSlot = activeSlot;
+  let displayMode: 'active' | 'next' | 'missed' | 'completed' | 'none' = 'none';
+
+  if (activeSlot) {
+    displayMode = 'active';
+  } else if (nextSlot) {
+    displayMode = 'next';
+  }
+
+  const allLogsForToday = uploadLogs.filter(log => isToday(new Date(log.timestamp)) && log.itemName === item.name && log.itemNumber === number.toString());
+
+  if (allLogsForToday.length >= allSlots.length && allSlots.length > 0) {
+    displayMode = 'completed';
+  } else if (!activeSlot && !nextSlot) {
+    const lastUncompletedPastSlot = [...allSlots].reverse().find(s => {
+      const now = serverTime;
+      const hasLog = allLogsForToday.some(log => {
+        const logTime = new Date(log.timestamp);
+        return logTime >= s.start && logTime <= s.end;
+      });
+      return now > s.end && !hasLog;
+    });
+    if (lastUncompletedPastSlot) {
+      relevantSlot = lastUncompletedPastSlot;
+      displayMode = 'missed';
+    }
+  }
+
+  const slotForCountdown = displayMode === 'active' ? activeSlot : nextSlot;
+  const countdown = useCountdown(slotForCountdown?.end ?? null);
+  const nextCountdown = useCountdown(slotForCountdown?.start ?? null);
+
+  const uploadKey = `${item.name}-${number}`;
+  const status = relevantSlot ? (statuses[uploadKey]?.[relevantSlot.time] || 'pending') : 'pending';
+
+  const statusInfo = {
+    pending: { icon: Clock, color: 'text-gray-500', text: `Next check at ${relevantSlot?.time}` },
+    uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
+    success: { icon: CheckCircle, color: 'text-green-500', text: 'Completed' },
+    error: { icon: XCircle, color: 'text-red-500', text: 'Failed' },
+    missed: { icon: XCircle, color: 'text-orange-500', text: `Missed check at ${relevantSlot?.time}` },
+  };
+
+  const isButtonDisabled = displayMode !== 'active';
+  const currentStatusInfo = displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status];
+  const CurrentIcon = currentStatusInfo.icon;
+
+  return (
+    <motion.div
+      key={`${item.id}-${number}`}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+    >
+      <Card className={`border-2 ${displayMode === 'completed' ? 'border-green-500' : 'border-transparent'}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+            {item.name} #{number}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center text-center">
+          {displayMode === 'completed' ? (
+            <>
+              <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
+              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
+            </>
+          ) : relevantSlot ? (
+            <>
+              <div className="my-2">
+                <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
+                <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
+              </div>
+              {displayMode === 'active' && (
+                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
+              )}
+              {displayMode === 'next' && (
+                <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
+              )}
+              <Input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => handleFileChange(e, item.name, number, relevantSlot!.time)}
+                className="hidden"
+                id={`${uploadKey}-${relevantSlot!.time}`}
+                disabled={isButtonDisabled}
+              />
+              <Label htmlFor={`${uploadKey}-${relevantSlot!.time}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                <Button
+                  asChild={false}
+                  disabled={isButtonDisabled}
+                  className="w-full"
+                  onClick={() => {
+                    if (!isButtonDisabled) {
+                      document.getElementById(`${uploadKey}-${relevantSlot!.time}`)?.click();
+                    }
+                  }}
+                >
+                  Upload Picture
+                </Button>
+              </Label>
+            </>
+          ) : (
+            <p>No checks scheduled for today.</p>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+};
+
 const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
   const [statuses, setStatuses] = useState<Record<string, Record<string, UploadStatus>>>({});
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
   const [showInstructions, setShowInstructions] = useState(true);
-
-  const isWithinTimeSlot = (timeFrames: string, timeWindow: number, serverTime: Date): boolean => {
-    if (!timeFrames) return false;
-    const { activeSlot } = getTimeSlotInfo(timeFrames, timeWindow, serverTime);
-    return !!activeSlot;
-  };
 
   useEffect(() => {
     const fetchServerTime = async () => {
@@ -1372,125 +1491,18 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         <p>No maintenance items configured.</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {items.flatMap(item =>
-            Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => {
-              const uploadKey = `${item.name}-${number}`;
-
-              if (!serverTime) return null;
-
-              const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
-
-              let relevantSlot = activeSlot;
-              let displayMode: 'active' | 'next' | 'missed' | 'completed' | 'none' = 'none';
-
-              if (activeSlot) {
-                displayMode = 'active';
-              } else if (nextSlot) {
-                displayMode = 'next';
-              }
-
-              const allLogsForToday = uploadLogs.filter(log => isToday(new Date(log.timestamp)) && log.itemName === item.name && log.itemNumber === number.toString());
-
-              if (allLogsForToday.length >= allSlots.length && allSlots.length > 0) {
-                displayMode = 'completed';
-              } else if (!activeSlot && !nextSlot) {
-                // Find last slot that is not completed
-                const lastUncompletedPastSlot = [...allSlots].reverse().find(s => {
-                  const now = serverTime;
-                  const hasLog = allLogsForToday.some(log => {
-                    const logTime = new Date(log.timestamp);
-                    return logTime >= s.start && logTime <= s.end;
-                  });
-                  return now > s.end && !hasLog;
-                });
-                if (lastUncompletedPastSlot) {
-                  relevantSlot = lastUncompletedPastSlot;
-                  displayMode = 'missed';
-                }
-              }
-
-              const slotForCountdown = displayMode === 'active' ? activeSlot : nextSlot;
-              const countdown = useCountdown(slotForCountdown?.end ?? null);
-              const nextCountdown = useCountdown(slotForCountdown?.start ?? null);
-
-              const status = relevantSlot ? (statuses[uploadKey]?.[relevantSlot.time] || 'pending') : 'pending';
-
-              const statusInfo = {
-                pending: { icon: Clock, color: 'text-gray-500', text: `Next check at ${relevantSlot?.time}` },
-                uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
-                success: { icon: CheckCircle, color: 'text-green-500', text: 'Completed' },
-                error: { icon: XCircle, color: 'text-red-500', text: 'Failed' },
-                missed: { icon: XCircle, color: 'text-orange-500', text: `Missed check at ${relevantSlot?.time}` },
-              };
-
-              const isButtonDisabled = displayMode !== 'active';
-              const currentStatusInfo = displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status];
-              const CurrentIcon = currentStatusInfo.icon;
-
-
-              return (
-                <motion.div
-                  key={`${item.id}-${number}`}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                >
-                  <Card className={`border-2 ${displayMode === 'completed' ? 'border-green-500' : 'border-transparent'}`}>
-                    <CardHeader>
-                      <CardTitle className="flex items-center">
-                        <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                        {item.name} #{number}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center justify-center text-center">
-                      {displayMode === 'completed' ? (
-                        <>
-                          <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
-                          <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
-                        </>
-                      ) : relevantSlot ? (
-                        <>
-                          <div className="my-2">
-                            <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
-                            <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
-                          </div>
-                          {displayMode === 'active' && (
-                            <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
-                          )}
-                          {displayMode === 'next' && (
-                            <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
-                          )}
-                          <Input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={(e) => handleFileChange(e, item.name, number, relevantSlot!.time)}
-                            className="hidden"
-                            id={`${uploadKey}-${relevantSlot!.time}`}
-                            disabled={isButtonDisabled}
-                          />
-                          <Label htmlFor={`${uploadKey}-${relevantSlot!.time}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                            <Button
-                              asChild={false}
-                              disabled={isButtonDisabled}
-                              className="w-full"
-                              onClick={() => {
-                                if (!isButtonDisabled) {
-                                  document.getElementById(`${uploadKey}-${relevantSlot!.time}`)?.click();
-                                }
-                              }}
-                            >
-                              Upload Picture
-                            </Button>
-                          </Label>
-                        </>
-                      ) : (
-                        <p>No checks scheduled for today.</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              );
-            })
+          {serverTime && items.flatMap(item =>
+            Array.from({ length: item.quantity }, (_, i) => i + 1).map(number => (
+              <OperatorViewItem
+                key={`${item.id}-${number}`}
+                item={item}
+                number={number}
+                serverTime={serverTime}
+                uploadLogs={uploadLogs}
+                statuses={statuses}
+                handleFileChange={handleFileChange}
+              />
+            ))
           )}
         </div>
       )}
