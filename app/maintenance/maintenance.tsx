@@ -1349,7 +1349,6 @@ const OperatorViewItem: React.FC<{
           ) : relevantSlot ? (
             <>
               <div className="my-2">
-                <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
                 <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${isSubmitting ? 'animate-spin' : ''}`} />
               </div>
               {displayMode === 'active' && (
