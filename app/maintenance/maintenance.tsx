@@ -68,130 +68,130 @@ interface Log {
 }
 
 const useCountdown = (targetDate: Date | null) => {
-    const [timeLeft, setTimeLeft] = useState({
-        days: 0,
-        hours: 0,
-        minutes: 0,
-        seconds: 0,
-    });
+  const [timeLeft, setTimeLeft] = useState({
+    days: 0,
+    hours: 0,
+    minutes: 0,
+    seconds: 0,
+  });
 
-    useEffect(() => {
-        if (!targetDate) return;
+  useEffect(() => {
+    if (!targetDate) return;
 
-        const interval = setInterval(() => {
-            const now = new Date();
-            const difference = targetDate.getTime() - now.getTime();
+    const interval = setInterval(() => {
+      const now = new Date();
+      const difference = targetDate.getTime() - now.getTime();
 
-            if (difference > 0) {
-                setTimeLeft({
-                    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-                    hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-                    minutes: Math.floor((difference / 1000 / 60) % 60),
-                    seconds: Math.floor((difference / 1000) % 60),
-                });
-            } else {
-                setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-                clearInterval(interval);
-            }
-        }, 1000);
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+          seconds: Math.floor((difference / 1000) % 60),
+        });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        clearInterval(interval);
+      }
+    }, 1000);
 
-        return () => clearInterval(interval);
-    }, [targetDate]);
+    return () => clearInterval(interval);
+  }, [targetDate]);
 
-    return timeLeft;
+  return timeLeft;
 };
 
 
 const getTimeSlotInfo = (timeFrames: string, timeWindow: number, serverTime: Date) => {
-    const now = serverTime;
-    const slots = (timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
+  const now = serverTime;
+  const slots = (timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
 
-    const slotDetails = slots.map(slot => {
-        const hour = parseInt(slot.replace(/(am|pm)/i, ''));
-        const isPM = /pm/i.test(slot);
-        let slotHour = isPM && hour < 12 ? hour + 12 : hour;
-        if (!isPM && hour === 12) slotHour = 0;
+  const slotDetails = slots.map(slot => {
+    const hour = parseInt(slot.replace(/(am|pm)/i, ''));
+    const isPM = /pm/i.test(slot);
+    let slotHour = isPM && hour < 12 ? hour + 12 : hour;
+    if (!isPM && hour === 12) slotHour = 0;
 
-        const halfWindow = (timeWindow || 60) / 2;
-        const slotCenter = new Date(now);
-        slotCenter.setHours(slotHour, 0, 0, 0);
+    const halfWindow = (timeWindow || 60) / 2;
+    const slotCenter = new Date(now);
+    slotCenter.setHours(slotHour, 0, 0, 0);
 
-        const slotStart = new Date(slotCenter.getTime() - halfWindow * 60000);
-        const slotEnd = new Date(slotCenter.getTime() + halfWindow * 60000);
+    const slotStart = new Date(slotCenter.getTime() - halfWindow * 60000);
+    const slotEnd = new Date(slotCenter.getTime() + halfWindow * 60000);
 
-        return { time: slot, start: slotStart, end: slotEnd };
-    });
+    return { time: slot, start: slotStart, end: slotEnd };
+  });
 
-    slotDetails.sort((a, b) => a.start.getTime() - b.start.getTime());
+  slotDetails.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-    const activeSlot = slotDetails.find(s => now >= s.start && now <= s.end);
-    const nextSlot = slotDetails.find(s => now < s.start);
+  const activeSlot = slotDetails.find(s => now >= s.start && now <= s.end);
+  const nextSlot = slotDetails.find(s => now < s.start);
 
-    return { activeSlot, nextSlot, allSlots: slotDetails };
+  return { activeSlot, nextSlot, allSlots: slotDetails };
 };
 
 const processDailyStatus = (
-    items: MaintenanceItem[],
-    uploadLogs: Log[],
-    serverTime: Date | null
+  items: MaintenanceItem[],
+  uploadLogs: Log[],
+  serverTime: Date | null
 ) => {
-    if (!serverTime) return [];
+  if (!serverTime) return [];
 
-    const now = serverTime;
-    const todaysLogs = uploadLogs.filter(log => isToday(new Date(log.timestamp)));
+  const now = serverTime;
+  const todaysLogs = uploadLogs.filter(log => isToday(new Date(log.timestamp)));
 
-    return items.flatMap(item =>
-      Array.from({ length: item.quantity }, (_, i) => {
-        const itemNumber = i + 1;
-        const instanceId = `${item.id}-${itemNumber}`;
+  return items.flatMap(item =>
+    Array.from({ length: item.quantity }, (_, i) => {
+      const itemNumber = i + 1;
+      const instanceId = `${item.id}-${itemNumber}`;
 
-        const timeSlots = (item.timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
+      const timeSlots = (item.timeFrames || "").split(',').map(t => t.trim()).filter(t => t);
 
-        const slotDetails = timeSlots.map(slot => {
-          const hour = parseInt(slot.replace(/(am|pm)/i, ''));
-          const isPM = /pm/i.test(slot);
-          let slotHour = isPM && hour < 12 ? hour + 12 : hour;
-          if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
+      const slotDetails = timeSlots.map(slot => {
+        const hour = parseInt(slot.replace(/(am|pm)/i, ''));
+        const isPM = /pm/i.test(slot);
+        let slotHour = isPM && hour < 12 ? hour + 12 : hour;
+        if (!isPM && hour === 12) slotHour = 0; // 12am is midnight
 
-          const timeWindow = item.timeWindow || 60;
-          const halfWindow = timeWindow / 2;
-          const slotStart = new Date(now);
-          slotStart.setHours(slotHour, -halfWindow, 0, 0);
-          const slotEnd = new Date(now);
-          slotEnd.setHours(slotHour, halfWindow, 0, 0);
+        const timeWindow = item.timeWindow || 60;
+        const halfWindow = timeWindow / 2;
+        const slotStart = new Date(now);
+        slotStart.setHours(slotHour, -halfWindow, 0, 0);
+        const slotEnd = new Date(now);
+        slotEnd.setHours(slotHour, halfWindow, 0, 0);
 
-          const logInSlot = todaysLogs.find(log => {
-              const logTime = new Date(log.timestamp);
-              return log.itemName === item.name &&
-                     log.itemNumber === itemNumber.toString() &&
-                     logTime >= slotStart &&
-                     logTime <= slotEnd;
-          });
-
-          let status: 'completed' | 'missed' | 'pending' | 'active' = 'pending';
-          if (logInSlot) {
-              status = 'completed';
-          } else if (now >= slotStart && now <= slotEnd) {
-              status = 'active';
-          } else if (now > slotEnd) {
-              status = 'missed';
-          }
-
-          return {
-              time: slot,
-              status,
-              log: logInSlot || null
-          };
+        const logInSlot = todaysLogs.find(log => {
+          const logTime = new Date(log.timestamp);
+          return log.itemName === item.name &&
+            log.itemNumber === itemNumber.toString() &&
+            logTime >= slotStart &&
+            logTime <= slotEnd;
         });
 
+        let status: 'completed' | 'missed' | 'pending' | 'active' = 'pending';
+        if (logInSlot) {
+          status = 'completed';
+        } else if (now >= slotStart && now <= slotEnd) {
+          status = 'active';
+        } else if (now > slotEnd) {
+          status = 'missed';
+        }
+
         return {
-          id: instanceId,
-          name: `${item.name} #${itemNumber}`,
-          color: item.color,
-          slots: slotDetails
+          time: slot,
+          status,
+          log: logInSlot || null
         };
-      })
-    );
+      });
+
+      return {
+        id: instanceId,
+        name: `${item.name} #${itemNumber}`,
+        color: item.color,
+        slots: slotDetails
+      };
+    })
+  );
 };
 
 const DashboardHeaderControl = React.memo(
@@ -600,7 +600,7 @@ const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items
               </div>
             ) : (
               <ul className="space-y-2">
-            {items.map((item, index) => (
+                {items.map((item, index) => (
                   <motion.li
                     key={item.id}
                     className="flex items-center justify-between p-2 border rounded-md"
@@ -618,18 +618,18 @@ const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items
                         </p>
                       </div>
                     </div>
-                <div className="flex items-center space-x-1">
-                  <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'up')} disabled={index === 0}>
-                    <ArrowUp className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'down')} disabled={index === items.length - 1}>
-                    <ArrowDown className="h-4 w-4" />
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => setEditingItem(item)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
-                </div>
+                    <div className="flex items-center space-x-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'up')} disabled={index === 0}>
+                        <ArrowUp className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => handleMoveItem(index, 'down')} disabled={index === items.length - 1}>
+                        <ArrowDown className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setEditingItem(item)}>
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={() => handleRemoveItem(item.id)}>Remove</Button>
+                    </div>
                   </motion.li>
                 ))}
               </ul>
@@ -691,11 +691,11 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, tota
       </div>
       <div className="p-4">
         <AdminStatusView
-            items={items}
-            uploadLogs={uploadLogs}
-            totalDailyChecks={totalDailyChecks}
-            todaysCompletedChecks={todaysCompletedChecks}
-            dailyStatusGridData={dailyStatusGridData}
+          items={items}
+          uploadLogs={uploadLogs}
+          totalDailyChecks={totalDailyChecks}
+          todaysCompletedChecks={todaysCompletedChecks}
+          dailyStatusGridData={dailyStatusGridData}
         />
       </div>
     </motion.div>
@@ -718,7 +718,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   const [previewDate, setPreviewDate] = useState<Date | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  const users = [...new Set(uploadLogs.map(log => log.username))];
+  const users = Array.from(new Set(uploadLogs.map(log => log.username)));
 
   const filteredLogs = uploadLogs.filter(log => {
     const logDate = new Date(log.timestamp);
@@ -810,27 +810,27 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
     <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
       <div className="mt-4">
         <Card className="mb-4">
-            <CardHeader>
-                <CardTitle>Today's Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="flex items-center gap-4">
-                    <Progress value={progressValue} className="w-full" />
-                    <span className="font-bold text-lg whitespace-nowrap">
-                        {todaysCompletedChecks} / {totalDailyChecks}
-                    </span>
-                </div>
-                <p className="text-sm text-muted-foreground mt-2">
-                    {Math.round(progressValue)}% of daily maintenance checks completed.
-                </p>
-            </CardContent>
+          <CardHeader>
+            <CardTitle>Today's Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-4">
+              <Progress value={progressValue} className="w-full" />
+              <span className="font-bold text-lg whitespace-nowrap">
+                {todaysCompletedChecks} / {totalDailyChecks}
+              </span>
+            </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              {Math.round(progressValue)}% of daily maintenance checks completed.
+            </p>
+          </CardContent>
         </Card>
 
         <div className="my-6">
-            <DailyStatusGrid
-                data={dailyStatusGridData}
-                onSlotClick={(log) => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`)}
-            />
+          <DailyStatusGrid
+            data={dailyStatusGridData}
+            onSlotClick={(log) => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`)}
+          />
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -868,11 +868,11 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                     if (earliestItemDate && dayDate < earliestItemDate) {
                       return (
                         <motion.div
-                            key={day}
-                            className="h-20 sm:h-24 flex flex-col items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-xs text-center p-1"
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: day * 0.02 }}
+                          key={day}
+                          className="h-20 sm:h-24 flex flex-col items-center justify-center rounded-md bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 text-xs text-center p-1"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          transition={{ delay: day * 0.02 }}
                         >
                           <div className="font-bold text-lg">{day}</div>
                           <div>N/A</div>
@@ -910,7 +910,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                       >
                         <div className="font-bold text-lg">{day}</div>
                         {totalChecks > 0 && (
-                           <div className="text-xs font-semibold">{completedCount}/{totalChecks}</div>
+                          <div className="text-xs font-semibold">{completedCount}/{totalChecks}</div>
                         )}
                       </motion.div>
                     );
@@ -926,7 +926,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                 <CardTitle>Image Upload Log</CardTitle>
                 <div className="flex items-center gap-2">
                   {exportDateRange && (
-                    <Button variant="outline" size="sm" onClick={() => setExportDateRange({from: undefined, to: undefined})}>
+                    <Button variant="outline" size="sm" onClick={() => setExportDateRange({ from: undefined, to: undefined })}>
                       Clear Date Filter
                     </Button>
                   )}
@@ -939,53 +939,53 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <Button
-                          id="date"
-                          variant={"outline"}
-                          className="w-full sm:w-auto justify-start text-left font-normal"
-                        >
-                          <CalendarIcon className="mr-2 h-4 w-4" />
-                          {exportDateRange?.from ? (
-                            exportDateRange.to ? (
-                              <>
-                                {format(exportDateRange.from, "LLL dd, y")} -{" "}
-                                {format(exportDateRange.to, "LLL dd, y")}
-                              </>
-                            ) : (
-                              format(exportDateRange.from, "LLL dd, y")
-                            )
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="date"
+                        variant={"outline"}
+                        className="w-full sm:w-auto justify-start text-left font-normal"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {exportDateRange?.from ? (
+                          exportDateRange.to ? (
+                            <>
+                              {format(exportDateRange.from, "LLL dd, y")} -{" "}
+                              {format(exportDateRange.to, "LLL dd, y")}
+                            </>
                           ) : (
-                            <span>Pick a date range</span>
-                          )}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          initialFocus
-                          mode="range"
-                          defaultMonth={exportDateRange?.from}
-                          selected={exportDateRange}
-                          onSelect={setExportDateRange}
-                          numberOfMonths={2}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Select value={selectedUser || ''} onValueChange={(value) => setSelectedUser(value)}>
-                        <SelectTrigger className="w-full sm:w-[180px]">
-                            <SelectValue placeholder="Filter by user" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {users.map(user => (
-                                <SelectItem key={user} value={user}>{user}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button onClick={handleExport} disabled={isExporting} className="w-full sm:w-auto">
-                      {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Export CSV
-                    </Button>
+                            format(exportDateRange.from, "LLL dd, y")
+                          )
+                        ) : (
+                          <span>Pick a date range</span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={exportDateRange?.from}
+                        selected={exportDateRange}
+                        onSelect={setExportDateRange}
+                        numberOfMonths={2}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <Select value={selectedUser || ''} onValueChange={(value) => setSelectedUser(value)}>
+                    <SelectTrigger className="w-full sm:w-[180px]">
+                      <SelectValue placeholder="Filter by user" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {users.map(user => (
+                        <SelectItem key={user} value={user}>{user}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button onClick={handleExport} disabled={isExporting} className="w-full sm:w-auto">
+                    {isExporting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Export CSV
+                  </Button>
                 </div>
                 <Table>
                   <TableHeader>
@@ -1077,13 +1077,13 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
               onSlotClick={(log) => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${log.filename}`)}
             />
             <div className="flex justify-end mt-4">
-                <Button onClick={() => {
-                    if (previewDate) {
-                        setExportDateRange({ from: previewDate, to: previewDate });
-                    }
-                    setActiveTab('upload-log');
-                    setPreviewDate(null);
-                }}>View Logs</Button>
+              <Button onClick={() => {
+                if (previewDate) {
+                  setExportDateRange({ from: previewDate, to: previewDate });
+                }
+                setActiveTab('upload-log');
+                setPreviewDate(null);
+              }}>View Logs</Button>
             </div>
           </DialogContent>
         </Dialog>
@@ -1093,76 +1093,76 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
 };
 
 const DailyStatusGrid: React.FC<{
-    data: ReturnType<typeof processDailyStatus>;
-    onSlotClick?: (log: Log) => void;
+  data: ReturnType<typeof processDailyStatus>;
+  onSlotClick?: (log: Log) => void;
 }> = ({ data, onSlotClick }) => {
-    if (data.length === 0) {
-        return (
-            <Card>
-                <CardContent className="p-6 text-center text-muted-foreground">
-                    No maintenance items with time slots are configured for today.
-                </CardContent>
-            </Card>
-        );
-    }
-
-    const statusStyles: { [key: string]: string } = {
-        completed: 'bg-green-500 text-white cursor-pointer hover:bg-green-600',
-        missed: 'bg-red-500 text-white',
-        active: 'bg-yellow-400 text-yellow-900',
-        pending: 'bg-blue-200 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300',
-    };
-
+  if (data.length === 0) {
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {data.map((item: any) => (
-                <motion.div key={item.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center">
-                                <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-                                {item.name}
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex flex-wrap gap-2">
-                                {item.slots.map((slot: any) => {
-                                    const isClickable = onSlotClick && slot.status === 'completed' && slot.log;
-                                    const slotElement = (
-                                        <div
-                                            className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusStyles[slot.status]} ${isClickable ? 'cursor-pointer' : ''}`}
-                                            onClick={() => isClickable && onSlotClick(slot.log)}
-                                        >
-                                            {slot.time}
-                                        </div>
-                                    );
-
-                                    return (
-                                        <TooltipProvider key={slot.time}>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    {slotElement}
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p><strong>Status:</strong> <span className="capitalize">{slot.status}</span></p>
-                                                    {slot.log && (
-                                                        <p><strong>Uploaded:</strong> {format(new Date(slot.log.timestamp), "HH:mm:ss")}</p>
-                                                    )}
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    )
-                                })}
-                                {item.slots.length === 0 && (
-                                    <p className="text-sm text-muted-foreground">No time slots configured.</p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </motion.div>
-            ))}
-        </div>
+      <Card>
+        <CardContent className="p-6 text-center text-muted-foreground">
+          No maintenance items with time slots are configured for today.
+        </CardContent>
+      </Card>
     );
+  }
+
+  const statusStyles: { [key: string]: string } = {
+    completed: 'bg-green-500 text-white cursor-pointer hover:bg-green-600',
+    missed: 'bg-red-500 text-white',
+    active: 'bg-yellow-400 text-yellow-900',
+    pending: 'bg-blue-200 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300',
+  };
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {data.map((item: any) => (
+        <motion.div key={item.id} layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+                {item.name}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {item.slots.map((slot: any) => {
+                  const isClickable = onSlotClick && slot.status === 'completed' && slot.log;
+                  const slotElement = (
+                    <div
+                      className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusStyles[slot.status]} ${isClickable ? 'cursor-pointer' : ''}`}
+                      onClick={() => isClickable && onSlotClick(slot.log)}
+                    >
+                      {slot.time}
+                    </div>
+                  );
+
+                  return (
+                    <TooltipProvider key={slot.time}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {slotElement}
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p><strong>Status:</strong> <span className="capitalize">{slot.status}</span></p>
+                          {slot.log && (
+                            <p><strong>Uploaded:</strong> {format(new Date(slot.log.timestamp), "HH:mm:ss")}</p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )
+                })}
+                {item.slots.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No time slots configured.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      ))}
+    </div>
+  );
 };
 
 interface OperatorViewProps extends ProgressProps {
@@ -1174,38 +1174,38 @@ interface OperatorViewProps extends ProgressProps {
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
 
-const TimeStatus: React.FC<{item: MaintenanceItem, serverTime: Date | null}> = ({ item, serverTime }) => {
-    if (!serverTime) return null;
+const TimeStatus: React.FC<{ item: MaintenanceItem, serverTime: Date | null }> = ({ item, serverTime }) => {
+  if (!serverTime) return null;
 
-    const { activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
+  const { activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
 
-    const activeCountdown = useCountdown(activeSlot?.end || null);
-    const nextCountdown = useCountdown(nextSlot?.start || null);
+  const activeCountdown = useCountdown(activeSlot?.end || null);
+  const nextCountdown = useCountdown(nextSlot?.start || null);
 
-    if (activeSlot) {
-        const isLowTime = (activeCountdown.minutes < 5 && activeCountdown.hours === 0 && activeCountdown.days === 0);
-        return (
-            <div className="text-sm text-center bg-blue-100 dark:bg-blue-900/50 p-2 rounded-md">
-                <p>Time slot <strong className="font-bold">{activeSlot.time}</strong> is active!</p>
-                <p className={`font-bold text-lg ${isLowTime ? 'text-red-500 animate-pulse' : 'text-blue-600 dark:text-blue-300'}`}>
-                    {String(activeCountdown.minutes).padStart(2, '0')}:{String(activeCountdown.seconds).padStart(2, '0')} remaining
-                </p>
-            </div>
-        )
-    }
+  if (activeSlot) {
+    const isLowTime = (activeCountdown.minutes < 5 && activeCountdown.hours === 0 && activeCountdown.days === 0);
+    return (
+      <div className="text-sm text-center bg-blue-100 dark:bg-blue-900/50 p-2 rounded-md">
+        <p>Time slot <strong className="font-bold">{activeSlot.time}</strong> is active!</p>
+        <p className={`font-bold text-lg ${isLowTime ? 'text-red-500 animate-pulse' : 'text-blue-600 dark:text-blue-300'}`}>
+          {String(activeCountdown.minutes).padStart(2, '0')}:{String(activeCountdown.seconds).padStart(2, '0')} remaining
+        </p>
+      </div>
+    )
+  }
 
-    if (nextSlot && nextSlot.start > serverTime) {
-        return (
-            <div className="text-sm text-center p-2">
-                <p>Next check at <strong className="font-bold">{nextSlot.time}</strong> in:</p>
-                <p className="font-bold text-lg text-muted-foreground">
-                    {String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')}
-                </p>
-            </div>
-        )
-    }
+  if (nextSlot && nextSlot.start > serverTime) {
+    return (
+      <div className="text-sm text-center p-2">
+        <p>Next check at <strong className="font-bold">{nextSlot.time}</strong> in:</p>
+        <p className="font-bold text-lg text-muted-foreground">
+          {String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')}
+        </p>
+      </div>
+    )
+  }
 
-    return <div className="text-sm text-center p-2 text-muted-foreground">No upcoming checks for today.</div>;
+  return <div className="text-sm text-center p-2 text-muted-foreground">No upcoming checks for today.</div>;
 }
 
 
@@ -1241,27 +1241,27 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
     if (!serverTime) return;
     const newStatuses: Record<string, Record<string, UploadStatus>> = {};
     items.forEach(item => {
-        const { allSlots } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
-        for (let i = 1; i <= item.quantity; i++) {
-            const uploadKey = `${item.name}-${i}`;
-            newStatuses[uploadKey] = {};
-            allSlots.forEach(slot => {
-                const hasLog = uploadLogs.some(log => {
-                    const logTime = new Date(log.timestamp);
-                    return log.itemName === item.name &&
-                           log.itemNumber === i.toString() &&
-                           logTime >= slot.start &&
-                           logTime <= slot.end;
-                });
-                if (hasLog) {
-                    newStatuses[uploadKey][slot.time] = 'success';
-                } else if (serverTime > slot.end) {
-                    newStatuses[uploadKey][slot.time] = 'missed';
-                } else {
-                    newStatuses[uploadKey][slot.time] = 'pending';
-                }
-            });
-        }
+      const { allSlots } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
+      for (let i = 1; i <= item.quantity; i++) {
+        const uploadKey = `${item.name}-${i}`;
+        newStatuses[uploadKey] = {};
+        allSlots.forEach(slot => {
+          const hasLog = uploadLogs.some(log => {
+            const logTime = new Date(log.timestamp);
+            return log.itemName === item.name &&
+              log.itemNumber === i.toString() &&
+              logTime >= slot.start &&
+              logTime <= slot.end;
+          });
+          if (hasLog) {
+            newStatuses[uploadKey][slot.time] = 'success';
+          } else if (serverTime > slot.end) {
+            newStatuses[uploadKey][slot.time] = 'missed';
+          } else {
+            newStatuses[uploadKey][slot.time] = 'pending';
+          }
+        });
+      }
     });
     setStatuses(newStatuses);
   }, [items, uploadLogs, serverTime]);
@@ -1273,11 +1273,11 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
 
     const uploadKey = `${itemName}-${itemNumber}`;
     setStatuses(prev => ({
-        ...prev,
-        [uploadKey]: {
-            ...prev[uploadKey],
-            [slotTime]: 'uploading'
-        }
+      ...prev,
+      [uploadKey]: {
+        ...prev[uploadKey],
+        [slotTime]: 'uploading'
+      }
     }));
 
     const formData = new FormData();
@@ -1296,21 +1296,21 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         const newLog = await response.json();
         toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
         setStatuses(prev => ({
-            ...prev,
-            [uploadKey]: {
-                ...prev[uploadKey],
-                [slotTime]: 'success'
-            }
+          ...prev,
+          [uploadKey]: {
+            ...prev[uploadKey],
+            [slotTime]: 'success'
+          }
         }));
         onUploadSuccess(newLog);
       } else {
         toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
         setStatuses(prev => ({
-            ...prev,
-            [uploadKey]: {
-                ...prev[uploadKey],
-                [slotTime]: 'error'
-            }
+          ...prev,
+          [uploadKey]: {
+            ...prev[uploadKey],
+            [slotTime]: 'error'
+          }
         }));
       }
     } catch (error) {
@@ -1318,8 +1318,8 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
       setStatuses(prev => ({
         ...prev,
         [uploadKey]: {
-            ...prev[uploadKey],
-            [slotTime]: 'error'
+          ...prev[uploadKey],
+          [slotTime]: 'error'
         }
       }));
     }
@@ -1354,15 +1354,15 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
 
       <Card className="mb-4">
         <CardHeader>
-            <CardTitle>Today's Progress</CardTitle>
+          <CardTitle>Today's Progress</CardTitle>
         </CardHeader>
         <CardContent>
-            <div className="flex items-center gap-4">
-                <Progress value={(totalDailyChecks > 0 ? (todaysCompletedChecks / totalDailyChecks) * 100 : 0)} className="w-full" />
-                <span className="font-bold text-lg whitespace-nowrap">
-                    {todaysCompletedChecks} / {totalDailyChecks}
-                </span>
-            </div>
+          <div className="flex items-center gap-4">
+            <Progress value={(totalDailyChecks > 0 ? (todaysCompletedChecks / totalDailyChecks) * 100 : 0)} className="w-full" />
+            <span className="font-bold text-lg whitespace-nowrap">
+              {todaysCompletedChecks} / {totalDailyChecks}
+            </span>
+          </div>
         </CardContent>
       </Card>
 
@@ -1396,16 +1396,16 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
               } else if (!activeSlot && !nextSlot) {
                 // Find last slot that is not completed
                 const lastUncompletedPastSlot = [...allSlots].reverse().find(s => {
-                    const now = serverTime;
-                    const hasLog = allLogsForToday.some(log => {
-                        const logTime = new Date(log.timestamp);
-                        return logTime >= s.start && logTime <= s.end;
-                    });
-                    return now > s.end && !hasLog;
+                  const now = serverTime;
+                  const hasLog = allLogsForToday.some(log => {
+                    const logTime = new Date(log.timestamp);
+                    return logTime >= s.start && logTime <= s.end;
+                  });
+                  return now > s.end && !hasLog;
                 });
-                if(lastUncompletedPastSlot) {
-                    relevantSlot = lastUncompletedPastSlot;
-                    displayMode = 'missed';
+                if (lastUncompletedPastSlot) {
+                  relevantSlot = lastUncompletedPastSlot;
+                  displayMode = 'missed';
                 }
               }
 
@@ -1424,7 +1424,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
               };
 
               const isButtonDisabled = displayMode !== 'active';
-              const currentStatusInfo = displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot.time}` } : statusInfo[status];
+              const currentStatusInfo = displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status];
               const CurrentIcon = currentStatusInfo.icon;
 
 
@@ -1442,50 +1442,50 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="flex flex-col items-center justify-center text-center">
-                        {displayMode === 'completed' ? (
-                            <>
-                                <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
-                                <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
-                            </>
-                        ) : relevantSlot ? (
-                            <>
-                                <div className="my-2">
-                                  <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
-                                  <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
-                                </div>
-                                {displayMode === 'active' && (
-                                    <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
-                                )}
-                                {displayMode === 'next' && (
-                                     <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
-                                )}
-                                <Input
-                                  type="file"
-                                  accept="image/*"
-                                  capture="environment"
-                                  onChange={(e) => handleFileChange(e, item.name, number, relevantSlot!.time)}
-                                  className="hidden"
-                                  id={`${uploadKey}-${relevantSlot!.time}`}
-                                  disabled={isButtonDisabled}
-                                />
-                                <Label htmlFor={`${uploadKey}-${relevantSlot!.time}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                                  <Button
-                                    asChild={false}
-                                    disabled={isButtonDisabled}
-                                    className="w-full"
-                                    onClick={() => {
-                                        if (!isButtonDisabled) {
-                                            document.getElementById(`${uploadKey}-${relevantSlot!.time}`)?.click();
-                                        }
-                                    }}
-                                  >
-                                    Upload Picture
-                                  </Button>
-                                </Label>
-                            </>
-                        ) : (
-                            <p>No checks scheduled for today.</p>
-                        )}
+                      {displayMode === 'completed' ? (
+                        <>
+                          <CurrentIcon className={`h-10 w-10 ${statusInfo.success.color}`} />
+                          <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
+                        </>
+                      ) : relevantSlot ? (
+                        <>
+                          <div className="my-2">
+                            <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
+                            <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
+                          </div>
+                          {displayMode === 'active' && (
+                            <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
+                          )}
+                          {displayMode === 'next' && (
+                            <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
+                          )}
+                          <Input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => handleFileChange(e, item.name, number, relevantSlot!.time)}
+                            className="hidden"
+                            id={`${uploadKey}-${relevantSlot!.time}`}
+                            disabled={isButtonDisabled}
+                          />
+                          <Label htmlFor={`${uploadKey}-${relevantSlot!.time}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                            <Button
+                              asChild={false}
+                              disabled={isButtonDisabled}
+                              className="w-full"
+                              onClick={() => {
+                                if (!isButtonDisabled) {
+                                  document.getElementById(`${uploadKey}-${relevantSlot!.time}`)?.click();
+                                }
+                              }}
+                            >
+                              Upload Picture
+                            </Button>
+                          </Label>
+                        </>
+                      ) : (
+                        <p>No checks scheduled for today.</p>
+                      )}
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -1623,8 +1623,8 @@ const MaintenancePage = () => {
   };
 
   const progressProps = {
-      totalDailyChecks,
-      todaysCompletedChecks
+    totalDailyChecks,
+    todaysCompletedChecks
   };
 
   return (
@@ -1646,11 +1646,11 @@ const MaintenancePage = () => {
       )}
       {currentUser.role === UserRole.OPERATOR && (
         <OperatorView
-            items={items}
-            uploadLogs={uploadLogs}
-            onUploadSuccess={handleUploadSuccess}
-            {...progressProps}
-            dailyStatusGridData={dailyStatusGridData}
+          items={items}
+          uploadLogs={uploadLogs}
+          onUploadSuccess={handleUploadSuccess}
+          {...progressProps}
+          dailyStatusGridData={dailyStatusGridData}
         />
       )}
     </div>
