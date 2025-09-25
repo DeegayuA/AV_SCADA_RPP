@@ -1500,18 +1500,21 @@ const MaintenancePage = () => {
   const currentUser = useAppStore((state) => state.currentUser);
 
   // State for header
-  const { connect: connectWebSocket, isConnected } = useWebSocket((message: MessageEvent) => {
-    try {
-        const data = JSON.parse(message.data);
-        if (data.type === 'esp32-status') {
-            setEsp32Status(data.payload.status);
-        } else if (data.type === 'esp32-raw-data') {
-            console.log("ESP32 Raw Data:", data.payload);
+  const { connect: connectWebSocket, isConnected, lastJsonMessage } = useWebSocket();
+
+  useEffect(() => {
+    if (lastJsonMessage) {
+      try {
+        if (lastJsonMessage.type === 'esp32-status') {
+          setEsp32Status(lastJsonMessage.payload.status);
+        } else if (lastJsonMessage.type === 'esp32-raw-data') {
+          console.log("ESP32 Raw Data:", lastJsonMessage.payload);
         }
-    } catch (error) {
+      } catch (error) {
         // This is expected for the main data broadcast
+      }
     }
-  });
+  }, [lastJsonMessage]);
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
   const [esp32Status, setEsp32Status] = useState<'connected' | 'disconnected'>('disconnected');
   const [currentTime, setCurrentTime] = useState<string>('');

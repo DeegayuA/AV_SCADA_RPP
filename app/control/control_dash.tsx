@@ -345,18 +345,17 @@ const UnifiedDashboardPage: React.FC = () => {
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
 
   // WebSocket connection via dedicated hook
-  const { sendJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket((message: MessageEvent) => {
-    try {
-        const data = JSON.parse(message.data);
-        if (data.type === 'esp32-status') {
-            setEsp32Status(data.payload.status);
-        } else if (data.type === 'esp32-raw-data') {
-            console.log("ESP32 Raw Data:", data.payload);
+  const { sendJsonMessage, lastJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
+
+  useEffect(() => {
+    if (lastJsonMessage) {
+        if (lastJsonMessage.type === 'esp32-status') {
+            setEsp32Status(lastJsonMessage.payload.status);
+        } else if (lastJsonMessage.type === 'esp32-raw-data') {
+            console.log("ESP32 Raw Data:", lastJsonMessage.payload);
         }
-    } catch (error) {
-        // This is expected for the main data broadcast
     }
-  });
+  }, [lastJsonMessage]);
 
   const currentUserRole = currentUser?.role;
 
