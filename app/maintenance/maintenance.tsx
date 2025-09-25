@@ -38,7 +38,7 @@ import { Slider } from "@/components/ui/slider";
 import { Dispatch, SetStateAction } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { format, isToday, getDaysInMonth, startOfMonth, endOfMonth } from "date-fns";
+import { format, isToday, getDaysInMonth, startOfMonth, endOfMonth, endOfDay } from "date-fns";
 import { Progress } from "@/components/ui/progress";
 import {
   Select,
@@ -718,7 +718,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   const [previewDate, setPreviewDate] = useState<Date | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  const users = Array.from(new Set(uploadLogs.map(log => log.username)));
+  const allUsers = Array.from(new Set(uploadLogs.map(log => log.username)));
 
   const filteredLogs = uploadLogs.filter(log => {
     const logDate = new Date(log.timestamp);
@@ -977,7 +977,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                       <SelectValue placeholder="Filter by user" />
                     </SelectTrigger>
                     <SelectContent>
-                      {users.map(user => (
+                      {allUsers.map(user => (
                         <SelectItem key={user} value={user}>{user}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1068,7 +1068,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
 
       {previewDate && (
         <Dialog open={!!previewDate} onOpenChange={() => setPreviewDate(null)}>
-          <DialogContent className="max-w-6xl">
+          <DialogContent className="max-w-screen-xl max-h-[80vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Daily Preview for {format(previewDate, "PPP")}</DialogTitle>
             </DialogHeader>
@@ -1079,7 +1079,8 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
             <div className="flex justify-end mt-4">
               <Button onClick={() => {
                 if (previewDate) {
-                  setExportDateRange({ from: previewDate, to: previewDate });
+                  const day = new Date(previewDate);
+                  setExportDateRange({ from: day, to: endOfDay(day) });
                 }
                 setActiveTab('upload-log');
                 setPreviewDate(null);
