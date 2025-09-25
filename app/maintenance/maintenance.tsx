@@ -67,7 +67,7 @@ interface Log {
   filename: string;
 }
 
-const useCountdown = (targetDate: Date | null) => {
+const useCountdown = (targetDate: Date | null, serverTime: Date | null) => {
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -76,27 +76,24 @@ const useCountdown = (targetDate: Date | null) => {
   });
 
   useEffect(() => {
-    if (!targetDate) return;
+    if (!targetDate || !serverTime) {
+      setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+      return;
+    }
 
-    const interval = setInterval(() => {
-      const now = new Date();
-      const difference = targetDate.getTime() - now.getTime();
+    const difference = targetDate.getTime() - serverTime.getTime();
 
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60),
-        });
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-        clearInterval(interval);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [targetDate]);
+    if (difference > 0) {
+      setTimeLeft({
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      });
+    } else {
+      setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+    }
+  }, [targetDate, serverTime]);
 
   return timeLeft;
 };
@@ -1180,8 +1177,8 @@ const TimeStatus: React.FC<{ item: MaintenanceItem, serverTime: Date | null }> =
     ? getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime)
     : { activeSlot: null, nextSlot: null };
 
-  const activeCountdown = useCountdown(activeSlot?.end || null);
-  const nextCountdown = useCountdown(nextSlot?.start || null);
+  const activeCountdown = useCountdown(activeSlot?.end || null, serverTime);
+  const nextCountdown = useCountdown(nextSlot?.start || null, serverTime);
 
   if (!serverTime) {
     return null;
@@ -1225,8 +1222,8 @@ const OperatorViewItem: React.FC<{
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
 
   // Call hooks unconditionally at the top level
-  const countdown = useCountdown(activeSlot?.end ?? null);
-  const nextCountdown = useCountdown(nextSlot?.start ?? null);
+  const countdown = useCountdown(activeSlot?.end ?? null, serverTime);
+  const nextCountdown = useCountdown(nextSlot?.start ?? null, serverTime);
 
   let relevantSlot = activeSlot;
   let displayMode: 'active' | 'next' | 'missed' | 'completed' | 'none' = 'none';
