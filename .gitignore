@@ -46,12 +46,6 @@ next-env.d.ts
 /dist_electron
 *.tmp
 /user-data
-config/constants.ts
-config/dataPoints.ts
-config/desiredDataPointsConfig.ts
-config/constants.ts
-config/constants.ts
-config/constants.ts
 /backups
 system.log.json
 
