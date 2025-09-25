@@ -1332,13 +1332,13 @@ const OperatorViewItem: React.FC<{
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center text-center">
           {hasLogForActiveSlot ? (
-            <div>
-              <CheckCircle className={`h-10 w-10 ${statusInfo.success.color}`} />
+            <div className="flex flex-col items-center">
+              <CheckCircle className={`h-10 w-10  ${statusInfo.success.color}`} />
               <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>Uploaded</p>
               {nextSlot && (
-                <div className="mt-2">
-                  <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
-                </div>
+              <div className="mt-2">
+                <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
+              </div>
               )}
             </div>
           ) : displayMode === 'completed' ? (
