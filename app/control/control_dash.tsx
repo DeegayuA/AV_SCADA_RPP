@@ -249,7 +249,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
           <div className="flex items-center gap-2">
             <Clock className="h-3 w-3" />
             <span>{currentTime}</span>
-            {isConnected ? (
+            {/* {isConnected ? (
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -267,7 +267,7 @@ const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo
               <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
                 (reconnect)
               </Button>
-            )}
+            )} */}
           </div>
           <span className='font-mono'>{version || '?.?.?'}</span>
         </motion.div>
