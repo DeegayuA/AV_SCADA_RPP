@@ -1246,10 +1246,10 @@ const OperatorViewItem: React.FC<{
   } else if (!activeSlot && !nextSlot) {
     const lastUncompletedPastSlot = [...allSlots].reverse().find(s => {
       const now = serverTime;
-      const hasLog = allLogsForToday.some(log => {
+      const hasLog = itemLogsForToday.some(log => {
         const logTime = new Date(log.timestamp);
         return logTime >= s.start && logTime <= s.end;
-      });
+      });  
       return now > s.end && !hasLog;
     });
     if (lastUncompletedPastSlot) {
@@ -1304,7 +1304,6 @@ const OperatorViewItem: React.FC<{
   const hasLogForActiveSlot = activeSlot ? completedSlots.some(s => s.time === activeSlot.time) : false;
 
   const uploadKey = `${item.name}-${number}`;
-  const status = relevantSlot ? 'pending' : 'pending';
 
   const statusInfo = {
     pending: { icon: Clock, color: 'text-gray-500', text: `Next check at ${relevantSlot?.time}` },
@@ -1315,7 +1314,7 @@ const OperatorViewItem: React.FC<{
   };
 
   const isButtonDisabled = displayMode !== 'active' || isSubmitting || hasLogForActiveSlot;
-  const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo[status]);
+  const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo.pending);
   const CurrentIcon = currentStatusInfo.icon;
 
   return (
@@ -1351,7 +1350,7 @@ const OperatorViewItem: React.FC<{
             <>
               <div className="my-2">
                 <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${status === 'uploading' ? 'animate-spin' : ''}`} />
-                <p className={`mt-1 font-semibold ${currentStatusInfo.color}`}>{currentStatusInfo.text}</p>
+                <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${isSubmitting ? 'animate-spin' : ''}`} />
               </div>
               {displayMode === 'active' && (
                 <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
