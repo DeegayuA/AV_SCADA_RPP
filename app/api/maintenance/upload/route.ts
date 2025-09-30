@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     await fs.mkdir(previewDir, { recursive: true });
     await fs.mkdir(logDir, { recursive: true });
 
-    const filename = `${PLANT_LOCATION}_${itemName.replace(/ /g, '_')}_${itemNumber}_${dateTimeString}_${username}.jpg`;
+    const filename = `${PLANT_LOCATION}_${itemName.replace(/ /g, '_')}_${itemNumber.replace(/ /g, '_')}_${dateTimeString}_${username.replace(/ /g, '_')}.jpg`;
 
     const fullResPath = path.join(fullResDir, filename);
     const previewPath = path.join(previewDir, filename);
