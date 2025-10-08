@@ -40,6 +40,10 @@ export async function POST(request: Request) {
   try {
     const backupData = await request.json();
 
+    if (!backupData.maintenanceData) {
+      backupData.maintenanceData = {};
+    }
+
     const maintenanceFiles = await getMaintenanceFiles();
     backupData.maintenanceData.logs = maintenanceFiles.logs;
     backupData.maintenanceData.images = maintenanceFiles.images;
