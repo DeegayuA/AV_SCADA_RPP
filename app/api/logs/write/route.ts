@@ -7,27 +7,46 @@ const SYSTEM_LOG_FILE = path.resolve(process.cwd(), 'system.log.json');
 const ERROR_LOG_FILE = path.resolve(process.cwd(), 'error.log.json');
 
 async function appendToLog(filePath: string, entry: ActivityLogEntry) {
-  let fileHandle;
+  let logs: ActivityLogEntry[] = [];
   try {
-    fileHandle = await fs.open(filePath, 'r+');
-    const data = await fileHandle.readFile('utf-8');
-    const logs: ActivityLogEntry[] = data ? JSON.parse(data) : [];
-    logs.push(entry);
-    await fileHandle.truncate();
-    await fileHandle.write(JSON.stringify(logs, null, 2), 0, 'utf-8');
-  } catch (error: any) {
-    if (error.code === 'ENOENT') {
-      // File doesn't exist, create it with the first log
-      try {
-        await fs.writeFile(filePath, JSON.stringify([entry], null, 2));
-      } catch (writeError) {
-        console.error(`Error creating log file ${filePath}:`, writeError);
+    const data = await fs.readFile(filePath, 'utf-8');
+    try {
+      logs = JSON.parse(data);
+      if (!Array.isArray(logs)) {
+        throw new SyntaxError("Log file content is not an array.");
       }
-    } else {
-      console.error(`Error writing to log file ${filePath}:`, error);
+    } catch (parseError) {
+      if (parseError instanceof SyntaxError) {
+        console.error(`Log file ${filePath} is corrupted. Backing it up and creating a new one.`);
+        const backupPath = `${filePath}.corrupted-${Date.now()}`;
+        try {
+          await fs.rename(filePath, backupPath);
+        } catch (renameError) {
+          console.error(`Could not rename corrupted log file ${filePath}:`, renameError);
+        }
+        // Start with a fresh log array
+        logs = [];
+      } else {
+        // Re-throw other parsing errors
+        throw parseError;
+      }
     }
-  } finally {
-    await fileHandle?.close();
+  } catch (readError: any) {
+    // If the file doesn't exist, it's not an error. `logs` is already `[]`.
+    if (readError.code !== 'ENOENT') {
+      console.error(`Failed to read log file ${filePath}:`, readError);
+      // If we can't read the file for unexpected reasons, don't proceed.
+      return;
+    }
+  }
+
+  logs.push(entry);
+
+  try {
+    // Write the updated logs back to the file
+    await fs.writeFile(filePath, JSON.stringify(logs, null, 2));
+  } catch (writeError) {
+    console.error(`Failed to write to log file ${filePath}:`, writeError);
   }
 }
 
