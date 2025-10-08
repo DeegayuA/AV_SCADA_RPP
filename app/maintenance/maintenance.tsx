@@ -826,7 +826,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
         <div className="my-6">
           <DailyStatusGrid
             data={dailyStatusGridData}
-            onSlotClick={(log) => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
+            onSlotClick={(log) => handleStatusClick(`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
           />
         </div>
 
@@ -1009,10 +1009,10 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                         <TableCell>{log.username}</TableCell>
                         <TableCell>
                           <img
-                            src={`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`}
+                            src={`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`}
                             alt="thumbnail"
                             className="w-16 h-16 object-cover cursor-pointer rounded-md border"
-                            onClick={() => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
+                            onClick={() => handleStatusClick(`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
                           />
                         </TableCell>
                       </motion.tr>
@@ -1074,7 +1074,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
             </DialogHeader>
             <DailyStatusGrid
               data={processDailyStatus(items, uploadLogs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === format(previewDate, 'yyyy-MM-dd')), previewDate)}
-              onSlotClick={(log) => handleStatusClick(`/maintenance_image_preview/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
+              onSlotClick={(log) => handleStatusClick(`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
             />
             <div className="flex justify-end mt-4">
               <Button onClick={() => {
