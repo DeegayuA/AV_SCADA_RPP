@@ -76,8 +76,8 @@ export const getWebSocketUrl = async (): Promise<string> => {
 
 // --- Other Application Constants ---
 
-// export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
-// export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.178.74:4840";
+export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.0.0:4840";
+export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://0.0.0.0:4840";
 export const VERSION = "- Release v2025.10.09 • 08:30 (GMT+5:30)";
 export const PLANT_NAME = "Dakma ";
 export const PLANT_LOCATION = "Matara, Sri Lanka";
