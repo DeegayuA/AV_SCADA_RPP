@@ -6,7 +6,7 @@ import logo2 from "@/av_logo.svg";
 // Base configuration
 export const WS_PORT = 2001;
 export const WS_API_PATH = "/api/opcua";
-export const LOCAL_STORAGE_KEY_PREFIX = "ranna_2mw_";
+export const LOCAL_STORAGE_KEY_PREFIX = "Mathara_Dakma_ModubusDevice_";
 export const WEBSOCKET_CUSTOM_URL_KEY = `${LOCAL_STORAGE_KEY_PREFIX}custom_websocket_url`;
 
 /**
@@ -76,17 +76,17 @@ export const getWebSocketUrl = async (): Promise<string> => {
 
 // --- Other Application Constants ---
 
-export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
-export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.178.74:4840";
-export const VERSION = "- Release v2025.08.29 • 08:30 (GMT+5:30)";
-export const PLANT_NAME = "Colombo Office Mini Grid";
-export const PLANT_LOCATION = "Athurugiriya, Sri Lanka";
-export const PLANT_TYPE = "Mini Grid";
-export const PLANT_CAPACITY = "25kW";
-export const PLANT_CAPACITY_WATTS = 25000;
+// export const OPC_UA_ENDPOINT_OFFLINE = "opc.tcp://192.168.1.2:4840";
+// export const OPC_UA_ENDPOINT_ONLINE = "opc.tcp://100.91.178.74:4840";
+export const VERSION = "- Release v2025.10.09 • 08:30 (GMT+5:30)";
+export const PLANT_NAME = "Dakma ";
+export const PLANT_LOCATION = "Matara, Sri Lanka";
+export const PLANT_TYPE = "Solar";
+export const PLANT_CAPACITY = "150kW";
+export const PLANT_CAPACITY_WATTS = 1500000;
 
-export const APP_NAME = "Colombo Office Mini Grid";
-export const APP_BASE_URL = "https://av-mini-grid-offline-dashboard.vercel.app";
+export const APP_NAME = "Dakma Modubus Device";
+export const APP_BASE_URL = "dakmaav.vercel.app";
 export const APP_URL = "https://yourwebsite.com";
 export const APP_KEYWORDS = "solar, monitoring, control, energy, management";
 export const APP_DESCRIPTION = "A web-based plant monitoring system for real-time data visualization and control.";
@@ -106,10 +106,7 @@ export type TimeScale = 'day' | '6h' | '1h' | '30m' | '5m' | '1m';
 export const USER = "viewer";
 
 export const AVAILABLE_SLD_LAYOUT_IDS: string[] = [
-    'ranna_main_sld',
-    'Mini_Grid_SLD',
-    'Ranna_PLC',
-    'Mini-Grid',
+    'Dakma_SLD',
     'weather',
     'misc1',
     'misc2',
