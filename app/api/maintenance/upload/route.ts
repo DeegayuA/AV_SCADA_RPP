@@ -31,6 +31,9 @@ export async function POST(request: Request) {
     const itemName = formData.get('itemName') as string;
     const itemNumber = formData.get('itemNumber') as string;
     const username = formData.get('username') as string;
+    const deviceId = formData.get('deviceId') as string;
+    const tags = formData.get('tags') as string;
+    const noteText = formData.get('noteText') as string;
 
     if (!file) {
       return NextResponse.json({ message: 'No file found.' }, { status: 400 });
@@ -75,6 +78,22 @@ export async function POST(request: Request) {
 
     const encryptedLogData = encrypt(JSON.stringify(logData), encryptionKey);
     await fs.appendFile(logFilePath, encryptedLogData + '\n');
+
+    if (tags || noteText) {
+      const noteLogFilePath = path.join(logDir, `${dateString}.notes.log`);
+      const noteData = {
+        id: crypto.randomUUID(),
+        timestamp: date.toISOString(),
+        deviceId: deviceId,
+        itemNumber: parseInt(itemNumber, 10),
+        tags: tags ? tags.split(',') : [],
+        text: noteText,
+        author: username,
+        imageFilename: filename,
+      };
+      const encryptedNoteData = encrypt(JSON.stringify(noteData), encryptionKey);
+      await fs.appendFile(noteLogFilePath, encryptedNoteData + '\n');
+    }
 
     return NextResponse.json({ message: 'File uploaded successfully.', filename });
   } catch (error) {

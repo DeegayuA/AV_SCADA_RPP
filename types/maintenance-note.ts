@@ -6,4 +6,5 @@ export interface MaintenanceNote {
   tags: string[];
   text?: string;
   author: string;
+  imageFilename?: string;
 }

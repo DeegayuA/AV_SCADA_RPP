@@ -60,7 +60,7 @@ import { DateRange } from "react-day-picker";
 import { saveAs } from "file-saver";
 import { MaintenanceNotesLog } from '@/components/maintenance/MaintenanceNotesLog';
 import { MaintenanceNote } from '@/types/maintenance-note';
-import { MaintenanceNoteForm } from '@/components/maintenance/MaintenanceNoteForm';
+import { UploadNoteDialog } from '@/components/maintenance/UploadNoteDialog';
 
 interface Log {
   timestamp: string;
@@ -1191,7 +1191,6 @@ interface OperatorViewProps extends ProgressProps {
   onUploadSuccess: (log: Log) => void;
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
   maintenanceNotes: MaintenanceNote[];
-  onNoteSubmitted: (note: MaintenanceNote) => void;
 }
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
@@ -1241,8 +1240,7 @@ const OperatorViewItem: React.FC<{
   serverTime: Date;
   uploadLogs: Log[];
   onUploadSuccess: (log: Log) => void;
-  onServerTimeUpdate: (time: Date) => void;
-}> = ({ item, number, serverTime, uploadLogs, onUploadSuccess, onServerTimeUpdate }) => {
+}> = ({ item, number, serverTime, uploadLogs, onUploadSuccess }) => {
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const currentUser = useAppStore((state) => state.currentUser);
@@ -1280,48 +1278,6 @@ const OperatorViewItem: React.FC<{
     }
   }
 
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, itemName: string, itemNumber: number) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsSubmitting(true);
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('itemName', itemName);
-    formData.append('itemNumber', itemNumber.toString());
-    formData.append('username', currentUser?.name || 'unknown');
-
-    try {
-      const response = await fetch('/api/maintenance/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        const newLog = await response.json();
-        toast.success(`Successfully uploaded image for ${itemName} #${itemNumber}`);
-        
-        // Update the upload logs immediately
-        onUploadSuccess(newLog);
-        
-        // Update server time to trigger re-calculation of time slots and status
-        try {
-          const timeResponse = await fetch('/api/time');
-          const timeData = await timeResponse.json();
-          onServerTimeUpdate(new Date(timeData.time));
-        } catch (error) {
-          console.error('Failed to update server time:', error);
-        }
-      } else {
-        toast.error(`Failed to upload image for ${itemName} #${itemNumber}`);
-      }
-    } catch (error) {
-      toast.error('An error occurred while uploading the image.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   const completedSlots = allSlots.filter(slot => {
     return itemLogsForToday.some(log => {
@@ -1399,20 +1355,11 @@ const OperatorViewItem: React.FC<{
                 id={`${uploadKey}-${relevantSlot!.time}`}
                 disabled={isButtonDisabled}
               />
-              <Label htmlFor={`${uploadKey}-${relevantSlot!.time}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
-                <Button
-                  asChild={false}
-                  disabled={isButtonDisabled}
-                  className="w-full"
-                  onClick={() => {
-                    if (!isButtonDisabled) {
-                      document.getElementById(`${uploadKey}-${relevantSlot!.time}`)?.click();
-                    }
-                  }}
-                >
-                  {isSubmitting ? 'Uploading...' : 'Upload Picture'}
-                </Button>
-              </Label>
+              <UploadNoteDialog
+                item={item}
+                itemNumber={number}
+                onUploadSuccess={() => window.location.reload()}
+              />
             </>
           ) : (
             <p>No checks scheduled for today.</p>
@@ -1423,7 +1370,7 @@ const OperatorViewItem: React.FC<{
   );
 };
 
-const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, onNoteSubmitted }) => {
+const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
   const [showInstructions, setShowInstructions] = useState(true);
@@ -1502,7 +1449,6 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                   serverTime={serverTime}
                   uploadLogs={uploadLogs}
                   onUploadSuccess={onUploadSuccess}
-                  onServerTimeUpdate={setServerTime}
                 />
               );
             })
@@ -1510,14 +1456,6 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
         </div>
       )}
 
-      <div className="mt-8">
-        <h2 className="text-2xl font-bold mb-4">Add Maintenance Note</h2>
-        <Card>
-          <CardContent className="p-6">
-            <MaintenanceNoteForm items={items} onNoteSubmitted={onNoteSubmitted} />
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 };
@@ -1642,9 +1580,6 @@ const MaintenancePage = () => {
     setUploadLogs(prevLogs => [...prevLogs, newLog]);
   };
 
-  const handleNoteSubmitted = (note: MaintenanceNote) => {
-    setMaintenanceNotes(prevNotes => [...prevNotes, note]);
-  };
 
   const dailyStatusGridData = processDailyStatus(items, uploadLogs, serverTime);
   const totalDailyChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
@@ -1690,7 +1625,6 @@ const MaintenancePage = () => {
           {...progressProps}
           dailyStatusGridData={dailyStatusGridData}
           maintenanceNotes={maintenanceNotes}
-          onNoteSubmitted={handleNoteSubmitted}
         />
       )}
     </div>

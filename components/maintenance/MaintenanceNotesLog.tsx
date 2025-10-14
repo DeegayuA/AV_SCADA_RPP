@@ -58,7 +58,7 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
 
   const exportToCSV = () => {
     const csvRows = [
-      ['Timestamp', 'Device', 'Item #', 'Tags', 'Note', 'Author'],
+      ['Timestamp', 'Device', 'Item #', 'Tags', 'Note', 'Author', 'Image Filename'],
       ...filteredNotes.map(note => [
         format(new Date(note.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         getDeviceName(note.deviceId),
@@ -66,6 +66,7 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
         note.tags.join(', '),
         note.text || '',
         note.author,
+        note.imageFilename || '',
       ].map(field => `"${field.replace(/"/g, '""')}"`).join(','))
     ];
 
@@ -79,28 +80,32 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
   return (
     <div>
       <div className="flex items-center gap-4 mb-4">
-        <Select onValueChange={setDeviceFilter} value={deviceFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by device" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Devices</SelectItem>
-            {items.map(item => (
-              <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select onValueChange={setTagFilter} value={tagFilter}>
-          <SelectTrigger>
-            <SelectValue placeholder="Filter by tag" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="">All Tags</SelectItem>
-            {allTags.map(tag => (
-              <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          <Select onValueChange={setDeviceFilter} value={deviceFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by device" />
+            </SelectTrigger>
+            <SelectContent>
+              {items.map(item => (
+                <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {deviceFilter && <Button variant="ghost" onClick={() => setDeviceFilter('')}>Clear</Button>}
+        </div>
+        <div className="flex items-center gap-2">
+          <Select onValueChange={setTagFilter} value={tagFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by tag" />
+            </SelectTrigger>
+            <SelectContent>
+              {allTags.map(tag => (
+                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {tagFilter && <Button variant="ghost" onClick={() => setTagFilter('')}>Clear</Button>}
+        </div>
         <Button onClick={exportToCSV}>Export to CSV</Button>
       </div>
       <Table>
@@ -111,6 +116,7 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
             <TableHead>Tags</TableHead>
             <TableHead>Note</TableHead>
             <TableHead>Author</TableHead>
+              <TableHead>Image</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -121,6 +127,16 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
               <TableCell>{note.tags.join(', ')}</TableCell>
               <TableCell>{note.text}</TableCell>
               <TableCell>{note.author}</TableCell>
+                <TableCell>
+                  {note.imageFilename && (
+                    <img
+                      src={`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`}
+                      alt="thumbnail"
+                      className="w-16 h-16 object-cover cursor-pointer rounded-md border"
+                      onClick={() => window.open(`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`, '_blank')}
+                    />
+                  )}
+                </TableCell>
             </TableRow>
           ))}
         </TableBody>
