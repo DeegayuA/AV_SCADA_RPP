@@ -99,7 +99,7 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
               <SelectValue placeholder="Filter by tag" />
             </SelectTrigger>
             <SelectContent>
-              {allTags.map(tag => (
+              {allTags.filter(tag => tag).map(tag => (
                 <SelectItem key={tag} value={tag}>{tag}</SelectItem>
               ))}
             </SelectContent>

@@ -17,13 +17,15 @@ import { MaintenanceItem } from '@/types/maintenance';
 import { useAppStore } from '@/stores/appStore';
 import { Combobox } from '@/components/ui/combobox';
 
-interface UploadNoteDialogProps {
-  item: MaintenanceItem;
-  itemNumber: number;
-  onUploadSuccess: () => void;
+interface NoteDialogProps {
+  item?: MaintenanceItem;
+  itemNumber?: number;
+  isScheduledCheck: boolean;
+  onNoteSubmitted: () => void;
 }
 
-export const UploadNoteDialog: React.FC<UploadNoteDialogProps> = ({ item, itemNumber, onUploadSuccess }) => {
+export const NoteDialog: React.FC<NoteDialogProps> = ({ item, itemNumber, isScheduledCheck, onNoteSubmitted }) => {
+  const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [tags, setTags] = useState<string[]>([]);
   const [text, setText] = useState('');
@@ -69,47 +71,51 @@ export const UploadNoteDialog: React.FC<UploadNoteDialogProps> = ({ item, itemNu
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) {
-      toast.error("Please select a file to upload.");
+    if (isScheduledCheck && !file) {
+      toast.error("An image is required for scheduled checks.");
       return;
     }
     setIsSubmitting(true);
 
     const formData = new FormData();
-    formData.append('file', file);
-    formData.append('itemName', item.name);
-    formData.append('itemNumber', itemNumber.toString());
+    if (file) {
+      formData.append('file', file);
+    }
+    formData.append('itemName', item?.name || 'Ad-hoc Note');
+    formData.append('itemNumber', (itemNumber || 0).toString());
     formData.append('username', currentUser?.name || 'unknown');
-    formData.append('deviceId', item.id);
+    formData.append('deviceId', item?.id || 'adhoc');
     formData.append('tags', tags.join(','));
-    formData.append('noteText', text);
+    formData.append('text', text);
+    formData.append('isScheduledCheck', isScheduledCheck.toString());
 
     try {
-      const response = await fetch('/api/maintenance/upload', {
+      const response = await fetch('/api/maintenance/notes', {
         method: 'POST',
         body: formData,
       });
       if (response.ok) {
-        toast.success("File uploaded successfully.");
-        onUploadSuccess();
+        toast.success("Note submitted successfully.");
+        onNoteSubmitted();
+        setOpen(false);
       } else {
-        toast.error("Failed to upload file.");
+        toast.error("Failed to submit note.");
       }
     } catch (error) {
-      toast.error("An error occurred while uploading the file.");
+      toast.error("An error occurred while submitting the note.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Dialog>
+    <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className="w-full">Upload Picture</Button>
+        <Button className={isScheduledCheck ? "w-full" : ""}>{isScheduledCheck ? 'Upload Picture' : 'Add Maintenance Note'}</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Upload Picture and Add Note for {item.name} #{itemNumber}</DialogTitle>
+          <DialogTitle>{isScheduledCheck ? `Upload for ${item?.name} #${itemNumber}` : 'Add a New Maintenance Note'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

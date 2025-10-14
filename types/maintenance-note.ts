@@ -7,4 +7,5 @@ export interface MaintenanceNote {
   text?: string;
   author: string;
   imageFilename?: string;
+  isScheduledCheck: boolean;
 }

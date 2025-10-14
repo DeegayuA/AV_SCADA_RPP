@@ -60,15 +60,8 @@ import { DateRange } from "react-day-picker";
 import { saveAs } from "file-saver";
 import { MaintenanceNotesLog } from '@/components/maintenance/MaintenanceNotesLog';
 import { MaintenanceNote } from '@/types/maintenance-note';
-import { UploadNoteDialog } from '@/components/maintenance/UploadNoteDialog';
+import { NoteDialog } from '@/components/maintenance/NoteDialog';
 
-interface Log {
-  timestamp: string;
-  itemName: string;
-  itemNumber: string;
-  username: string;
-  filename: string;
-}
 
 const useCountdown = (targetDate: Date | null, serverTime: Date | null) => {
   const [timeLeft, setTimeLeft] = useState({
@@ -132,13 +125,13 @@ const getTimeSlotInfo = (timeFrames: string, timeWindow: number, serverTime: Dat
 
 const processDailyStatus = (
   items: MaintenanceItem[],
-  uploadLogs: Log[],
+  maintenanceNotes: MaintenanceNote[],
   serverTime: Date | null
 ) => {
   if (!serverTime) return [];
 
   const now = serverTime;
-  const dailyLogs = uploadLogs;
+  const dailyNotes = maintenanceNotes.filter(note => note.isScheduledCheck);
 
   return items.flatMap(item =>
     Array.from({ length: item.quantity }, (_, i) => {
@@ -160,16 +153,17 @@ const processDailyStatus = (
         const slotEnd = new Date(now);
         slotEnd.setHours(slotHour, halfWindow, 0, 0);
 
-        const logInSlot = dailyLogs.find(log => {
-          const logTime = new Date(log.timestamp);
-          return log.itemName === item.name &&
-            log.itemNumber === itemNumber.toString() &&
-            logTime >= slotStart &&
-            logTime <= slotEnd;
+        const noteInSlot = dailyNotes.find(note => {
+          const noteTime = new Date(note.timestamp);
+          const item = items.find(i => i.id === note.deviceId);
+          return item?.name === item.name &&
+            note.itemNumber === itemNumber &&
+            noteTime >= slotStart &&
+            noteTime <= slotEnd;
         });
 
         let status: 'completed' | 'missed' | 'pending' | 'active' = 'pending';
-        if (logInSlot) {
+        if (noteInSlot) {
           status = 'completed';
         } else if (now >= slotStart && now <= slotEnd) {
           status = 'active';
@@ -180,7 +174,7 @@ const processDailyStatus = (
         return {
           time: slot,
           status,
-          log: logInSlot || null
+          note: noteInSlot || null
         };
       });
 
@@ -273,7 +267,6 @@ interface ProgressProps {
 
 interface AdminStatusViewProps extends ProgressProps {
   items: MaintenanceItem[];
-  uploadLogs: Log[];
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
   maintenanceNotes: MaintenanceNote[];
 }
@@ -281,18 +274,16 @@ interface AdminStatusViewProps extends ProgressProps {
 interface AdminViewProps extends ProgressProps {
   items: MaintenanceItem[];
   setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
-  uploadLogs: Log[];
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
   maintenanceNotes: MaintenanceNote[];
 }
 
-const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
+const ViewerView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
       <AdminStatusView
         items={items}
-        uploadLogs={uploadLogs}
         totalDailyChecks={totalDailyChecks}
         todaysCompletedChecks={todaysCompletedChecks}
         dailyStatusGridData={dailyStatusGridData}
@@ -658,7 +649,7 @@ const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items
   );
 };
 
-const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
   const currentUser = useAppStore((state) => state.currentUser);
   const [showHelp, setShowHelp] = useState(true);
 
@@ -709,7 +700,6 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, tota
 const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [monthlyStatusData, setMonthlyStatusData] = useState<Log[]>([]);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [exportDateRange, setExportDateRange] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -722,12 +712,12 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
   const [previewDate, setPreviewDate] = useState<Date | null>(null);
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  const allUsers = Array.from(new Set(uploadLogs.map(log => log.username)));
+  const allUsers = Array.from(new Set(maintenanceNotes.map(note => note.author)));
 
-  const filteredLogs = uploadLogs.filter(log => {
-    const logDate = new Date(log.timestamp);
+  const filteredLogs = maintenanceNotes.filter(note => {
+    const logDate = new Date(note.timestamp);
     const isDateMatch = exportDateRange?.from && exportDateRange?.to ? (logDate >= exportDateRange.from && logDate <= exportDateRange.to) : true;
-    const isUserMatch = selectedUser ? log.username === selectedUser : true;
+    const isUserMatch = selectedUser ? note.author === selectedUser : true;
     return isDateMatch && isUserMatch;
   });
 
@@ -735,21 +725,6 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
     (logCurrentPage - 1) * logPageSize,
     logCurrentPage * logPageSize
   );
-
-  useEffect(() => {
-    const fetchMonthlyStatus = async () => {
-      try {
-        const response = await fetch(`/api/maintenance/status?month=${format(currentMonth, 'yyyy-MM')}`);
-        if (response.ok) {
-          const data = await response.json();
-          setMonthlyStatusData(data);
-        }
-      } catch (error) {
-        toast.error('Failed to fetch monthly maintenance status.');
-      }
-    };
-    fetchMonthlyStatus();
-  }, [currentMonth, items, uploadLogs]);
 
   const handleExport = async () => {
     if (!exportDateRange?.from || !exportDateRange?.to) {
@@ -793,12 +768,15 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
     }
   };
 
-  const completedDays = monthlyStatusData.reduce((acc: { [key: string]: Set<string> }, log) => {
-    const date = format(new Date(log.timestamp), 'yyyy-MM-dd');
+  const completedDays = maintenanceNotes.filter(note => note.isScheduledCheck).reduce((acc: { [key: string]: Set<string> }, note) => {
+    const date = format(new Date(note.timestamp), 'yyyy-MM-dd');
     if (!acc[date]) {
       acc[date] = new Set();
     }
-    acc[date].add(`${log.itemName}-${log.itemNumber}`);
+    const item = items.find(i => i.id === note.deviceId);
+    if (item) {
+      acc[date].add(`${item.name}-${note.itemNumber}`);
+    }
     return acc;
   }, {});
 
@@ -833,7 +811,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
         <div className="my-6">
           <DailyStatusGrid
             data={dailyStatusGridData}
-            onSlotClick={(log) => handleStatusClick(`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
+            onSlotClick={(note) => handleStatusClick(`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`)}
           />
         </div>
 
@@ -1005,23 +983,25 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedLogs.map((log, index) => (
+                    {paginatedLogs.map((note, index) => (
                       <motion.tr
                         key={index}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: index * 0.05 }}
                       >
-                        <TableCell>{format(new Date(log.timestamp), "yyyy-MM-dd HH:mm:ss")}</TableCell>
-                        <TableCell>{log.itemName} #{log.itemNumber}</TableCell>
-                        <TableCell>{log.username}</TableCell>
+                        <TableCell>{format(new Date(note.timestamp), "yyyy-MM-dd HH:mm:ss")}</TableCell>
+                        <TableCell>{items.find(item => item.id === note.deviceId)?.name} #{note.itemNumber}</TableCell>
+                        <TableCell>{note.author}</TableCell>
                         <TableCell>
-                          <img
-                            src={`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`}
-                            alt="thumbnail"
-                            className="w-16 h-16 object-cover cursor-pointer rounded-md border"
-                            onClick={() => handleStatusClick(`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
-                          />
+                          {note.imageFilename && (
+                            <img
+                              src={`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`}
+                              alt="thumbnail"
+                              className="w-16 h-16 object-cover cursor-pointer rounded-md border"
+                              onClick={() => handleStatusClick(`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`)}
+                            />
+                          )}
                         </TableCell>
                       </motion.tr>
                     ))}
@@ -1092,8 +1072,8 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
               <DialogTitle>Daily Preview for {format(previewDate, "PPP")}</DialogTitle>
             </DialogHeader>
             <DailyStatusGrid
-              data={processDailyStatus(items, uploadLogs.filter(log => format(new Date(log.timestamp), 'yyyy-MM-dd') === format(previewDate, 'yyyy-MM-dd')), previewDate)}
-              onSlotClick={(log) => handleStatusClick(`/api/maintenance/image/${format(new Date(log.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(log.filename)}`)}
+              data={processDailyStatus(items, maintenanceNotes.filter(note => format(new Date(note.timestamp), 'yyyy-MM-dd') === format(previewDate, 'yyyy-MM-dd')), previewDate)}
+              onSlotClick={(note) => handleStatusClick(`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`)}
             />
             <div className="flex justify-end mt-4">
               <Button onClick={() => {
@@ -1114,7 +1094,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
 
 const DailyStatusGrid: React.FC<{
   data: ReturnType<typeof processDailyStatus>;
-  onSlotClick?: (log: Log) => void;
+  onSlotClick?: (note: MaintenanceNote) => void;
 }> = ({ data, onSlotClick }) => {
   if (data.length === 0) {
     return (
@@ -1147,11 +1127,11 @@ const DailyStatusGrid: React.FC<{
             <CardContent>
               <div className="flex flex-wrap gap-2">
                 {item.slots.map((slot: any) => {
-                  const isClickable = onSlotClick && slot.status === 'completed' && slot.log;
+                  const isClickable = onSlotClick && slot.status === 'completed' && slot.note;
                   const slotElement = (
                     <div
                       className={`px-3 py-1.5 rounded-full text-sm font-semibold ${statusStyles[slot.status]} ${isClickable ? 'cursor-pointer' : ''}`}
-                      onClick={() => isClickable && onSlotClick(slot.log)}
+                      onClick={() => isClickable && onSlotClick(slot.note)}
                     >
                       {slot.time}
                     </div>
@@ -1165,8 +1145,8 @@ const DailyStatusGrid: React.FC<{
                         </TooltipTrigger>
                         <TooltipContent>
                           <p><strong>Status:</strong> <span className="capitalize">{slot.status}</span></p>
-                          {slot.log && (
-                            <p><strong>Uploaded:</strong> {format(new Date(slot.log.timestamp), "HH:mm:ss")}</p>
+                          {slot.note && (
+                            <p><strong>Uploaded:</strong> {format(new Date(slot.note.timestamp), "HH:mm:ss")}</p>
                           )}
                         </TooltipContent>
                       </Tooltip>
@@ -1187,10 +1167,9 @@ const DailyStatusGrid: React.FC<{
 
 interface OperatorViewProps extends ProgressProps {
   items: MaintenanceItem[];
-  uploadLogs: Log[];
-  onUploadSuccess: (log: Log) => void;
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
   maintenanceNotes: MaintenanceNote[];
+  onNoteSubmitted: () => void;
 }
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
@@ -1238,9 +1217,9 @@ const OperatorViewItem: React.FC<{
   item: MaintenanceItem;
   number: number;
   serverTime: Date;
-  uploadLogs: Log[];
-  onUploadSuccess: (log: Log) => void;
-}> = ({ item, number, serverTime, uploadLogs, onUploadSuccess }) => {
+  maintenanceNotes: MaintenanceNote[];
+  onNoteSubmitted: () => void;
+}> = ({ item, number, serverTime, maintenanceNotes, onNoteSubmitted }) => {
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const currentUser = useAppStore((state) => state.currentUser);
@@ -1259,18 +1238,18 @@ const OperatorViewItem: React.FC<{
     relevantSlot = nextSlot;
   }
 
-  const itemLogsForToday = uploadLogs.filter(log => isToday(new Date(log.timestamp)) && log.itemName === item.name && log.itemNumber === number.toString());
+  const itemNotesForToday = maintenanceNotes.filter(note => note.isScheduledCheck && note.deviceId === item.id && note.itemNumber === number && isToday(new Date(note.timestamp)));
 
-  if (itemLogsForToday.length >= allSlots.length && allSlots.length > 0) {
+  if (itemNotesForToday.length >= allSlots.length && allSlots.length > 0) {
     displayMode = 'completed';
   } else if (!activeSlot && !nextSlot) {
     const lastUncompletedPastSlot = [...allSlots].reverse().find(s => {
       const now = serverTime;
-      const hasLog = itemLogsForToday.some(log => {
-        const logTime = new Date(log.timestamp);
-        return logTime >= s.start && logTime <= s.end;
+      const hasNote = itemNotesForToday.some(note => {
+        const noteTime = new Date(note.timestamp);
+        return noteTime >= s.start && noteTime <= s.end;
       });  
-      return now > s.end && !hasLog;
+      return now > s.end && !hasNote;
     });
     if (lastUncompletedPastSlot) {
       relevantSlot = lastUncompletedPastSlot;
@@ -1280,9 +1259,9 @@ const OperatorViewItem: React.FC<{
 
 
   const completedSlots = allSlots.filter(slot => {
-    return itemLogsForToday.some(log => {
-      const logTime = new Date(log.timestamp);
-      return logTime >= slot.start && logTime <= slot.end;
+    return itemNotesForToday.some(note => {
+      const noteTime = new Date(note.timestamp);
+      return noteTime >= slot.start && noteTime <= slot.end;
     });
   });
 
@@ -1290,7 +1269,7 @@ const OperatorViewItem: React.FC<{
     displayMode = 'completed';
   }
 
-  const hasLogForActiveSlot = activeSlot ? completedSlots.some(s => s.time === activeSlot.time) : false;
+  const hasNoteForActiveSlot = activeSlot ? completedSlots.some(s => s.time === activeSlot.time) : false;
 
   const uploadKey = `${item.name}-${number}`;
 
@@ -1302,7 +1281,7 @@ const OperatorViewItem: React.FC<{
     missed: { icon: XCircle, color: 'text-orange-500', text: `Missed check at ${relevantSlot?.time}` },
   };
 
-  const isButtonDisabled = displayMode !== 'active' || isSubmitting || hasLogForActiveSlot;
+  const isButtonDisabled = displayMode !== 'active' || isSubmitting || hasNoteForActiveSlot;
   const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo.pending);
   const CurrentIcon = currentStatusInfo.icon;
 
@@ -1320,7 +1299,7 @@ const OperatorViewItem: React.FC<{
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center text-center">
-          {hasLogForActiveSlot ? (
+          {hasNoteForActiveSlot ? (
             <div className="flex flex-col items-center">
               <CheckCircle className={`h-10 w-10  ${statusInfo.success.color}`} />
               <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>Uploaded</p>
@@ -1346,19 +1325,11 @@ const OperatorViewItem: React.FC<{
               {displayMode === 'next' && (
                 <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
               )}
-              <Input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => handleFileChange(e, item.name, number)}
-                className="hidden"
-                id={`${uploadKey}-${relevantSlot!.time}`}
-                disabled={isButtonDisabled}
-              />
-              <UploadNoteDialog
+              <NoteDialog
                 item={item}
                 itemNumber={number}
-                onUploadSuccess={() => window.location.reload()}
+                isScheduledCheck={true}
+                onNoteSubmitted={onNoteSubmitted}
               />
             </>
           ) : (
@@ -1370,7 +1341,7 @@ const OperatorViewItem: React.FC<{
   );
 };
 
-const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
+const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, onNoteSubmitted }) => {
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
   const [showInstructions, setShowInstructions] = useState(true);
@@ -1433,7 +1404,15 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
       </Card>
 
 
-      <h2 className="text-2xl font-bold mt-6 mb-4">Upload Controls</h2>
+      <div className="flex justify-between items-center mt-6 mb-4">
+        <h2 className="text-2xl font-bold">Upload Controls</h2>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button>Add Maintenance Note</Button>
+          </DialogTrigger>
+          <NoteDialog isScheduledCheck={false} onNoteSubmitted={onNoteSubmitted} />
+        </Dialog>
+      </div>
       {items.length === 0 ? (
         <p>No maintenance items configured.</p>
       ) : (
@@ -1447,8 +1426,8 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
                   item={item}
                   number={number}
                   serverTime={serverTime}
-                  uploadLogs={uploadLogs}
-                  onUploadSuccess={onUploadSuccess}
+                  maintenanceNotes={maintenanceNotes}
+                  onNoteSubmitted={onNoteSubmitted}
                 />
               );
             })
@@ -1462,7 +1441,6 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
 
 const MaintenancePage = () => {
   const [items, setItems] = useState<MaintenanceItem[]>([]);
-  const [uploadLogs, setUploadLogs] = useState<Log[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const currentUser = useAppStore((state) => state.currentUser);
 
@@ -1494,48 +1472,40 @@ const MaintenancePage = () => {
     }
   }, []);
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      setIsLoading(true);
-      try {
-        const [configResponse, logsResponse, notesResponse] = await Promise.all([
-          fetch('/api/maintenance/config'),
-          fetch('/api/maintenance/logs'),
-          fetch('/api/maintenance/notes')
-        ]);
+  const fetchAllData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [configResponse, notesResponse] = await Promise.all([
+        fetch('/api/maintenance/config'),
+        fetch('/api/maintenance/notes')
+      ]);
 
-        if (configResponse.ok) {
-          const config = await configResponse.json();
-          setItems(config);
-        } else {
-          toast.error("Failed to fetch maintenance configuration.");
-        }
-
-        if (logsResponse.ok) {
-          const data = await logsResponse.json();
-          setUploadLogs(data);
-        } else {
-          toast.error('Failed to fetch upload logs.');
-        }
-
-        if (notesResponse.ok) {
-          const data = await notesResponse.json();
-          setMaintenanceNotes(data);
-        } else {
-          toast.error('Failed to fetch maintenance notes.');
-        }
-      } catch (error) {
-        toast.error('An error occurred while fetching maintenance data.');
-      } finally {
-        setIsLoading(false);
+      if (configResponse.ok) {
+        const config = await configResponse.json();
+        setItems(config);
+      } else {
+        toast.error("Failed to fetch maintenance configuration.");
       }
-    };
 
+      if (notesResponse.ok) {
+        const data = await notesResponse.json();
+        setMaintenanceNotes(data);
+      } else {
+        toast.error('Failed to fetch maintenance notes.');
+      }
+    } catch (error) {
+      toast.error('An error occurred while fetching maintenance data.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
     fetchAllData();
     checkPlcConnection();
     const plcI = setInterval(checkPlcConnection, 15000);
     return () => clearInterval(plcI);
-  }, [checkPlcConnection]);
+  }, [checkPlcConnection, fetchAllData]);
 
   useEffect(() => {
     const fetchServerTime = async () => {
@@ -1576,14 +1546,11 @@ const MaintenancePage = () => {
 
   const [maintenanceNotes, setMaintenanceNotes] = useState<MaintenanceNote[]>([]);
 
-  const handleUploadSuccess = (newLog: Log) => {
-    setUploadLogs(prevLogs => [...prevLogs, newLog]);
-  };
 
 
-  const dailyStatusGridData = processDailyStatus(items, uploadLogs, serverTime);
+  const dailyStatusGridData = processDailyStatus(items, maintenanceNotes, serverTime);
   const totalDailyChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);
-  const todaysCompletedChecks = uploadLogs.filter(log => isToday(new Date(log.timestamp))).length;
+  const todaysCompletedChecks = maintenanceNotes.filter(note => note.isScheduledCheck && isToday(new Date(note.timestamp))).length;
 
   if (!currentUser || isLoading) {
     return <div className="flex flex-col items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin" /><p className="mt-4">Loading Maintenance Module...</p></div>;
@@ -1612,19 +1579,18 @@ const MaintenancePage = () => {
         version={VERSION}
       />
       {currentUser.role === UserRole.ADMIN && (
-        <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
+        <AdminView items={items} setItems={setItems} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
       )}
       {currentUser.role === UserRole.VIEWER && (
-        <ViewerView items={items} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
+        <ViewerView items={items} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
       )}
       {currentUser.role === UserRole.OPERATOR && (
         <OperatorView
           items={items}
-          uploadLogs={uploadLogs}
-          onUploadSuccess={handleUploadSuccess}
           {...progressProps}
           dailyStatusGridData={dailyStatusGridData}
           maintenanceNotes={maintenanceNotes}
+          onNoteSubmitted={fetchAllData}
         />
       )}
     </div>

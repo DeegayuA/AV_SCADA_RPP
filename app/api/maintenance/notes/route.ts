@@ -5,6 +5,8 @@ import { format } from 'date-fns';
 import crypto from 'crypto';
 import { getEncryptionKey, decrypt } from '@/lib/maintenance-crypto';
 import { MaintenanceNote } from '@/types/maintenance-note';
+import sharp from 'sharp';
+import { PLANT_LOCATION } from '@/config/constants';
 
 const logDir = path.join(process.cwd(), 'logs', 'maintenance');
 const IV_LENGTH = 16;
@@ -24,15 +26,49 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Encryption key is not set up on the server.' }, { status: 500 });
     }
 
-    const note: MaintenanceNote = await request.json();
-    note.id = crypto.randomUUID();
-    note.timestamp = new Date().toISOString();
+    const formData = await request.formData();
+    const file = formData.get('file') as File | null;
+    const deviceId = formData.get('deviceId') as string;
+    const itemName = formData.get('itemName') as string;
+    const itemNumber = formData.get('itemNumber') as string;
+    const username = formData.get('username') as string;
+    const tags = formData.get('tags') as string;
+    const text = formData.get('text') as string;
+    const isScheduledCheck = formData.get('isScheduledCheck') === 'true';
+
+    const date = new Date();
+    const dateString = format(date, 'yyyy-MM-dd');
+    const dateTimeString = format(date, 'yyyyMMdd_HHmmss');
+
+    let filename: string | undefined;
+    if (file) {
+      const fullResDir = path.join(process.cwd(), 'public', 'maintenance_image', dateString);
+      const previewDir = path.join(process.cwd(), 'public', 'maintenance_image_preview', dateString);
+      await fs.mkdir(fullResDir, { recursive: true });
+      await fs.mkdir(previewDir, { recursive: true });
+
+      filename = `${PLANT_LOCATION}_${itemName.replace(/ /g, '_')}_${itemNumber.replace(/ /g, '_')}_${dateTimeString}_${username.replace(/ /g, '_')}.jpg`;
+      const buffer = Buffer.from(await file.arrayBuffer());
+      await fs.writeFile(path.join(fullResDir, filename), buffer);
+      await sharp(buffer)
+        .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
+        .toFile(path.join(previewDir, filename));
+    }
+
+    const note: MaintenanceNote = {
+      id: crypto.randomUUID(),
+      timestamp: date.toISOString(),
+      deviceId,
+      itemNumber: parseInt(itemNumber, 10),
+      tags: tags ? tags.split(',') : [],
+      text,
+      author: username,
+      imageFilename: filename,
+      isScheduledCheck,
+    };
 
     await fs.mkdir(logDir, { recursive: true });
-
-    const dateString = format(new Date(note.timestamp), 'yyyy-MM-dd');
     const logFilePath = path.join(logDir, `${dateString}.notes.log`);
-
     const encryptedLogData = encrypt(JSON.stringify(note), encryptionKey);
     await fs.appendFile(logFilePath, encryptedLogData + '\n');
 
