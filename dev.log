@@ -1,0 +1,48 @@
+
+> regenerative-minigrid-dashboard@1.6.0 dev
+> next dev --hostname 0.0.0.0
+
+ ⚠ Port 3000 is in use by an unknown process, using available port 3001 instead.
+   ▲ Next.js 15.4.3
+   - Local:        http://localhost:3001
+   - Network:      http://0.0.0.0:3001
+   - Environments: .env.local
+   - Experiments (use with caution):
+     · serverActions
+
+ ✓ Starting...
+ ✓ Ready in 3.7s
+ ○ Compiling /middleware ...
+ ✓ Compiled /middleware in 767ms (108 modules)
+ ○ Compiling /login ...
+ ✓ Compiled /login in 14s (1787 modules)
+ GET /login 200 in 16494ms
+ ○ Compiling /api/logs/write ...
+ ✓ Compiled /api/logs/write in 5.6s (1874 modules)
+ GET /api/auth/session 401 in 5973ms
+ POST /api/logs/write 200 in 5987ms
+ GET /login 200 in 231ms
+ ○ Compiling /api/auth/[...nextauth] ...
+ ✓ Compiled /api/auth/[...nextauth] in 2.4s (2105 modules)
+ POST /api/auth/_log 200 in 4387ms
+ ✓ Compiled in 2.4s (1828 modules)
+ ✓ Compiled in 3.2s (1902 modules)
+ ✓ Compiled in 1631ms (1842 modules)
+ ✓ Compiled in 1823ms (1902 modules)
+ ✓ Compiled in 1693ms (1808 modules)
+ ✓ Compiled in 2.2s (1882 modules)
+ ✓ Compiled in 1656ms (1822 modules)
+ ✓ Compiled in 1864ms (1882 modules)
+ ⨯ Error: ENOENT: no such file or directory, open '/app/.next/server/vendor-chunks/next.js'
+    at <unknown> (.next/server/app/(auth)/login/page.js:709:47)
+    at Object.<anonymous> (.next/server/app/(auth)/login/page.js:712:3) {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'open',
+  path: '/app/.next/server/vendor-chunks/next.js',
+  page: '/login'
+}
+ ○ Compiling /_error ...
+ ✓ Compiled /_error in 2.1s (2102 modules)
+ GET /login 500 in 2768ms
+ ✓ Compiled in 2.4s (2150 modules)

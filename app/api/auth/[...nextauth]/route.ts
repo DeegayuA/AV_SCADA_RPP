@@ -4,7 +4,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { decryptUsers, encryptUsers } from '@/lib/user-crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 
 const USERS_PATH = path.join(process.cwd(), 'config', 'users.json.enc');
 
@@ -21,21 +21,16 @@ const handler = NextAuth({
         password: {  label: "Password", type: "password" }
       },
       async authorize(credentials, req) {
-        console.log('authorize called with:', credentials);
         const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
         const users = await decryptUsers(encryptedData);
 
         if (users && users[credentials!.email]) {
           const user = users[credentials!.email];
           const isPasswordValid = await bcrypt.compare(credentials!.password, user.password);
-          console.log('isPasswordValid:', isPasswordValid);
           if (isPasswordValid) {
-            const result = { id: credentials!.email, email: credentials!.email, role: user.role };
-            console.log('authorize returning:', result);
-            return result;
+            return { id: credentials!.email, email: credentials!.email, role: user.role };
           }
         }
-        console.log('authorize returning null');
         return null;
       }
     })

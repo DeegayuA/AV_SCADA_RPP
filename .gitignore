@@ -34,17 +34,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# User Management
-config/users.json.enc
-config/users-key.enc
-config/jwt-secret.enc
-
-# Logs
-dev.log
-
-# Verification
-jules-scratch/
-
 .bolt
 
 # documentation

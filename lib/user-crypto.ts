@@ -1,6 +1,6 @@
-import * as crypto from 'crypto';
+import crypto from 'crypto';
 import { promises as fs } from 'fs';
-import * as path from 'path';
+import path from 'path';
 
 const IV_LENGTH = 16;
 const KEY_PATH = path.join(process.cwd(), 'config', 'users-key.enc');
