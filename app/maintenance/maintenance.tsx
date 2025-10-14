@@ -58,6 +58,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRange } from "react-day-picker";
 import { saveAs } from "file-saver";
+import { MaintenanceNotesLog } from '@/components/maintenance/MaintenanceNotesLog';
 
 interface Log {
   timestamp: string;
@@ -272,6 +273,7 @@ interface AdminStatusViewProps extends ProgressProps {
   items: MaintenanceItem[];
   uploadLogs: Log[];
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
+  maintenanceNotes: MaintenanceNote[];
 }
 
 interface AdminViewProps extends ProgressProps {
@@ -281,7 +283,7 @@ interface AdminViewProps extends ProgressProps {
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
 }
 
-const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
+const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
@@ -291,6 +293,7 @@ const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDa
         totalDailyChecks={totalDailyChecks}
         todaysCompletedChecks={todaysCompletedChecks}
         dailyStatusGridData={dailyStatusGridData}
+        maintenanceNotes={maintenanceNotes}
       />
     </div>
   );
@@ -693,13 +696,14 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, tota
           totalDailyChecks={totalDailyChecks}
           todaysCompletedChecks={todaysCompletedChecks}
           dailyStatusGridData={dailyStatusGridData}
+          maintenanceNotes={maintenanceNotes}
         />
       </div>
     </motion.div>
   );
 };
 
-const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
+const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [monthlyStatusData, setMonthlyStatusData] = useState<Log[]>([]);
@@ -836,6 +840,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
             <TabsList>
               <TabsTrigger value="monthly">Monthly Calendar</TabsTrigger>
               <TabsTrigger value="upload-log">Image Upload Log</TabsTrigger>
+              <TabsTrigger value="notes-log">Maintenance Notes</TabsTrigger>
             </TabsList>
           </div>
 
@@ -1054,6 +1059,17 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
               </CardContent>
             </Card>
           </TabsContent>
+
+          <TabsContent value="notes-log">
+            <Card>
+              <CardHeader>
+                <CardTitle>Maintenance Notes Log</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <MaintenanceNotesLog items={items} initialNotes={maintenanceNotes} />
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -1171,6 +1187,8 @@ interface OperatorViewProps extends ProgressProps {
   uploadLogs: Log[];
   onUploadSuccess: (log: Log) => void;
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
+  maintenanceNotes: MaintenanceNote[];
+  onNoteSubmitted: (note: MaintenanceNote) => void;
 }
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
@@ -1402,7 +1420,10 @@ const OperatorViewItem: React.FC<{
   );
 };
 
-const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
+import { MaintenanceNoteForm } from '@/components/maintenance/MaintenanceNoteForm';
+import { MaintenanceNote } from '@/types/maintenance-note';
+
+const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, onNoteSubmitted }) => {
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
   const [showInstructions, setShowInstructions] = useState(true);
@@ -1488,6 +1509,15 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUpload
           )}
         </div>
       )}
+
+      <div className="mt-8">
+        <h2 className="text-2xl font-bold mb-4">Add Maintenance Note</h2>
+        <Card>
+          <CardContent className="p-6">
+            <MaintenanceNoteForm items={items} onNoteSubmitted={onNoteSubmitted} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };
@@ -1530,9 +1560,10 @@ const MaintenancePage = () => {
     const fetchAllData = async () => {
       setIsLoading(true);
       try {
-        const [configResponse, logsResponse] = await Promise.all([
+        const [configResponse, logsResponse, notesResponse] = await Promise.all([
           fetch('/api/maintenance/config'),
-          fetch('/api/maintenance/logs')
+          fetch('/api/maintenance/logs'),
+          fetch('/api/maintenance/notes')
         ]);
 
         if (configResponse.ok) {
@@ -1547,6 +1578,13 @@ const MaintenancePage = () => {
           setUploadLogs(data);
         } else {
           toast.error('Failed to fetch upload logs.');
+        }
+
+        if (notesResponse.ok) {
+          const data = await notesResponse.json();
+          setMaintenanceNotes(data);
+        } else {
+          toast.error('Failed to fetch maintenance notes.');
         }
       } catch (error) {
         toast.error('An error occurred while fetching maintenance data.');
@@ -1598,8 +1636,14 @@ const MaintenancePage = () => {
     return () => clearInterval(lagI);
   }, [lastUpdateTime]);
 
+  const [maintenanceNotes, setMaintenanceNotes] = useState<MaintenanceNote[]>([]);
+
   const handleUploadSuccess = (newLog: Log) => {
     setUploadLogs(prevLogs => [...prevLogs, newLog]);
+  };
+
+  const handleNoteSubmitted = (note: MaintenanceNote) => {
+    setMaintenanceNotes(prevNotes => [...prevNotes, note]);
   };
 
   const dailyStatusGridData = processDailyStatus(items, uploadLogs, serverTime);
@@ -1645,6 +1689,8 @@ const MaintenancePage = () => {
           onUploadSuccess={handleUploadSuccess}
           {...progressProps}
           dailyStatusGridData={dailyStatusGridData}
+          maintenanceNotes={maintenanceNotes}
+          onNoteSubmitted={handleNoteSubmitted}
         />
       )}
     </div>
