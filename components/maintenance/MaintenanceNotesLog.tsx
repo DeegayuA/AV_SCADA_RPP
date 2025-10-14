@@ -58,10 +58,11 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
 
   const exportToCSV = () => {
     const csvRows = [
-      ['Timestamp', 'Device', 'Tags', 'Note', 'Author'],
+      ['Timestamp', 'Device', 'Item #', 'Tags', 'Note', 'Author'],
       ...filteredNotes.map(note => [
         format(new Date(note.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         getDeviceName(note.deviceId),
+        note.itemNumber.toString(),
         note.tags.join(', '),
         note.text || '',
         note.author,
@@ -116,7 +117,7 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
           {filteredNotes.map(note => (
             <TableRow key={note.id}>
               <TableCell>{format(new Date(note.timestamp), 'yyyy-MM-dd HH:mm:ss')}</TableCell>
-              <TableCell>{getDeviceName(note.deviceId)}</TableCell>
+              <TableCell>{getDeviceName(note.deviceId)} #{note.itemNumber}</TableCell>
               <TableCell>{note.tags.join(', ')}</TableCell>
               <TableCell>{note.text}</TableCell>
               <TableCell>{note.author}</TableCell>

@@ -2,13 +2,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from 'sonner';
@@ -16,6 +9,7 @@ import { MaintenanceItem } from '@/types/maintenance';
 import { MaintenanceNote } from '@/types/maintenance-note';
 import { useAppStore } from '@/stores/appStore';
 import { Input } from '@/components/ui/input';
+import { Combobox } from '@/components/ui/combobox';
 
 interface MaintenanceNoteFormProps {
   items: MaintenanceItem[];
@@ -24,10 +18,10 @@ interface MaintenanceNoteFormProps {
 
 export const MaintenanceNoteForm: React.FC<MaintenanceNoteFormProps> = ({ items, onNoteSubmitted }) => {
   const [deviceId, setDeviceId] = useState<string>('');
+  const [itemNumber, setItemNumber] = useState<number>(1);
   const [tags, setTags] = useState<string[]>([]);
   const [text, setText] = useState('');
   const [availableTags, setAvailableTags] = useState<string[]>([]);
-  const [newTag, setNewTag] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const currentUser = useAppStore((state) => state.currentUser);
 
@@ -46,26 +40,24 @@ export const MaintenanceNoteForm: React.FC<MaintenanceNoteFormProps> = ({ items,
     fetchTags();
   }, []);
 
-  const handleAddTag = async () => {
-    if (newTag && !availableTags.includes(newTag)) {
+  const handleAddTag = async (tag: string) => {
+    if (tag && !availableTags.includes(tag)) {
       try {
         const response = await fetch('/api/maintenance/tags', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tag: newTag }),
+          body: JSON.stringify({ tag }),
         });
         if (response.ok) {
-          setAvailableTags([...availableTags, newTag]);
-          setTags([...tags, newTag]);
-          setNewTag('');
-          toast.success(`Tag "${newTag}" added.`);
+          setAvailableTags([...availableTags, tag]);
+          setTags([...tags, tag]);
+          toast.success(`Tag "${tag}" added.`);
         }
       } catch (error) {
         toast.error("Failed to add new tag.");
       }
-    } else if (availableTags.includes(newTag) && !tags.includes(newTag)) {
-      setTags([...tags, newTag]);
-      setNewTag('');
+    } else if (availableTags.includes(tag) && !tags.includes(tag)) {
+      setTags([...tags, tag]);
     }
   };
 
@@ -79,6 +71,7 @@ export const MaintenanceNoteForm: React.FC<MaintenanceNoteFormProps> = ({ items,
 
     const note: Omit<MaintenanceNote, 'id' | 'timestamp'> = {
       deviceId,
+      itemNumber,
       tags,
       text,
       author: currentUser?.name || 'Unknown',
@@ -109,44 +102,51 @@ export const MaintenanceNoteForm: React.FC<MaintenanceNoteFormProps> = ({ items,
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <Label htmlFor="device">Device</Label>
-        <Select onValueChange={setDeviceId} value={deviceId}>
-          <SelectTrigger id="device">
-            <SelectValue placeholder="Select a device" />
-          </SelectTrigger>
-          <SelectContent>
-            {items.map((item) => (
-              <SelectItem key={item.id} value={item.id}>
-                {item.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex items-end gap-2">
+        <div className="flex-grow">
+          <Label htmlFor="device">Device</Label>
+          <Combobox
+            options={items.map(item => ({ label: item.name, value: item.id }))}
+            value={deviceId}
+            onChange={setDeviceId}
+            placeholder="Select a device"
+            emptyMessage="No devices found."
+          />
+        </div>
+        {deviceId && (
+          <div>
+            <Label htmlFor="itemNumber">#</Label>
+            <Input
+              id="itemNumber"
+              type="number"
+              value={itemNumber}
+              onChange={(e) => setItemNumber(parseInt(e.target.value, 10))}
+              min="1"
+              max={items.find(item => item.id === deviceId)?.quantity}
+              className="w-24"
+            />
+          </div>
+        )}
       </div>
       <div>
         <Label>Tags</Label>
-        <div className="flex items-center gap-2">
-          <Select onValueChange={(value) => setTags([...tags, value])}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select a tag" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableTags.filter(t => !tags.includes(t)).map(tag => (
-                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
-            placeholder="Or add a new tag"
-          />
-          <Button type="button" onClick={handleAddTag}>Add Tag</Button>
-        </div>
+        <Combobox
+          options={availableTags.map(tag => ({ label: tag, value: tag }))}
+          onChange={(value) => {
+            if (value && !tags.includes(value)) {
+              setTags([...tags, value]);
+            }
+          }}
+          placeholder="Select or create a tag"
+          emptyMessage="No tags found."
+          canCreate
+          onCreate={async (value) => {
+            await handleAddTag(value);
+          }}
+        />
         <div className="flex flex-wrap gap-2 mt-2">
           {tags.map(tag => (
-            <div key={tag} className="flex items-center gap-1 bg-gray-200 rounded-full px-2 py-1 text-sm">
+            <div key={tag} className="flex items-center gap-1 bg-gray-200 dark:bg-gray-700 rounded-full px-2 py-1 text-sm">
               {tag}
               <button type="button" onClick={() => setTags(tags.filter(t => t !== tag))}>
                 &times;
