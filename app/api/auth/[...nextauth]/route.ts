@@ -21,16 +21,21 @@ const handler = NextAuth({
         password: {  label: "Password", type: "password" }
       },
       async authorize(credentials, req) {
+        console.log('authorize called with:', credentials);
         const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
         const users = await decryptUsers(encryptedData);
 
         if (users && users[credentials!.email]) {
           const user = users[credentials!.email];
           const isPasswordValid = await bcrypt.compare(credentials!.password, user.password);
+          console.log('isPasswordValid:', isPasswordValid);
           if (isPasswordValid) {
-            return { id: credentials!.email, email: credentials!.email, role: user.role };
+            const result = { id: credentials!.email, email: credentials!.email, role: user.role };
+            console.log('authorize returning:', result);
+            return result;
           }
         }
+        console.log('authorize returning null');
         return null;
       }
     })
