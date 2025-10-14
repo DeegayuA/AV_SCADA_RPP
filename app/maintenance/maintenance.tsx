@@ -281,6 +281,7 @@ interface AdminViewProps extends ProgressProps {
   setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
   uploadLogs: Log[];
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
+  maintenanceNotes: MaintenanceNote[];
 }
 
 const ViewerView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
@@ -655,7 +656,7 @@ const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items
   );
 };
 
-const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData }) => {
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
   const currentUser = useAppStore((state) => state.currentUser);
   const [showHelp, setShowHelp] = useState(true);
 
@@ -1677,10 +1678,10 @@ const MaintenancePage = () => {
         version={VERSION}
       />
       {currentUser.role === UserRole.ADMIN && (
-        <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} />
+        <AdminView items={items} setItems={setItems} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
       )}
       {currentUser.role === UserRole.VIEWER && (
-        <ViewerView items={items} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} />
+        <ViewerView items={items} uploadLogs={uploadLogs} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
       )}
       {currentUser.role === UserRole.OPERATOR && (
         <OperatorView
