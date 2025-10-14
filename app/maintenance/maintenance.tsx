@@ -59,6 +59,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRange } from "react-day-picker";
 import { saveAs } from "file-saver";
 import { MaintenanceNotesLog } from '@/components/maintenance/MaintenanceNotesLog';
+import { MaintenanceNote } from '@/types/maintenance-note';
+import { MaintenanceNoteForm } from '@/components/maintenance/MaintenanceNoteForm';
 
 interface Log {
   timestamp: string;
@@ -1420,9 +1422,6 @@ const OperatorViewItem: React.FC<{
     </motion.div>
   );
 };
-
-import { MaintenanceNoteForm } from '@/components/maintenance/MaintenanceNoteForm';
-import { MaintenanceNote } from '@/types/maintenance-note';
 
 const OperatorView: React.FC<OperatorViewProps> = ({ items, uploadLogs, onUploadSuccess, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, onNoteSubmitted }) => {
   const [serverTime, setServerTime] = useState<Date | null>(null);
