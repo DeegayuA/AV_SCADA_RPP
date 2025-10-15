@@ -5,13 +5,10 @@ import path from 'path';
 
 const USERS_PATH = path.join(process.cwd(), 'config', 'users.json.enc');
 
-type RouteContext = {
-  params: {
-    email: string;
-  };
-};
-
-export async function GET(request: Request, { params }: RouteContext) {
+export async function GET(
+  request: Request,
+  { params }: { params: { email: string } }
+) {
   try {
     const email = decodeURIComponent(params.email);
     const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
@@ -27,7 +24,10 @@ export async function GET(request: Request, { params }: RouteContext) {
   }
 }
 
-export async function PUT(request: Request, { params }: RouteContext) {
+export async function PUT(
+  request: Request,
+  { params }: { params: { email: string } }
+) {
   try {
     const email = decodeURIComponent(params.email);
     const { role } = await request.json();
@@ -55,7 +55,10 @@ export async function PUT(request: Request, { params }: RouteContext) {
   }
 }
 
-export async function DELETE(request: Request, { params }: RouteContext) {
+export async function DELETE(
+  request: Request,
+  { params }: { params: { email: string } }
+) {
   try {
     const email = decodeURIComponent(params.email);
     const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');

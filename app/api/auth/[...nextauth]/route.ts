@@ -21,16 +21,43 @@ const handler = NextAuth({
         password: {  label: "Password", type: "password" }
       },
       async authorize(credentials, req) {
-        const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
-        const users = await decryptUsers(encryptedData);
-
-        if (users && users[credentials!.email]) {
-          const user = users[credentials!.email];
-          const isPasswordValid = await bcrypt.compare(credentials!.password, user.password);
-          if (isPasswordValid) {
-            return { id: credentials!.email, email: credentials!.email, role: user.role };
-          }
+        console.log("--- Authorize Function Start ---");
+        if (!credentials) {
+          console.log("No credentials provided.");
+          console.log("--- Authorize Function End (null) ---");
+          return null;
         }
+        console.log("Attempting login for email:", credentials.email);
+
+        try {
+          const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
+          const users = await decryptUsers(encryptedData);
+          console.log("Successfully decrypted user file.");
+
+          const user = users ? users[credentials.email] : null;
+
+          if (user) {
+            console.log("User found in store:", { email: credentials.email, role: user.role });
+            console.log("Comparing provided password with stored hash...");
+            const isPasswordValid = await bcrypt.compare(credentials.password, user.password);
+            console.log("Password validation result:", isPasswordValid);
+
+            if (isPasswordValid) {
+              const authorizedUser = { id: credentials.email, email: credentials.email, role: user.role };
+              console.log("Password is valid. Authorizing user:", authorizedUser);
+              console.log("--- Authorize Function End (success) ---");
+              return authorizedUser;
+            } else {
+              console.log("Password comparison failed.");
+            }
+          } else {
+            console.log("User not found in store for email:", credentials.email);
+          }
+        } catch (error) {
+          console.error("Error during authorization process:", error);
+        }
+
+        console.log("--- Authorize Function End (failure) ---");
         return null;
       }
     })
