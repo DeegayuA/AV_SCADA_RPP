@@ -25,6 +25,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { useAppStore } from '@/stores/appStore';
 import { UserRole } from '@/types/auth';
@@ -155,8 +156,8 @@ const processDailyStatus = (
 
         const noteInSlot = dailyNotes.find(note => {
           const noteTime = new Date(note.timestamp);
-          const item = items.find(i => i.id === note.deviceId);
-          return item?.name === item.name &&
+          const noteItem = items.find(i => i.id === note.deviceId);
+          return noteItem?.name === item.name &&
             note.itemNumber === itemNumber &&
             noteTime >= slotStart &&
             noteTime <= slotEnd;
@@ -686,7 +687,6 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, totalDailyChecks
       <div className="p-4">
         <AdminStatusView
           items={items}
-          uploadLogs={uploadLogs}
           totalDailyChecks={totalDailyChecks}
           todaysCompletedChecks={todaysCompletedChecks}
           dailyStatusGridData={dailyStatusGridData}
@@ -697,7 +697,7 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, totalDailyChecks
   );
 };
 
-const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
+const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -811,7 +811,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
         <div className="my-6">
           <DailyStatusGrid
             data={dailyStatusGridData}
-            onSlotClick={(note) => handleStatusClick(`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`)}
+            onSlotClick={(note) => handleStatusClick(note.imageFilename ? `/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}` : null)}
           />
         </div>
 
@@ -999,7 +999,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
                               src={`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`}
                               alt="thumbnail"
                               className="w-16 h-16 object-cover cursor-pointer rounded-md border"
-                              onClick={() => handleStatusClick(`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`)}
+                              onClick={() => handleStatusClick(note.imageFilename ? `/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}` : null)}
                             />
                           )}
                         </TableCell>
@@ -1073,7 +1073,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, uploadLogs, to
             </DialogHeader>
             <DailyStatusGrid
               data={processDailyStatus(items, maintenanceNotes.filter(note => format(new Date(note.timestamp), 'yyyy-MM-dd') === format(previewDate, 'yyyy-MM-dd')), previewDate)}
-              onSlotClick={(note) => handleStatusClick(`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`)}
+              onSlotClick={(note) => handleStatusClick(note.imageFilename ? `/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}` : null)}
             />
             <div className="flex justify-end mt-4">
               <Button onClick={() => {
@@ -1341,7 +1341,7 @@ const OperatorViewItem: React.FC<{
   );
 };
 
-const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, onNoteSubmitted }) => {
+const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, onNoteSubmitted, maintenanceNotes }) => {
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const currentUser = useAppStore((state) => state.currentUser);
   const [showInstructions, setShowInstructions] = useState(true);
@@ -1452,6 +1452,7 @@ const MaintenancePage = () => {
   const [delay, setDelay] = useState<number>(0);
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
   const [serverTime, setServerTime] = useState<Date | null>(null);
+  const [maintenanceNotes, setMaintenanceNotes] = useState<MaintenanceNote[]>([]);
 
   const checkPlcConnection = useCallback(async () => {
     try {
@@ -1543,10 +1544,6 @@ const MaintenancePage = () => {
     }, 1000);
     return () => clearInterval(lagI);
   }, [lastUpdateTime]);
-
-  const [maintenanceNotes, setMaintenanceNotes] = useState<MaintenanceNote[]>([]);
-
-
 
   const dailyStatusGridData = processDailyStatus(items, maintenanceNotes, serverTime);
   const totalDailyChecks = items.reduce((acc, item) => acc + item.quantity * item.timesPerDay, 0);

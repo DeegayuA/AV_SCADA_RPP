@@ -46,7 +46,7 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
       newFilteredNotes = newFilteredNotes.filter(note => note.deviceId === deviceFilter);
     }
     if (tagFilter) {
-      newFilteredNotes = newFilteredNotes.filter(note => note.tags.includes(tagFilter));
+      newFilteredNotes = newFilteredNotes.filter(note => note.tags && note.tags.includes(tagFilter));
     }
     setFilteredNotes(newFilteredNotes);
   }, [deviceFilter, tagFilter, notes]);
@@ -57,25 +57,23 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
   };
 
   const exportToCSV = () => {
-    const csvRows = [
+    const csvRows: string[][] = [
       ['Timestamp', 'Device', 'Item #', 'Tags', 'Note', 'Author', 'Image Filename'],
       ...filteredNotes.map(note => [
         format(new Date(note.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         getDeviceName(note.deviceId),
         note.itemNumber.toString(),
-        note.tags.join(', '),
+        note.tags ? note.tags.join(', ') : '',
         note.text || '',
-        note.author,
+        note.author || '',
         note.imageFilename || '',
-      ].map(field => `"${field.replace(/"/g, '""')}"`).join(','))
+      ])
     ];
 
-    const csvContent = csvRows.map(row => Array.isArray(row) ? row.join(',') : row).join('\n');
+    const csvContent = csvRows.map(e => e.map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'maintenance_notes.csv');
   };
-
-  const allTags = Array.from(new Set(notes.flatMap(note => note.tags)));
 
   return (
     <div>
@@ -99,8 +97,8 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
               <SelectValue placeholder="Filter by tag" />
             </SelectTrigger>
             <SelectContent>
-              {allTags.filter(tag => tag).map(tag => (
-                <SelectItem key={tag} value={tag}>{tag}</SelectItem>
+              {Array.from(new Set(notes.flatMap(note => note.tags || []).filter(tag => tag))).map((tag, index) => (
+                <SelectItem key={`${tag}-${index}`} value={tag || ''}>{tag}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -124,9 +122,9 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
             <TableRow key={note.id}>
               <TableCell>{format(new Date(note.timestamp), 'yyyy-MM-dd HH:mm:ss')}</TableCell>
               <TableCell>{getDeviceName(note.deviceId)} #{note.itemNumber}</TableCell>
-              <TableCell>{note.tags.join(', ')}</TableCell>
-              <TableCell>{note.text}</TableCell>
-              <TableCell>{note.author}</TableCell>
+              <TableCell>{note.tags ? note.tags.join(', ') : ''}</TableCell>
+              <TableCell>{note.text || ''}</TableCell>
+              <TableCell>{note.author || ''}</TableCell>
                 <TableCell>
                   {note.imageFilename && (
                     <img
