@@ -55,3 +55,6 @@ system.log.json
 /logs/
 /config/maintenance.json
 config/maintenance.key
+config/users.json.enc
+config/users-key.enc
+config/jwt-secret.enc
