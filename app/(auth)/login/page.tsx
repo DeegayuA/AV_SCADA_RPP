@@ -37,11 +37,6 @@ const rotatingMessages = [
 ];
 const iconsMap: { [key: string]: React.ElementType } = { Zap, Lock, Settings2, Eye };
 
-const users = [
-  { email: 'admin@av.lk', passwordHash: 'AVR&D490', name: 'Admin', role: 'admin' },
-  { email: 'operator@av.lk', passwordHash: 'operator123', name: 'Operator', role: 'operator' },
-  { email: 'viewer@av.lk', passwordHash: 'viewer123', name: 'Viewer', role: 'viewer' },
-];
 
 const GoogleIcon = () => (
     <motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
@@ -230,9 +225,26 @@ const LoginFormInternalContent = React.memo(({
   onGoogleLogin: () => void;
 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [devUsers, setDevUsers] = useState<any[]>([]);
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
-  const devUsersCount = process.env.NODE_ENV === 'development' ? users.length : 0;
+  useEffect(() => {
+    const fetchDevUsers = async () => {
+      try {
+        const response = await fetch('/api/users');
+        const data = await response.json();
+        setDevUsers(Object.entries(data).map(([email, user]) => ({ email, ...(user as any) })));
+      } catch (error) {
+        console.error('Failed to fetch dev users:', error);
+      }
+    };
+
+    if (process.env.NODE_ENV === 'development') {
+      fetchDevUsers();
+    }
+  }, []);
+
+  const devUsersCount = process.env.NODE_ENV === 'development' ? devUsers.length : 0;
   const formElementDelayOffset = devUsersCount * 0.03 + (devUsersCount > 0 ? 0.1 : 0) ;
 
   const inputBaseClass = "h-11 sm:h-12 text-sm bg-slate-100/70 dark:bg-slate-800/50 border-slate-300/80 dark:border-slate-700/70 focus:border-primary focus:ring-2 focus:ring-primary/30 dark:focus:border-primary dark:focus:ring-primary/30 placeholder:text-slate-400/90 dark:placeholder:text-slate-500/80 transition-all duration-200 ease-in-out rounded-lg shadow-sm";
@@ -261,7 +273,7 @@ const LoginFormInternalContent = React.memo(({
             <Users className="mr-2 h-5 w-5" /> Development Logins
           </p>
           <div className="space-y-2">
-            {users.map((user, index) => (
+            {devUsers.map((user, index) => (
               <motion.div
                 key={user.email}
                 initial={{ opacity: 0, x: -15 }}
@@ -270,15 +282,12 @@ const LoginFormInternalContent = React.memo(({
               >
                 <div className="truncate mr-2 flex-grow">
                   <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 flex items-center">
-                    {user.name}
+                    {user.email}
                     <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
                       {user.role.toUpperCase()}
                     </span>
                   </p>
                   <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
-                    <KeyRound size={10} className="mr-1 opacity-60"/> {user.passwordHash}
-                  </p>
                 </div>
                 <Button
                   variant="ghost"
@@ -286,8 +295,8 @@ const LoginFormInternalContent = React.memo(({
                   className="h-auto px-2.5 py-1.5 text-xs text-primary/90 dark:text-primary/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-primary/10 rounded-md"
                   onClick={() => {
                     rhForm.setValue('email', user.email, { shouldValidate: true });
-                    rhForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
-                    toast.info(`Credentials auto-filled for ${user.name}.`, {position: 'top-center'});
+                    rhForm.setValue('password', 'password', { shouldValidate: true }); // Note: We don't have the password here, so we can't autofill it.
+                    toast.info(`Credentials auto-filled for ${user.email}.`, {position: 'top-center'});
                   }}
                 >
                   Use

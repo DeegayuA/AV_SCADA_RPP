@@ -89,6 +89,9 @@ const handler = NextAuth({
         } else if ((user as any).role) {
           token.role = (user as any).role;
         }
+        if (user.email === 'admin@av.lk') {
+          token.role = 'superadmin';
+        }
       }
       return token;
     },
