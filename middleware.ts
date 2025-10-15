@@ -3,7 +3,9 @@ import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 
 export const config = {
-  matcher: ['/((?!api/auth/login|_next/static|_next/image|favicon.ico|images|login).*)'],
+  matcher: [
+    '/((?!api/auth/login|api/auth/session|api/onboarding|_next/static|_next/image|favicon.ico|images|login).*)',
+  ],
 };
 
 const publicPaths = [
@@ -11,18 +13,15 @@ const publicPaths = [
   '/onboarding',
   '/terms-of-service',
   '/privacy-policy',
-  '/api/onboarding',
 ];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
 
-  if (publicPaths.some(path => pathname.startsWith(path))) {
-    return NextResponse.next();
-  }
+  const isPublicPath = publicPaths.some(path => pathname.startsWith(path));
 
-  if (pathname.startsWith('/login')) {
+  if (isPublicPath) {
     return NextResponse.next();
   }
 
