@@ -42,17 +42,20 @@ export async function POST(request: Request) {
 
     let filename: string | undefined;
     if (file) {
-      const fullResDir = path.join(process.cwd(), 'public', 'maintenance_image', dateString);
-      const previewDir = path.join(process.cwd(), 'public', 'maintenance_image_preview', dateString);
-      await fs.mkdir(fullResDir, { recursive: true });
-      await fs.mkdir(previewDir, { recursive: true });
+      const imageDir = path.join(process.cwd(), 'logs', 'maintenance_images', dateString);
+      await fs.mkdir(imageDir, { recursive: true });
 
       filename = `${PLANT_LOCATION}_${itemName.replace(/ /g, '_')}_${itemNumber.replace(/ /g, '_')}_${dateTimeString}_${username.replace(/ /g, '_')}.jpg`;
       const buffer = Buffer.from(await file.arrayBuffer());
-      await fs.writeFile(path.join(fullResDir, filename), buffer);
+
+      // Save the original image
+      await fs.writeFile(path.join(imageDir, filename), buffer);
+
+      // Create and save a preview image
+      const previewFilename = `preview_${filename}`;
       await sharp(buffer)
         .resize(1024, 1024, { fit: 'inside', withoutEnlargement: true })
-        .toFile(path.join(previewDir, filename));
+        .toFile(path.join(imageDir, previewFilename));
     }
 
     const note: MaintenanceNote = {
@@ -65,6 +68,7 @@ export async function POST(request: Request) {
       author: username,
       imageFilename: filename,
       isScheduledCheck,
+      isRead: false,
     };
 
     await fs.mkdir(logDir, { recursive: true });

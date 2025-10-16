@@ -16,12 +16,13 @@ import { toast } from 'sonner';
 import { MaintenanceItem } from '@/types/maintenance';
 import { useAppStore } from '@/stores/appStore';
 import { Combobox } from '@/components/ui/combobox';
+import { MaintenanceNote } from '@/types/maintenance-note';
 
 interface NoteDialogProps {
   item?: MaintenanceItem;
   itemNumber?: number;
   isScheduledCheck: boolean;
-  onNoteSubmitted: () => void;
+  onNoteSubmitted: (newNote: MaintenanceNote) => void;
   trigger?: React.ReactNode;
 }
 
@@ -96,8 +97,9 @@ export const NoteDialog: React.FC<NoteDialogProps> = ({ item, itemNumber, isSche
         body: formData,
       });
       if (response.ok) {
+        const newNote = await response.json();
         toast.success("Note submitted successfully.");
-        onNoteSubmitted();
+        onNoteSubmitted(newNote);
         setOpen(false);
       } else {
         toast.error("Failed to submit note.");

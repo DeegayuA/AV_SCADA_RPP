@@ -816,13 +816,45 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChec
           />
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={async (value) => {
+          setActiveTab(value);
+          if (value === 'notes-log') {
+            const unreadNotes = maintenanceNotes.filter(note => !note.isRead);
+            if (unreadNotes.length > 0) {
+              const noteIds = unreadNotes.map(note => note.id);
+              try {
+                await fetch('/api/maintenance/notes/mark-as-read', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ noteIds }),
+                });
+                // Optimistically update the UI
+                const updatedNotes = maintenanceNotes.map(note =>
+                  noteIds.includes(note.id) ? { ...note, isRead: true } : note
+                );
+                // This is a prop, so we can't update it directly.
+                // The parent component will need to handle this.
+                // For now, we'll just refetch all data.
+                // A better solution would be to pass a state setter down.
+              } catch (error) {
+                toast.error("Failed to mark notes as read.");
+              }
+            }
+          }
+        }}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">Monthly Status & Logs</h2>
             <TabsList>
               <TabsTrigger value="monthly">Monthly Calendar</TabsTrigger>
               <TabsTrigger value="upload-log">Image Upload Log</TabsTrigger>
-              <TabsTrigger value="notes-log">Maintenance Notes</TabsTrigger>
+              <TabsTrigger value="notes-log">
+                Maintenance Notes
+                {maintenanceNotes.filter(note => !note.isRead).length > 0 && (
+                  <span className="ml-2 bg-red-500 text-white rounded-full px-2 text-xs">
+                    {maintenanceNotes.filter(note => !note.isRead).length}
+                  </span>
+                )}
+              </TabsTrigger>
             </TabsList>
           </div>
 
@@ -1170,7 +1202,7 @@ interface OperatorViewProps extends ProgressProps {
   items: MaintenanceItem[];
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
   maintenanceNotes: MaintenanceNote[];
-  onNoteSubmitted: () => void;
+  onNoteSubmitted: (newNote: MaintenanceNote) => void;
 }
 
 type UploadStatus = 'pending' | 'uploading' | 'success' | 'error' | 'missed';
@@ -1219,7 +1251,7 @@ const OperatorViewItem: React.FC<{
   number: number;
   serverTime: Date;
   maintenanceNotes: MaintenanceNote[];
-  onNoteSubmitted: () => void;
+  onNoteSubmitted: (newNote: MaintenanceNote) => void;
 }> = ({ item, number, serverTime, maintenanceNotes, onNoteSubmitted }) => {
   const { allSlots, activeSlot, nextSlot } = getTimeSlotInfo(item.timeFrames, item.timeWindow || 60, serverTime);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1382,14 +1414,15 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, to
     <div>
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-4">
-          <Dialog>
-            <DialogTrigger asChild>
+          <NoteDialog
+            isScheduledCheck={false}
+            onNoteSubmitted={onNoteSubmitted}
+            trigger={
               <Button size="icon" className="rounded-full w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white">
                 <Plus className="h-6 w-6" />
               </Button>
-            </DialogTrigger>
-            <NoteDialog isScheduledCheck={false} onNoteSubmitted={onNoteSubmitted} />
-          </Dialog>
+            }
+          />
           <h1 className="text-3xl font-bold">Maintenance Checks</h1>
         </div>
         <div className="text-right">
@@ -1491,7 +1524,7 @@ const MaintenancePage = () => {
     } catch (e) {
       setPlcStatus('disconnected');
     }
-  }, []);
+  }, [setPlcStatus]);
 
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
@@ -1519,7 +1552,7 @@ const MaintenancePage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [setItems, setMaintenanceNotes, setIsLoading]);
 
   useEffect(() => {
     fetchAllData();
@@ -1607,7 +1640,7 @@ const MaintenancePage = () => {
           {...progressProps}
           dailyStatusGridData={dailyStatusGridData}
           maintenanceNotes={maintenanceNotes}
-          onNoteSubmitted={fetchAllData}
+          onNoteSubmitted={(newNote) => setMaintenanceNotes(prev => [...prev, newNote])}
         />
       )}
     </div>

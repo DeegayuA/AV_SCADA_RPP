@@ -19,11 +19,17 @@ export async function GET(
     const [date, filename] = slug;
     const imagePath = path.join(process.cwd(), 'logs', 'maintenance_images', date, filename);
 
+    const imageDir = path.join(process.cwd(), 'logs', 'maintenance_images');
+    const safeImagePath = path.join(imageDir, date, filename);
+
     // Basic security check to prevent directory traversal
-    const logsDir = path.join(process.cwd(), 'logs', 'maintenance_images');
-    if (!path.resolve(imagePath).startsWith(path.resolve(logsDir))) {
+    if (!path.resolve(safeImagePath).startsWith(path.resolve(imageDir))) {
         return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+
+    await stat(safeImagePath); // Check if file exists
+
+    const imageBuffer = await readFile(safeImagePath);
 
     await stat(imagePath); // Check if file exists
 
