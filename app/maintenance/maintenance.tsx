@@ -271,6 +271,7 @@ interface AdminStatusViewProps extends ProgressProps {
   items: MaintenanceItem[];
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
   maintenanceNotes: MaintenanceNote[];
+  setMaintenanceNotes: Dispatch<SetStateAction<MaintenanceNote[]>>;
 }
 
 interface AdminViewProps extends ProgressProps {
@@ -278,9 +279,10 @@ interface AdminViewProps extends ProgressProps {
   setItems: Dispatch<SetStateAction<MaintenanceItem[]>>;
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
   maintenanceNotes: MaintenanceNote[];
+  setMaintenanceNotes: Dispatch<SetStateAction<MaintenanceNote[]>>;
 }
 
-const ViewerView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
+const ViewerView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes, setMaintenanceNotes }) => {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-4">Maintenance Status</h1>
@@ -290,6 +292,7 @@ const ViewerView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChecks, t
         todaysCompletedChecks={todaysCompletedChecks}
         dailyStatusGridData={dailyStatusGridData}
         maintenanceNotes={maintenanceNotes}
+        setMaintenanceNotes={setMaintenanceNotes}
       />
     </div>
   );
@@ -651,7 +654,7 @@ const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items
   );
 };
 
-const AdminView: React.FC<AdminViewProps> = ({ items, setItems, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
+const AdminView: React.FC<AdminViewProps> = ({ items, setItems, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes, setMaintenanceNotes }) => {
   const currentUser = useAppStore((state) => state.currentUser);
   const [showHelp, setShowHelp] = useState(true);
 
@@ -692,13 +695,14 @@ const AdminView: React.FC<AdminViewProps> = ({ items, setItems, totalDailyChecks
           todaysCompletedChecks={todaysCompletedChecks}
           dailyStatusGridData={dailyStatusGridData}
           maintenanceNotes={maintenanceNotes}
+          setMaintenanceNotes={setMaintenanceNotes}
         />
       </div>
     </motion.div>
   );
 };
 
-const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes }) => {
+const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, maintenanceNotes, setMaintenanceNotes }) => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -832,10 +836,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChec
                 const updatedNotes = maintenanceNotes.map(note =>
                   noteIds.includes(note.id) ? { ...note, isRead: true } : note
                 );
-                // This is a prop, so we can't update it directly.
-                // The parent component will need to handle this.
-                // For now, we'll just refetch all data.
-                // A better solution would be to pass a state setter down.
+                setMaintenanceNotes(updatedNotes);
               } catch (error) {
                 toast.error("Failed to mark notes as read.");
               }
@@ -1629,10 +1630,10 @@ const MaintenancePage = () => {
         version={VERSION}
       />
       {currentUser.role === UserRole.ADMIN && (
-        <AdminView items={items} setItems={setItems} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
+        <AdminView items={items} setItems={setItems} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} setMaintenanceNotes={setMaintenanceNotes} />
       )}
       {currentUser.role === UserRole.VIEWER && (
-        <ViewerView items={items} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} />
+        <ViewerView items={items} {...progressProps} dailyStatusGridData={dailyStatusGridData} maintenanceNotes={maintenanceNotes} setMaintenanceNotes={setMaintenanceNotes} />
       )}
       {currentUser.role === UserRole.OPERATOR && (
         <OperatorView

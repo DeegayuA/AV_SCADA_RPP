@@ -31,10 +31,6 @@ export async function GET(
 
     const imageBuffer = await readFile(safeImagePath);
 
-    await stat(imagePath); // Check if file exists
-
-    const imageBuffer = await readFile(imagePath);
-
     // Determine content type from file extension
     const extension = path.extname(filename).toLowerCase();
     let contentType = 'image/jpeg'; // default
