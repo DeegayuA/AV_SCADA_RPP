@@ -59,6 +59,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRange } from "react-day-picker";
 import { saveAs } from "file-saver";
+import Image from 'next/image';
 import { MaintenanceNotesLog } from '@/components/maintenance/MaintenanceNotesLog';
 import { MaintenanceNote } from '@/types/maintenance-note';
 import { NoteDialog } from '@/components/maintenance/NoteDialog';
@@ -191,19 +192,26 @@ const processDailyStatus = (
 
 const DashboardHeaderControl = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
+    plcStatus, isConnected, connectWebSocket, onClickWsStatus, delay,
     version,
   }: {
     plcStatus: "online" | "offline" | "disconnected";
     isConnected: boolean;
     connectWebSocket: () => void;
     onClickWsStatus: () => void;
-    currentTime: string;
     delay: number;
     version: string;
   }) => {
     const router = useRouter();
     const headerTitle = "Maintenance";
+    const [currentTime, setCurrentTime] = useState<string>('');
+
+    useEffect(() => {
+      const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
+      uc();
+      const i = setInterval(uc, 1000);
+      return () => clearInterval(i);
+    }, []);
 
     return (
       <>
@@ -1029,10 +1037,12 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChec
                         <TableCell>{note.author}</TableCell>
                         <TableCell>
                           {note.imageFilename && (
-                            <img
+                            <Image
                               src={`/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}`}
                               alt="thumbnail"
-                              className="w-16 h-16 object-cover cursor-pointer rounded-md border"
+                              width={64}
+                              height={64}
+                              className="object-cover cursor-pointer rounded-md border"
                               onClick={() => handleStatusClick(note.imageFilename ? `/api/maintenance/image/${format(new Date(note.timestamp), 'yyyy-MM-dd')}/${encodeURIComponent(note.imageFilename)}` : null)}
                             />
                           )}
@@ -1095,7 +1105,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChec
           <DialogHeader>
             <DialogTitle>Image Preview</DialogTitle>
           </DialogHeader>
-          <img src={selectedImage} alt="Maintenance Check" className="w-full h-auto" />
+          <Image src={selectedImage} alt="Maintenance Check" width={1200} height={800} className="w-full h-auto" />
         </DialogContent>
       )}
 
@@ -1307,16 +1317,20 @@ const OperatorViewItem: React.FC<{
 
   const uploadKey = `${item.name}-${number}`;
 
-  const statusInfo = {
+  const statusInfo = React.useMemo(() => ({
     pending: { icon: Clock, color: 'text-gray-500', text: `Next check at ${relevantSlot?.time}` },
     uploading: { icon: Loader2, color: 'text-blue-500', text: 'Uploading...' },
     success: { icon: CheckCircle, color: 'text-green-500', text: 'Completed' },
     error: { icon: XCircle, color: 'text-red-500', text: 'Failed' },
     missed: { icon: XCircle, color: 'text-orange-500', text: `Missed check at ${relevantSlot?.time}` },
-  };
+  }), [relevantSlot?.time]);
 
   const isButtonDisabled = displayMode !== 'active' || isSubmitting || hasNoteForActiveSlot;
-  const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo.pending);
+  const currentStatusInfo = React.useMemo(() => {
+    if (isSubmitting) return statusInfo.uploading;
+    if (displayMode === 'active') return { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` };
+    return statusInfo.pending;
+  }, [isSubmitting, displayMode, activeSlot, statusInfo]);
   const CurrentIcon = currentStatusInfo.icon;
 
   const memoizedTrigger = React.useMemo(() => (
@@ -1457,7 +1471,7 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, to
 
       <Card className="mb-4">
         <CardHeader>
-          <CardTitle>Today's Progress</CardTitle>
+          <CardTitle>Today&apos;s Progress</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
@@ -1507,12 +1521,15 @@ const MaintenancePage = () => {
   // State for header
   const { connect: connectWebSocket, isConnected } = useWebSocket();
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
-  const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const [maintenanceNotes, setMaintenanceNotes] = useState<MaintenanceNote[]>([]);
+
+  const onNoteSubmitted = useCallback((newNote: MaintenanceNote) => {
+    setMaintenanceNotes(prev => [...prev, newNote]);
+  }, []);
 
   useEffect(() => {
     const fetchAllData = async () => {
@@ -1590,12 +1607,12 @@ const MaintenancePage = () => {
     }
   }, [nodeValues]);
 
-  useEffect(() => {
-    const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
-    uc();
-    const i = setInterval(uc, 1000);
-    return () => clearInterval(i);
-  }, []);
+  // useEffect(() => {
+  //   const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
+  //   uc();
+  //   const i = setInterval(uc, 1000);
+  //   return () => clearInterval(i);
+  // }, []);
 
   useEffect(() => {
     const lagI = setInterval(() => {
@@ -1631,7 +1648,6 @@ const MaintenancePage = () => {
         isConnected={isConnected}
         connectWebSocket={connectWebSocket}
         onClickWsStatus={handleWsStatusClick}
-        currentTime={currentTime}
         delay={delay}
         version={VERSION}
       />
@@ -1647,7 +1663,7 @@ const MaintenancePage = () => {
           {...progressProps}
           dailyStatusGridData={dailyStatusGridData}
           maintenanceNotes={maintenanceNotes}
-          onNoteSubmitted={(newNote) => setMaintenanceNotes(prev => [...prev, newNote])}
+          onNoteSubmitted={onNoteSubmitted}
         />
       )}
     </div>
