@@ -1,121 +1,113 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { decryptUsers, encryptUsers } from '@/lib/user-crypto';
+import { NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { decryptUsers, encryptUsers } from '@/lib/user-crypto';
 import bcrypt from 'bcryptjs';
-import { getSession } from 'next-auth/react';
-import { getToken } from 'next-auth/jwt';
 
 const USERS_PATH = path.join(process.cwd(), 'config', 'users.json.enc');
-const SALT_ROUNDS = 10;
 
-async function getUsers() {
-    try {
-        const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
-        return await decryptUsers(encryptedData);
-    } catch (error) {
-        // If the file doesn't exist, return an empty object
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-            return {};
-        }
-        throw error;
-    }
-}
-
-async function saveUsers(users: any) {
-    const encryptedUsers = await encryptUsers(users);
-    if (encryptedUsers) {
-        await fs.writeFile(USERS_PATH, encryptedUsers);
-    }
-}
-
-export async function GET(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token || (token.role !== 'admin' && token.role !== 'superadmin')) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const users = await getUsers();
+export async function GET() {
+  try {
+    const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
+    const users = await decryptUsers(encryptedData);
     // remove passwords before sending
-    for (const email in users) {
-        delete users[email].password;
+    for (const user in users) {
+        delete users[user].password;
     }
     return NextResponse.json(users);
+  } catch (error) {
+    console.error('Failed to read users file:', error);
+    return NextResponse.json({});
+  }
 }
 
-export async function POST(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token || (token.role !== 'admin' && token.role !== 'superadmin')) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const { email, password, role } = await req.json();
-
-    if (!email || !password || !role) {
-        return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
-    }
-
-    const users = await getUsers();
+export async function POST(request: Request) {
+  try {
+    const { email, password, role } = await request.json();
+    const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
+    const users = await decryptUsers(encryptedData) || {};
 
     if (users[email]) {
-        return NextResponse.json({ message: 'User already exists' }, { status: 409 });
+      return NextResponse.json({ message: 'User already exists' }, { status: 400 });
     }
 
-    const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     users[email] = { password: hashedPassword, role };
 
-    await saveUsers(users);
-
-    return NextResponse.json({ message: 'User created successfully' }, { status: 201 });
+    const encryptedUsers = await encryptUsers(users);
+    if (encryptedUsers) {
+      await fs.writeFile(USERS_PATH, encryptedUsers);
+      return NextResponse.json({ message: 'User created' });
+    } else {
+        return NextResponse.json({ message: 'Failed to encrypt users' }, { status: 500 });
+    }
+  } catch (error) {
+    console.error('Failed to create user:', error);
+    return NextResponse.json({ message: 'Failed to create user' }, { status: 500 });
+  }
 }
 
-export async function PUT(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token || (token.role !== 'admin' && token.role !== 'superadmin')) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-    }
+export async function PUT(request: Request) {
+    try {
+      const { email, password, role } = await request.json();
+      const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
+      const users = await decryptUsers(encryptedData) || {};
 
-    const { email, role } = await req.json();
-
-    if (!email || !role) {
-        return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
-    }
-
-    const users = await getUsers();
-
-    if (!users[email]) {
+      if (!users[email]) {
         return NextResponse.json({ message: 'User not found' }, { status: 404 });
+      }
+
+      if (password) {
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        users[email].password = hashedPassword;
+      }
+
+      if (role) {
+        users[email].role = role;
+      }
+
+      const encryptedUsers = await encryptUsers(users);
+      if (encryptedUsers) {
+        await fs.writeFile(USERS_PATH, encryptedUsers);
+        return NextResponse.json({ message: 'User updated' });
+      } else {
+          return NextResponse.json({ message: 'Failed to encrypt users' }, { status: 500 });
+      }
+    } catch (error) {
+      console.error('Failed to update user:', error);
+      return NextResponse.json({ message: 'Failed to update user' }, { status: 500 });
     }
+  }
 
-    users[email].role = role;
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const email = searchParams.get('email');
+        if (!email) {
+            return NextResponse.json({ message: 'Email is required' }, { status: 400 });
+        }
 
-    await saveUsers(users);
+        const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
+        const users = await decryptUsers(encryptedData) || {};
 
-    return NextResponse.json({ message: 'User updated successfully' });
-}
+        if (!users[email]) {
+            return NextResponse.json({ message: 'User not found' }, { status: 404 });
+        }
 
-export async function DELETE(req: NextRequest) {
-    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
-    if (!token || (token.role !== 'admin' && token.role !== 'superadmin')) {
-        return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        delete users[email];
+
+        const encryptedUsers = await encryptUsers(users);
+        if (encryptedUsers) {
+            await fs.writeFile(USERS_PATH, encryptedUsers);
+            return NextResponse.json({ message: 'User deleted' });
+        } else {
+            return NextResponse.json({ message: 'Failed to encrypt users' }, { status: 500 });
+        }
+    } catch (error) {
+        console.error('Failed to delete user:', error);
+        return NextResponse.json({ message: 'Failed to delete user' }, { status: 500 });
     }
-
-    const { email } = await req.json();
-
-    if (!email) {
-        return NextResponse.json({ message: 'Missing required fields' }, { status: 400 });
-    }
-
-    const users = await getUsers();
-
-    if (!users[email]) {
-        return NextResponse.json({ message: 'User not found' }, { status: 404 });
-    }
-
-    delete users[email];
-
-    await saveUsers(users);
-
-    return NextResponse.json({ message: 'User deleted successfully' });
 }

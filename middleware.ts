@@ -32,7 +32,7 @@ export async function middleware(req: NextRequest) {
   // Role-based access control for authenticated users
   const role = token.role as string;
 
-  if (pathname.startsWith('/admin') && role !== 'admin') {
+  if (pathname.startsWith('/admin') && !['admin', 'superadmin'].includes(role)) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 

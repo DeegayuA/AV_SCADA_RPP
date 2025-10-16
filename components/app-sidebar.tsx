@@ -101,7 +101,16 @@ const navDataConfig = {
     { title: "Circuit Layouts", url: "/circuit", icon: BookOpen, sectionId: "Circuit Layouts", colorKey: "circuit" },
   ] as NavMainItemProps[],
   maintenanceNavItem: { title: "Maintenance", url: "/maintenance", icon: Wrench, sectionId: "Maintenance", colorKey: "red" } as NavMainItemProps,
-  adminNavItem: { title: "Administration", url: "/admin", icon: ShieldCheck, sectionId: "Administration", colorKey: "admin" } as NavMainItemProps,
+  adminNavItem: {
+    title: "Administration",
+    url: "/admin",
+    icon: ShieldCheck,
+    sectionId: "Administration",
+    colorKey: "admin",
+    items: [
+      { title: "User Management", url: "/admin/users", sectionId: "User Management" },
+    ]
+  } as NavMainItemProps,
   adminSettingsNavItem: { title: "Mobile Config", url: "/mobile-config", icon: Settings2, sectionId: "Settings", colorKey: "settings" } as NavMainItemProps,
   apiMonitoringNavItem: { title: "API Monitoring", url: "/system/api-monitoring", icon: ServerCog, sectionId: "API Monitoring", colorKey: "system" } as NavMainItemProps,
   navSecondary: [

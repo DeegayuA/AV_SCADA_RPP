@@ -239,9 +239,7 @@ const LoginFormInternalContent = React.memo(({
       }
     };
 
-    if (process.env.NODE_ENV === 'development') {
-      fetchDevUsers();
-    }
+    fetchDevUsers();
   }, []);
 
   const devUsersCount = process.env.NODE_ENV === 'development' ? devUsers.length : 0;

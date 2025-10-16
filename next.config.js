@@ -2,7 +2,7 @@
 const nextConfig = {
   // output: 'export',
   experimental: {
-    serverActions: {},
+    serverActions: true,
   },
   eslint: {
     ignoreDuringBuilds: true,

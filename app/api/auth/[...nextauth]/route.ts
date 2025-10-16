@@ -84,13 +84,12 @@ const handler = NextAuth({
       if (user) {
         const encryptedData = await fs.readFile(USERS_PATH, 'utf-8');
         const users = await decryptUsers(encryptedData);
-        if (users && users[user.email!]) {
+        if (user.email === 'admin@av.lk') {
+          token.role = 'superadmin';
+        } else if (users && users[user.email!]) {
           token.role = users[user.email!].role;
         } else if ((user as any).role) {
           token.role = (user as any).role;
-        }
-        if (user.email === 'admin@av.lk') {
-          token.role = 'superadmin';
         }
       }
       return token;
