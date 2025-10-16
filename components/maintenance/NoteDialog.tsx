@@ -22,9 +22,10 @@ interface NoteDialogProps {
   itemNumber?: number;
   isScheduledCheck: boolean;
   onNoteSubmitted: () => void;
+  trigger?: React.ReactNode;
 }
 
-export const NoteDialog: React.FC<NoteDialogProps> = ({ item, itemNumber, isScheduledCheck, onNoteSubmitted }) => {
+export const NoteDialog: React.FC<NoteDialogProps> = ({ item, itemNumber, isScheduledCheck, onNoteSubmitted, trigger }) => {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [tags, setTags] = useState<string[]>([]);
@@ -111,7 +112,7 @@ export const NoteDialog: React.FC<NoteDialogProps> = ({ item, itemNumber, isSche
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className={isScheduledCheck ? "w-full" : ""}>{isScheduledCheck ? 'Upload Picture' : 'Add Maintenance Note'}</Button>
+        {trigger || <Button className={isScheduledCheck ? "w-full" : ""}>{isScheduledCheck ? 'Upload Picture' : 'Add Maintenance Note'}</Button>}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

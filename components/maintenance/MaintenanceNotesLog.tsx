@@ -97,8 +97,8 @@ export const MaintenanceNotesLog: React.FC<MaintenanceNotesLogProps> = ({ items,
               <SelectValue placeholder="Filter by tag" />
             </SelectTrigger>
             <SelectContent>
-              {Array.from(new Set(notes.flatMap(note => note.tags || []).filter(tag => tag))).map((tag, index) => (
-                <SelectItem key={`${tag}-${index}`} value={tag || ''}>{tag}</SelectItem>
+              {Array.from(new Set(notes.flatMap(note => note.tags || []).filter(tag => tag && tag.trim() !== ''))).map((tag, index) => (
+                <SelectItem key={`${tag}-${index}`} value={tag}>{tag}</SelectItem>
               ))}
             </SelectContent>
           </Select>

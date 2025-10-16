@@ -14,12 +14,12 @@ import { useWebSocket } from '@/hooks/useWebSocketListener';
 import {
   Loader2, KeyRound, Settings, ArrowUp, ArrowDown, Pencil,
   Clock, CheckCircle, XCircle, UploadCloud, Calendar as CalendarIcon,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Plus
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -260,6 +260,7 @@ const DashboardHeaderControl = React.memo(
       </>
     );
   });
+DashboardHeaderControl.displayName = 'DashboardHeaderControl';
 
 interface ProgressProps {
   totalDailyChecks: number;
@@ -793,7 +794,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({ items, totalDailyChec
       <div className="mt-4">
         <Card className="mb-4">
           <CardHeader>
-            <CardTitle>Today's Progress</CardTitle>
+            <CardTitle>Today&apos;s Progress</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-4">
@@ -1330,12 +1331,27 @@ const OperatorViewItem: React.FC<{
                 itemNumber={number}
                 isScheduledCheck={true}
                 onNoteSubmitted={onNoteSubmitted}
+                trigger={
+                  <Button disabled={isButtonDisabled} className="w-full">
+                    <CurrentIcon className={`mr-2 h-4 w-4 ${isSubmitting ? 'animate-spin' : ''}`} />
+                    {currentStatusInfo.text}
+                  </Button>
+                }
               />
             </>
           ) : (
             <p>No checks scheduled for today.</p>
           )}
         </CardContent>
+        <CardFooter>
+          <NoteDialog
+            item={item}
+            itemNumber={number}
+            isScheduledCheck={false}
+            onNoteSubmitted={onNoteSubmitted}
+            trigger={<Button variant="outline" className="w-full">Add Note</Button>}
+          />
+        </CardFooter>
       </Card>
     </motion.div>
   );
@@ -1365,7 +1381,17 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, to
   return (
     <div>
       <div className="flex justify-between items-center mb-4">
-        <h1 className="text-3xl font-bold">Maintenance Checks</h1>
+        <div className="flex items-center gap-4">
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button size="icon" className="rounded-full w-12 h-12 bg-blue-500 hover:bg-blue-600 text-white">
+                <Plus className="h-6 w-6" />
+              </Button>
+            </DialogTrigger>
+            <NoteDialog isScheduledCheck={false} onNoteSubmitted={onNoteSubmitted} />
+          </Dialog>
+          <h1 className="text-3xl font-bold">Maintenance Checks</h1>
+        </div>
         <div className="text-right">
           <p className="text-lg font-semibold">{currentUser?.name || 'Operator'}</p>
           <p className="text-sm text-muted-foreground">Operator View</p>
@@ -1406,12 +1432,6 @@ const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, to
 
       <div className="flex justify-between items-center mt-6 mb-4">
         <h2 className="text-2xl font-bold">Upload Controls</h2>
-        <Dialog>
-          <DialogTrigger asChild>
-            <Button>Add Maintenance Note</Button>
-          </DialogTrigger>
-          <NoteDialog isScheduledCheck={false} onNoteSubmitted={onNoteSubmitted} />
-        </Dialog>
       </div>
       {items.length === 0 ? (
         <p>No maintenance items configured.</p>
