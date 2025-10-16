@@ -1508,59 +1508,59 @@ const MaintenancePage = () => {
   const [serverTime, setServerTime] = useState<Date | null>(null);
   const [maintenanceNotes, setMaintenanceNotes] = useState<MaintenanceNote[]>([]);
 
-  const checkPlcConnection = useCallback(async () => {
-    try {
-      const r = await fetch('/api/opcua/status');
-      if (!r.ok) {
-        setPlcStatus('disconnected');
-        return;
-      }
-      const d = await r.json();
-      const nS = d.connectionStatus;
-      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
-        setPlcStatus(nS);
-      } else {
-        setPlcStatus('disconnected');
-      }
-    } catch (e) {
-      setPlcStatus('disconnected');
-    }
-  }, [setPlcStatus]);
-
-  const fetchAllData = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const [configResponse, notesResponse] = await Promise.all([
-        fetch('/api/maintenance/config'),
-        fetch('/api/maintenance/notes')
-      ]);
-
-      if (configResponse.ok) {
-        const config = await configResponse.json();
-        setItems(config);
-      } else {
-        toast.error("Failed to fetch maintenance configuration.");
-      }
-
-      if (notesResponse.ok) {
-        const data = await notesResponse.json();
-        setMaintenanceNotes(data);
-      } else {
-        toast.error('Failed to fetch maintenance notes.');
-      }
-    } catch (error) {
-      toast.error('An error occurred while fetching maintenance data.');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setItems, setMaintenanceNotes, setIsLoading]);
-
   useEffect(() => {
+    const fetchAllData = async () => {
+      setIsLoading(true);
+      try {
+        const [configResponse, notesResponse] = await Promise.all([
+          fetch('/api/maintenance/config'),
+          fetch('/api/maintenance/notes')
+        ]);
+
+        if (configResponse.ok) {
+          const config = await configResponse.json();
+          setItems(config);
+        } else {
+          toast.error("Failed to fetch maintenance configuration.");
+        }
+
+        if (notesResponse.ok) {
+          const data = await notesResponse.json();
+          setMaintenanceNotes(data);
+        } else {
+          toast.error('Failed to fetch maintenance notes.');
+        }
+      } catch (error) {
+        toast.error('An error occurred while fetching maintenance data.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    const checkPlcConnection = async () => {
+      try {
+        const r = await fetch('/api/opcua/status');
+        if (!r.ok) {
+          setPlcStatus('disconnected');
+          return;
+        }
+        const d = await r.json();
+        const nS = d.connectionStatus;
+        if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
+          setPlcStatus(nS);
+        } else {
+          setPlcStatus('disconnected');
+        }
+      } catch (e) {
+        setPlcStatus('disconnected');
+      }
+    };
+
     fetchAllData();
     checkPlcConnection();
     const plcI = setInterval(checkPlcConnection, 15000);
     return () => clearInterval(plcI);
-  }, [checkPlcConnection, fetchAllData]);
+  }, []);
 
   useEffect(() => {
     const fetchServerTime = async () => {
