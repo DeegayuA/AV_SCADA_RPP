@@ -1319,6 +1319,17 @@ const OperatorViewItem: React.FC<{
   const currentStatusInfo = isSubmitting ? statusInfo.uploading : (displayMode === 'active' ? { icon: UploadCloud, color: 'text-blue-500', text: `Upload for ${activeSlot!.time}` } : statusInfo.pending);
   const CurrentIcon = currentStatusInfo.icon;
 
+  const memoizedTrigger = React.useMemo(() => (
+    <Button disabled={isButtonDisabled} className="w-full">
+      <CurrentIcon className={`mr-2 h-4 w-4 ${isSubmitting ? 'animate-spin' : ''}`} />
+      {currentStatusInfo.text}
+    </Button>
+  ), [isButtonDisabled, currentStatusInfo, isSubmitting, CurrentIcon]);
+
+  const memoizedNoteTrigger = React.useMemo(() => (
+    <Button variant="outline" className="w-full">Add Note</Button>
+  ), []);
+
   return (
     <motion.div
       key={`${item.id}-${number}`}
@@ -1364,12 +1375,7 @@ const OperatorViewItem: React.FC<{
                 itemNumber={number}
                 isScheduledCheck={true}
                 onNoteSubmitted={onNoteSubmitted}
-                trigger={
-                  <Button disabled={isButtonDisabled} className="w-full">
-                    <CurrentIcon className={`mr-2 h-4 w-4 ${isSubmitting ? 'animate-spin' : ''}`} />
-                    {currentStatusInfo.text}
-                  </Button>
-                }
+                trigger={memoizedTrigger}
               />
             </>
           ) : (
@@ -1382,7 +1388,7 @@ const OperatorViewItem: React.FC<{
             itemNumber={number}
             isScheduledCheck={false}
             onNoteSubmitted={onNoteSubmitted}
-            trigger={<Button variant="outline" className="w-full">Add Note</Button>}
+            trigger={memoizedNoteTrigger}
           />
         </CardFooter>
       </Card>
