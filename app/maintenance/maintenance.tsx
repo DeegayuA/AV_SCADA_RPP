@@ -192,26 +192,19 @@ const processDailyStatus = (
 
 const DashboardHeaderControl = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, delay,
+    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
     version,
   }: {
     plcStatus: "online" | "offline" | "disconnected";
     isConnected: boolean;
     connectWebSocket: () => void;
     onClickWsStatus: () => void;
+    currentTime: string;
     delay: number;
     version: string;
   }) => {
     const router = useRouter();
     const headerTitle = "Maintenance";
-    const [currentTime, setCurrentTime] = useState<string>('');
-
-    useEffect(() => {
-      const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
-      uc();
-      const i = setInterval(uc, 1000);
-      return () => clearInterval(i);
-    }, []);
 
     return (
       <>
@@ -1521,6 +1514,7 @@ const MaintenancePage = () => {
   // State for header
   const { connect: connectWebSocket, isConnected } = useWebSocket();
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
+  const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
   const nodeValues = useAppStore(state => state.opcUaNodeValues);
@@ -1531,59 +1525,59 @@ const MaintenancePage = () => {
     setMaintenanceNotes(prev => [...prev, newNote]);
   }, []);
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      setIsLoading(true);
-      try {
-        const [configResponse, notesResponse] = await Promise.all([
-          fetch('/api/maintenance/config'),
-          fetch('/api/maintenance/notes')
-        ]);
-
-        if (configResponse.ok) {
-          const config = await configResponse.json();
-          setItems(config);
-        } else {
-          toast.error("Failed to fetch maintenance configuration.");
-        }
-
-        if (notesResponse.ok) {
-          const data = await notesResponse.json();
-          setMaintenanceNotes(data);
-        } else {
-          toast.error('Failed to fetch maintenance notes.');
-        }
-      } catch (error) {
-        toast.error('An error occurred while fetching maintenance data.');
-      } finally {
-        setIsLoading(false);
+  const checkPlcConnection = useCallback(async () => {
+    try {
+      const r = await fetch('/api/opcua/status');
+      if (!r.ok) {
+        setPlcStatus('disconnected');
+        return;
       }
-    };
-
-    const checkPlcConnection = async () => {
-      try {
-        const r = await fetch('/api/opcua/status');
-        if (!r.ok) {
-          setPlcStatus('disconnected');
-          return;
-        }
-        const d = await r.json();
-        const nS = d.connectionStatus;
-        if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
-          setPlcStatus(nS);
-        } else {
-          setPlcStatus('disconnected');
-        }
-      } catch (e) {
+      const d = await r.json();
+      const nS = d.connectionStatus;
+      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
+        setPlcStatus(nS);
+      } else {
         setPlcStatus('disconnected');
       }
-    };
+    } catch (e) {
+      setPlcStatus('disconnected');
+    }
+  }, [setPlcStatus]);
 
+  const fetchAllData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const [configResponse, notesResponse] = await Promise.all([
+        fetch('/api/maintenance/config'),
+        fetch('/api/maintenance/notes')
+      ]);
+
+      if (configResponse.ok) {
+        const config = await configResponse.json();
+        setItems(config);
+      } else {
+        toast.error("Failed to fetch maintenance configuration.");
+      }
+
+      if (notesResponse.ok) {
+        const data = await notesResponse.json();
+        setMaintenanceNotes(data);
+      } else {
+        toast.error('Failed to fetch maintenance notes.');
+      }
+    } catch (error) {
+      toast.error('An error occurred while fetching maintenance data.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [setItems, setMaintenanceNotes, setIsLoading]);
+
+  useEffect(() => {
     fetchAllData();
     checkPlcConnection();
     const plcI = setInterval(checkPlcConnection, 15000);
     return () => clearInterval(plcI);
-  }, []);
+  }, [checkPlcConnection, fetchAllData]);
 
   useEffect(() => {
     const fetchServerTime = async () => {
@@ -1607,12 +1601,12 @@ const MaintenancePage = () => {
     }
   }, [nodeValues]);
 
-  // useEffect(() => {
-  //   const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
-  //   uc();
-  //   const i = setInterval(uc, 1000);
-  //   return () => clearInterval(i);
-  // }, []);
+  useEffect(() => {
+    const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' }));
+    uc();
+    const i = setInterval(uc, 1000);
+    return () => clearInterval(i);
+  }, []);
 
   useEffect(() => {
     const lagI = setInterval(() => {
@@ -1648,6 +1642,7 @@ const MaintenancePage = () => {
         isConnected={isConnected}
         connectWebSocket={connectWebSocket}
         onClickWsStatus={handleWsStatusClick}
+        currentTime={currentTime}
         delay={delay}
         version={VERSION}
       />

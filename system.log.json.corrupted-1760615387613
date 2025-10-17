@@ -1,20 +1,6 @@
 [
   {
-    "timestamp": "2025-10-16T11:11:21.127Z",
-    "userId": "admin@av.lk",
-    "userName": "Admin SolarCtrl",
-    "userRole": "admin",
-    "actionType": "PAGE_VIEW_START",
-    "details": {
-      "path": "/maintenance"
-    },
-    "pageUrl": "/maintenance",
-    "clientInfo": {
-      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
-    }
-  },
-  {
-    "timestamp": "2025-10-16T11:13:05.834Z",
+    "timestamp": "2025-10-16T11:49:25.873Z",
     "userId": "guest@example.com",
     "userName": "Guest Viewer",
     "userRole": "viewer",
@@ -28,7 +14,7 @@
     }
   },
   {
-    "timestamp": "2025-10-16T11:13:16.132Z",
+    "timestamp": "2025-10-16T11:49:36.475Z",
     "userId": "guest@example.com",
     "userName": "Guest Viewer",
     "userRole": "viewer",
@@ -43,15 +29,15 @@
     }
   },
   {
-    "timestamp": "2025-10-16T11:13:16.194Z",
+    "timestamp": "2025-10-16T11:49:36.498Z",
     "userId": "admin@av.lk",
     "userName": "Admin SolarCtrl",
     "userRole": "admin",
     "actionType": "PAGE_VIEW_END",
     "details": {
       "path": "/login",
-      "durationMs": 10357,
-      "durationSeconds": 10.36,
+      "durationMs": 10623,
+      "durationSeconds": 10.62,
       "reason": "Component unmount or navigation away from app scope"
     },
     "pageUrl": "/login",
@@ -60,7 +46,7 @@
     }
   },
   {
-    "timestamp": "2025-10-16T11:13:16.197Z",
+    "timestamp": "2025-10-16T11:49:36.501Z",
     "userId": "admin@av.lk",
     "userName": "Admin SolarCtrl",
     "userRole": "admin",
@@ -74,15 +60,15 @@
     }
   },
   {
-    "timestamp": "2025-10-16T11:13:18.015Z",
+    "timestamp": "2025-10-16T11:49:38.058Z",
     "userId": "admin@av.lk",
     "userName": "Admin SolarCtrl",
     "userRole": "admin",
     "actionType": "PAGE_VIEW_END",
     "details": {
       "path": "/login",
-      "durationMs": 1816,
-      "durationSeconds": 1.82,
+      "durationMs": 1556,
+      "durationSeconds": 1.56,
       "reason": "Component unmount or navigation away from app scope"
     },
     "pageUrl": "/login",
@@ -91,7 +77,7 @@
     }
   },
   {
-    "timestamp": "2025-10-16T11:13:18.018Z",
+    "timestamp": "2025-10-16T11:49:38.064Z",
     "userId": "admin@av.lk",
     "userName": "Admin SolarCtrl",
     "userRole": "admin",
@@ -105,15 +91,15 @@
     }
   },
   {
-    "timestamp": "2025-10-16T11:13:20.285Z",
+    "timestamp": "2025-10-16T11:49:40.970Z",
     "userId": "admin@av.lk",
     "userName": "Admin SolarCtrl",
     "userRole": "admin",
     "actionType": "PAGE_LEAVE_SITE",
     "details": {
       "path": "/onboarding",
-      "durationMs": 2263,
-      "durationSeconds": 2.26
+      "durationMs": 2901,
+      "durationSeconds": 2.9
     },
     "pageUrl": "/onboarding",
     "clientInfo": {
@@ -121,7 +107,7 @@
     }
   },
   {
-    "timestamp": "2025-10-16T11:13:23.695Z",
+    "timestamp": "2025-10-16T11:49:43.986Z",
     "userId": "admin@av.lk",
     "userName": "Admin SolarCtrl",
     "userRole": "admin",

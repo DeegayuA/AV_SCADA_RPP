@@ -52,7 +52,7 @@ export function NavMain({
 
         return (
           <React.Fragment key={item.title + index}>
-            <Link href={item.url} passHref legacyBehavior>
+            <Link href={item.url} passHref>
               <motion.a
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-all duration-200 ease-in-out group",
