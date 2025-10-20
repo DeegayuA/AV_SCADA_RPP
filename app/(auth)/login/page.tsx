@@ -1,7 +1,7 @@
 // app/(auth)/login/page.tsx
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect, useMemo, ForwardRefExoticComponent, RefAttributes, useCallback } from 'react';
 import Image, { StaticImageData } from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useForm, UseFormReturn } from 'react-hook-form';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon, Zap, LucideProps, Settings2, ShieldCheck, KeyRound, CircleDotDashed, CheckCircle } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { signIn } from 'next-auth/react';
+
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
 import React from 'react';
@@ -28,6 +29,7 @@ import bg5 from "@/img/solar_bg00005.jpg";
 import bg6 from "@/img/solar_bg00006.jpg";
 const imageUrls: StaticImageData[] = [bg1, bg2, bg3, bg4, bg5, bg6];
 
+
 const rotatingMessages = [
   { title: "Empowering Solar Innovations.", iconName: "Zap" },
   { title: "Secure Energy Management.", iconName: "Lock" },
@@ -35,6 +37,7 @@ const rotatingMessages = [
   { title: "Insightful Energy Analytics.", iconName: "Eye" },
 ];
 const iconsMap: { [key: string]: React.ElementType } = { Zap, Lock, Settings2, Eye };
+
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -56,11 +59,27 @@ const formElementVariants = (delayOffset: number = 0) => ({
   hidden: { opacity: 0, y: 15 },
   visible: (i: number) => ({ opacity: 1, y: 0, transition: { delay: (i * 0.07) + delayOffset + parseFloat(String(0.3)), duration: 0.4, ease: "easeOut" as const } }),
 });
+type IconType = ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>;
+interface FormItemConfigBase { name: "email" | "password"; label: string; placeholder: string; icon: IconType; type: string; }
+interface EmailFormItemConfig extends FormItemConfigBase { name: "email"; type: "email"; }
+interface PasswordFormItemConfig extends FormItemConfigBase { name: "password"; type: "text" | "password"; rightIcon: IconType; onRightIconClick: () => void; rightIconAriaLabel: string; }
+type FormItemConfig = EmailFormItemConfig | PasswordFormItemConfig;
+
+const GoogleIcon = () => (
+    <motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+      <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+      <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+      <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+      <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.994,36.076,44,30.54,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+    </motion.svg>
+);
+
 
 export default function LoginPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
   const [currentImageIndex, setCurrentImageIndex] = useState(Math.floor(Math.random() * imageUrls.length));
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
 
@@ -79,7 +98,7 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      const msg = 'Invalid credentials. Please review your email and password.';
+      const msg = 'Invalid username or password.';
       toast.error("Login Failed", { description: msg });
       setLoginError(msg);
       setIsSubmitting(false);
@@ -87,6 +106,12 @@ export default function LoginPage() {
       router.push('/');
     }
   };
+
+  useEffect(() => {
+    const imageI = setInterval(() => setCurrentImageIndex((p) => (p + 1) % imageUrls.length), 7000);
+    const messageI = setInterval(() => setCurrentMessageIndex((p) => (p + 1) % rotatingMessages.length), 5500);
+    return () => { clearInterval(imageI); clearInterval(messageI); };
+  }, []);
 
   const handlePlaceholderLinkClick = (
     event: React.MouseEvent<HTMLAnchorElement>,
@@ -200,7 +225,7 @@ const LoginFormInternalContent = React.memo(({
   const inputBaseClass = "h-11 sm:h-12 text-sm bg-slate-100/70 dark:bg-slate-800/50 border-slate-300/80 dark:border-slate-700/70 focus:border-primary focus:ring-2 focus:ring-primary/30 dark:focus:border-primary dark:focus:ring-primary/30 placeholder:text-slate-400/90 dark:placeholder:text-slate-500/80 transition-all duration-200 ease-in-out rounded-lg shadow-sm";
   const inputWithIconClass = `${inputBaseClass} pl-11 sm:pl-12`;
 
-  const formItemsConfig = [
+  const formItemsConfig: FormItemConfig[] = [
     { name: "email", label: "Email Address", placeholder: "user@example.com", icon: Mail, type: "email" },
     { name: "password", label: "Password", placeholder: "Your secure password", icon: Lock, type: showPassword ? "text" : "password", rightIcon: showPassword ? EyeOff : Eye, onRightIconClick: togglePasswordVisibility, rightIconAriaLabel: showPassword ? "Hide password" : "Show password" },
   ];
@@ -232,8 +257,8 @@ const LoginFormInternalContent = React.memo(({
                         <Input type={item.type} placeholder={item.placeholder} {...field} className={inputWithIconClass} autoComplete={item.name} />
                         {item.name === "password" && 'rightIcon' in item && item.rightIcon && (
                           <Button type="button" variant="ghost" size="icon" className="absolute right-1.5 sm:right-2.5 top-1/2 h-8 w-8 -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-primary hover:bg-transparent focus-visible:ring-0 rounded-full"
-                            onClick={item.onRightIconClick} aria-label={item.rightIconAriaLabel}>
-                            {React.createElement(item.rightIcon, { className: "h-5 w-5" })}
+                            onClick={(item as PasswordFormItemConfig).onRightIconClick} aria-label={(item as PasswordFormItemConfig).rightIconAriaLabel}>
+                            {React.createElement((item as PasswordFormItemConfig).rightIcon, { className: "h-5 w-5" })}
                           </Button>
                         )}
                       </div>
@@ -313,12 +338,3 @@ const ThemeToggleButton = React.memo(() => {
   );
 });
 ThemeToggleButton.displayName = "ThemeToggleButton";
-
-const GoogleIcon = () => (
-    <motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-      <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
-      <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
-      <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
-      <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.994,36.076,44,30.54,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
-    </motion.svg>
-);
