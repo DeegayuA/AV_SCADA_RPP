@@ -16,6 +16,7 @@ import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon,
 import { useTheme } from 'next-themes';
 import { signIn } from 'next-auth/react';
 
+import { isOnboardingComplete } from '@/lib/idb-store';
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
 import React from 'react';

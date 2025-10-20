@@ -1,8 +1,20 @@
 [
   {
-    "id": "d89b92ba-c479-4c45-933a-2aee21b2320a",
+    "id": "c4c041b1-1d56-4518-810b-a0d54ca11461",
     "username": "admin@av.lk",
-    "password": "$2b$12$l6mARQad97eA5aLOLDAwreXoLgDQQl6hkktsLiYFM3UPMp8StiN6W",
+    "password": "$2b$12$F48VqemFw/osTsvbp/571ePaQRrbjlEs/nUOsC92vYkiRy1EkWKFi",
     "role": "admin"
+  },
+  {
+    "id": "f9dccd21-30b3-485c-8699-c7c782702159",
+    "username": "operator@av.lk",
+    "password": "$2b$12$Ujl1HSiB8U4CRumhEwobF.13g7S5eQeOO6wc8fz/PPIvAUxS5Uy2u",
+    "role": "operator"
+  },
+  {
+    "id": "10f50274-2075-4740-97e2-148d086d9b11",
+    "username": "viewer@av.lk",
+    "password": "$2b$12$VYRbRCyJk3VSEjwur77vludAQ6RlxmtgOfo1vrYvlS.EjCvZ7w7Au",
+    "role": "viewer"
   }
 ]
