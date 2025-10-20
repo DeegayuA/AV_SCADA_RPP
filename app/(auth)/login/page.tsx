@@ -19,7 +19,14 @@ import { signIn } from 'next-auth/react';
 import { isOnboardingComplete } from '@/lib/idb-store';
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
+import { User, UserRole } from '@/types/auth';
 import React from 'react';
+
+const users: User[] = [ // Mock users
+  { email: 'admin@av.lk', passwordHash: 'AVR&D490', role: UserRole.ADMIN, avatar: `https://avatar.vercel.sh/admin-av.png`, name: 'Admin SolarCtrl', redirectPath: '/control' },
+  { email: 'operator@av.lk', passwordHash: 'operator123', role: UserRole.OPERATOR, avatar: `https://avatar.vercel.sh/operator-solar.png`, name: 'Operator Prime', redirectPath: '/control' },
+  { email: 'viewer@av.lk', passwordHash: 'viewer123', role: UserRole.VIEWER, avatar: `https://avatar.vercel.sh/viewer-energy.png`, name: 'Guest Observer', redirectPath: '/dashboard' },
+];
 
 // Background images
 import bg1 from "@/img/solar_bg00001.jpg";
@@ -221,7 +228,8 @@ const LoginFormInternalContent = React.memo(({
   const [showPassword, setShowPassword] = useState(false);
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
 
-  const formElementDelayOffset = 0.1;
+  const devUsersCount = process.env.NODE_ENV === 'development' ? users.length : 0;
+  const formElementDelayOffset = devUsersCount * 0.03 + (devUsersCount > 0 ? 0.1 : 0) ;
 
   const inputBaseClass = "h-11 sm:h-12 text-sm bg-slate-100/70 dark:bg-slate-800/50 border-slate-300/80 dark:border-slate-700/70 focus:border-primary focus:ring-2 focus:ring-primary/30 dark:focus:border-primary dark:focus:ring-primary/30 placeholder:text-slate-400/90 dark:placeholder:text-slate-500/80 transition-all duration-200 ease-in-out rounded-lg shadow-sm";
   const inputWithIconClass = `${inputBaseClass} pl-11 sm:pl-12`;
@@ -241,6 +249,50 @@ const LoginFormInternalContent = React.memo(({
         <h2 className="text-2xl sm:text-3xl font-semibold text-gray-800 dark:text-gray-100">Sign In to Your Account</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">Access your personalized energy dashboard.</p>
       </div>
+
+      {process.env.NODE_ENV === 'development' && (
+        <motion.div initial={{ opacity: 0, y:10 }} animate={{ opacity: 1, y:0, transition: { delay: 0.3 } }}
+          className="rounded-xl border border-primary/20 dark:border-primary/30 bg-primary/5 dark:bg-primary/10 p-3.5 sm:p-4 text-xs shadow-md">
+          <p className="mb-2.5 flex items-center text-sm font-semibold text-primary/90 dark:text-primary/80">
+            <Users className="mr-2 h-5 w-5" /> Development Logins
+          </p>
+          <div className="space-y-2">
+            {users.map((user, index) => (
+              <motion.div
+                key={user.email}
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0, transition: { delay: 0.3 + (index * 0.05) } }}
+                className="flex items-center justify-between rounded-lg border border-slate-300/70 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 px-3 py-2.5 group hover:border-primary/70 dark:hover:border-primary/60 transition-all duration-150 shadow-sm hover:shadow-md"
+              >
+                <div className="truncate mr-2 flex-grow">
+                  <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 flex items-center">
+                    {user.name}
+                    <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
+                      {user.role.toUpperCase()}
+                    </span>
+                  </p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
+                    <KeyRound size={10} className="mr-1 opacity-60"/> {user.passwordHash}
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto px-2.5 py-1.5 text-xs text-primary/90 dark:text-primary/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-primary/10 rounded-md"
+                  onClick={() => {
+                    rhForm.setValue('email', user.email, { shouldValidate: true });
+                    rhForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
+                    toast.info(`Credentials auto-filled for ${user.name}.`, {position: 'top-center'});
+                  }}
+                >
+                  Use
+                </Button>
+              </motion.div >
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       <Form {...rhForm}>
         <form onSubmit={rhForm.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
