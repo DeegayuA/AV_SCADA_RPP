@@ -3,8 +3,7 @@
 
 import { useState, useEffect, useMemo, ForwardRefExoticComponent, RefAttributes, useCallback } from 'react';
 import Image, { StaticImageData } from 'next/image';
-import { useRouter } from 'next/navigation'; // Keep this
-// import { useSearchParams } from 'next/navigation'; // Example if you need query params
+import { useRouter } from 'next/navigation';
 import { useForm, UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,15 +12,16 @@ import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon, Zap, LucideProps, Settings2, ShieldCheck, KeyRound, CircleDotDashed, CheckCircle } from 'lucide-react'; // Added CircleDotDashed, CheckCircle
+import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon, Zap, LucideProps, Settings2, ShieldCheck, KeyRound, CircleDotDashed, CheckCircle } from 'lucide-react';
 import { useTheme } from 'next-themes';
+import { signIn, useSession } from 'next-auth/react';
 
 import { isOnboardingComplete } from '@/lib/idb-store';
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
 import { User, UserRole } from '@/types/auth';
 import { useAppStore } from '@/stores/appStore';
-import { logActivity } from '@/lib/activityLog'; // Added import
+import { logActivity } from '@/lib/activityLog';
 import React from 'react';
 
 // Background images
@@ -42,22 +42,11 @@ const rotatingMessages = [
 ];
 const iconsMap: { [key: string]: React.ElementType } = { Zap, Lock, Settings2, Eye };
 
-
 const users: User[] = [ // Mock users
   { email: 'admin@av.lk', passwordHash: 'AVR&D490', role: UserRole.ADMIN, avatar: `https://avatar.vercel.sh/admin-av.png`, name: 'Admin SolarCtrl', redirectPath: '/control' },
   { email: 'operator@av.lk', passwordHash: 'operator123', role: UserRole.OPERATOR, avatar: `https://avatar.vercel.sh/operator-solar.png`, name: 'Operator Prime', redirectPath: '/control' },
   { email: 'viewer@av.lk', passwordHash: 'viewer123', role: UserRole.VIEWER, avatar: `https://avatar.vercel.sh/viewer-energy.png`, name: 'Guest Observer', redirectPath: '/dashboard' },
 ];
-
-// ... (GoogleIcon, loginSchema types remain the same)
-const GoogleIcon = () => (
-    <motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
-      <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
-      <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
-      <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
-      <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.994,36.076,44,30.54,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
-    </motion.svg>
-);
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -133,109 +122,33 @@ const RedirectingLoader = ({ userName, userRole }: { userName: string, userRole:
 
 export default function LoginPage() {
   const router = useRouter();
+  const { data: session, status } = useSession();
   const setCurrentUserInStore = useAppStore((state) => state.setCurrentUser);
-  const directStoreUser = useAppStore((state) => state.currentUser);
   
-  const [isStoreHydrated, setIsStoreHydrated] = useState(false);
-
-  // ... (useEffect for store hydration - no changes)
-  useEffect(() => {
-    const checkHydration = () => {
-      if (useAppStore.persist.hasHydrated()) {
-        setIsStoreHydrated(true);
-        return true;
-      }
-      return false;
-    };
-
-    if (checkHydration()) return;
-
-    const unsubscribe = useAppStore.persist.onHydrate(() => {
-        setIsStoreHydrated(true);
-    });
-    
-    const timer = setTimeout(() => { 
-      if (!isStoreHydrated && useAppStore.persist.hasHydrated()) {
-        setIsStoreHydrated(true);
-      }
-    }, 250); 
-
-    return () => {
-      unsubscribe();
-      clearTimeout(timer);
-    };
-}, [isStoreHydrated]);
-
-
-  const [pageState, setPageState] = useState<'loading' | 'onboarding_required' | 'login_form' | 'admin_login_for_setup'>('loading');
+  const [pageState, setPageState] = useState<'login_form'>('login_form');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [isRedirecting, setIsRedirecting] = useState(false); // NEW: State for redirect loader
-  const [redirectingUser, setRedirectingUser] = useState<User | null>(null); // NEW: To pass user info to loader
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const [redirectingUser, setRedirectingUser] = useState<any | null>(null);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(Math.floor(Math.random() * imageUrls.length));
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
-  const [showAdminPasswordForSetup, setShowAdminPasswordForSetup] = useState(false);
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' },
   });
-  
-  const adminSetupForm = useForm<LoginFormValues>({
-    resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' },
-  });
 
-  const performLogin = useCallback(async (values: LoginFormValues, isAdminSetupLogin: boolean = false) => {
-    if (!isAdminSetupLogin && pageState !== 'login_form') {
-      toast.error("System Not Ready", { description: "Initial setup may be required by an administrator." });
-      return;
-    }
-    setIsSubmitting(true); setLoginError(null);
+  const performLogin = useCallback(async (values: LoginFormValues) => {
+    setIsSubmitting(true);
+    setLoginError(null);
 
-    await new Promise(resolve => setTimeout(resolve, 500)); 
+    const result = await signIn('credentials', {
+      redirect: false,
+      username: values.email,
+      password: values.password,
+    });
 
-    const user = users.find((u) => u.email.toLowerCase() === values.email.toLowerCase() && u.passwordHash === values.password);
-
-    if (user) {
-      // Log successful login
-      logActivity(
-        'LOGIN_SUCCESS',
-        { email: user.email, role: user.role },
-        '/login',
-        'info'
-      );
-
-      setCurrentUserInStore(user); // Store user immediately
-      toast.success(
-        isAdminSetupLogin ? `Admin Verified: ${user.name}!` : `Welcome back, ${user.name}!`, 
-        { 
-          description: isAdminSetupLogin ? "Proceeding to system setup..." : `Signed in as ${user.role}. Redirecting...`,
-          duration: 2000 // Keep toast shorter as redirect loader takes over
-        }
-      );
-      
-      // Set state for redirect loader and then push route
-      setRedirectingUser(user);
-      setIsRedirecting(true); 
-      
-      // No setTimeout here, let the RedirectingLoader show while Next.js loads the new page
-      if (isAdminSetupLogin) {
-        if (user.role === UserRole.ADMIN) {
-          router.push('/onboarding');
-        } else {
-          // This case shouldn't be hit if validation is robust but as a fallback:
-          setIsRedirecting(false); // Hide loader
-          setRedirectingUser(null);
-          toast.error("Admin Privileges Required", { description: "Only an administrator can perform the initial setup." });
-          adminSetupForm.setError("root.serverError", { message: "This account does not have admin rights." });
-          setIsSubmitting(false); // Re-enable form
-          return; 
-        }
-      } else { 
-        router.push(user.redirectPath);
-      }
-
-    } else {
+    if (result?.error) {
       const msg = 'Invalid credentials. Please review your email and password.';
       toast.error("Login Failed", { description: msg });
       logActivity(
@@ -245,54 +158,31 @@ export default function LoginPage() {
         'warn'
       );
       setLoginError(msg);
-      if (isAdminSetupLogin) {
-        adminSetupForm.setError("root.serverError", { message: msg });
-      } else {
-        form.setError("root.serverError", { message: msg });
-      }
-      setIsSubmitting(false); // Re-enable form on failure
+      form.setError("root.serverError", { message: msg });
+      setIsSubmitting(false);
     }
-    // Note: setIsSubmitting(false) is only called on failure here.
-    // On success, the component might unmount before it's set back, which is fine.
-    // If redirect is super fast, the loader won't stay.
-  }, [router, setCurrentUserInStore, pageState, form, adminSetupForm]);
+  }, [form]);
 
-  // ... (MemoizedLoginForm, useEffect for checkOnboardingAndUser, useEffect for image/message rotation, handlePlaceholderLinkClick remain the same)
+  useEffect(() => {
+    if (status === "authenticated") {
+      const user = session.user as any;
+      setCurrentUserInStore(user);
+      setRedirectingUser(user);
+      setIsRedirecting(true);
+      router.push(user.redirectPath || '/');
+    }
+  }, [status, session, router, setCurrentUserInStore]);
+
 
   const MemoizedLoginForm = useMemo(() =>
     <LoginFormInternalContent
       form={form}
-      onSubmit={values => performLogin(values, false)}
+      onSubmit={performLogin}
       isSubmitting={isSubmitting}
       loginError={loginError}
       onGoogleLogin={() => toast.info("Google Sign-In feature under development.")}
     />,
   [form, performLogin, isSubmitting, loginError]);
-
-  useEffect(() => {
-    if (!isStoreHydrated) {
-        setPageState('loading');
-        return;
-    }
-
-    const checkOnboardingAndUser = async () => {
-      setPageState('loading');
-      const completed = await isOnboardingComplete();
-
-      if (!completed) {
-        if (directStoreUser && directStoreUser.role === UserRole.ADMIN && directStoreUser.email !== 'guest@example.com') {
-            toast.info("Initial Setup Required", { description: "Redirecting you to the setup wizard.", duration: 3000 });
-            router.replace('/onboarding');
-            return;
-        }
-        setPageState('onboarding_required');
-      } else {
-        setPageState('login_form');
-      }
-    };
-
-    checkOnboardingAndUser();
-  }, [router, isStoreHydrated, directStoreUser]); 
 
   useEffect(() => { 
     const imageI = setInterval(() => setCurrentImageIndex((p) => (p + 1) % imageUrls.length), 7000);
@@ -312,142 +202,13 @@ export default function LoginPage() {
 
   // RENDER LOGIC
 
-  // NEW: Fullscreen Redirecting Loader
   if (isRedirecting && redirectingUser) {
     return <RedirectingLoader userName={redirectingUser.name} userRole={redirectingUser.role} />;
-  }
-
-  if (pageState === 'loading' || !isStoreHydrated) {
-    return ( /* ... Initializing Loader UI - no changes ... */ 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-neutral-900 text-slate-200 z-50">
-        <motion.div initial={{ opacity: 0, scale: 0.7 }} animate={{ opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 150, damping: 12, delay: 0.1 } }}>
-            <AppLogo className="h-16 w-16 sm:h-20 sm:w-20 text-primary animate-bounce-slow mb-6" />
-        </motion.div>
-        <Loader2 className="h-10 w-10 sm:h-12 sm:w-12 animate-spin text-primary" />
-        <motion.p initial={{ opacity: 0, y:10 }} animate={{ opacity: 1, y:0, transition:{delay:0.2}}} className="mt-4 text-lg sm:text-xl tracking-wider">
-            Initializing {APP_NAME}...
-        </motion.p>
-      </motion.div>
-    );
-  }
-
-  if (pageState === 'onboarding_required' || pageState === 'admin_login_for_setup') {
-    return ( /* ... Onboarding/Admin Setup UI - no changes ... */ 
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-sky-600 via-blue-700 to-indigo-800 text-white text-center p-4 sm:p-6 z-50">
-        <ThemeToggleButton />
-        <motion.div
-          initial={{ y: -20, opacity: 0, scale: 0.95 }}
-          animate={{ y: 0, opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 120, damping: 12, delay: 0.2 } }}
-          className="bg-white/10 dark:bg-black/20 p-6 sm:p-8 md:p-10 rounded-2xl shadow-2xl backdrop-blur-lg max-w-md lg:max-w-lg w-full">
-          <Settings2 className="h-14 w-14 sm:h-16 sm:w-16 mx-auto mb-4 text-sky-300 opacity-90 animate-pulse" />
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-2 tracking-tight">Initial System Setup Required</h1>
-          <p className="text-xs sm:text-sm text-sky-100/80 max-w-md mx-auto mb-5">
-            Your control panel is not yet configured. An administrator must complete the initial setup.
-          </p>
-
-          {pageState === 'admin_login_for_setup' ? (
-            <Form {...adminSetupForm}>
-              <form onSubmit={adminSetupForm.handleSubmit(values => performLogin(values, true))} className="space-y-3 text-left">
-                {process.env.NODE_ENV === 'development' && (
-                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
-                    className="rounded-xl border border-primary/20 dark:border-primary/30 bg-primary/5 dark:bg-primary/10 p-3.5 sm:p-4 text-xs shadow-md">
-                    <p className="mb-2.5 flex items-center text-sm font-semibold text-primary/90 dark:text-primary/80">
-                      <Users className="mr-2 h-5 w-5" /> Development Logins
-                    </p>
-                    <div className="space-y-2">
-                      {users.map((user, index) => (
-                        <motion.div
-                          key={user.email}
-                          initial={{ opacity: 0, x: -15 }}
-                          animate={{ opacity: 1, x: 0, transition: { delay: 0.3 + (index * 0.05) } }}
-                          className="flex items-center justify-between rounded-lg border border-slate-300/70 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 px-3 py-2.5 group hover:border-primary/70 dark:hover:border-primary/60 transition-all duration-150 shadow-sm hover:shadow-md"
-                        >
-                          <div className="truncate mr-2 flex-grow">
-                            <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 flex items-center">
-                              {user.name}
-                              <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
-                                {user.role.toUpperCase()}
-                              </span>
-                            </p>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
-                              <KeyRound size={10} className="mr-1 opacity-60" /> {user.passwordHash}
-                            </p>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-auto px-2.5 py-1.5 text-xs text-primary/90 dark:text-primary/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-primary/10 rounded-md"
-                            onClick={() => {
-                              adminSetupForm.setValue('email', user.email, { shouldValidate: true });
-                              adminSetupForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
-                              toast.info(`Credentials auto-filled for ${user.name}.`, { position: 'top-center' });
-                            } }
-                          >
-                            Use
-                          </Button>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-                <FormField control={adminSetupForm.control} name="email" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Email</FormLabel>
-                    <FormControl>
-                      <Input type="email" placeholder="admin@example.com" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm" autoComplete="username" />
-                    </FormControl>
-                    <FormMessage className="text-red-300/90 text-xs pt-0.5" />
-                  </FormItem>
-                )} />
-                <FormField control={adminSetupForm.control} name="password" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sky-200/80 text-xs font-medium">Admin Password</FormLabel>
-                    <div className="relative">
-                      <Input type={showAdminPasswordForSetup ? "text" : "password"} placeholder="Enter admin password" {...field} className="bg-white/5 border-sky-300/20 text-white placeholder-sky-200/40 h-10 sm:h-11 focus:bg-white/10 focus:border-sky-300/50 rounded-md text-sm pr-10" autoComplete="current-password" />
-                      <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-sky-200/60 hover:text-sky-100" onClick={() => setShowAdminPasswordForSetup(!showAdminPasswordForSetup)}>
-                        {showAdminPasswordForSetup ? <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" /> : <Eye className="h-4 w-4 sm:h-5 sm:w-5" />}
-                      </Button>
-                    </div>
-                    <FormMessage className="text-red-300/90 text-xs pt-0.5" />
-                  </FormItem>
-                )} />
-                <AnimatePresence>
-                  {adminSetupForm.formState.errors.root?.serverError && (
-                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                      className="text-xs text-red-300 bg-red-500/25 p-2 rounded-md flex items-center border border-red-400/50 mt-1!"><AlertCircle size={14} className="mr-1.5" />{adminSetupForm.formState.errors.root.serverError.message}</motion.p>
-                  )}
-                </AnimatePresence>
-                <div className="pt-2 space-y-2.5">
-                  <Button type="submit" size="lg" className="w-full bg-sky-400 hover:bg-sky-300 text-sky-900 shadow-lg font-semibold group py-2.5 h-auto text-sm rounded-md transition-transform hover:scale-[1.02]">
-                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4 group-hover:scale-110 transition-transform" />} Authenticate & Setup
-                  </Button>
-                  <Button variant="link" size="sm" onClick={() => { setPageState('onboarding_required'); adminSetupForm.reset(); setLoginError(null); } } className="w-full text-sky-200/70 hover:text-sky-100 text-xs !mt-1.5">
-                    Cancel Admin Login
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          ) : (
-            <>
-              <p className="text-xs text-sky-200/70 mb-4">If you are not an administrator, please ask one to perform the initial system configuration.</p>
-              <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1, transition: { delay: 0.3, type: 'spring', stiffness: 150 } }}>
-                <Button onClick={() => setPageState('admin_login_for_setup')} size="lg" className="bg-white text-blue-700 hover:bg-sky-100 shadow-xl px-6 py-3 text-sm sm:text-base font-semibold group h-auto rounded-md transition-transform hover:scale-105">
-                  Log In as Administrator <ShieldCheck className="ml-2.5 h-5 w-5 transition-transform group-hover:scale-110 text-blue-600" />
-                </Button>
-              </motion.div>
-            </>
-          )}
-        </motion.div>
-      </motion.div>
-    );
   }
   
   const RotatingMessageIcon = iconsMap[rotatingMessages[currentMessageIndex].iconName] || Zap;
 
-  return ( /* ... Main Login Form UI with two columns - no changes in structure ... */ 
+  return (
     <div className="grid min-h-svh w-full lg:grid-cols-2 bg-slate-50 dark:bg-slate-950 transition-colors duration-500">
         <motion.div 
             variants={columnVariants} 
@@ -525,7 +286,6 @@ export default function LoginPage() {
   );
 }
 
-// ... (LoginFormInternalContent - no changes needed for this specific request)
 const LoginFormInternalContent = React.memo(({
   form: rhForm, onSubmit, isSubmitting, loginError, onGoogleLogin
 }: {
@@ -608,7 +368,7 @@ const LoginFormInternalContent = React.memo(({
         <form onSubmit={rhForm.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">
           {formItemsConfig.map((item, index) => (
             <motion.div key={item.name} custom={index} initial="hidden" animate="visible" variants={formElementVariants(formElementDelayOffset)} >
-              <FormField control={rhForm.control} name={item.name} render={({ field }) => (
+              <FormField control={rhForm.control} name={item.name as "email" | "password"} render={({ field }) => (
                 <FormItem>
                     <div className="flex items-center justify-between mb-1.5">
                       <FormLabel className="text-xs font-medium text-gray-600 dark:text-gray-400">{item.label}</FormLabel>
@@ -670,11 +430,10 @@ const LoginFormInternalContent = React.memo(({
 LoginFormInternalContent.displayName = 'LoginFormInternalContent';
 
 
-// ... (ThemeToggleButton - no changes needed)
 const ThemeToggleButton = React.memo(() => {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  React.useEffect(() => setMounted(true), []);
   if (!mounted) return <div className="absolute top-5 right-5 sm:top-6 sm:right-6 z-20 h-10 w-10 rounded-full bg-black/10 dark:bg-white/5 animate-pulse" />;
   
   const cycleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -703,3 +462,12 @@ const ThemeToggleButton = React.memo(() => {
   );
 });
 ThemeToggleButton.displayName = "ThemeToggleButton";
+
+const GoogleIcon = () => (
+    <motion.svg whileHover={{ scale: 1.1 }} className="mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+      <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24s8.955,20,20,20s20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z" />
+      <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z" />
+      <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z" />
+      <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.574l6.19,5.238C39.994,36.076,44,30.54,44,24C44,22.659,43.862,21.35,43.611,20.083z" />
+    </motion.svg>
+);

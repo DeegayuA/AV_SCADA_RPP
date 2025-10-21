@@ -1,0 +1,23 @@
+[
+  {
+    "id": "e7ecb366-541c-420c-8f27-be96f535b9c9",
+    "username": "admin@av.lk",
+    "password": "$2b$12$4n1kb7YGp92LSL3MSyFBE.vOyFqtPCgMvJkdXR74moqN3q8UAoM1S",
+    "role": "admin",
+    "name": "Admin SolarCtrl"
+  },
+  {
+    "id": "088d5980-d2c7-4c30-bdbb-49a553900c33",
+    "username": "operator@av.lk",
+    "password": "$2b$12$.OaUi87XrucftFIGlmiv6utdyL0QVZrLPcmpCMDL6VCAl9tzOj3Fq",
+    "role": "operator",
+    "name": "Operator Prime"
+  },
+  {
+    "id": "c2f40584-9790-429d-926b-d6fe47efffa6",
+    "username": "viewer@av.lk",
+    "password": "$2b$12$V1Y81CSYpqrkMlMPQq5WqOLyl79WdI1Tbk5KPS5xWLiswaXaQoNIa",
+    "role": "viewer",
+    "name": "Guest Observer"
+  }
+]

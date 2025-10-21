@@ -12,6 +12,7 @@ import {
   APP_NAME as APP_DEFAULT_TITLE,
   APP_BASE_URL as APP_OG_IMAGE_URL
 } from '@/config/constants';
+import { Providers } from './providers';
 
 // Define constants that were missing from the provided file
 const APP_THEME_COLOR_LIGHT = '#ffffff';
@@ -90,14 +91,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="robots" content="noindex, nofollow" />
       </head>
       <body className={inter.className}>
-        <ThemeProvider attribute="class">
-          {isLoading && <LoadingScreen onDone={() => setIsLoading(false)} />}
-          <NotificationSystemProvider />
-          {children}
-          <ActiveAlarmsDisplay />
-          <PageViewLogger />
-        </ThemeProvider>
-        <Toaster richColors theme="system" position="bottom-right" closeButton />
+        <Providers>
+          <ThemeProvider attribute="class">
+            {isLoading && <LoadingScreen onDone={() => setIsLoading(false)} />}
+            <NotificationSystemProvider />
+            {children}
+            <ActiveAlarmsDisplay />
+            <PageViewLogger />
+          </ThemeProvider>
+          <Toaster richColors theme="system" position="bottom-right" closeButton />
+        </Providers>
       </body>
     </html>
   );
