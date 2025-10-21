@@ -1,0 +1,194 @@
+[
+  {
+    "timestamp": "2025-10-21T06:55:58.942Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/login",
+      "durationMs": 3001,
+      "durationSeconds": 3,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:55:58.958Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/control"
+    },
+    "pageUrl": "/control",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:55:58.978Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_LEAVE_SITE",
+    "details": {
+      "path": "/control",
+      "durationMs": 18,
+      "durationSeconds": 0.02
+    },
+    "pageUrl": "/control",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:56:02.428Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/admin/users"
+    },
+    "pageUrl": "/admin/users",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:56:02.445Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/admin/users",
+      "durationMs": 16,
+      "durationSeconds": 0.02,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/admin/users",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:31.163Z",
+    "userId": "guest@example.com",
+    "userName": "Guest Viewer",
+    "userRole": "viewer",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/login"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:41.414Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/login",
+      "durationMs": 10249,
+      "durationSeconds": 10.25,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:44.444Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/login",
+      "durationMs": 3026,
+      "durationSeconds": 3.03,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:44.461Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/control"
+    },
+    "pageUrl": "/control",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:44.484Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_LEAVE_SITE",
+    "details": {
+      "path": "/control",
+      "durationMs": 21,
+      "durationSeconds": 0.02
+    },
+    "pageUrl": "/control",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:44.755Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/control",
+      "durationMs": 292,
+      "durationSeconds": 0.29,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/control",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:47.908Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/admin/users"
+    },
+    "pageUrl": "/admin/users",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:57:47.927Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/admin/users"
+    },
+    "pageUrl": "/admin/users",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]zilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]

@@ -1,0 +1,76 @@
+[
+  {
+    "timestamp": "2025-10-21T06:58:06.864Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/login",
+      "durationMs": 2491,
+      "durationSeconds": 2.49,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:18.596Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/login",
+      "durationMs": 11728,
+      "durationSeconds": 11.73,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:18.607Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/maintenance"
+    },
+    "pageUrl": "/maintenance",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:38.485Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/"
+    },
+    "pageUrl": "/",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:38.505Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/"
+    },
+    "pageUrl": "/",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]zilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]

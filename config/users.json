@@ -1,22 +1,22 @@
 [
   {
-    "id": "e7ecb366-541c-420c-8f27-be96f535b9c9",
+    "id": "3309ba55-34e4-4876-a05a-7baaa930cda3",
     "username": "admin@av.lk",
-    "password": "$2b$12$4n1kb7YGp92LSL3MSyFBE.vOyFqtPCgMvJkdXR74moqN3q8UAoM1S",
+    "password": "$2b$12$boBkQCeuAg1zd2bMQslDluI9Dzvo.LaI4xkRAo1rQC3Tnzm6e2DnW",
     "role": "admin",
     "name": "Admin SolarCtrl"
   },
   {
-    "id": "088d5980-d2c7-4c30-bdbb-49a553900c33",
+    "id": "7c00f9ee-6ccd-4d4c-b613-9c6da4068137",
     "username": "operator@av.lk",
-    "password": "$2b$12$.OaUi87XrucftFIGlmiv6utdyL0QVZrLPcmpCMDL6VCAl9tzOj3Fq",
+    "password": "$2b$12$rNxBItplsLE2DMQznrAcquuj/jk7Kkb99bMe.wBozyNuZ2uDDt3p.",
     "role": "operator",
     "name": "Operator Prime"
   },
   {
-    "id": "c2f40584-9790-429d-926b-d6fe47efffa6",
+    "id": "e7e8e21d-eb3f-41de-b0f9-4d7cba0a7aab",
     "username": "viewer@av.lk",
-    "password": "$2b$12$V1Y81CSYpqrkMlMPQq5WqOLyl79WdI1Tbk5KPS5xWLiswaXaQoNIa",
+    "password": "$2b$12$HHq031Pz5GKyVCzCzw6dH.xFzhhU64c6Jgj4luvQBZ6JJ4TqH0vlS",
     "role": "viewer",
     "name": "Guest Observer"
   }

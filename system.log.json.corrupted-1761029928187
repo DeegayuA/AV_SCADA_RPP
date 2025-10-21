@@ -1,0 +1,59 @@
+[
+  {
+    "timestamp": "2025-10-21T06:58:39.014Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_LEAVE_SITE",
+    "details": {
+      "path": "/",
+      "durationMs": 508,
+      "durationSeconds": 0.51
+    },
+    "pageUrl": "/",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:40.627Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/login"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:43.288Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/login"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:43.352Z",
+    "userName": "Operator Prime",
+    "userRole": "operator",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/login"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]zilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]

@@ -59,7 +59,7 @@ async def main():
         await page.click('text="Create User"')
         await page.fill('input[id="username"]', 'newuser@test.com')
         await page.fill('input[id="password"]', 'password')
-        await page.click('button:has-text("Create")')
+        await page.get_by_role("dialog").get_by_role("button", name="Create", exact=True).click()
 
         # Verify new user
         await page.get_by_role("cell", name="newuser@test.com").first.wait_for()
@@ -67,15 +67,15 @@ async def main():
         # Edit the new user's role
         await page.get_by_role("row", name="newuser@test.com viewer").get_by_role("button", name="Edit").click()
         await page.click('button[role="combobox"]')
-        await page.click('text="operator"')
-        await page.click('button:has-text("Save")')
+        await page.get_by_role("option", name="operator").click()
+        await page.get_by_role("dialog").get_by_role("button", name="Save", exact=True).click()
 
         # Verify role change
         await page.get_by_role("cell", name="operator").nth(1).wait_for()
 
         # Delete the new user
         await page.get_by_role("row", name="newuser@test.com operator").get_by_role("button", name="Delete").click()
-        await page.click('button:has-text("Delete")')
+        await page.get_by_role("dialog").get_by_role("button", name="Delete", exact=True).click()
 
         # Verify user is deleted
         await page.wait_for_function("() => !document.body.innerText.includes('newuser@test.com')")

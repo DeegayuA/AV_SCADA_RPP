@@ -1,0 +1,103 @@
+[
+  {
+    "timestamp": "2025-10-21T06:57:55.323Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_LEAVE_SITE",
+    "details": {
+      "path": "/admin/users",
+      "durationMs": 7395,
+      "durationSeconds": 7.39
+    },
+    "pageUrl": "/admin/users",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:00.392Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/"
+    },
+    "pageUrl": "/",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:00.414Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_END",
+    "details": {
+      "path": "/",
+      "durationMs": 19,
+      "durationSeconds": 0.02,
+      "reason": "Component unmount or navigation away from app scope"
+    },
+    "pageUrl": "/",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:00.416Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/"
+    },
+    "pageUrl": "/",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:00.870Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_LEAVE_SITE",
+    "details": {
+      "path": "/",
+      "durationMs": 452,
+      "durationSeconds": 0.45
+    },
+    "pageUrl": "/",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:04.343Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/login"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  },
+  {
+    "timestamp": "2025-10-21T06:58:04.372Z",
+    "userName": "Admin SolarCtrl",
+    "userRole": "admin",
+    "actionType": "PAGE_VIEW_START",
+    "details": {
+      "path": "/login"
+    },
+    "pageUrl": "/login",
+    "clientInfo": {
+      "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]zilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/140.0.7339.16 Safari/537.36"
+    }
+  }
+]
