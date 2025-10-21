@@ -14,13 +14,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { LogIn, Mail, Lock, Loader2, AlertCircle, Users, Eye, EyeOff, Sun, Moon, Zap, LucideProps, Settings2, ShieldCheck, KeyRound, CircleDotDashed, CheckCircle } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { signIn, useSession } from 'next-auth/react';
+import { signIn } from 'next-auth/react';
 
-import { isOnboardingComplete } from '@/lib/idb-store';
 import { APP_NAME, APP_AUTHOR } from '@/config/constants';
 import { AppLogo } from '@/app/onboarding/AppLogo';
-import { User, UserRole } from '@/types/auth';
-import { useAppStore } from '@/stores/appStore';
 import { logActivity } from '@/lib/activityLog';
 import React from 'react';
 
@@ -41,12 +38,6 @@ const rotatingMessages = [
   { title: "Insightful Energy Analytics.", iconName: "Eye" },
 ];
 const iconsMap: { [key: string]: React.ElementType } = { Zap, Lock, Settings2, Eye };
-
-const users: User[] = [ // Mock users
-  { email: 'admin@av.lk', passwordHash: 'AVR&D490', role: UserRole.ADMIN, avatar: `https://avatar.vercel.sh/admin-av.png`, name: 'Admin SolarCtrl', redirectPath: '/control' },
-  { email: 'operator@av.lk', passwordHash: 'operator123', role: UserRole.OPERATOR, avatar: `https://avatar.vercel.sh/operator-solar.png`, name: 'Operator Prime', redirectPath: '/control' },
-  { email: 'viewer@av.lk', passwordHash: 'viewer123', role: UserRole.VIEWER, avatar: `https://avatar.vercel.sh/viewer-energy.png`, name: 'Guest Observer', redirectPath: '/dashboard' },
-];
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Please enter a valid email address." }),
@@ -74,62 +65,11 @@ interface EmailFormItemConfig extends FormItemConfigBase { name: "email"; type: 
 interface PasswordFormItemConfig extends FormItemConfigBase { name: "password"; type: "text" | "password"; rightIcon: IconType; onRightIconClick: () => void; rightIconAriaLabel: string; }
 type FormItemConfig = EmailFormItemConfig | PasswordFormItemConfig;
 
-const RedirectingLoader = ({ userName, userRole }: { userName: string, userRole: string }) => (
-  <motion.div
-    key="redirecting-loader"
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-slate-900/90 dark:bg-black/90 backdrop-blur-md text-white p-8 text-center"
-  >
-    <motion.div 
-      initial={{ scale: 0.8, opacity:0 }} 
-      animate={{ scale: 1, opacity:1, transition: { type: 'spring', stiffness:150, damping:15, delay:0.1 } }}
-    >
-      <CheckCircle className="h-16 w-16 sm:h-20 sm:w-20 text-green-400 mb-6" />
-    </motion.div>
-    <motion.h2 
-      initial={{ y: 10, opacity:0 }} 
-      animate={{ y: 0, opacity:1, transition: { delay:0.2 } }}
-      className="text-2xl sm:text-3xl font-semibold mb-2"
-    >
-      Welcome back, {userName}!
-    </motion.h2>
-    <motion.p 
-      initial={{ y: 10, opacity:0 }} 
-      animate={{ y: 0, opacity:1, transition: { delay:0.3 } }}
-      className="text-slate-300/90 dark:text-slate-400/90 mb-8 text-sm sm:text-base"
-    >
-      Signed in as {userRole}. Preparing your experience...
-    </motion.p>
-    <div className="flex items-center space-x-3 text-slate-200/80 dark:text-slate-300/80">
-        <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-        >
-            <CircleDotDashed className="h-8 w-8 sm:h-10 sm:w-10 opacity-80" />
-        </motion.div>
-        <motion.span 
-          initial={{ opacity: 0 }} animate={{ opacity: 1, transition: { delay: 0.5, duration:0.5 }}}
-          className="text-lg sm:text-xl tracking-wide"
-        >
-          Loading Dashboard
-        </motion.span>
-    </div>
-  </motion.div>
-);
-
-
 export default function LoginPage() {
   const router = useRouter();
-  const { data: session, status } = useSession();
-  const setCurrentUserInStore = useAppStore((state) => state.setCurrentUser);
   
-  const [pageState, setPageState] = useState<'login_form'>('login_form');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
-  const [isRedirecting, setIsRedirecting] = useState(false);
-  const [redirectingUser, setRedirectingUser] = useState<any | null>(null);
 
   const [currentImageIndex, setCurrentImageIndex] = useState(Math.floor(Math.random() * imageUrls.length));
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
@@ -143,9 +83,10 @@ export default function LoginPage() {
     setLoginError(null);
 
     const result = await signIn('credentials', {
-      redirect: false,
+      redirect: true,
       username: values.email,
       password: values.password,
+      callbackUrl: '/',
     });
 
     if (result?.error) {
@@ -162,16 +103,6 @@ export default function LoginPage() {
       setIsSubmitting(false);
     }
   }, [form]);
-
-  useEffect(() => {
-    if (status === "authenticated") {
-      const user = session.user as any;
-      setCurrentUserInStore(user);
-      setRedirectingUser(user);
-      setIsRedirecting(true);
-      router.push(user.redirectPath || '/');
-    }
-  }, [status, session, router, setCurrentUserInStore]);
 
 
   const MemoizedLoginForm = useMemo(() =>
@@ -201,10 +132,6 @@ export default function LoginPage() {
 
 
   // RENDER LOGIC
-
-  if (isRedirecting && redirectingUser) {
-    return <RedirectingLoader userName={redirectingUser.name} userRole={redirectingUser.role} />;
-  }
   
   const RotatingMessageIcon = iconsMap[rotatingMessages[currentMessageIndex].iconName] || Zap;
 
@@ -298,7 +225,7 @@ const LoginFormInternalContent = React.memo(({
   const [showPassword, setShowPassword] = useState(false);
   const togglePasswordVisibility = () => setShowPassword(!showPassword);
   
-  const devUsersCount = process.env.NODE_ENV === 'development' ? users.length : 0;
+  const devUsersCount = 0;
   const formElementDelayOffset = devUsersCount * 0.03 + (devUsersCount > 0 ? 0.1 : 0) ;
 
   const inputBaseClass = "h-11 sm:h-12 text-sm bg-slate-100/70 dark:bg-slate-800/50 border-slate-300/80 dark:border-slate-700/70 focus:border-primary focus:ring-2 focus:ring-primary/30 dark:focus:border-primary dark:focus:ring-primary/30 placeholder:text-slate-400/90 dark:placeholder:text-slate-500/80 transition-all duration-200 ease-in-out rounded-lg shadow-sm";
@@ -319,50 +246,6 @@ const LoginFormInternalContent = React.memo(({
         <h2 className="text-2xl sm:text-3xl font-semibold text-gray-800 dark:text-gray-100">Sign In to Your Account</h2>
         <p className="text-sm text-gray-500 dark:text-gray-400 mt-1.5">Access your personalized energy dashboard.</p>
       </div>
-
-      {process.env.NODE_ENV === 'development' && (
-        <motion.div initial={{ opacity: 0, y:10 }} animate={{ opacity: 1, y:0, transition: { delay: 0.3 } }}
-          className="rounded-xl border border-primary/20 dark:border-primary/30 bg-primary/5 dark:bg-primary/10 p-3.5 sm:p-4 text-xs shadow-md">
-          <p className="mb-2.5 flex items-center text-sm font-semibold text-primary/90 dark:text-primary/80">
-            <Users className="mr-2 h-5 w-5" /> Development Logins
-          </p>
-          <div className="space-y-2">
-            {users.map((user, index) => (
-              <motion.div
-                key={user.email}
-                initial={{ opacity: 0, x: -15 }} 
-                animate={{ opacity: 1, x: 0, transition: { delay: 0.3 + (index * 0.05) } }}
-                className="flex items-center justify-between rounded-lg border border-slate-300/70 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 px-3 py-2.5 group hover:border-primary/70 dark:hover:border-primary/60 transition-all duration-150 shadow-sm hover:shadow-md"
-              >
-                <div className="truncate mr-2 flex-grow">
-                  <p className="font-semibold text-xs text-slate-700 dark:text-slate-200 flex items-center">
-                    {user.name} 
-                    <span className="ml-1.5 text-[10px] opacity-70 bg-slate-200 dark:bg-slate-700 px-1.5 py-0.5 rounded-sm">
-                      {user.role.toUpperCase()}
-                    </span>
-                  </p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{user.email}</p>
-                  <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center mt-0.5">
-                    <KeyRound size={10} className="mr-1 opacity-60"/> {user.passwordHash}
-                  </p>
-                </div> 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto px-2.5 py-1.5 text-xs text-primary/90 dark:text-primary/80 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity hover:bg-primary/10 rounded-md"
-                  onClick={() => {
-                    rhForm.setValue('email', user.email, { shouldValidate: true });
-                    rhForm.setValue('password', user.passwordHash || '', { shouldValidate: true });
-                    toast.info(`Credentials auto-filled for ${user.name}.`, {position: 'top-center'});
-                  }}
-                >
-                  Use
-                </Button>
-              </motion.div >
-            ))}
-          </div>
-        </motion.div>
-      )}
 
       <Form {...rhForm}>
         <form onSubmit={rhForm.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-5">

@@ -9,7 +9,6 @@ interface User {
   name: string;
   username: string;
   role: string;
-  redirectPath: string;
   password?: string;
 }
 
@@ -33,13 +32,7 @@ export const authOptions: NextAuthOptions = {
         const user = users.find((user) => user.username === credentials.username);
 
         if (user && user.password && await bcrypt.compare(credentials.password, user.password)) {
-          let redirectPath = '/dashboard'; // Default for viewer
-          if (user.role === 'admin') {
-            redirectPath = '/control';
-          } else if (user.role === 'operator') {
-            redirectPath = '/maintenance';
-          }
-          return { id: user.id, name: user.name, role: user.role, redirectPath };
+          return { id: user.id, name: user.name, role: user.role, email: user.username };
         }
         return null;
       }
@@ -49,14 +42,12 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.role = (user as any).role;
-        token.redirectPath = (user as any).redirectPath;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).role = token.role;
-        (session.user as any).redirectPath = token.redirectPath;
       }
       return session;
     }
