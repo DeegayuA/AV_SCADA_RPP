@@ -32,7 +32,6 @@ export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
 export type TimeScale = '30s' | '1m' | '5m' | '30m' | '1h' | '6h' | '12h' | '1d' | '7d' | '1mo';
 
 // --- Component Constants ---
-const CHART_TARGET_UNIT: PowerUnit = 'kW';
 const POWER_PRECISION: Record<PowerUnit, number> = { 'W': 0, 'kW': 2, 'MW': 3, 'GW': 4 };
 const MAX_POINTS_FOR_RECHARTS = 750;
 const MIN_BUFFER_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,7 +50,7 @@ type ChartDataPoint = {
 };
 
 interface GridFeedSegment { type: 'export' | 'import'; data: ChartDataPoint[]; }
-import { PowerTimelineGraphConfig } from './PowerTimelineGraphConfigurator';
+import { PowerTimelineGraphConfig, TimelineSeries } from './PowerTimelineGraphConfigurator';
 
 interface PowerTimelineGraphProps {
     nodeValues: NodeData;
@@ -97,8 +96,13 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const [animationKey, setAnimationKey] = useState(Date.now());
     const [lastUpdatedDisplayTime, setLastUpdatedDisplayTime] = useState<string>('N/A');
 
-    const displayUnitLabel = CHART_TARGET_UNIT;
-    const valuePrecision = POWER_PRECISION[CHART_TARGET_UNIT];
+    const chartTargetUnit = useMemo(() => {
+        const firstSeriesWithUnit = timelineSeries.find(s => s.unit);
+        return (firstSeriesWithUnit?.unit as PowerUnit) || 'kW';
+    }, [timelineSeries]);
+
+    const displayUnitLabel = chartTargetUnit;
+    const valuePrecision = POWER_PRECISION[chartTargetUnit];
     const prevDemoUsageRef = useRef<number | null>(null);
 
     const dataBufferRef = useRef<ChartDataPoint[]>([]);
@@ -234,17 +238,17 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         return seriesValues;
     }, [timelineSeries]);
 
-    const sumValuesForDpIds = useCallback((dpIdsToSum: string[]): number => {
+    const sumValuesForDpIds = useCallback((series: TimelineSeries, chartTargetUnit: PowerUnit): number => {
         if (!allPossibleDataPoints?.length || !nodeValues || Object.keys(nodeValues).length === 0) {
             return 0;
         }
         let sumInWatts = 0;
-        dpIdsToSum.forEach(dpId => {
+        series.dpIds.forEach(dpId => {
             const dp = allPossibleDataPoints.find(p => p.id === dpId);
             if (dp) {
                 const rawValueFromNode = nodeValues[dp.nodeId];
                 let numericValue = 0;
-                let unitForConversion = dp.unit;
+                let unitForConversion = series.unit || dp.unit;
                 if (typeof rawValueFromNode === 'object' && rawValueFromNode !== null) {
                     if ('value' in rawValueFromNode) {
                         const typedValue = rawValueFromNode as { value: unknown, unit?: string };
@@ -259,8 +263,9 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                 sumInWatts += convertToWatts(valueOfInterest, unitForConversion);
             }
         });
-        return convertFromWatts(sumInWatts, CHART_TARGET_UNIT);
-    }, [nodeValues, allPossibleDataPoints, CHART_TARGET_UNIT]);
+        const multiplier = series.multiplier || 1;
+        return convertFromWatts(sumInWatts, chartTargetUnit) * multiplier;
+    }, [nodeValues, allPossibleDataPoints]);
 
     useEffect(() => {
       setChartData([]);
@@ -293,7 +298,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
           const currentTimestamp = Date.now();
           const seriesValues: { [key: string]: number } = {};
           timelineSeries.forEach(series => {
-              seriesValues[series.id] = sumValuesForDpIds(series.dpIds);
+              seriesValues[series.id] = sumValuesForDpIds(series, chartTargetUnit);
           });
           dataBufferRef.current.push(processDataPoint(currentTimestamp, seriesValues));
       }
@@ -423,7 +428,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
             }
         } else if (effectiveIsLive && dpsConfigured && nodeValues && Object.keys(nodeValues).length > 0 && allPossibleDataPoints && allPossibleDataPoints.length > 0) {
             timelineSeries.forEach(series => {
-                seriesValues[series.id] = sumValuesForDpIds(series.dpIds);
+                seriesValues[series.id] = sumValuesForDpIds(series, chartTargetUnit);
             });
         } else if (chartData.length > 0) {
             const pointSource = chartData[chartData.length - 1];
@@ -532,28 +537,28 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         });
 
         if (allValues.length === 0) {
-            return [CHART_TARGET_UNIT === 'kW' ? -5 : -5000, CHART_TARGET_UNIT === 'kW' ? 20 : 20000];
+            return [chartTargetUnit === 'kW' ? -5 : -5000, chartTargetUnit === 'kW' ? 20 : 20000];
         }
 
         let minV = Math.min(...allValues);
         let maxV = Math.max(...allValues);
 
         if (minV === maxV) {
-            const pad = CHART_TARGET_UNIT === 'kW' ? 1 : 100;
+            const pad = chartTargetUnit === 'kW' ? 1 : 100;
             minV -= pad;
             maxV += pad;
         } else {
             const range = maxV - minV;
-            const padding = Math.max(range * 0.1, CHART_TARGET_UNIT === 'kW' ? 0.5 : 50);
+            const padding = Math.max(range * 0.1, chartTargetUnit === 'kW' ? 0.5 : 50);
             minV -= padding;
             maxV += padding;
         }
 
-        if (minV > 0 && minV < (CHART_TARGET_UNIT === 'kW' ? 2 : 200)) minV = Math.min(0, minV);
-        if (maxV < 0 && maxV > (CHART_TARGET_UNIT === 'kW' ? -2 : -200)) maxV = Math.max(0, maxV);
+        if (minV > 0 && minV < (chartTargetUnit === 'kW' ? 2 : 200)) minV = Math.min(0, minV);
+        if (maxV < 0 && maxV > (chartTargetUnit === 'kW' ? -2 : -200)) maxV = Math.max(0, maxV);
 
         return [Math.floor(minV), Math.ceil(maxV)];
-    }, [chartData, currentData, timelineSeries, CHART_TARGET_UNIT]);
+    }, [chartData, currentData, timelineSeries, chartTargetUnit]);
 
     const isCurrentlyDrawingLiveOrDemo = (effectiveIsLive || effectiveUseDemoData) && historicalTimeOffsetMs === 0;
 
@@ -890,7 +895,7 @@ function getSimulatedHistoricalWindData(timeScale: TimeScale, currentDate: Date,
         windFactor = Math.max(0, Math.min(1, windFactor)); // Clamp between 0 and 1
         
         const windOutputW = windFactor * maxWindOutputW;
-        const windOutputInTargetUnit = convertFromWatts(windOutputW, CHART_TARGET_UNIT);
+        const windOutputInTargetUnit = convertFromWatts(windOutputW, 'kW');
         
         dataPoints.push({
             timestamp,
@@ -914,7 +919,7 @@ function generateUsageData(timestamp: number, baseUsageW: number, variationW: nu
     const randomVariation = (Math.random() - 0.5) * variationW * 0.3;
     
     const totalUsageW = baseUsageW + peakUsage + randomVariation;
-    return convertFromWatts(Math.max(100, totalUsageW), CHART_TARGET_UNIT);
+    return convertFromWatts(Math.max(100, totalUsageW), 'kW');
 }
 
 export default PowerTimelineGraph;

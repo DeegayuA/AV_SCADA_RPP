@@ -42,6 +42,7 @@ import { useWebSocket } from '@/hooks/useWebSocketListener';
 // --- CONFIGURATION ---
 const USER_DASHBOARD_CONFIG_KEY = `userDashboardLayout_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_v2`;
 const WEATHER_CARD_CONFIG_KEY = `weatherCardConfig_v3.5_compact_${appConstants.PLANT_NAME || 'defaultPlant'}`;
+const GRAPH_SERIES_CONFIG_KEY = `powerGraphConfig_${appConstants.PLANT_NAME.replace(/\s+/g, '_')}_control_dashboard_series_v1`;
 
 const APP_LOCAL_STORAGE_KEYS = [
   USER_DASHBOARD_CONFIG_KEY,
@@ -50,6 +51,7 @@ const APP_LOCAL_STORAGE_KEYS = [
   'theme',
   WEATHER_CARD_CONFIG_KEY,
   appConstants.WEBSOCKET_CUSTOM_URL_KEY,
+  GRAPH_SERIES_CONFIG_KEY,
 ];
 
 const SLD_LAYOUT_IDS_TO_BACKUP: string[] = ['main_plant'];

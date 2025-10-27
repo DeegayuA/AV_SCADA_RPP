@@ -652,13 +652,13 @@ const UnifiedDashboardPage: React.FC = () => {
         const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
         const migratedSeries: TimelineSeries[] = [];
         if (legacyGenDpIds.length > 0) {
-          migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true });
+          migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1 });
         }
         if (legacyUsageDpIds.length > 0) {
-          migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true });
+          migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1 });
         }
         if (legacyWindDpIds.length > 0) {
-          migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true });
+          migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1 });
         }
 
         config = { series: migratedSeries, exportMode };
@@ -677,8 +677,8 @@ const UnifiedDashboardPage: React.FC = () => {
         // Set a default configuration if no config is found at all
         setPowerGraphConfig({
           series: [
-            { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true },
-            { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true }
+            { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1 },
+            { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1 }
           ],
           exportMode: 'auto'
         });
