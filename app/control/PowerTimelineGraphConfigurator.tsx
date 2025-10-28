@@ -29,6 +29,7 @@ export interface TimelineSeries {
   unit?: string;
   multiplier?: number;
   precision?: number;
+  invert?: boolean;
 }
 
 export interface PowerTimelineGraphConfig {
@@ -162,7 +163,7 @@ const CategoryDataPointManager: React.FC<CategoryDataPointManagerProps> = ({
             </Button>
           )}
         </div>
-        <ScrollArea className="h-[180px] rounded-md border flex-grow">
+        <ScrollArea className="flex-grow rounded-md border">
           <AnimatePresence mode="sync">
             {availableDataPointsToSelect.length > 0 ? (
               availableDataPointsToSelect.map((dp) => (
@@ -269,7 +270,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Configured Series</h3>
-        <Button onClick={() => setEditingSeries({ id: `new_${Date.now()}`, name: 'New Series', dpIds: [], color: '#4d4dff', displayType: 'line', role: 'other', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 })}>
+        <Button onClick={() => setEditingSeries({ id: `new_${Date.now()}`, name: 'New Series', dpIds: [], color: '#4d4dff', displayType: 'line', role: 'other', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2, invert: false })}>
           <PlusCircle className="h-4 w-4 mr-2" />
           Add New Series
         </Button>
@@ -447,6 +448,16 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
             />
             <Label htmlFor="draw-on-graph" className="cursor-pointer">
                 Draw this series on the graph
+            </Label>
+        </div>
+        <div className="flex items-center space-x-2 rounded-lg border p-3 mt-1">
+            <Switch
+                id="invert-series"
+                checked={editingSeries.invert}
+                onCheckedChange={(checked) => setEditingSeries({ ...editingSeries, invert: checked })}
+            />
+            <Label htmlFor="invert-series" className="cursor-pointer">
+                Invert Series (+/-)
             </Label>
         </div>
         <div className="flex-grow min-h-0 pt-1">
