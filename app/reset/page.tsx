@@ -46,6 +46,7 @@ const GRAPH_SERIES_CONFIG_KEY = `powerGraphConfig_${appConstants.PLANT_NAME.repl
 
 const APP_LOCAL_STORAGE_KEYS = [
   USER_DASHBOARD_CONFIG_KEY,
+  GRAPH_SERIES_CONFIG_KEY,
   'user-preferences',
   'last-session',
   'theme',
