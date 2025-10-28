@@ -215,10 +215,12 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const processDataPoint = useCallback((timestamp: number, seriesValues: { [key: string]: number }): ChartDataPoint => {
         const processedValues: ChartDataPoint = { timestamp };
         for (const seriesId in seriesValues) {
-            processedValues[seriesId] = parseFloat(seriesValues[seriesId].toFixed(valuePrecision));
+            const series = timelineSeries.find(s => s.id === seriesId);
+            const precision = series?.precision ?? valuePrecision;
+            processedValues[seriesId] = parseFloat(seriesValues[seriesId].toFixed(precision));
         }
         return processedValues;
-    }, [valuePrecision]);
+    }, [timelineSeries, valuePrecision]);
 
     const generateDemoValues = useCallback(() => {
         const now = new Date();
@@ -627,6 +629,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                     const value = currentData.seriesValues[series.id] || 0;
                     const IconToUse = chartConfig[series.id]?.icon || Zap;
                     const isVisible = seriesVisibility[series.id];
+                    const precision = series.precision ?? valuePrecision;
                     return (
                     <motion.button
                         key={series.id}
@@ -643,7 +646,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                         <div className="flex flex-col">
                             <span className="text-xs sm:text-[0.8rem] text-muted-foreground leading-tight">{series.name}</span>
                             <span className="font-bold text-sm sm:text-[0.9rem] leading-tight" style={{color: series.color}}>
-                                <AnimatedNumber value={value} precision={valuePrecision} /> {displayUnitLabel}
+                                <AnimatedNumber value={value} precision={precision} /> {displayUnitLabel}
                             </span>
                         </div>
                     </motion.button>
@@ -737,6 +740,8 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                             }
                                         }}
                                         formatter={(value, name, item, index, payloadProp) => {
+                                            const series = timelineSeries.find(s => s.id === item.dataKey);
+                                            const precision = series?.precision ?? valuePrecision;
                                             const config = chartConfig[item.dataKey as string];
                                             if (!config) return null;
 
@@ -746,7 +751,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                                     <div className="flex flex-1 justify-between leading-none"> 
                                                         <span className="text-muted-foreground">{config.label}</span>
                                                         <span className="font-bold" style={{ color: config.color }}>
-                                                            {(value as number).toFixed(valuePrecision)} <span className="ml-1 font-normal text-muted-foreground">{displayUnitLabel}</span>
+                                                            {(value as number).toFixed(precision)} <span className="ml-1 font-normal text-muted-foreground">{displayUnitLabel}</span>
                                                         </span> 
                                                     </div> 
                                                 </div> 

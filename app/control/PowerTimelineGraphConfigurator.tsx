@@ -28,6 +28,7 @@ export interface TimelineSeries {
   drawOnGraph: boolean;
   unit?: string;
   multiplier?: number;
+  precision?: number;
 }
 
 export interface PowerTimelineGraphConfig {
@@ -268,7 +269,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-medium">Configured Series</h3>
-        <Button onClick={() => setEditingSeries({ id: `new_${Date.now()}`, name: 'New Series', dpIds: [], color: '#4d4dff', displayType: 'line', role: 'other', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1 })}>
+        <Button onClick={() => setEditingSeries({ id: `new_${Date.now()}`, name: 'New Series', dpIds: [], color: '#4d4dff', displayType: 'line', role: 'other', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 })}>
           <PlusCircle className="h-4 w-4 mr-2" />
           Add New Series
         </Button>
@@ -288,7 +289,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
               <div className="w-6 h-6 rounded-sm shrink-0" style={{ backgroundColor: series.color }} />
               <div className="flex-grow">
                 <p className="font-semibold">{series.name}</p>
-                <p className="text-xs text-muted-foreground">{series.dpIds.length} data point(s) - Unit: {series.unit || 'auto'}</p>
+                <p className="text-xs text-muted-foreground">{series.dpIds.length} data point(s) - Unit: {series.unit || 'auto'} - Precision: {series.precision ?? 2}</p>
               </div>
               <div className="flex items-center gap-1">
                  <div className="flex flex-col gap-1">
@@ -423,6 +424,18 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                     value={editingSeries.multiplier}
                     onChange={(e) => setEditingSeries({ ...editingSeries, multiplier: parseFloat(e.target.value) })}
                     placeholder="e.g., 1"
+                />
+            </div>
+            <div>
+                <Label htmlFor="series-precision">Precision</Label>
+                <Input
+                    id="series-precision"
+                    type="number"
+                    value={editingSeries.precision}
+                    onChange={(e) => setEditingSeries({ ...editingSeries, precision: parseInt(e.target.value) })}
+                    placeholder="e.g., 2"
+                    min="0"
+                    max="10"
                 />
             </div>
         </div>
