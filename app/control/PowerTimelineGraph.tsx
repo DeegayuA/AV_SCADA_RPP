@@ -32,7 +32,6 @@ export type PowerUnit = 'W' | 'kW' | 'MW' | 'GW';
 export type TimeScale = '30s' | '1m' | '5m' | '30m' | '1h' | '6h' | '12h' | '1d' | '7d' | '1mo';
 
 // --- Component Constants ---
-const CHART_TARGET_UNIT: PowerUnit = 'kW';
 const POWER_PRECISION: Record<PowerUnit, number> = { 'W': 0, 'kW': 2, 'MW': 3, 'GW': 4 };
 const MAX_POINTS_FOR_RECHARTS = 750;
 const MIN_BUFFER_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -51,7 +50,7 @@ type ChartDataPoint = {
 };
 
 interface GridFeedSegment { type: 'export' | 'import'; data: ChartDataPoint[]; }
-import { PowerTimelineGraphConfig } from './PowerTimelineGraphConfigurator';
+import { PowerTimelineGraphConfig, TimelineSeries } from './PowerTimelineGraphConfigurator';
 
 interface PowerTimelineGraphProps {
     nodeValues: NodeData;
@@ -96,9 +95,6 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const [isGraphReady, setIsGraphReady] = useState(false);
     const [animationKey, setAnimationKey] = useState(Date.now());
     const [lastUpdatedDisplayTime, setLastUpdatedDisplayTime] = useState<string>('N/A');
-
-    const displayUnitLabel = CHART_TARGET_UNIT;
-    const valuePrecision = POWER_PRECISION[CHART_TARGET_UNIT];
     const prevDemoUsageRef = useRef<number | null>(null);
 
     const dataBufferRef = useRef<ChartDataPoint[]>([]);
@@ -209,42 +205,40 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const effectiveIsLive = useMemo(() => (isLiveSourceAvailable || isForcedLiveUiButtonActive) && !effectiveUseDemoData && historicalTimeOffsetMs === 0, [isLiveSourceAvailable, isForcedLiveUiButtonActive, effectiveUseDemoData, historicalTimeOffsetMs]);
 
     const processDataPoint = useCallback((timestamp: number, seriesValues: { [key: string]: number }): ChartDataPoint => {
-        const processedValues: ChartDataPoint = { timestamp };
-        for (const seriesId in seriesValues) {
-            processedValues[seriesId] = parseFloat(seriesValues[seriesId].toFixed(valuePrecision));
-        }
-        return processedValues;
-    }, [valuePrecision]);
+        // Storing raw data (in Watts) without rounding. Rounding happens at display time.
+        return { timestamp, ...seriesValues };
+    }, []);
 
     const generateDemoValues = useCallback(() => {
         const now = new Date();
         const totalMinutesInDay = now.getHours() * 60 + now.getMinutes();
         const seriesValues: { [key: string]: number } = {};
 
-        // Generate demo values for the first two series, if they exist
+        // All demo values are generated in WATTS
         if (timelineSeries[0]) {
             const solarPotential = Math.sin((totalMinutesInDay - 6 * 60) * Math.PI / (13 * 60));
-            const solarValue = Math.max(0, solarPotential * 25); // Demo kW
-            seriesValues[timelineSeries[0].id] = solarValue;
+            const solarValueInWatts = Math.max(0, solarPotential * 25000); // Demo W (was 25 kW)
+            seriesValues[timelineSeries[0].id] = solarValueInWatts;
         }
         if (timelineSeries[1]) {
-            const usageValue = 8 + Math.sin(totalMinutesInDay / 120 * Math.PI) * 4; // Demo kW
-            seriesValues[timelineSeries[1].id] = usageValue;
+            const usageValueInWatts = (8 + Math.sin(totalMinutesInDay / 120 * Math.PI) * 4) * 1000; // Demo W (was 8-12 kW)
+            seriesValues[timelineSeries[1].id] = usageValueInWatts;
         }
         return seriesValues;
     }, [timelineSeries]);
 
-    const sumValuesForDpIds = useCallback((dpIdsToSum: string[]): number => {
+    const sumValuesForDpIds = useCallback((series: TimelineSeries): number => {
         if (!allPossibleDataPoints?.length || !nodeValues || Object.keys(nodeValues).length === 0) {
             return 0;
         }
         let sumInWatts = 0;
-        dpIdsToSum.forEach(dpId => {
+        series.dpIds.forEach(dpId => {
             const dp = allPossibleDataPoints.find(p => p.id === dpId);
             if (dp) {
                 const rawValueFromNode = nodeValues[dp.nodeId];
                 let numericValue = 0;
-                let unitForConversion = dp.unit;
+                // The unit for conversion comes from the data point itself, or the series override
+                let unitForConversion = series.unit || dp.unit;
                 if (typeof rawValueFromNode === 'object' && rawValueFromNode !== null) {
                     if ('value' in rawValueFromNode) {
                         const typedValue = rawValueFromNode as { value: unknown, unit?: string };
@@ -259,8 +253,11 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                 sumInWatts += convertToWatts(valueOfInterest, unitForConversion);
             }
         });
-        return convertFromWatts(sumInWatts, CHART_TARGET_UNIT);
-    }, [nodeValues, allPossibleDataPoints, CHART_TARGET_UNIT]);
+        // The final value is always returned in Watts, with multiplier and inversion applied.
+        const multiplier = series.multiplier || 1;
+        const valueInWatts = sumInWatts * multiplier;
+        return series.invert ? valueInWatts * -1 : valueInWatts;
+    }, [nodeValues, allPossibleDataPoints]);
 
     useEffect(() => {
       setChartData([]);
@@ -293,7 +290,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
           const currentTimestamp = Date.now();
           const seriesValues: { [key: string]: number } = {};
           timelineSeries.forEach(series => {
-              seriesValues[series.id] = sumValuesForDpIds(series.dpIds);
+              seriesValues[series.id] = sumValuesForDpIds(series);
           });
           dataBufferRef.current.push(processDataPoint(currentTimestamp, seriesValues));
       }
@@ -400,65 +397,63 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
 
     const currentData = useMemo(() => {
         const dpsConfigured = timelineSeries.length > 0 && timelineSeries.some(s => s.dpIds.length > 0);
-        const seriesValues: { [key: string]: number } = {};
+        const rawSeriesValuesInWatts: { [key: string]: number } = {};
 
+        // Determine the source of the latest data point (live, demo, or historical)
         if (historicalTimeOffsetMs > 0 && chartData.length > 0) {
             const lastPointInView = chartData[chartData.length - 1];
             if (lastPointInView) {
-                timelineSeries.forEach(series => {
-                    seriesValues[series.id] = lastPointInView[series.id] || 0;
-                });
+                timelineSeries.forEach(series => { rawSeriesValuesInWatts[series.id] = lastPointInView[series.id] || 0; });
             }
         } else if (effectiveUseDemoData && dpsConfigured) {
-            const lastDemoPoint = dataBufferRef.current.length > 0 ? dataBufferRef.current[dataBufferRef.current.length - 1] : null;
+            const lastDemoPoint = dataBufferRef.current[dataBufferRef.current.length - 1];
             if (lastDemoPoint && lastDemoPoint.timestamp > Date.now() - 5000) {
-                 timelineSeries.forEach(series => {
-                    seriesValues[series.id] = lastDemoPoint[series.id] || 0;
-                });
+                timelineSeries.forEach(series => { rawSeriesValuesInWatts[series.id] = lastDemoPoint[series.id] || 0; });
             } else {
                 const demo = generateDemoValues();
-                 timelineSeries.forEach(series => {
-                    seriesValues[series.id] = demo[series.id] || 0;
-                });
+                timelineSeries.forEach(series => { rawSeriesValuesInWatts[series.id] = demo[series.id] || 0; });
             }
         } else if (effectiveIsLive && dpsConfigured && nodeValues && Object.keys(nodeValues).length > 0 && allPossibleDataPoints && allPossibleDataPoints.length > 0) {
-            timelineSeries.forEach(series => {
-                seriesValues[series.id] = sumValuesForDpIds(series.dpIds);
-            });
+            timelineSeries.forEach(series => { rawSeriesValuesInWatts[series.id] = sumValuesForDpIds(series); });
         } else if (chartData.length > 0) {
             const pointSource = chartData[chartData.length - 1];
-            timelineSeries.forEach(series => {
-                seriesValues[series.id] = pointSource[series.id] || 0;
-            });
+            timelineSeries.forEach(series => { rawSeriesValuesInWatts[series.id] = pointSource[series.id] || 0; });
         }
 
+        // Fill in any missing series with 0
         timelineSeries.forEach(series => {
-            if (seriesValues[series.id] === undefined) {
-                seriesValues[series.id] = 0;
-            }
+            if (rawSeriesValuesInWatts[series.id] === undefined) { rawSeriesValuesInWatts[series.id] = 0; }
         });
 
-        const totalGeneration = timelineSeries
+        // Convert raw Watt values to the desired display format for the UI
+        const displaySeriesValues: { [key: string]: number } = {};
+        timelineSeries.forEach(series => {
+            const rawValue = rawSeriesValuesInWatts[series.id];
+            const displayUnit = (series.unit as PowerUnit) || 'W';
+            displaySeriesValues[series.id] = convertFromWatts(rawValue, displayUnit);
+        });
+
+        const totalGenerationInWatts = timelineSeries
             .filter(s => s.role === 'generation')
-            .reduce((sum, s) => sum + (seriesValues[s.id] || 0), 0);
+            .reduce((sum, s) => sum + (rawSeriesValuesInWatts[s.id] || 0), 0);
 
-        const totalUsage = timelineSeries
+        const totalUsageInWatts = timelineSeries
             .filter(s => s.role === 'usage')
-            .reduce((sum, s) => sum + (seriesValues[s.id] || 0), 0);
+            .reduce((sum, s) => sum + (rawSeriesValuesInWatts[s.id] || 0), 0);
 
-        const netPower = totalGeneration - totalUsage;
+        const netPowerInWatts = totalGenerationInWatts - totalUsageInWatts;
 
         return {
-            seriesValues,
+            displayValues: displaySeriesValues, // Values converted for top display
+            rawValuesInWatts: rawSeriesValuesInWatts, // Original values for logic
             metadata: {
-                netPower,
-                isSelfSufficient: netPower >= 0,
+                netPowerInWatts,
+                isSelfSufficient: netPowerInWatts >= 0,
             }
         };
     }, [
-        nodeValues, allPossibleDataPoints, chartData, timelineSeries,
-        valuePrecision, sumValuesForDpIds, generateDemoValues, effectiveIsLive, effectiveUseDemoData,
-        historicalTimeOffsetMs, dataBufferRef.current.length
+        nodeValues, allPossibleDataPoints, chartData, timelineSeries, sumValuesForDpIds,
+        generateDemoValues, effectiveIsLive, effectiveUseDemoData, historicalTimeOffsetMs
     ]);
 
     const formatXAxisTick = useCallback((ts: number) => {
@@ -519,7 +514,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     },[timeScale, effectiveIsLive, effectiveUseDemoData, historicalTimeOffsetMs, chartData]);
 
     const yAxisDomain = useMemo(():[number,number] => {
-        const dataToUse = chartData.length > 0 ? chartData : [currentData.seriesValues];
+        const dataToUse = chartData.length > 0 ? chartData : [currentData.rawValuesInWatts];
         let allValues: number[] = [];
         const seriesIds = timelineSeries.map(s => s.id);
 
@@ -530,30 +525,34 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                 }
             });
         });
-
-        if (allValues.length === 0) {
-            return [CHART_TARGET_UNIT === 'kW' ? -5 : -5000, CHART_TARGET_UNIT === 'kW' ? 20 : 20000];
-        }
+        if (allValues.length === 0) return [-5000, 20000]; // Default domain in Watts (-5kW to 20kW)
 
         let minV = Math.min(...allValues);
         let maxV = Math.max(...allValues);
 
         if (minV === maxV) {
-            const pad = CHART_TARGET_UNIT === 'kW' ? 1 : 100;
-            minV -= pad;
-            maxV += pad;
+            minV -= 1000; // Pad by 1kW
+            maxV += 1000; // Pad by 1kW
         } else {
             const range = maxV - minV;
-            const padding = Math.max(range * 0.1, CHART_TARGET_UNIT === 'kW' ? 0.5 : 50);
+            const padding = Math.max(range * 0.1, 500); // Pad by 10% or at least 500W
             minV -= padding;
             maxV += padding;
         }
 
-        if (minV > 0 && minV < (CHART_TARGET_UNIT === 'kW' ? 2 : 200)) minV = Math.min(0, minV);
-        if (maxV < 0 && maxV > (CHART_TARGET_UNIT === 'kW' ? -2 : -200)) maxV = Math.max(0, maxV);
+        if (minV > 0 && minV < 2000) minV = Math.min(0, minV); // Ensure 0 is visible if we are close
+        if (maxV < 0 && maxV > -2000) maxV = Math.max(0, maxV);
 
         return [Math.floor(minV), Math.ceil(maxV)];
-    }, [chartData, currentData, timelineSeries, CHART_TARGET_UNIT]);
+    }, [chartData, currentData.rawValuesInWatts, timelineSeries]);
+
+    const yAxisTickFormatter = useCallback((value: number): string => {
+        const absValue = Math.abs(value);
+        if (absValue >= 1000000) return `${(value / 1000000).toFixed(1)} MW`;
+        if (absValue >= 1000) return `${(value / 1000).toFixed(1)} kW`;
+        return `${value.toFixed(0)} W`;
+    }, []);
+
 
     const isCurrentlyDrawingLiveOrDemo = (effectiveIsLive || effectiveUseDemoData) && historicalTimeOffsetMs === 0;
 
@@ -619,7 +618,9 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
             <div className="flex flex-wrap justify-between items-center gap-x-4 gap-y-2 text-xs sm:text-sm mb-2 px-1">
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-3 gap-y-2 items-stretch">
                 {timelineSeries.map(series => {
-                    const value = currentData.seriesValues[series.id] || 0;
+                    const value = currentData.displayValues[series.id] || 0;
+                    const displayUnit = (series.unit as PowerUnit) || 'W';
+                    const precision = series.precision ?? POWER_PRECISION[displayUnit];
                     const IconToUse = chartConfig[series.id]?.icon || Zap;
                     const isVisible = seriesVisibility[series.id];
                     return (
@@ -638,7 +639,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                         <div className="flex flex-col">
                             <span className="text-xs sm:text-[0.8rem] text-muted-foreground leading-tight">{series.name}</span>
                             <span className="font-bold text-sm sm:text-[0.9rem] leading-tight" style={{color: series.color}}>
-                                <AnimatedNumber value={value} precision={valuePrecision} /> {displayUnitLabel}
+                                <AnimatedNumber value={value} precision={precision} /> {displayUnit}
                             </span>
                         </div>
                     </motion.button>
@@ -708,7 +709,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                         <ComposedChart accessibilityLayer data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={resolvedTheme === 'dark' ? 0.3 : 0.5} />
                             <XAxis dataKey="timestamp" type="number" domain={xAxisDomain as [number, number]} scale="time" tickFormatter={formatXAxisTick} tickLine={false} axisLine={false} tickMargin={8} minTickGap={timeScale === '1mo' || timeScale === '7d' ? 15 : 30} interval="preserveStartEnd" stroke="hsl(var(--muted-foreground))"/>
-                            <YAxis yAxisId="left" domain={yAxisDomain} orientation="left" width={60} tickFormatter={(v) => v.toFixed(valuePrecision > 0 ? 1 : 0)} tickLine={false} axisLine={false} tickMargin={5} stroke="hsl(var(--muted-foreground))"/>
+                            <YAxis yAxisId="left" domain={yAxisDomain} orientation="left" width={60} tickFormatter={yAxisTickFormatter} tickLine={false} axisLine={false} tickMargin={5} stroke="hsl(var(--muted-foreground))"/>
 
                             <ChartTooltip
                                 cursor={{ stroke: "hsl(var(--foreground)/0.3)", strokeWidth: 1.5, strokeDasharray: '3 3' }}
@@ -732,36 +733,46 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                             }
                                         }}
                                         formatter={(value, name, item, index, payloadProp) => {
+                                            const rawValueInWatts = value as number;
+                                            const series = timelineSeries.find(s => s.id === item.dataKey);
+                                            if (!series) return null;
+
+                                            const displayUnit = (series.unit as PowerUnit) || 'W';
+                                            const precision = series.precision ?? POWER_PRECISION[displayUnit];
+                                            const displayValue = convertFromWatts(rawValueInWatts, displayUnit);
+
                                             const config = chartConfig[item.dataKey as string];
                                             if (!config) return null;
 
-                                            const mainContent = ( 
+                                            const mainContent = (
                                                 <div className="flex items-center gap-2.5">
                                                     {config.icon && <config.icon className="h-4 w-4 shrink-0" style={{ color: config.color }} />}
-                                                    <div className="flex flex-1 justify-between leading-none"> 
+                                                    <div className="flex flex-1 justify-between leading-none">
                                                         <span className="text-muted-foreground">{config.label}</span>
                                                         <span className="font-bold" style={{ color: config.color }}>
-                                                            {(value as number).toFixed(valuePrecision)} <span className="ml-1 font-normal text-muted-foreground">{displayUnitLabel}</span>
-                                                        </span> 
-                                                    </div> 
-                                                </div> 
+                                                            {displayValue.toFixed(precision)} <span className="ml-1 font-normal text-muted-foreground">{displayUnit}</span>
+                                                        </span>
+                                                    </div>
+                                                </div>
                                             );
 
                                             const currentPoint = item.payload as ChartDataPoint;
                                             const isLastItem = Array.isArray(payloadProp) && index === payloadProp.length - 1;
 
                                             if (isLastItem) {
-                                                const totalGeneration = timelineSeries
+                                                const totalGenerationW = timelineSeries
                                                     .filter(s => s.role === 'generation')
                                                     .reduce((sum, s) => sum + (currentPoint[s.id] || 0), 0);
-                                                
-                                                const totalUsage = timelineSeries
+
+                                                const totalUsageW = timelineSeries
                                                     .filter(s => s.role === 'usage')
                                                     .reduce((sum, s) => sum + (currentPoint[s.id] || 0), 0);
 
-                                                const netPower = totalGeneration - totalUsage;
+                                                const netPowerW = totalGenerationW - totalUsageW;
+                                                const { unit: displayUnit, value: displayValue } = formatPowerForDisplay(netPowerW);
+
                                                 const netPowerConfig = chartConfig['netPower'];
-                                                const netColor = netPower >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))";
+                                                const netColor = netPowerW >= 0 ? "hsl(var(--success))" : "hsl(var(--destructive))";
 
                                                 return (
                                                     <div key={`${name as string}-${index}-with-net`}>
@@ -771,7 +782,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                                             <div className="flex flex-1 justify-between leading-none">
                                                                 <span className="text-muted-foreground">{netPowerConfig?.label || "Net Power"}</span>
                                                                 <span className="font-bold" style={{color: netColor}}>
-                                                                   {netPower.toFixed(valuePrecision)} <span className="ml-1 font-normal text-muted-foreground">{displayUnitLabel}</span>
+                                                                   {displayValue} <span className="ml-1 font-normal text-muted-foreground">{displayUnit}</span>
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -866,55 +877,50 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     );
 };
 
+// --- Helper Functions ---
+
+function formatPowerForDisplay(watts: number): { value: string; unit: PowerUnit } {
+    const absWatts = Math.abs(watts);
+    if (absWatts >= 1000000) {
+        return { value: (watts / 1000000).toFixed(2), unit: 'MW' };
+    }
+    if (absWatts >= 1000) {
+        return { value: (watts / 1000).toFixed(2), unit: 'kW' };
+    }
+    return { value: watts.toFixed(0), unit: 'W' };
+}
+
 function getSimulatedHistoricalWindData(timeScale: TimeScale, currentDate: Date, maxWindOutputW: number) {
     const now = currentDate.getTime();
     const { durationMs } = timeScaleConfig[timeScale];
-    
-    // Generate wind data for the time window
     const dataPoints: { timestamp: number; value: number }[] = [];
-    const pointCount = Math.min(100, Math.max(10, Math.floor(durationMs / (5 * 60 * 1000)))); // One point every 5 minutes, capped
-    
+    const pointCount = Math.min(100, Math.max(10, Math.floor(durationMs / (5 * 60 * 1000))));
+
     for (let i = 0; i < pointCount; i++) {
         const timestamp = now - durationMs + (i * durationMs / pointCount);
         const timeOfDayMinutes = new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
-        
-        // Wind is more active during certain times (early morning and evening)
         const windTimePattern = Math.sin((timeOfDayMinutes / (24 * 60)) * 2 * Math.PI + Math.PI) * 0.3 + 0.7;
-        
-        // Add some randomness and variability
-        const windVariability = Math.sin((timestamp / (30 * 60 * 1000)) * 2 * Math.PI) * 0.4 + 0.6; // 30min cycle
-        const windNoise = (Math.random() - 0.5) * 0.3; // Random noise
-        
-        // Combine factors
-        let windFactor = windTimePattern * windVariability + windNoise;
-        windFactor = Math.max(0, Math.min(1, windFactor)); // Clamp between 0 and 1
-        
-        const windOutputW = windFactor * maxWindOutputW;
-        const windOutputInTargetUnit = convertFromWatts(windOutputW, CHART_TARGET_UNIT);
+        const windVariability = Math.sin((timestamp / (30 * 60 * 1000)) * 2 * Math.PI) * 0.4 + 0.6;
+        const windNoise = (Math.random() - 0.5) * 0.3;
+        let windFactor = Math.max(0, Math.min(1, windTimePattern * windVariability + windNoise));
         
         dataPoints.push({
             timestamp,
-            value: windOutputInTargetUnit
+            value: windFactor * maxWindOutputW // Value is in Watts
         });
     }
     
-    return {
-        generation: dataPoints
-    };
+    return { generation: dataPoints };
 }
 
 function generateUsageData(timestamp: number, baseUsageW: number, variationW: number): number {
     const timeOfDayMinutes = new Date(timestamp).getHours() * 60 + new Date(timestamp).getMinutes();
-    
-    // Basic usage pattern with morning and evening peaks
     const morningPeak = Math.exp(-Math.pow(timeOfDayMinutes - 7.5 * 60, 2) / (2 * Math.pow(60, 2)));
     const eveningPeak = Math.exp(-Math.pow(timeOfDayMinutes - 18.5 * 60, 2) / (2 * Math.pow(60, 2)));
-    
     const peakUsage = (morningPeak + eveningPeak * 1.2) * variationW;
     const randomVariation = (Math.random() - 0.5) * variationW * 0.3;
-    
     const totalUsageW = baseUsageW + peakUsage + randomVariation;
-    return convertFromWatts(Math.max(100, totalUsageW), CHART_TARGET_UNIT);
+    return Math.max(100, totalUsageW); // Return value in Watts
 }
 
 export default PowerTimelineGraph;
