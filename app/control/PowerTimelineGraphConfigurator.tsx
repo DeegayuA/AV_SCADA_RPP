@@ -275,8 +275,8 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
           Add New Series
         </Button>
       </div>
-      <ScrollArea className="h-[calc(100vh-200px)]">
-        <div className="space-y-3 pr-4">
+      <ScrollArea className="h-[calc(100vh-400px)]">
+        <div className="space-y-1 pr-4">
           {config.series.map((series, index) => (
             <motion.div
               key={series.id}
@@ -346,9 +346,9 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Series List
         </Button>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-1 ml-10">
           <div className="md:col-span-2">
-            <Label htmlFor="series-name">Series Name</Label>
+            <Label htmlFor="series-name" className="mb-2">Series Name</Label>
             <Input
               id="series-name"
               value={editingSeries.name}
@@ -357,7 +357,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
             />
           </div>
           <div>
-            <Label htmlFor="series-color">Color</Label>
+            <Label htmlFor="series-color" className="mb-2">Color</Label>
             <Input
               id="series-color"
               type="color"
@@ -368,7 +368,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
           </div>
           <div className="md:col-span-3 grid grid-cols-2 gap-4">
             <div>
-                <Label htmlFor="series-role">Series Role</Label>
+                <Label htmlFor="series-role" className="mb-2">Series Role</Label>
                 <Select
                   value={editingSeries.role}
                   onValueChange={(value: 'generation' | 'usage' | 'gridFeed' | 'other') => setEditingSeries({ ...editingSeries, role: value })}
@@ -386,7 +386,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 <p className="text-xs text-muted-foreground mt-1">Used for Net Power calculation.</p>
             </div>
             <div>
-                <Label htmlFor="display-type">Display Type</Label>
+                <Label htmlFor="display-type" className="mb-2">Display Type</Label>
                 <Select
                   value={editingSeries.displayType}
                   onValueChange={(value: 'line' | 'area') => setEditingSeries({ ...editingSeries, displayType: value })}
@@ -409,7 +409,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 />
             </div>
             <div>
-                <Label htmlFor="series-unit">Unit</Label>
+                <Label htmlFor="series-unit" className="m-2">Unit</Label>
                 <Input
                     id="series-unit"
                     value={editingSeries.unit}
@@ -418,7 +418,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 />
             </div>
             <div>
-                <Label htmlFor="series-multiplier">Multiplier</Label>
+                <Label htmlFor="series-multiplier" className="m-2">Multiplier</Label>
                 <Input
                     id="series-multiplier"
                     type="number"
@@ -428,7 +428,7 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 />
             </div>
             <div>
-                <Label htmlFor="series-precision">Precision</Label>
+                <Label htmlFor="series-precision" className="m-2">Precision</Label>
                 <Input
                     id="series-precision"
                     type="number"
@@ -440,27 +440,29 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 />
             </div>
         </div>
-        <div className="flex items-center space-x-2 rounded-lg border p-3 mt-1">
-            <Switch
-                id="draw-on-graph"
-                checked={editingSeries.drawOnGraph}
-                onCheckedChange={(checked) => setEditingSeries({ ...editingSeries, drawOnGraph: checked })}
-            />
-            <Label htmlFor="draw-on-graph" className="cursor-pointer">
-                Draw this series on the graph
-            </Label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-2  ml-10">
+            <div className="flex items-center space-x-2 rounded-lg border p-3">
+          <Switch
+              id="draw-on-graph"
+              checked={editingSeries.drawOnGraph}
+              onCheckedChange={(checked) => setEditingSeries({ ...editingSeries, drawOnGraph: checked })}
+          />
+          <Label htmlFor="draw-on-graph" className="cursor-pointer text-sm">
+              Draw this series on the graph
+          </Label>
+            </div>
+            <div className="flex items-center space-x-2 rounded-lg border p-3">
+          <Switch
+              id="invert-series"
+              checked={!!editingSeries.invert}
+              onCheckedChange={(checked) => setEditingSeries({ ...editingSeries, invert: checked })}
+          />
+          <Label htmlFor="invert-series" className="cursor-pointer text-sm">
+              Invert Series Values (+/-)
+          </Label>
+            </div>
         </div>
-        <div className="flex items-center space-x-2 rounded-lg border p-3 mt-1">
-            <Switch
-                id="invert-series"
-                checked={editingSeries.invert}
-                onCheckedChange={(checked) => setEditingSeries({ ...editingSeries, invert: checked })}
-            />
-            <Label htmlFor="invert-series" className="cursor-pointer">
-                Invert Series (+/-)
-            </Label>
-        </div>
-        <div className="flex-grow min-h-0 pt-1">
+        <div className="flex-grow min-h-100 pt-1 ml-10">
             <CategoryDataPointManager
                 instanceId={`series-editor-${editingSeries.id}`}
                 categoryTitle="Data Points for this Series"
@@ -483,8 +485,8 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) { onClose(); }}}>
-      <DialogContent className="sm:max-w-[700px] md:max-w-[750px] p-0 flex flex-col overflow-hidden h-[95vh] max-h-[900px]">
-        <DialogHeader className="p-6 pb-4 border-b shrink-0">
+      <DialogContent className="sm:max-w-[800px] md:max-w-[850px] p-0 flex flex-col overflow-hidden h-[98vh]">
+        <DialogHeader className="p-6 border-b shrink-0">
           <DialogTitle className="text-xl flex items-center">
             <Settings2 className="h-5 w-5 mr-2 text-primary" />
             Configure Power Timeline Graph
@@ -494,11 +496,11 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
           </DialogDescription>
         </DialogHeader>
         
-        <div className="flex-grow p-6 overflow-y-auto">
+        <div className="flex-grow px-6 overflow-y-auto">
           {editingSeries ? renderEditView() : renderSeriesList()}
         </div>
 
-        <DialogFooter className="p-6 border-t shrink-0 flex justify-end">
+        <DialogFooter className="px-6 border-t shrink-0 flex justify-end">
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
             <Button onClick={handleSave}>
