@@ -219,6 +219,30 @@ export async function restoreFromBackupContent(
       }
     }
 
+    if (backupData.browserStorage.localStorage[GRAPH_SERIES_CONFIG_KEY]) {
+      setProgress?.("Restoring Power Graph Configuration...");
+      await new Promise(res => setTimeout(res, 200));
+      try {
+        const response = await fetch('/api/power-graph-backup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(backupData.browserStorage.localStorage[GRAPH_SERIES_CONFIG_KEY]),
+        });
+
+        if (!response.ok) {
+          const errorResult = await response.json();
+          throw new Error(errorResult.message || 'Failed to restore power graph config.');
+        }
+
+        toast.info("Power graph configuration restored.", { id: importToastId });
+      } catch (error) {
+        console.error("Failed to restore power graph config:", error);
+        toast.error("Power Graph Restore Failed", { id: importToastId, description: (error as Error).message });
+      }
+    }
+
     setProgress?.("Finalizing...");
     await new Promise(res => setTimeout(res, 300));
     logout();

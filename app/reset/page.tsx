@@ -390,6 +390,22 @@ export default function ResetApplicationPage() {
         backupData.sldLayouts = getAllSldLayoutsFromStorage();
       }
 
+      try {
+        const response = await fetch('/api/power-graph-backup');
+        if (response.ok) {
+          const powerGraphConfig = await response.json();
+          if (!backupData.browserStorage) {
+            backupData.browserStorage = { localStorage: {} };
+          }
+          backupData.browserStorage.localStorage[GRAPH_SERIES_CONFIG_KEY] = powerGraphConfig;
+        } else {
+          throw new Error('Failed to fetch power graph config');
+        }
+      } catch (error) {
+        console.error("Failed to fetch power graph config:", error);
+        toast.error("Power Graph Backup Failed", { id: backupToastId, description: (error as Error).message });
+      }
+
       const jsonData = JSON.stringify(backupData, null, 2);
 
       // Save to server
