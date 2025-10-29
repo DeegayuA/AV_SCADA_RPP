@@ -675,14 +675,13 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [powerGraphConfig, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
   useEffect(() => {
-    if (authCheckComplete) {
-      // Check for legacy keys and migrate them. This should only run once.
-      // This logic can be removed after a transition period.
+    // Legacy migration logic
+    if (authCheckComplete && powerGraphConfig && powerGraphConfig.series.length === 0) {
       const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
       const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
       const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
 
-      if ((!config || config.series.length === 0) && (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0)) {
+      if (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0) {
         const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
         const migratedSeries: TimelineSeries[] = [];
         if (legacyGenDpIds.length > 0) {
@@ -695,7 +694,8 @@ const UnifiedDashboardPage: React.FC = () => {
           migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
         }
 
-        config = { series: migratedSeries, exportMode };
+        const newConfig = { series: migratedSeries, exportMode };
+        setPowerGraphConfig(newConfig);
 
         // Clean up old keys after successful migration
         localStorage.removeItem(GRAPH_GEN_KEY);
