@@ -222,6 +222,19 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const drawableSeries = useMemo(() => visibleSeries.filter(s => s.drawOnGraph && s.role !== 'gridFeed'), [visibleSeries]);
     const gridFeedSeries = useMemo(() => visibleSeries.filter(s => s.drawOnGraph && s.role === 'gridFeed'), [visibleSeries]);
 
+    const chartGroups = useMemo(() => {
+        const units = Array.from(new Set(drawableSeries.map(s => s.unit || 'W')));
+        const groups = [];
+        for (let i = 0; i < units.length; i += 2) {
+            groups.push(units.slice(i, i + 2));
+        }
+        return groups.map((unitGroup, index) => ({
+            id: `chart-group-${index}`,
+            units: unitGroup,
+            series: drawableSeries.filter(s => unitGroup.includes(s.unit || 'W')),
+        }));
+    }, [drawableSeries]);
+
     const gridFeedSegments = useMemo(() => {
         const segments: { seriesId: string, type: 'export' | 'import', data: ChartDataPoint[] }[] = [];
         if (!chartData || chartData.length < 1) return segments;
@@ -850,22 +863,38 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                     className="w-full h-[280px] sm:h-[300px]"
                 >
                    {isGraphReady && dpsAreConfigured && (chartData.length > 0 || !isCurrentlyDrawingLiveOrDemo) ? (
-                    <ChartContainer config={chartConfig} className="w-full h-full">
-                        <ComposedChart
-                            accessibilityLayer
-                            data={chartData}
-                            margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
-                            onWheel={handleWheel}
-                            onMouseDown={handleMouseDown}
-                            onMouseMove={handleMouseMove}
-                            onMouseUp={handleMouseUp}
-                        >
-                             <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={resolvedTheme === 'dark' ? 0.3 : 0.5} />
-                            <XAxis dataKey="timestamp" type="number" domain={xAxisDomain as [number, number]} scale="time" tickFormatter={formatXAxisTick} tickLine={false} axisLine={false} tickMargin={8} minTickGap={timeScale === '1mo' || timeScale === '7d' ? 15 : 30} interval="preserveStartEnd" stroke="hsl(var(--muted-foreground))"/>
-                            <YAxis yAxisId="left" domain={yAxisDomain} orientation="left" width={60} tickFormatter={yAxisTickFormatter} tickLine={false} axisLine={false} tickMargin={5} stroke="hsl(var(--muted-foreground))"/>
+                    <div className="w-full h-full flex flex-col">
+                        {chartGroups.map((group, groupIndex) => (
+                            <ChartContainer key={group.id} config={chartConfig} className="w-full flex-1">
+                                <ComposedChart
+                                    accessibilityLayer
+                                    data={chartData}
+                                    margin={{ top: 5, right: group.units.length > 1 ? 40 : 10, left: -20, bottom: groupIndex === chartGroups.length - 1 ? 0 : 20 }}
+                                    syncId="powerTimeLineSync"
+                                    onWheel={handleWheel}
+                                    onMouseDown={handleMouseDown}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseUp={handleMouseUp}
+                                >
+                                    <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={resolvedTheme === 'dark' ? 0.3 : 0.5} />
+                                    <XAxis dataKey="timestamp" type="number" domain={xAxisDomain as [number, number]} scale="time" tickFormatter={formatXAxisTick} tickLine={false} axisLine={false} tickMargin={8} minTickGap={timeScale === '1mo' || timeScale === '7d' ? 15 : 30} interval="preserveStartEnd" stroke="hsl(var(--muted-foreground))" hide={groupIndex !== chartGroups.length - 1} />
 
-                            <ChartTooltip
-                                cursor={{ stroke: "hsl(var(--foreground)/0.3)", strokeWidth: 1.5, strokeDasharray: '3 3' }}
+                                    {group.units.map((unit, unitIndex) => (
+                                        <YAxis
+                                            key={`yaxis-${unit}`}
+                                            yAxisId={unit}
+                                            orientation={unitIndex % 2 === 0 ? 'left' : 'right'}
+                                            width={unitIndex % 2 === 0 ? 60 : 80}
+                                            tickFormatter={(value) => `${value.toFixed(1)} ${unit}`}
+                                            tickLine={false}
+                                            axisLine={false}
+                                            tickMargin={5}
+                                            stroke={chartConfig[group.series.find(s => s.unit === unit)?.id || '']?.color || '#888888'}
+                                        />
+                                    ))}
+
+                                    <ChartTooltip
+                                        cursor={{ stroke: "hsl(var(--foreground)/0.3)", strokeWidth: 1.5, strokeDasharray: '3 3' }}
                                 wrapperStyle={{ outline: "none" }}
                                 content={
                                     <ChartTooltipContent
@@ -962,14 +991,14 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                 content={<ChartLegendContent className="mt-1 -mb-1 text-xs" />}
                               />
                             }
-                            <ReferenceLine y={0} yAxisId="left" stroke="hsl(var(--foreground)/0.3)" strokeDasharray="3 3" strokeWidth={1}/>
+                            <ReferenceLine y={0} yAxisId={group.units[0]} stroke="hsl(var(--foreground)/0.3)" strokeDasharray="3 3" strokeWidth={1}/>
 
-                            {drawableSeries.map(series => {
+                            {group.series.map(series => {
                                 if (series.displayType === 'area') {
                                     return (
                                         <Area
                                             key={series.id}
-                                            yAxisId="left"
+                                            yAxisId={series.unit || 'W'}
                                             dataKey={series.id}
                                             name={series.name}
                                             type="monotone"
@@ -988,7 +1017,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                 return (
                                     <Line
                                         key={series.id}
-                                        yAxisId="left"
+                                        yAxisId={series.unit || 'W'}
                                         dataKey={series.id}
                                         name={series.name}
                                         type="monotone"
@@ -1021,7 +1050,9 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                 />
                             ))}
                         </ComposedChart>
-                    </ChartContainer>
+                            </ChartContainer>
+                        ))}
+                    </div>
                      ) : null }
                 </motion.div>
             </AnimatePresence>
