@@ -227,8 +227,25 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
   }, [isOpen, currentConfig]);
 
   const handleSave = () => {
-    onSaveConfiguration(config);
-    onClose();
+    // If we are currently editing a series, save its state before saving the whole config
+    if (editingSeries) {
+      const index = config.series.findIndex(s => s.id === editingSeries.id);
+      let newSeriesList: TimelineSeries[];
+      if (index > -1) {
+        newSeriesList = [...config.series];
+        newSeriesList[index] = editingSeries;
+      } else {
+        newSeriesList = [...config.series, editingSeries];
+      }
+      const newConfig = { ...config, series: newSeriesList };
+      setConfig(newConfig); // Update local state
+      onSaveConfiguration(newConfig); // Pass the updated config up
+    } else {
+      onSaveConfiguration(config); // Pass the current state up
+    }
+
+    setEditingSeries(null); // Always exit edit mode on save
+    onClose(); // Close the dialog
   };
   
   const addDataPoint = (id: string, currentIds: string[], setter: React.Dispatch<React.SetStateAction<string[]>>) => {
@@ -327,22 +344,25 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
   const renderEditView = () => {
     if (!editingSeries) return null;
 
-    const handleSeriesUpdate = (updatedSeries: TimelineSeries) => {
-      const index = config.series.findIndex(s => s.id === updatedSeries.id);
+    const handleBackToList = () => {
+      const index = config.series.findIndex(s => s.id === editingSeries.id);
       let newSeriesList: TimelineSeries[];
-      if (index > -1) {
-        newSeriesList = [...config.series];
-        newSeriesList[index] = updatedSeries;
-      } else {
-        newSeriesList = [...config.series, updatedSeries];
+      // If the series is not empty and has datapoints, save it. Otherwise, discard it.
+      if (editingSeries.name.trim() !== '' && editingSeries.dpIds.length > 0) {
+        if (index > -1) {
+          newSeriesList = [...config.series];
+          newSeriesList[index] = editingSeries;
+        } else {
+          newSeriesList = [...config.series, editingSeries];
+        }
+        setConfig({ ...config, series: newSeriesList });
       }
-      setConfig({ ...config, series: newSeriesList });
       setEditingSeries(null);
     };
 
     return (
       <div className="space-y-1 h-full flex flex-col">
-        <Button variant="ghost" onClick={() => setEditingSeries(null)} className="self-start">
+        <Button variant="ghost" onClick={handleBackToList} className="self-start">
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Series List
         </Button>
@@ -472,12 +492,6 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 onDataPointRemove={(id) => setEditingSeries(prev => prev ? { ...prev, dpIds: prev.dpIds.filter(dpId => dpId !== id) } : null)}
                 dataPointsMap={dataPointsMap}
             />
-        </div>
-        <div className="flex justify-end pt-4">
-          <Button onClick={() => handleSeriesUpdate(editingSeries)}>
-            <Save className="h-4 w-4 mr-2" />
-            Save Series
-          </Button>
         </div>
       </div>
     );
