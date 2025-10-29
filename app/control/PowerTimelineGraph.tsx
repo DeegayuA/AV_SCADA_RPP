@@ -228,12 +228,26 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         for (let i = 0; i < units.length; i += 2) {
             groups.push(units.slice(i, i + 2));
         }
-        return groups.map((unitGroup, index) => ({
+
+        const mappedGroups = groups.map((unitGroup, index) => ({
             id: `chart-group-${index}`,
             units: unitGroup,
             series: drawableSeries.filter(s => unitGroup.includes(s.unit || 'W')),
         }));
-    }, [drawableSeries]);
+
+        // If there are no standard drawable series but there are grid feed series,
+        // create a default group so the chart still renders.
+        if (mappedGroups.length === 0 && gridFeedSeries.length > 0) {
+            const defaultUnit = gridFeedSeries[0].unit || 'W';
+            return [{
+                id: 'chart-group-default-gridfeed',
+                units: [defaultUnit],
+                series: [], // No standard series to draw, but this allows the ComposedChart to render.
+            }];
+        }
+
+        return mappedGroups;
+    }, [drawableSeries, gridFeedSeries]);
 
     const gridFeedSegments = useMemo(() => {
         const segments: { seriesId: string, type: 'export' | 'import', data: ChartDataPoint[] }[] = [];
