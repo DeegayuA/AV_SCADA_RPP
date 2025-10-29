@@ -488,7 +488,17 @@ const PowerTimelineGraphConfigurator: React.FC<PowerTimelineGraphConfiguratorPro
                 categoryTitle="Data Points for this Series"
                 allPossibleDataPoints={allPossibleDataPoints}
                 selectedDataPointIds={editingSeries.dpIds}
-                onDataPointAdd={(id) => setEditingSeries(prev => prev ? { ...prev, dpIds: [...prev.dpIds, id] } : null)}
+                onDataPointAdd={(id) => {
+                  const dataPoint = allPossibleDataPoints.find(dp => dp.id === id);
+                  setEditingSeries(prev => {
+                    if (!prev) return null;
+                    // If this is the first data point being added, auto-set the unit
+                    if (prev.dpIds.length === 0 && dataPoint?.unit) {
+                      return { ...prev, dpIds: [...prev.dpIds, id], unit: dataPoint.unit };
+                    }
+                    return { ...prev, dpIds: [...prev.dpIds, id] };
+                  });
+                }}
                 onDataPointRemove={(id) => setEditingSeries(prev => prev ? { ...prev, dpIds: prev.dpIds.filter(dpId => dpId !== id) } : null)}
                 dataPointsMap={dataPointsMap}
             />

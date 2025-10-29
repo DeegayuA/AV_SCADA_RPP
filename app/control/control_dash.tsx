@@ -699,6 +699,26 @@ const UnifiedDashboardPage: React.FC = () => {
 
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
 
+  const useDebouncedEffect = (effect: () => void, deps: any[], delay: number) => {
+    useEffect(() => {
+      const handler = setTimeout(() => effect(), delay);
+      return () => clearTimeout(handler);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [...(deps || []), delay]);
+  };
+
+  useDebouncedEffect(() => {
+    if (Object.keys(nodeValues).length > 0) {
+      fetch('/api/graph-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(nodeValues),
+      }).catch(console.error);
+    }
+  }, [nodeValues], 5000); // Debounce by 5 seconds
+
   useEffect(() => {
     const fetchStatus = async () => {
       if (isWsConfigModalOpen) {

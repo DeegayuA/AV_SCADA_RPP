@@ -113,6 +113,60 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         setSeriesVisibility(initialVisibility);
     }, [timelineSeries]);
 
+    useEffect(() => {
+        const fetchData = async () => {
+            const { durationMs } = timeScaleConfig[timeScale];
+            const end = new Date(Date.now() - historicalTimeOffsetMs);
+            const start = new Date(end.getTime() - durationMs);
+
+            const datesToFetch = new Set<string>();
+            let currentDate = new Date(start);
+            while (currentDate <= end) {
+                datesToFetch.add(currentDate.toISOString().substring(0, 10));
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            const promises = Array.from(datesToFetch).map(date =>
+                fetch(`/api/graph-history?date=${date}`).then(res => res.json())
+            );
+
+            try {
+                const results = await Promise.all(promises);
+                const historicalData = results.flat();
+
+                // Assuming the API returns data points with a 'timestamp' and other values.
+                // We need to transform this into the ChartDataPoint format.
+                const formattedData = historicalData.map((d: any) => {
+                    const seriesValues: { [key: string]: number } = {};
+                    timelineSeries.forEach(series => {
+                        let sum = 0;
+                        series.dpIds.forEach(dpId => {
+                            const dp = allPossibleDataPoints.find(p => p.id === dpId);
+                            if (dp && d[dp.nodeId] !== undefined) {
+                                const rawValue = d[dp.nodeId];
+                                const factor = dp.factor || 1;
+                                const valueInWatts = convertToWatts(rawValue * factor, dp.unit);
+                                const multiplier = series.multiplier || 1;
+                                sum += series.invert ? -valueInWatts * multiplier : valueInWatts * multiplier;
+                            }
+                        });
+                        seriesValues[series.id] = sum;
+                    });
+                    return { timestamp: new Date(d.timestamp).getTime(), ...seriesValues };
+                });
+
+                dataBufferRef.current = formattedData.sort((a, b) => a.timestamp - b.timestamp);
+                setAnimationKey(Date.now()); // Trigger re-render
+            } catch (error) {
+                console.error("Failed to fetch historical graph data:", error);
+            }
+        };
+
+        if (historicalTimeOffsetMs > 0 || !isLiveSourceAvailable) {
+            fetchData();
+        }
+    }, [timeScale, historicalTimeOffsetMs, isLiveSourceAvailable, allPossibleDataPoints, timelineSeries]);
+
     const handleVisibilityToggle = (seriesId: string) => {
         setSeriesVisibility(prev => ({
             ...prev,

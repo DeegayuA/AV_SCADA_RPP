@@ -99,4 +99,33 @@ export async function cleanupBackups() {
       });
     }
   }
+
+  await cleanupGraphHistory();
+}
+
+async function cleanupGraphHistory() {
+  const historyDir = path.join(process.cwd(), 'logs', 'graph_history');
+  try {
+    const allFiles = await fs.readdir(historyDir);
+    const oneMonthAgo = new Date();
+    oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+    for (const file of allFiles) {
+      const match = file.match(/^(\d{4}-\d{2}-\d{2})\.json$/);
+      if (match) {
+        const fileDate = new Date(match[1]);
+        if (fileDate < oneMonthAgo) {
+          console.log(`Deleting old graph history file: ${file}`);
+          await fs.unlink(path.join(historyDir, file)).catch(err => {
+            console.error(`Failed to delete graph history file ${file}:`, err);
+          });
+        }
+      }
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.error('Failed to cleanup graph history:', error);
+    }
+    // If the directory doesn't exist, there's nothing to clean up.
+  }
 }
