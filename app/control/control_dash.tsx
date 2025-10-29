@@ -704,24 +704,8 @@ const UnifiedDashboardPage: React.FC = () => {
         localStorage.removeItem(GRAPH_WIND_KEY);
         localStorage.removeItem(GRAPH_EXPORT_MODE_KEY);
       }
-
-      if (config) {
-        setPowerGraphConfig(config);
-      } else {
-        // Set a default configuration if no config is found at all
-        setPowerGraphConfig({
-          series: [
-            { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 },
-            { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 }
-          ],
-          exportMode: 'auto'
-        });
-      }
-
-      setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');
-      setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m');
     }
-  }, [authCheckComplete]);
+  }, [authCheckComplete, powerGraphConfig]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && authCheckComplete) {

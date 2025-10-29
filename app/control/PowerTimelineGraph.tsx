@@ -866,15 +866,18 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                     <div className="w-full h-full flex flex-col">
                         {chartGroups.map((group, groupIndex) => (
                             <ChartContainer key={group.id} config={chartConfig} className="w-full flex-1">
+                                <div
+                                    onWheel={handleWheel}
+                                    onMouseDown={handleMouseDown}
+                                    onMouseMove={handleMouseMove}
+                                    onMouseUp={handleMouseUp}
+                                    className={cn("w-full h-full", isPanning ? "cursor-grabbing" : "cursor-grab")}
+                                >
                                 <ComposedChart
                                     accessibilityLayer
                                     data={chartData}
                                     margin={{ top: 5, right: group.units.length > 1 ? 40 : 10, left: -20, bottom: groupIndex === chartGroups.length - 1 ? 0 : 20 }}
                                     syncId="powerTimeLineSync"
-                                    onWheel={handleWheel}
-                                    onMouseDown={handleMouseDown}
-                                    onMouseMove={handleMouseMove}
-                                    onMouseUp={handleMouseUp}
                                 >
                                     <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={resolvedTheme === 'dark' ? 0.3 : 0.5} />
                                     <XAxis dataKey="timestamp" type="number" domain={xAxisDomain as [number, number]} scale="time" tickFormatter={formatXAxisTick} tickLine={false} axisLine={false} tickMargin={8} minTickGap={timeScale === '1mo' || timeScale === '7d' ? 15 : 30} interval="preserveStartEnd" stroke="hsl(var(--muted-foreground))" hide={groupIndex !== chartGroups.length - 1} />
@@ -1050,6 +1053,7 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                                 />
                             ))}
                         </ComposedChart>
+                        </div>
                             </ChartContainer>
                         ))}
                     </div>
