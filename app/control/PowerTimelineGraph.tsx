@@ -104,6 +104,46 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
     const [isForcedLiveUiButtonActive, setIsForcedLiveUiButtonActive] = useState(false);
     const [historicalTimeOffsetMs, setHistoricalTimeOffsetMs] = useState(0);
     const [seriesVisibility, setSeriesVisibility] = useState<Record<string, boolean>>({});
+    const [isPanning, setIsPanning] = useState(false);
+    const [panStart, setPanStart] = useState({ x: 0, time: 0 });
+    const [viewDomain, setViewDomain] = useState<[number, number] | null>(null);
+
+    const handleWheel = (e: any) => {
+        if (e.deltaY === 0) return;
+        e.preventDefault();
+
+        const { durationMs } = timeScaleConfig[timeScale];
+        const currentDomain = viewDomain || [Date.now() - durationMs - historicalTimeOffsetMs, Date.now() - historicalTimeOffsetMs];
+
+        const zoomFactor = 1.1;
+        const newDuration = e.deltaY < 0 ? (currentDomain[1] - currentDomain[0]) / zoomFactor : (currentDomain[1] - currentDomain[0]) * zoomFactor;
+
+        // Prevent zooming out beyond the original timeScale duration
+        if (newDuration > durationMs) {
+            setViewDomain([currentDomain[1] - durationMs, currentDomain[1]]);
+            return;
+        }
+
+        // Center the zoom on the cursor
+        const chart = e.currentTarget;
+        const chartRect = chart.getBoundingClientRect();
+        const mouseX = e.clientX - chartRect.left;
+
+        const chartWidth = chartRect.width;
+        // Adjust for padding/margin if the chart's inner area is different
+        const chartAreaX = mouseX - 60; // Approximate left margin of the chart
+        const chartAreaWidth = chartWidth - 70; // Approximate total width minus margins
+
+        if (chartAreaX < 0 || chartAreaX > chartAreaWidth) return;
+
+        const timeAtCursor = currentDomain[0] + (currentDomain[1] - currentDomain[0]) * (chartAreaX / chartAreaWidth);
+
+        const newStart = timeAtCursor - newDuration * (chartAreaX / chartAreaWidth);
+        const newEnd = newStart + newDuration;
+
+        setViewDomain([newStart, newEnd]);
+        setHistoricalTimeOffsetMs(Date.now() - newEnd);
+    };
 
     useEffect(() => {
         const initialVisibility: Record<string, boolean> = {};
@@ -255,8 +295,14 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
       }
     }, [timeScale]);
 
-    const effectiveUseDemoData = useMemo(() => (useDemoDataSource || useWindDemoDataSource) && !isForcedLiveUiButtonActive && historicalTimeOffsetMs === 0, [useDemoDataSource, useWindDemoDataSource, isForcedLiveUiButtonActive, historicalTimeOffsetMs]);
-    const effectiveIsLive = useMemo(() => (isLiveSourceAvailable || isForcedLiveUiButtonActive) && !effectiveUseDemoData && historicalTimeOffsetMs === 0, [isLiveSourceAvailable, isForcedLiveUiButtonActive, effectiveUseDemoData, historicalTimeOffsetMs]);
+    const effectiveUseDemoData = useMemo(() => (useDemoDataSource || useWindDemoDataSource) && !isForcedLiveUiButtonActive && historicalTimeOffsetMs === 0 && !viewDomain, [useDemoDataSource, useWindDemoDataSource, isForcedLiveUiButtonActive, historicalTimeOffsetMs, viewDomain]);
+    const effectiveIsLive = useMemo(() => (isLiveSourceAvailable || isForcedLiveUiButtonActive) && !effectiveUseDemoData && historicalTimeOffsetMs === 0 && !viewDomain, [isLiveSourceAvailable, isForcedLiveUiButtonActive, effectiveUseDemoData, historicalTimeOffsetMs, viewDomain]);
+
+    const resetZoomAndPan = () => {
+        setViewDomain(null);
+        setHistoricalTimeOffsetMs(0);
+        setIsForcedLiveUiButtonActive(true);
+    };
 
     const processDataPoint = useCallback((timestamp: number, seriesValues: { [key: string]: number }): ChartDataPoint => {
         // Storing raw data (in Watts) without rounding. Rounding happens at display time.
@@ -547,7 +593,44 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
         }
     }, [timeScale]);
 
+    const handleMouseDown = (e: any) => {
+        if (e.target.classList.contains('recharts-surface')) {
+            setIsPanning(true);
+            const { durationMs } = timeScaleConfig[timeScale];
+            const currentDomain = viewDomain || [Date.now() - durationMs - historicalTimeOffsetMs, Date.now() - historicalTimeOffsetMs];
+            setPanStart({ x: e.clientX, time: currentDomain[0] });
+        }
+    };
+
+    const handleMouseMove = (e: any) => {
+        if (!isPanning) return;
+
+        const { durationMs } = timeScaleConfig[timeScale];
+        const currentDomain = viewDomain || [Date.now() - durationMs - historicalTimeOffsetMs, Date.now() - historicalTimeOffsetMs];
+        const domainDuration = currentDomain[1] - currentDomain[0];
+
+        const chart = e.currentTarget;
+        const chartRect = chart.getBoundingClientRect();
+        const chartWidth = chartRect.width - 70; // Adjust for margins
+
+        const dx = e.clientX - panStart.x;
+        const dt = (dx / chartWidth) * domainDuration;
+
+        const newStart = panStart.time - dt;
+        const newEnd = newStart + domainDuration;
+
+        setViewDomain([newStart, newEnd]);
+        setHistoricalTimeOffsetMs(Date.now() - newEnd);
+    };
+
+    const handleMouseUp = () => {
+        setIsPanning(false);
+    };
+
     const xAxisDomain = useMemo(():[number,number|'dataMax'] => {
+        if (viewDomain) {
+            return viewDomain as [number, number];
+        }
         const { durationMs } = timeScaleConfig[timeScale];
         let viewEndTime: number;
 
@@ -725,6 +808,14 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                         <span className="ml-1.5">{(isCurrentlyDrawingLiveOrDemo) ? "Now" : "Go to now"}</span>
                     </Button>
                 </TooltipTrigger><TooltipContent><p>{(isCurrentlyDrawingLiveOrDemo) ? "Currently Live" : "Return to Live View"}</p></TooltipContent></Tooltip>
+                {viewDomain && (
+                    <Tooltip><TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={resetZoomAndPan} className="h-7 px-2">
+                            <Scale className="h-4 w-4 mr-1.5" />
+                            Reset View
+                        </Button>
+                    </TooltipTrigger><TooltipContent><p>Reset zoom and pan</p></TooltipContent></Tooltip>
+                )}
                 <Tooltip><TooltipTrigger asChild>
                     <Button variant="outline" size="sm" onClick={() => handleTimeShift('prev')} className="h-7 w-7" disabled={disablePrevButton}>
                         <ChevronLeft className="h-4 w-4" />
@@ -760,7 +851,15 @@ const PowerTimelineGraph: React.FC<PowerTimelineGraphProps> = ({
                 >
                    {isGraphReady && dpsAreConfigured && (chartData.length > 0 || !isCurrentlyDrawingLiveOrDemo) ? (
                     <ChartContainer config={chartConfig} className="w-full h-full">
-                        <ComposedChart accessibilityLayer data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                        <ComposedChart
+                            accessibilityLayer
+                            data={chartData}
+                            margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+                            onWheel={handleWheel}
+                            onMouseDown={handleMouseDown}
+                            onMouseMove={handleMouseMove}
+                            onMouseUp={handleMouseUp}
+                        >
                              <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={resolvedTheme === 'dark' ? 0.3 : 0.5} />
                             <XAxis dataKey="timestamp" type="number" domain={xAxisDomain as [number, number]} scale="time" tickFormatter={formatXAxisTick} tickLine={false} axisLine={false} tickMargin={8} minTickGap={timeScale === '1mo' || timeScale === '7d' ? 15 : 30} interval="preserveStartEnd" stroke="hsl(var(--muted-foreground))"/>
                             <YAxis yAxisId="left" domain={yAxisDomain} orientation="left" width={60} tickFormatter={yAxisTickFormatter} tickLine={false} axisLine={false} tickMargin={5} stroke="hsl(var(--muted-foreground))"/>

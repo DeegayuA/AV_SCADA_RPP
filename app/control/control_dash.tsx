@@ -629,21 +629,55 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); connectWebSocket(); } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 1000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
   useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
   useEffect(() => {
-    if (typeof window !== 'undefined' && authCheckComplete) {
-      const storedSeriesConfig = localStorage.getItem(GRAPH_SERIES_CONFIG_KEY);
-      let config = null;
-      if (storedSeriesConfig) {
-        try {
-          const parsedConfig = JSON.parse(storedSeriesConfig);
-          if (parsedConfig && Array.isArray(parsedConfig.series)) {
-            config = parsedConfig;
+    const fetchGraphConfig = async () => {
+      try {
+        const response = await fetch('/api/power-graph-backup');
+        if (response.ok) {
+          const config = await response.json();
+          if (config && Array.isArray(config.series)) {
+            setPowerGraphConfig(config);
           }
-        } catch (e) {
-          console.error("Failed to parse timeline series config.", e);
+        } else {
+          throw new Error('Failed to fetch power graph config');
         }
+      } catch (error) {
+        console.error("Failed to fetch power graph config:", error);
+        // Set a default configuration if fetching fails
+        setPowerGraphConfig({
+          series: [
+            { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 },
+            { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 }
+          ],
+          exportMode: 'auto'
+        });
       }
+    };
 
-      // Check for legacy keys IF no valid new config is found OR if the new config is empty.
+    if (authCheckComplete) {
+      fetchGraphConfig();
+    }
+  }, [authCheckComplete]);
+
+  useEffect(() => {
+    if (authCheckComplete) {
+      // These can remain as they are client-side preferences
+      setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');
+      setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m');
+    }
+  }, [authCheckComplete]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && authCheckComplete) {
+      // localStorage.setItem(GRAPH_SERIES_CONFIG_KEY, JSON.stringify(powerGraphConfig)); // This will be removed next
+      localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph));
+      localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale);
+    }
+  }, [powerGraphConfig, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
+
+  useEffect(() => {
+    if (authCheckComplete) {
+      // Check for legacy keys and migrate them. This should only run once.
+      // This logic can be removed after a transition period.
       const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
       const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
       const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
@@ -691,11 +725,10 @@ const UnifiedDashboardPage: React.FC = () => {
 
   useEffect(() => {
     if (typeof window !== 'undefined' && authCheckComplete) {
-      localStorage.setItem(GRAPH_SERIES_CONFIG_KEY, JSON.stringify(powerGraphConfig));
       localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph));
       localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale);
     }
-  }, [powerGraphConfig, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
+  }, [useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
 
@@ -929,10 +962,27 @@ const UnifiedDashboardPage: React.FC = () => {
         onClose={() => setIsGraphConfiguratorOpen(false)}
         allPossibleDataPoints={allPossibleDataPoints}
         currentConfig={powerGraphConfig}
-        onSaveConfiguration={(newConfig) => {
-          setPowerGraphConfig(newConfig);
-          setIsGraphConfiguratorOpen(false);
-          toast.success("Power timeline configuration updated.");
+        onSaveConfiguration={async (newConfig) => {
+          try {
+            const response = await fetch('/api/power-graph-backup', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(newConfig),
+            });
+            if (response.ok) {
+              setPowerGraphConfig(newConfig);
+              toast.success("Power timeline configuration updated.");
+            } else {
+              throw new Error('Failed to save power graph config');
+            }
+          } catch (error) {
+            console.error("Failed to save power graph config:", error);
+            toast.error("Failed to save power graph configuration.");
+          } finally {
+            setIsGraphConfiguratorOpen(false);
+          }
         }}
       />
 
