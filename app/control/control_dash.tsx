@@ -878,6 +878,7 @@ const UnifiedDashboardPage: React.FC = () => {
                     allPossibleDataPoints={allPossibleDataPoints}
                     config={powerGraphConfig}
                     timeScale={graphTimeScale}
+                    useDemoDataSource={useDemoDataForGraph}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
