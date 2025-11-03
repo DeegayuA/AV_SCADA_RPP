@@ -1,41 +1,57 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest, NextFetchEvent } from 'next/server';
-import fs from 'fs/promises';
+import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
+import fs from 'fs';
+import { promisify } from 'util';
+
+const stat = promisify(fs.stat);
+const readFile = promisify(fs.readFile);
 
 export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ slug: string[] }> }
+  req: NextRequest,
+  { params }: { params: { slug: string[] } }
 ) {
-  const { slug } = await context.params;
-  if (!slug || !Array.isArray(slug) || slug.length === 0) {
-    return new NextResponse('Invalid image path', { status: 400 });
-  }
-
   try {
-    const imagePath = path.join(process.cwd(), 'public', 'maintenance_image_preview', ...slug);
-
-    // Sanitize the path to prevent directory traversal
-    const publicDir = path.resolve(process.cwd(), 'public', 'maintenance_image_preview');
-    const resolvedImagePath = path.resolve(imagePath);
-
-    if (!resolvedImagePath.startsWith(publicDir)) {
-      return new NextResponse('Forbidden', { status: 403 });
+    const { slug } = params;
+    if (!slug || slug.length < 2) {
+      return NextResponse.json({ message: 'Invalid image path' }, { status: 400 });
     }
 
-    const imageBuffer = await fs.readFile(resolvedImagePath);
+    const [date, filename] = slug;
+    const imagePath = path.join(process.cwd(), 'logs', 'maintenance_images', date, filename);
 
-    return new Response(new Uint8Array(imageBuffer), {
+    const imageDir = path.join(process.cwd(), 'logs', 'maintenance_images');
+    const safeImagePath = path.join(imageDir, date, filename);
+
+    // Basic security check to prevent directory traversal
+    if (!path.resolve(safeImagePath).startsWith(path.resolve(imageDir))) {
+        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    await stat(safeImagePath); // Check if file exists
+
+    const imageBuffer = await readFile(safeImagePath);
+
+    // Determine content type from file extension
+    const extension = path.extname(filename).toLowerCase();
+    let contentType = 'image/jpeg'; // default
+    if (extension === '.png') {
+      contentType = 'image/png';
+    } else if (extension === '.jpg' || extension === '.jpeg') {
+      contentType = 'image/jpeg';
+    } else if (extension === '.gif') {
+      contentType = 'image/gif';
+    }
+
+    return new NextResponse(imageBuffer, {
       status: 200,
       headers: {
-        'Content-Type': 'image/jpeg',
+        'Content-Type': contentType,
+        'Content-Length': imageBuffer.length.toString(),
       },
     });
-  } catch (error: any) {
-    if (error?.code === 'ENOENT') {
-      return new NextResponse('Image not found', { status: 404 });
-    }
-    console.error('Failed to serve image:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+
+  } catch (error) {
+    console.error('Error serving maintenance image:', error);
+    return NextResponse.json({ message: 'Image not found' }, { status: 404 });
   }
 }
