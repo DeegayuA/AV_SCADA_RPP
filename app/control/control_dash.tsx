@@ -629,73 +629,68 @@ const UnifiedDashboardPage: React.FC = () => {
   useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); connectWebSocket(); } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 1000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
   useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
   useEffect(() => {
-    if (typeof window !== 'undefined' && authCheckComplete) {
-      const storedSeriesConfig = localStorage.getItem(GRAPH_SERIES_CONFIG_KEY);
-      let config = null;
-      if (storedSeriesConfig) {
+    if (authCheckComplete) {
+      const fetchGraphConfig = async () => {
         try {
-          const parsedConfig = JSON.parse(storedSeriesConfig);
-          if (parsedConfig && Array.isArray(parsedConfig.series)) {
-            config = parsedConfig;
+          const response = await fetch('/api/power-graph-backup');
+          if (response.ok) {
+            const config = await response.json();
+            if (config && Array.isArray(config.series) && config.series.length > 0) {
+              setPowerGraphConfig(config);
+            } else {
+              // Fallback to legacy or default if server config is empty/invalid
+              handleLegacyConfigMigration();
+            }
+          } else {
+            handleLegacyConfigMigration();
           }
-        } catch (e) {
-          console.error("Failed to parse timeline series config.", e);
+        } catch (error) {
+          console.error("Failed to fetch graph config from server:", error);
+          handleLegacyConfigMigration();
         }
-      }
+      };
 
-      // Check for legacy keys IF no valid new config is found OR if the new config is empty.
-      const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
-      const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
-      const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
+      const handleLegacyConfigMigration = () => {
+        const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
+        const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
+        const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
 
-      if ((!config || config.series.length === 0) && (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0)) {
-        const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
-        const migratedSeries: TimelineSeries[] = [];
-        if (legacyGenDpIds.length > 0) {
-          migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
+        if (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0) {
+          const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
+          const migratedSeries: TimelineSeries[] = [];
+          if (legacyGenDpIds.length > 0) {
+            migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
+          }
+          if (legacyUsageDpIds.length > 0) {
+            migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
+          }
+          if (legacyWindDpIds.length > 0) {
+            migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
+          }
+
+          const newConfig = { series: migratedSeries, exportMode };
+          setPowerGraphConfig(newConfig);
+
+          // Clean up old keys
+          [GRAPH_GEN_KEY, GRAPH_USAGE_KEY, GRAPH_EXPORT_KEY, GRAPH_WIND_KEY, GRAPH_EXPORT_MODE_KEY].forEach(key => localStorage.removeItem(key));
+        } else {
+          // Set a default configuration if no config is found at all
+          setPowerGraphConfig({
+            series: [
+              { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 },
+              { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 }
+            ],
+            exportMode: 'auto'
+          });
         }
-        if (legacyUsageDpIds.length > 0) {
-          migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
-        }
-        if (legacyWindDpIds.length > 0) {
-          migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
-        }
+      };
 
-        config = { series: migratedSeries, exportMode };
-
-        // Clean up old keys after successful migration
-        localStorage.removeItem(GRAPH_GEN_KEY);
-        localStorage.removeItem(GRAPH_USAGE_KEY);
-        localStorage.removeItem(GRAPH_EXPORT_KEY);
-        localStorage.removeItem(GRAPH_WIND_KEY);
-        localStorage.removeItem(GRAPH_EXPORT_MODE_KEY);
-      }
-
-      if (config) {
-        setPowerGraphConfig(config);
-      } else {
-        // Set a default configuration if no config is found at all
-        setPowerGraphConfig({
-          series: [
-            { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 },
-            { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 }
-          ],
-          exportMode: 'auto'
-        });
-      }
-
+      fetchGraphConfig();
       setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');
       setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m');
     }
   }, [authCheckComplete]);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined' && authCheckComplete) {
-      localStorage.setItem(GRAPH_SERIES_CONFIG_KEY, JSON.stringify(powerGraphConfig));
-      localStorage.setItem(GRAPH_DEMO_MODE_KEY, String(useDemoDataForGraph));
-      localStorage.setItem(GRAPH_TIMESCALESETTING_KEY, graphTimeScale);
-    }
-  }, [powerGraphConfig, useDemoDataForGraph, graphTimeScale, authCheckComplete]);
 
   useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
 
@@ -909,10 +904,25 @@ const UnifiedDashboardPage: React.FC = () => {
         onClose={() => setIsGraphConfiguratorOpen(false)}
         allPossibleDataPoints={allPossibleDataPoints}
         currentConfig={powerGraphConfig}
-        onSaveConfiguration={(newConfig) => {
-          setPowerGraphConfig(newConfig);
-          setIsGraphConfiguratorOpen(false);
-          toast.success("Power timeline configuration updated.");
+        onSaveConfiguration={async (newConfig) => {
+          try {
+            const response = await fetch('/api/power-graph-backup', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(newConfig),
+            });
+            if (response.ok) {
+              setPowerGraphConfig(newConfig);
+              setIsGraphConfiguratorOpen(false);
+              toast.success("Power timeline configuration saved to server.");
+            } else {
+              const error = await response.json();
+              throw new Error(error.message || 'Failed to save configuration');
+            }
+          } catch (error) {
+            console.error("Error saving power graph config:", error);
+            toast.error("Save Failed", { description: (error as Error).message });
+          }
         }}
       />
 

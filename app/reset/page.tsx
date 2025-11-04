@@ -51,7 +51,6 @@ const APP_LOCAL_STORAGE_KEYS = [
   'theme',
   WEATHER_CARD_CONFIG_KEY,
   appConstants.WEBSOCKET_CUSTOM_URL_KEY,
-  GRAPH_SERIES_CONFIG_KEY,
 ];
 
 const SLD_LAYOUT_IDS_TO_BACKUP: string[] = ['main_plant'];
@@ -151,7 +150,7 @@ const ServerRestoreSection = ({ setShowImportDialog, onBackupFetched }: { setSho
     const [isLoading, setIsLoading] = useState(true);
     const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
     const [isFetching, setIsFetching] = useState(false);
-  
+
     useEffect(() => {
       const fetchBackups = async () => {
         setIsLoading(true);
@@ -169,7 +168,7 @@ const ServerRestoreSection = ({ setShowImportDialog, onBackupFetched }: { setSho
       };
       fetchBackups();
     }, []);
-  
+
     const handleFetchBackup = async () => {
       if (!selectedBackup) {
         return toast.warning("Please select a backup to restore.");
@@ -206,7 +205,7 @@ const ServerRestoreSection = ({ setShowImportDialog, onBackupFetched }: { setSho
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
       };
-  
+
     return (
       <div className="space-y-4 pt-4 mt-4 border-t border-gray-200/80 dark:border-neutral-700/60">
         <div className="flex items-center gap-3">
@@ -375,6 +374,22 @@ export default function ResetApplicationPage() {
           backupData.browserStorage = { localStorage: {} };
         }
         backupData.browserStorage.localStorage = localStorageData;
+
+        // Fetch and add power graph config
+        try {
+          const response = await fetch('/api/power-graph-backup');
+          if (response.ok) {
+            const powerGraphConfig = await response.json();
+            backupData.powerGraphConfig = powerGraphConfig;
+            toast.info("Fetched power graph config for backup.", { id: backupToastId });
+          } else {
+            throw new Error('Failed to fetch power graph config.');
+          }
+        } catch (error) {
+          console.error("Failed to fetch power graph config:", error);
+          toast.error("Power Graph Backup Failed", { id: backupToastId, description: (error as Error).message });
+          // Decide if you want to continue or abort the backup
+        }
       }
 
       if (backupSelection.appSettings) {
