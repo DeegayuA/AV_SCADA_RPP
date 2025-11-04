@@ -32,7 +32,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ImportBackupDialogContent } from '@/app/onboarding/import_all';
 import { exportIdbData, clearOnboardingData } from '@/lib/idb-store';
 import { restoreFromBackupContent, BackupFileContent, RestoreSelection } from '@/lib/restore';
-import { PowerTimelineGraphConfig } from '@/app/control/PowerTimelineGraphConfigurator';
 import { dataPoints as rawDataPointsDefinitions } from '@/config/dataPoints';
 import * as appConstants from '@/config/constants';
 import { sldLayouts as constantSldLayouts } from '@/config/sldLayouts';
@@ -145,6 +144,114 @@ const ActionSection = React.memo(({
 ActionSection.displayName = "ActionSection";
 
 
+// --- ServerRestoreSection (Correctly Integrated) ---
+const ServerRestoreSection = ({ setShowImportDialog, onBackupFetched }: { setShowImportDialog: (show: boolean) => void, onBackupFetched: (data: BackupFileContent) => void }) => {
+    const [serverBackups, setServerBackups] = useState<ServerBackup[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [selectedBackup, setSelectedBackup] = useState<string | null>(null);
+    const [isFetching, setIsFetching] = useState(false);
+
+    useEffect(() => {
+      const fetchBackups = async () => {
+        setIsLoading(true);
+        try {
+          const response = await fetch('/api/backups');
+          if (!response.ok) throw new Error('Failed to fetch server backups.');
+          const data = await response.json();
+          setServerBackups(data.backups || []);
+        } catch (error) {
+          console.error("Error fetching backups:", error);
+          toast.error("Could not load server backups.", { description: (error as Error).message });
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchBackups();
+    }, []);
+
+    const handleFetchBackup = async () => {
+      if (!selectedBackup) {
+        return toast.warning("Please select a backup to restore.");
+      }
+
+      setIsFetching(true);
+      const fetchToastId = toast.loading("Fetching backup from server...", {
+        description: `Retrieving ${selectedBackup}.`
+      });
+
+      try {
+        const response = await fetch(`/api/backups/${selectedBackup}`);
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || 'Failed to fetch backup file from server.');
+        }
+        const backupData: BackupFileContent = await response.json();
+        toast.success("Backup file fetched!", { id: fetchToastId });
+        onBackupFetched(backupData); // Pass data to parent to open selection modal
+
+      } catch (error) {
+        console.error("Server backup fetch failed:", error);
+        toast.error("Fetch Failed", { id: fetchToastId, description: (error as Error).message });
+      } finally {
+        setIsFetching(false);
+      }
+    };
+
+    const formatBytes = (bytes: number, decimals = 2) => {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const dm = decimals < 0 ? 0 : decimals;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+      };
+
+    return (
+      <div className="space-y-4 pt-4 mt-4 border-t border-gray-200/80 dark:border-neutral-700/60">
+        <div className="flex items-center gap-3">
+            <Server className="w-5 h-5 text-gray-500"/>
+            <h4 className="font-semibold text-gray-800 dark:text-gray-200">Restore from Server</h4>
+        </div>
+        <Select onValueChange={setSelectedBackup} disabled={isFetching || isLoading}>
+          <SelectTrigger className="w-full text-base bg-gray-50/50 dark:bg-neutral-900/50">
+            <SelectValue placeholder={isLoading ? "Loading backups..." : "Choose a server backup..."} />
+          </SelectTrigger>
+          <SelectContent>
+            <ScrollArea className="h-[180px]">
+              {serverBackups.length > 0 ? (
+                serverBackups.map((backup) => (
+                  <SelectItem key={backup.filename} value={backup.filename}>
+                    <div className="flex justify-between w-full text-sm">
+                      <span>{backup.filename}</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 pr-4">
+                        {new Date(backup.createdAt).toLocaleString()} ({formatBytes(backup.size)})
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))
+              ) : (
+                <div className="p-4 text-center text-sm text-gray-500">No server backups found.</div>
+              )}
+            </ScrollArea>
+          </SelectContent>
+        </Select>
+        <motion.div variants={interactiveElementVariants} whileHover="hover" whileTap="tap">
+          <Button
+            onClick={handleFetchBackup}
+            disabled={!selectedBackup || isFetching || isLoading}
+            variant="outline"
+            className="w-full text-base py-6 rounded-xl border-2 transition-all duration-300"
+          >
+            {isFetching ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <UploadCloud className="mr-2 h-5 w-5" />}
+            {isFetching ? 'Fetching...' : 'Fetch Backup from Server'}
+          </Button>
+        </motion.div>
+         <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+            Or, <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => setShowImportDialog(true)}>upload a local backup file</Button>.
+         </p>
+      </div>
+    );
+  };
 
 
 // --- MAIN PAGE COMPONENT ---
@@ -225,39 +332,6 @@ export default function ResetApplicationPage() {
   }, [storeHasHydrated, directStoreUser, router]);
 
 
-
-  const handleRestoreFromLatest = async () => {
-    const restoreToastId = toast.loading("Fetching latest backup from server...");
-    try {
-      const response = await fetch('/api/backups/latest');
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch latest backup.');
-      }
-      const backupData: BackupFileContent = await response.json();
-      toast.info("Latest backup fetched. Starting restore...", { id: restoreToastId });
-
-      // Since this is a full restore, we can assume all components are selected
-      const fullSelection: RestoreSelection = {
-        ui: true,
-        appSettings: true,
-        sldLayouts: true,
-        configurations: true,
-        maintenanceData: true,
-      };
-
-      await restoreFromBackupContent(
-        backupData,
-        { isConnected, connect: connectWebSocket, sendJsonMessage },
-        logoutUser,
-        (message) => toast.info(message, { id: restoreToastId }),
-        fullSelection
-      );
-    } catch (error) {
-      console.error("Failed to restore from latest backup:", error);
-      toast.error("Restore Failed", { id: restoreToastId, description: (error as Error).message });
-    }
-  };
 
   const handleDownloadBackup = async () => {
     if (Object.values(backupSelection).every(v => !v)) {
@@ -346,7 +420,11 @@ export default function ResetApplicationPage() {
         toast.error("Server Backup Failed", { id: backupToastId, description: (error as Error).message });
       }
 
-      toast.success("Backup Created!", { id: backupToastId, duration: 6000, description: "The backup has been saved to the server." });
+      // Save to client machine
+      const blob = new Blob([jsonData], { type: 'application/json;charset=utf-8' });
+      saveAs(blob, `manual_backup_${localTime}_${(currentUserForUI?.name || 'system').replace(/\s+/g, '_')}.json`);
+
+      toast.success("Backup Download Started!", { id: backupToastId, duration: 6000, description: "Check your browser downloads." });
       setBackupDownloaded(true);
     } catch (error: any) {
       console.error("Backup process failed:", error);
@@ -501,7 +579,7 @@ export default function ResetApplicationPage() {
                             className="w-full text-lg py-7 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300"
                         >
                         {isBackupInProgress ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Download className="mr-2 h-5 w-5" />}
-                        {isBackupInProgress ? 'Creating Backup...' : 'Create Backup'}
+                        {isBackupInProgress ? 'Creating Backup...' : 'Download Selected Backup'}
                         </Button>
                     </motion.div>
                   </div>
@@ -526,16 +604,13 @@ export default function ResetApplicationPage() {
                       Upload Backup from Computer...
                     </Button>
                   </motion.div>
-                 <div className="mt-5">
-                    <Button
-                      onClick={handleRestoreFromLatest}
-                      variant="outline"
-                      className="w-full text-base py-6 rounded-xl border-2"
-                    >
-                      <RotateCw className="mr-2 h-5 w-5" />
-                      Restore from Latest Backup
-                    </Button>
-                  </div>
+                 <ServerRestoreSection
+                    setShowImportDialog={setShowImportDialog}
+                    onBackupFetched={(data) => {
+                      setSelectedBackupData(data);
+                      setShowRestoreSelectionDialog(true);
+                    }}
+                  />
               </ActionSection>
             </TabsContent>
 
