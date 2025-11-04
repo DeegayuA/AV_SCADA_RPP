@@ -173,6 +173,38 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
 
 
 
+  const handleRestoreFromLatest = async () => {
+    const restoreToastId = toast.loading("Fetching latest backup from server...");
+    try {
+      const response = await fetch('/api/backups/latest');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch latest backup.');
+      }
+      const backupData: BackupFileContent = await response.json();
+      toast.info("Latest backup fetched. Starting restore...", { id: restoreToastId });
+
+      const fullSelection: RestoreSelection = {
+        ui: true,
+        appSettings: true,
+        sldLayouts: true,
+        configurations: true,
+        maintenanceData: true,
+      };
+
+      await restoreFromBackupContent(
+        backupData,
+        { isConnected, connect: connectWebSocket, sendJsonMessage },
+        logoutUser,
+        (message) => toast.info(message, { id: restoreToastId }),
+        fullSelection
+      );
+    } catch (error) {
+      console.error("Failed to restore from latest backup:", error);
+      toast.error("Restore Failed", { id: restoreToastId, description: (error as Error).message });
+    }
+  };
+
   const handleImportData = async () => {
     if (!parsedBackupData || validationStatus === 'invalid') {
       toast.error("Cannot Import: Backup data missing or invalid."); return;
@@ -287,6 +319,12 @@ export function ImportBackupDialogContent({ onDialogClose }: ImportBackupDialogC
               {uploadedFile && <p className="text-xs text-muted-foreground">({(uploadedFile.size / 1024).toFixed(2)} KB)</p>}
               <input id="backup-file-input-modal" type="file" accept=".json" onChange={handleFileChange} className="sr-only" />
           </label>
+          <div className="mt-4">
+            <Button onClick={handleRestoreFromLatest} variant="outline" className="w-full">
+              <RotateCw className="mr-2 h-4 w-4" />
+              Restore from Latest Backup
+            </Button>
+          </div>
           {importStage === 'error' && !parsedBackupData && validationIssues.length > 0 && (
               <div className="mt-2 text-left text-xs px-1">
               {validationIssues.map((issue, idx) => (

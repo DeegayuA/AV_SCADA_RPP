@@ -36,6 +36,8 @@ const APP_LOCAL_STORAGE_KEYS_TO_MANAGE_ON_IMPORT = [
   // Consider 'theme' separately, usually user preference
 ];
 
+import { PowerTimelineGraphConfig } from '@/app/control/PowerTimelineGraphConfigurator';
+
 export interface BackupFileContent {
   backupSchemaVersion: string;
   createdAt: string;
@@ -51,6 +53,7 @@ export interface BackupFileContent {
     localStorage: Record<string, any>;
   };
   sldLayouts?: Record<string, SLDLayout | null>;
+  powerGraphConfig?: PowerTimelineGraphConfig;
 }
 
 import { MaintenanceItem } from '@/types/maintenance';
@@ -168,6 +171,30 @@ export async function restoreFromBackupContent(
       } catch (error) {
         console.error("Failed to restore SLD layouts to localStorage:", error);
         toast.error("SLD Restore Failed", { id: importToastId, description: "Could not save SLD layouts to local storage." });
+      }
+    }
+
+    if (finalSelection.ui && backupData.powerGraphConfig) {
+      setProgress?.("Restoring Power Graph Configuration...");
+      await new Promise(res => setTimeout(res, 200));
+      try {
+        const response = await fetch('/api/power-graph-backup', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(backupData.powerGraphConfig),
+        });
+
+        if (!response.ok) {
+          const errorResult = await response.json();
+          throw new Error(errorResult.message || 'Failed to restore power graph configuration.');
+        }
+
+        toast.info("Power graph configuration restored.", { id: importToastId });
+      } catch (error) {
+        console.error("Failed to restore power graph configuration:", error);
+        toast.error("Power Graph Restore Failed", { id: importToastId, description: (error as Error).message });
       }
     }
 

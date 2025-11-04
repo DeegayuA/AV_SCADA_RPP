@@ -49,25 +49,9 @@ export async function POST(request: Request) {
     backupData.maintenanceData.images = maintenanceFiles.images;
     backupData.maintenanceData.previews = maintenanceFiles.previews;
 
-    const username = backupData.createdBy?.replace(/\s+/g, '_') || 'system';
-    const localTime = backupData.localTime;
-
-    if (!localTime) {
-      throw new Error("localTime not provided in backup data");
-    }
-
-    let prefix = 'backup_';
-    if (backupData.backupType === 'manual') {
-      prefix = 'manual_backup_';
-    } else if (backupData.createdBy === 'auto-backup') {
-      prefix = 'auto_backup_';
-    }
-
-    const filename = `${prefix}${localTime}_${username}.json`;
-
+    const filename = `backup.json`;
     const backupsDir = path.join(process.cwd(), 'backups');
 
-    // Ensure the backups directory exists
     try {
       await fs.mkdir(backupsDir, { recursive: true });
     } catch (error) {
@@ -78,11 +62,6 @@ export async function POST(request: Request) {
 
     const filePath = path.join(backupsDir, filename);
     await fs.writeFile(filePath, JSON.stringify(backupData, null, 2));
-
-    // Run cleanup in the background, don't wait for it to finish
-    cleanupBackups().catch(err => {
-      console.error("Backup cleanup process failed:", err);
-    });
 
     return NextResponse.json({ message: 'Backup created successfully', filename }, { status: 201 });
   } catch (error) {
