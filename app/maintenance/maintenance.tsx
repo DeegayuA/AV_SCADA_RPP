@@ -79,19 +79,25 @@ const useCountdown = (targetDate: Date | null, serverTime: Date | null) => {
       return;
     }
 
-    const difference = targetDate.getTime() - serverTime.getTime();
+    const interval = setInterval(() => {
+      const now = new Date();
+      const difference = targetDate.getTime() - now.getTime();
 
-    if (difference > 0) {
-      setTimeLeft({
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-        minutes: Math.floor((difference / 1000 / 60) % 60),
-        seconds: Math.floor((difference / 1000) % 60),
-      });
-    } else {
-      setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-    }
-  }, [targetDate, serverTime]);
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+          seconds: Math.floor((difference / 1000) % 60),
+        });
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+        clearInterval(interval);
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [targetDate]); // ✅ only re-run when targetDate changes
 
   return timeLeft;
 };
@@ -1579,21 +1585,7 @@ const MaintenancePage = () => {
     return () => clearInterval(plcI);
   }, [checkPlcConnection, fetchAllData]);
 
-  useEffect(() => {
-    const fetchServerTime = async () => {
-      try {
-        const response = await fetch('/api/time');
-        const data = await response.json();
-        setServerTime(new Date(data.time));
-      } catch (error) {
-        console.error("Failed to fetch server time, using client time as fallback.", error);
-        setServerTime(new Date());
-      }
-    };
-    fetchServerTime();
-    const interval = setInterval(fetchServerTime, 1000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   useEffect(() => {
     if (Object.keys(nodeValues).length > 0) {

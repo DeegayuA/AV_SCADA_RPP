@@ -3,7 +3,7 @@
   "Panel Cleaning",
   "Cable Inspection",
   "Transformer Check",
-  "Switchgear Maintenance",
+  "Switchyard Maintenance",
   "Battery System Check",
   "Monitoring System",
   "SCADA System",
@@ -12,5 +12,5 @@
   "Vegetation Management",
   "Site Inspection",
   "Safety Drill",
-  "Emergency Shutdown Test"
+  "Tests"
 ]
