@@ -490,6 +490,34 @@ const AdminConfigurationPanel: React.FC<AdminConfigurationPanelProps> = ({ items
   const handleClearConfiguration = () => {
     setItems([]);
   };
+const handleImageUpload = async (
+  file: File,
+  itemName: string,
+  itemNumber: number,
+  username: string
+) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("itemName", itemName);
+    formData.append("itemNumber", itemNumber.toString());
+    formData.append("username", username);
+
+    const response = await fetch("/api/image/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      toast.success("Image uploaded successfully.");
+    } else {
+      toast.error("Image upload failed.");
+    }
+  } catch (error) {
+    console.error("Image upload error:", error);
+    toast.error("Error uploading image.");
+  }
+};
 
   return (
     <Collapsible className="mb-4">
@@ -1333,80 +1361,181 @@ const OperatorViewItem: React.FC<{
   const CurrentIcon = currentStatusInfo.icon;
 
   const memoizedTrigger = React.useMemo(() => (
-    <Button disabled={isButtonDisabled} className="w-full">
-      <CurrentIcon className={`mr-2 h-4 w-4 ${isSubmitting ? 'animate-spin' : ''}`} />
-      {currentStatusInfo.text}
-    </Button>
-  ), [isButtonDisabled, currentStatusInfo, isSubmitting, CurrentIcon]);
+  <Button disabled={isButtonDisabled} className="w-full">
+    <CurrentIcon className={`mr-2 h-4 w-4 ${isSubmitting ? 'animate-spin' : ''}`} />
+    {currentStatusInfo.text}
+  </Button>
+), [isButtonDisabled, currentStatusInfo, isSubmitting, CurrentIcon]);
 
-  const memoizedNoteTrigger = React.useMemo(() => (
-    <Button variant="outline" className="w-full">Add Note</Button>
-  ), []);
+const memoizedNoteTrigger = React.useMemo(() => (
+  <Button variant="outline" className="w-full">Add Note</Button>
+), []);
+const handleImageUploadOnly = async (
+  file: File,
+  itemName: string,
+  itemNumber: number,
+  username: string
+) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("itemName", itemName);
+    formData.append("itemNumber", itemNumber.toString());
+    formData.append("username", username);
 
-  return (
-    <motion.div
-      key={`${item.id}-${number}`}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+    const response = await fetch("/api/image/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      toast.success("Image uploaded successfully and logged.");
+    } else {
+      toast.error("Image upload failed.");
+    }
+  } catch (error) {
+    console.error("Image upload error:", error);
+    toast.error("Error uploading image.");
+  }
+};
+
+const handleImageUpload = async (file: File, itemName: string, itemNumber: number, username: string) => {
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("itemName", itemName);
+    formData.append("itemNumber", itemNumber.toString());
+    formData.append("username", username);
+
+    const response = await fetch("/api/image/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (response.ok) {
+      toast.success("Image uploaded successfully.");
+    } else {
+      toast.error("Image upload failed.");
+    }
+  } catch (error) {
+    console.error("Image upload error:", error);
+    toast.error("Error uploading image.");
+  }
+};
+
+return (
+  <motion.div
+    key={`${item.id}-${number}`}
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+  >
+    <Card
+      className={`border-2 ${
+        displayMode === "completed" ? "border-green-500" : "border-transparent"
+      }`}
     >
-      <Card className={`border-2 ${displayMode === 'completed' ? 'border-green-500' : 'border-transparent'}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center">
-            <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
-            {item.name} #{number}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-col items-center justify-center text-center">
-          {hasNoteForActiveSlot ? (
-            <div className="flex flex-col items-center">
-              <CheckCircle className={`h-10 w-10  ${statusInfo.success.color}`} />
-              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>Uploaded</p>
-              {nextSlot && (
-              <div className="mt-2">
-                <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
-              </div>
-              )}
-            </div>
-          ) : displayMode === 'completed' ? (
-            <>
-              <CheckCircle className={`h-10 w-10 ${statusInfo.success.color}`} />
-              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
-            </>
-          ) : relevantSlot ? (
-            <>
-              <div className="my-2">
-                <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${isSubmitting ? 'animate-spin' : ''}`} />
-              </div>
-              {displayMode === 'active' && (
-                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
-              )}
-              {displayMode === 'next' && (
-                <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
-              )}
-              <NoteDialog
-                item={item}
-                itemNumber={number}
-                isScheduledCheck={true}
-                onNoteSubmitted={onNoteSubmitted}
-                trigger={memoizedTrigger}
-              />
-            </>
-          ) : (
-            <p>No checks scheduled for today.</p>
-          )}
-        </CardContent>
-        <CardFooter>
-          <NoteDialog
-            item={item}
-            itemNumber={number}
-            isScheduledCheck={false}
-            onNoteSubmitted={onNoteSubmitted}
-            trigger={memoizedNoteTrigger}
+      <CardHeader>
+        <CardTitle className="flex items-center">
+          <div
+            className="w-4 h-4 rounded-full mr-3"
+            style={{ backgroundColor: item.color || "#000000" }}
           />
-        </CardFooter>
-      </Card>
-    </motion.div>
-  );
+          {item.name} #{number}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col items-center justify-center text-center">
+        {hasNoteForActiveSlot ? (
+          <div className="flex flex-col items-center">
+            <CheckCircle className={`h-10 w-10  ${statusInfo.success.color}`} />
+            <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>
+              Uploaded
+            </p>
+            {nextSlot && (
+              <div className="mt-2">
+                <p className="font-bold text-lg text-muted-foreground">
+                  {String(nextCountdown.hours).padStart(2, "0")}:
+                  {String(nextCountdown.minutes).padStart(2, "0")}:
+                  {String(nextCountdown.seconds).padStart(2, "0")} until next
+                  check
+                </p>
+              </div>
+            )}
+          </div>
+        ) : displayMode === "completed" ? (
+          <>
+            <CheckCircle className={`h-10 w-10 ${statusInfo.success.color}`} />
+            <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>
+              All checks completed for today
+            </p>
+          </>
+        ) : relevantSlot ? (
+          <>
+            <div className="my-2">
+              <CurrentIcon
+                className={`h-8 w-8 ${currentStatusInfo.color} ${
+                  isSubmitting ? "animate-spin" : ""
+                }`}
+              />
+            </div>
+            {displayMode === "active" && (
+              <p className="font-bold text-lg text-blue-600 dark:text-blue-300">
+                {String(countdown.hours).padStart(2, "0")}:
+                {String(countdown.minutes).padStart(2, "0")}:
+                {String(countdown.seconds).padStart(2, "0")} left
+              </p>
+            )}
+            {displayMode === "next" && (
+              <p className="font-bold text-lg text-muted-foreground">
+                {String(nextCountdown.hours).padStart(2, "0")}:
+                {String(nextCountdown.minutes).padStart(2, "0")}:
+                {String(nextCountdown.seconds).padStart(2, "0")} until next
+                check
+              </p>
+            )}
+
+            {/* 🔹 Independent Image Upload (not connected to NoteDialog) */}
+            <div className="flex flex-col items-center gap-2 w-full mt-2">
+              <Input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                id={`standalone-upload-${item.id}-${number}`}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file)
+                    handleImageUploadOnly(
+                      file,
+                      item.name,
+                      number,
+                      currentUser?.name || "unknown"
+                    );
+                }}
+              />
+              <label
+                htmlFor={`standalone-upload-${item.id}-${number}`}
+                className="w-full"
+              >
+                {memoizedTrigger}
+              </label>
+            </div>
+          </>
+        ) : (
+          <p>No checks scheduled for today.</p>
+        )}
+      </CardContent>
+      <CardFooter>
+        {/* ✅ Keep Add Note dialog exactly as-is */}
+        <NoteDialog
+          item={item}
+          itemNumber={number}
+          isScheduledCheck={false}
+          onNoteSubmitted={onNoteSubmitted}
+          trigger={memoizedNoteTrigger}
+        />
+      </CardFooter>
+    </Card>
+  </motion.div>
+);
 };
 
 const OperatorView: React.FC<OperatorViewProps> = ({ items, totalDailyChecks, todaysCompletedChecks, dailyStatusGridData, onNoteSubmitted, maintenanceNotes }) => {
