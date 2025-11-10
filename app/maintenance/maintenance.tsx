@@ -58,6 +58,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DateRange } from "react-day-picker";
 import { saveAs } from "file-saver";
+import NoteDialog from "./components/NoteDialog";
+
 
 interface Log {
   timestamp: string;
@@ -1335,39 +1337,74 @@ const OperatorViewItem: React.FC<{
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
     >
-      <Card className={`border-2 ${displayMode === 'completed' ? 'border-green-500' : 'border-transparent'}`}>
+      <Card
+        className={`border-2 ${
+          displayMode === "completed"
+            ? "border-green-500"
+            : "border-transparent"
+        }`}
+      >
         <CardHeader>
           <CardTitle className="flex items-center">
-            <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: item.color || '#000000' }} />
+            <div
+              className="w-4 h-4 rounded-full mr-3"
+              style={{ backgroundColor: item.color || "#000000" }}
+            />
             {item.name} #{number}
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col items-center justify-center text-center">
           {hasLogForActiveSlot ? (
             <div className="flex flex-col items-center">
-              <CheckCircle className={`h-10 w-10  ${statusInfo.success.color}`} />
-              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>Uploaded</p>
+              <CheckCircle
+                className={`h-10 w-10  ${statusInfo.success.color}`}
+              />
+              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>
+                Uploaded
+              </p>
               {nextSlot && (
-              <div className="mt-2">
-                <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
-              </div>
+                <div className="mt-2">
+                  <p className="font-bold text-lg text-muted-foreground">
+                    {String(nextCountdown.hours).padStart(2, "0")}:
+                    {String(nextCountdown.minutes).padStart(2, "0")}:
+                    {String(nextCountdown.seconds).padStart(2, "0")} until next
+                    check
+                  </p>
+                </div>
               )}
             </div>
-          ) : displayMode === 'completed' ? (
+          ) : displayMode === "completed" ? (
             <>
-              <CheckCircle className={`h-10 w-10 ${statusInfo.success.color}`} />
-              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>All checks completed for today</p>
+              <CheckCircle
+                className={`h-10 w-10 ${statusInfo.success.color}`}
+              />
+              <p className={`mt-2 font-semibold ${statusInfo.success.color}`}>
+                All checks completed for today
+              </p>
             </>
           ) : relevantSlot ? (
             <>
               <div className="my-2">
-                <CurrentIcon className={`h-8 w-8 ${currentStatusInfo.color} ${isSubmitting ? 'animate-spin' : ''}`} />
+                <CurrentIcon
+                  className={`h-8 w-8 ${currentStatusInfo.color} ${
+                    isSubmitting ? "animate-spin" : ""
+                  }`}
+                />
               </div>
-              {displayMode === 'active' && (
-                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">{String(countdown.hours).padStart(2, '0')}:{String(countdown.minutes).padStart(2, '0')}:{String(countdown.seconds).padStart(2, '0')} left</p>
+              {displayMode === "active" && (
+                <p className="font-bold text-lg text-blue-600 dark:text-blue-300">
+                  {String(countdown.hours).padStart(2, "0")}:
+                  {String(countdown.minutes).padStart(2, "0")}:
+                  {String(countdown.seconds).padStart(2, "0")} left
+                </p>
               )}
-              {displayMode === 'next' && (
-                <p className="font-bold text-lg text-muted-foreground">{String(nextCountdown.hours).padStart(2, '0')}:{String(nextCountdown.minutes).padStart(2, '0')}:{String(nextCountdown.seconds).padStart(2, '0')} until next check</p>
+              {displayMode === "next" && (
+                <p className="font-bold text-lg text-muted-foreground">
+                  {String(nextCountdown.hours).padStart(2, "0")}:
+                  {String(nextCountdown.minutes).padStart(2, "0")}:
+                  {String(nextCountdown.seconds).padStart(2, "0")} until next
+                  check
+                </p>
               )}
               <Input
                 type="file"
@@ -1378,20 +1415,30 @@ const OperatorViewItem: React.FC<{
                 id={`${uploadKey}-${relevantSlot!.time}`}
                 disabled={isButtonDisabled}
               />
-              <Label htmlFor={`${uploadKey}-${relevantSlot!.time}`} className={`w-full mt-4 ${isButtonDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+              <Label
+                htmlFor={`${uploadKey}-${relevantSlot!.time}`}
+                className={`w-full mt-4 ${
+                  isButtonDisabled ? "cursor-not-allowed" : "cursor-pointer"
+                }`}
+              >
                 <Button
                   asChild={false}
                   disabled={isButtonDisabled}
                   className="w-full"
                   onClick={() => {
                     if (!isButtonDisabled) {
-                      document.getElementById(`${uploadKey}-${relevantSlot!.time}`)?.click();
+                      document
+                        .getElementById(`${uploadKey}-${relevantSlot!.time}`)
+                        ?.click();
                     }
                   }}
                 >
-                  {isSubmitting ? 'Uploading...' : 'Upload Picture'}
+                  {isSubmitting ? "Uploading..." : "Upload Picture"}
                 </Button>
               </Label>
+              <div className="mt-2">
+                <NoteDialog />
+              </div>
             </>
           ) : (
             <p>No checks scheduled for today.</p>
