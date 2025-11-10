@@ -197,10 +197,10 @@ const processDailyStatus = (
 
         const timeWindow = item.timeWindow || 60;
         const halfWindow = timeWindow / 2;
-        const slotStart = new Date(now);
-        slotStart.setHours(slotHour, -halfWindow, 0, 0);
-        const slotEnd = new Date(now);
-        slotEnd.setHours(slotHour, halfWindow, 0, 0);
+        const slotCenter = new Date(now);
+        slotCenter.setHours(slotHour, 0, 0, 0);
+        const slotStart = new Date(slotCenter.getTime() - halfWindow * 60000);
+        const slotEnd = new Date(slotCenter.getTime() + halfWindow * 60000);
 
         const noteInSlot = dailyNotes.find((note) => {
           const noteTime = new Date(note.timestamp);
