@@ -960,6 +960,25 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
       to: endOfMonth(new Date()),
     }
   );
+
+  const [uploadLogs, setUploadLogs] = useState([]);
+
+  // 🔹 Load encrypted upload logs from backend
+  useEffect(() => {
+    const fetchLogs = async () => {
+      try {
+        const res = await fetch("/api/maintenance/upload/logs");
+        if (!res.ok) throw new Error("Failed to fetch logs");
+        const data = await res.json();
+        setUploadLogs(data.logs || []);
+      } catch (err) {
+        console.error("Error loading upload logs:", err);
+        toast.error("Failed to load image upload logs.");
+      }
+    };
+    fetchLogs();
+  }, []);
+
   const [isExporting, setIsExporting] = useState(false);
   const [logPageSize, setLogPageSize] = useState(31);
   const [logCurrentPage, setLogCurrentPage] = useState(1);
