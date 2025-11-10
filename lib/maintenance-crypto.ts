@@ -50,3 +50,11 @@ export function decrypt(text: string, key: Buffer): string | null {
         return null;
     }
 }
+
+export function encrypt(text: string, key: Buffer): string {
+  const iv = crypto.randomBytes(IV_LENGTH);
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+  let encrypted = cipher.update(text);
+  encrypted = Buffer.concat([encrypted, cipher.final()]);
+  return iv.toString('hex') + ':' + encrypted.toString('hex');
+}
