@@ -25,6 +25,7 @@ import PlantConfigStep from './PlantConfigStep';
 import OpcuaTestStep from './OpcuaTestStep';
 import DatapointDiscoveryStep from './DatapointDiscoveryStep';
 import ReviewStep from './ReviewStep';
+import MqttConfigStep from './MqttConfigStep';
 import { useTheme } from 'next-themes';
 import FirstTimeSetup from './FirstTimeSetup';
 
@@ -199,6 +200,7 @@ const OnboardingPanelInternalContent: React.FC = React.memo(() => {
     const stepsConfig = [
         { component: <WelcomeStep key="welcome" />, name: "Welcome" },
         { component: <PlantConfigStep key="plant" />, name: "Plant Setup" },
+        { component: <MqttConfigStep key="mqtt" onNext={nextStep} />, name: "MQTT Configuration" },
         { component: <DatapointDiscoveryStep key="datapoint_discovery_merged" />, name: "Datapoint Management" },
         { component: <ReviewStep key="review" />, name: "Review & Finalize" },
     ];

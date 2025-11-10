@@ -51,6 +51,10 @@ export interface BackupFileContent {
     localStorage: Record<string, any>;
   };
   sldLayouts?: Record<string, SLDLayout | null>;
+  mqttData?: {
+    config: any;
+    dataPoints: any;
+  };
 }
 
 import { MaintenanceItem } from '@/types/maintenance';
@@ -61,6 +65,7 @@ export interface RestoreSelection {
   sldLayouts: boolean;
   configurations: boolean;
   maintenanceData?: boolean;
+  mqttData?: boolean;
 }
 
 export async function restoreFromBackupContent(
@@ -84,6 +89,7 @@ export async function restoreFromBackupContent(
     sldLayouts: !!backupData.sldLayouts && Object.keys(backupData.sldLayouts).length > 0,
     configurations: !!backupData.configurations,
     maintenanceData: !!backupData.maintenanceData,
+    mqttData: !!backupData.mqttData,
   };
 
   const finalSelection = selection || fullSelection;
@@ -216,6 +222,31 @@ export async function restoreFromBackupContent(
       } catch (error) {
         console.error("Failed to restore maintenance data:", error);
         toast.error("Maintenance Data Restore Failed", { id: importToastId, description: (error as Error).message });
+      }
+    }
+
+    if (finalSelection.mqttData && backupData.mqttData) {
+      setProgress?.("Restoring MQTT Data...");
+      await new Promise(res => setTimeout(res, 200));
+      try {
+        // Restore MQTT config
+        await fetch('/api/mqtt/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupData.mqttData.config),
+        });
+
+        // Restore MQTT data points
+        await fetch('/api/mqtt/datapoints', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(backupData.mqttData.dataPoints),
+        });
+
+        toast.info("MQTT data restored.", { id: importToastId });
+      } catch (error) {
+        console.error("Failed to restore MQTT data:", error);
+        toast.error("MQTT Data Restore Failed", { id: importToastId, description: (error as Error).message });
       }
     }
 

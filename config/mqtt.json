@@ -1,0 +1,7 @@
+{
+  "enabled": false,
+  "brokerUrl": "",
+  "port": 1883,
+  "username": "",
+  "password": ""
+}

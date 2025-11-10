@@ -87,6 +87,10 @@ export async function getBackupData(): Promise<any> {
     maintenanceData: {
       config: maintenanceConfig,
     },
+    mqttData: {
+      config: await fetch('/api/mqtt/config').then(res => res.json()),
+      dataPoints: await fetch('/api/mqtt/datapoints').then(res => res.json()),
+    },
   };
 
   return backupData;

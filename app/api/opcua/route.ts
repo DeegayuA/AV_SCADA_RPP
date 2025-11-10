@@ -19,6 +19,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { initializeMqttClient } from '@/lib/mqttClient';
 
 const KEEP_OPCUA_ALIVE = true;
 let endpointUrl: string = OPC_UA_ENDPOINT_OFFLINE;
@@ -713,6 +714,7 @@ async function ensureWebSocketServerInitialized() {
         console.log(`Initializing WebSocket server on port ${WS_PORT}`);
         wsServer = new WebSocketServer({ port: WS_PORT });
         initializeWebSocketEventHandlers(wsServer);
+        initializeMqttClient(broadcast);
     }
 
     if (KEEP_OPCUA_ALIVE && (!opcuaClient || !opcuaSession) && !isConnectingOpcua) {

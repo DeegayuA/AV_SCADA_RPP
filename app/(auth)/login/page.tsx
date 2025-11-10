@@ -292,7 +292,7 @@ export default function LoginPage() {
     };
 
     checkOnboardingAndUser();
-  }, [router, isStoreHydrated, directStoreUser]); 
+  }, [router, isStoreHydrated, directStoreUser]);
 
   useEffect(() => { 
     const imageI = setInterval(() => setCurrentImageIndex((p) => (p + 1) % imageUrls.length), 7000);
