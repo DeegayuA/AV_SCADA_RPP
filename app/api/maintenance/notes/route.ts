@@ -34,6 +34,8 @@ export async function POST(request: Request) {
     const description = formData.get("description") as string;
     const image = formData.get("image") as File | null;
     const username = (formData.get("username") as string) || "Operator";
+    const itemName = (formData.get("itemName") as string) || "Maintenance Note"; // Get from form data
+    const itemNumber = (formData.get("itemNumber") as string) || "1"; // Get from form data
 
     // Validate required fields
     if (!tags || !issues) {
@@ -83,11 +85,11 @@ export async function POST(request: Request) {
         .toFile(path.join(previewDir, filename));
     }
 
-    // Create note log entry
+    // Create note log entry - USE THE ACTUAL ITEM NAME AND NUMBER
     const noteLog = {
       timestamp: date.toISOString(),
-      itemName: "Maintenance Note",
-      itemNumber: "1",
+      itemName: itemName, // Use the actual item name from form data
+      itemNumber: itemNumber, // Use the actual item number from form data
       username: username,
       filename: filename,
       tags: tagsArray,

@@ -78,8 +78,12 @@ const TAG_OPTIONS: Record<string, string[]> = {
 
 export default function NoteDialog({
   onNoteAdded,
+  itemName,
+  itemNumber,
 }: {
   onNoteAdded?: () => void;
+  itemName?: string; // Add this
+  itemNumber?: number;
 }) {
   const [open, setOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -118,6 +122,7 @@ export default function NoteDialog({
     );
   };
 
+  // In NoteDialog component - make sure this part is correct:
   const handleSubmit = async () => {
     if (selectedTags.length === 0 || selectedIssues.length === 0) {
       toast.error("Please select at least one tag and one issue.");
@@ -131,6 +136,9 @@ export default function NoteDialog({
       formData.append("tags", JSON.stringify(selectedTags));
       formData.append("issues", JSON.stringify(selectedIssues));
       formData.append("description", description);
+      formData.append("itemName", itemName || "General Note"); // This should now receive the correct props
+      formData.append("itemNumber", itemNumber?.toString() || "1"); // This should now receive the correct props
+      formData.append("username", "Operator"); // You might want to get this from context/store
       if (image) formData.append("image", image);
 
       const res = await fetch("/api/maintenance/notes", {
@@ -145,7 +153,7 @@ export default function NoteDialog({
         setSelectedIssues([]);
         setDescription("");
         setImage(null);
-        if (onNoteAdded) onNoteAdded();
+        if (onNoteAdded) onNoteAdded(); // This will trigger the refresh
       } else {
         toast.error("Failed to add note.");
       }
@@ -171,6 +179,11 @@ export default function NoteDialog({
           <DialogHeader>
             <DialogTitle className="text-white">
               Add Maintenance Note
+              {itemName && (
+                <div className="text-sm font-normal text-gray-300 mt-1">
+                  For: {itemName} {itemNumber ? `#${itemNumber}` : ""}
+                </div>
+              )}
             </DialogTitle>
           </DialogHeader>
 
