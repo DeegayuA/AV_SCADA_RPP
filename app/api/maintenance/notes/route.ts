@@ -20,68 +20,99 @@ function encrypt(text: string, key: Buffer) {
 export async function POST(request: Request) {
   try {
     const encryptionKey = await getEncryptionKey();
-    if (!encryptionKey)
+    if (!encryptionKey) {
       return NextResponse.json(
         { message: "No encryption key" },
         { status: 500 }
       );
+    }
 
     const formData = await request.formData();
-    const tag = formData.get("tag") as string;
-    const issues = JSON.parse(formData.get("issues") as string);
-    const description = (formData.get("description") as string) || "";
+
+    const tags = formData.get("tags");
+    const issues = formData.get("issues");
+    const description = formData.get("description") as string;
     const image = formData.get("image") as File | null;
+    const username = (formData.get("username") as string) || "Operator";
+
+    // Validate required fields
+    if (!tags || !issues) {
+      return NextResponse.json(
+        { message: "Tags and issues are required" },
+        { status: 400 }
+      );
+    }
+
+    // Parse the JSON arrays
+    const tagsArray = JSON.parse(tags as string);
+    const issuesArray = JSON.parse(issues as string);
 
     const date = new Date();
     const dateString = format(date, "yyyy-MM-dd");
     const dateTimeString = format(date, "yyyyMMdd_HHmmss");
 
-    const noteDir = path.join(
-      process.cwd(),
-      "public",
-      "maintenance_note_image",
-      dateString
-    );
-    const previewDir = path.join(
-      process.cwd(),
-      "public",
-      "maintenance_note_image_preview",
-      dateString
-    );
-    const logDir = path.join(process.cwd(), "logs", "notes");
+    // Generate filename for note image if exists
+    let filename = null;
+    if (image && image.size > 0) {
+      filename = `${PLANT_LOCATION}_note_${dateTimeString}.jpg`;
 
-    await fs.mkdir(noteDir, { recursive: true });
-    await fs.mkdir(previewDir, { recursive: true });
-    await fs.mkdir(logDir, { recursive: true });
+      // Store note images in the same structure as maintenance images
+      const noteImageDir = path.join(
+        process.cwd(),
+        "public",
+        "maintenance_note_image",
+        dateString
+      );
+      const previewDir = path.join(
+        process.cwd(),
+        "public",
+        "maintenance_note_image_preview",
+        dateString
+      );
 
-    let filename = "";
-    if (image) {
-      filename = `${PLANT_LOCATION}_note_${tag.replace(
-        / /g,
-        "_"
-      )}_${dateTimeString}.jpg`;
+      await fs.mkdir(noteImageDir, { recursive: true });
+      await fs.mkdir(previewDir, { recursive: true });
+
+      // Save the note image
       const buffer = Buffer.from(await image.arrayBuffer());
-      await fs.writeFile(path.join(noteDir, filename), buffer);
+      await fs.writeFile(path.join(noteImageDir, filename), buffer);
+
+      // Create preview
       await sharp(buffer)
         .resize(1024, 1024, { fit: "inside", withoutEnlargement: true })
         .toFile(path.join(previewDir, filename));
     }
 
-    const logFilePath = path.join(logDir, `${dateString}.json.log`);
-    const logData = {
+    // Create note log entry
+    const noteLog = {
       timestamp: date.toISOString(),
-      tag,
-      issues,
-      description,
-      filename,
+      itemName: "Maintenance Note",
+      itemNumber: "1",
+      username: username,
+      filename: filename,
+      tags: tagsArray,
+      issues: issuesArray,
+      description: description || "",
+      uploadType: "note" as const,
     };
 
-    const encryptedLog = encrypt(JSON.stringify(logData), encryptionKey);
-    await fs.appendFile(logFilePath, encryptedLog + "\n");
+    // Encrypt and save to notes log file
+    const encryptedLog = encrypt(JSON.stringify(noteLog), encryptionKey);
 
-    return NextResponse.json({ message: "Note saved successfully", filename });
+    // Ensure notes directory exists
+    const notesDir = path.join(process.cwd(), "logs", "notes");
+    await fs.mkdir(notesDir, { recursive: true });
+
+    // Append to today's note log file
+    const logFile = path.join(notesDir, `${dateString}.log`);
+    await fs.appendFile(logFile, encryptedLog + "\n");
+
+    return NextResponse.json({
+      message: "Note saved successfully",
+      log: noteLog,
+    });
   } catch (error) {
-    console.error("Note upload failed:", error);
+    console.error("Error saving note:", error);
     return NextResponse.json(
       { message: "Failed to save note" },
       { status: 500 }

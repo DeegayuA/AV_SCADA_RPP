@@ -1,55 +1,91 @@
-import { NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
-import { getEncryptionKey, decrypt } from '@/lib/maintenance-crypto';
+import { NextResponse } from "next/server";
+import fs from "fs/promises";
+import path from "path";
+import { getEncryptionKey } from "@/lib/maintenance-crypto";
+import crypto from "crypto";
 
-const logDir = path.join(process.cwd(), 'logs', 'maintenance');
+const IV_LENGTH = 16;
+
+function decrypt(text: string, key: Buffer) {
+  const [ivHex, encryptedHex] = text.split(":");
+  const iv = Buffer.from(ivHex, "hex");
+  const encrypted = Buffer.from(encryptedHex, "hex");
+  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
+  let decrypted = decipher.update(encrypted);
+  decrypted = Buffer.concat([decrypted, decipher.final()]);
+  return decrypted.toString();
+}
 
 export async function GET() {
-  const encryptionKey = await getEncryptionKey();
-  if (!encryptionKey) {
-    return NextResponse.json({ message: 'Encryption key is not set up on the server.' }, { status: 500 });
-  }
-
-  let logFiles;
   try {
-    logFiles = await fs.readdir(logDir);
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return NextResponse.json([]);
+    const encryptionKey = await getEncryptionKey();
+    if (!encryptionKey) {
+      return NextResponse.json(
+        { message: "No encryption key" },
+        { status: 500 }
+      );
     }
-    console.error('Failed to read log directory:', error);
-    return NextResponse.json({ message: 'Failed to read log directory.' }, { status: 500 });
-  }
 
-  const allLogs = [];
-  for (const logFile of logFiles) {
-    if (path.extname(logFile) !== '.log') continue;
+    const logs: any[] = [];
 
-    const logFilePath = path.join(logDir, logFile);
+    // ✅ maintenance image logs
+    const maintenanceDir = path.join(process.cwd(), "logs", "maintenance");
     try {
-      const fileContent = await fs.readFile(logFilePath, 'utf-8');
-      const encryptedLogs = fileContent.trim().split('\n');
-
-      for (const encryptedLog of encryptedLogs) {
-        if (!encryptedLog) continue;
-        try {
-          const decryptedLog = decrypt(encryptedLog, encryptionKey);
-          if (decryptedLog) {
-            allLogs.push(JSON.parse(decryptedLog));
+      const maintenanceFiles = await fs.readdir(maintenanceDir);
+      for (const file of maintenanceFiles) {
+        const lines = (
+          await fs.readFile(path.join(maintenanceDir, file), "utf8")
+        )
+          .split("\n")
+          .filter(Boolean);
+        for (const line of lines) {
+          try {
+            const decrypted = decrypt(line, encryptionKey);
+            const obj = JSON.parse(decrypted);
+            logs.push({ ...obj, uploadType: "maintenance" });
+          } catch (e) {
+            console.error("Failed to decrypt maintenance log:", e);
           }
-        } catch (e) {
-          console.error(`Failed to parse decrypted log from ${logFile}:`, e);
-          // Skip this log entry
         }
       }
     } catch (error) {
-      console.error(`Failed to read or process log file ${logFile}:`, error);
-      // Skip this file
+      console.log("No maintenance logs directory found");
     }
+
+    // ✅ note image logs
+    const noteDir = path.join(process.cwd(), "logs", "notes");
+    try {
+      const noteFiles = await fs.readdir(noteDir);
+      for (const file of noteFiles) {
+        const lines = (await fs.readFile(path.join(noteDir, file), "utf8"))
+          .split("\n")
+          .filter(Boolean);
+        for (const line of lines) {
+          try {
+            const decrypted = decrypt(line, encryptionKey);
+            const obj = JSON.parse(decrypted);
+            logs.push({ ...obj, uploadType: "note" });
+          } catch (e) {
+            console.error("Failed to decrypt note log:", e);
+          }
+        }
+      }
+    } catch (error) {
+      console.log("No note logs directory found");
+    }
+
+    // Sort logs by timestamp (newest first)
+    logs.sort(
+      (a, b) =>
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+
+    return NextResponse.json(logs);
+  } catch (error) {
+    console.error("Error reading logs:", error);
+    return NextResponse.json(
+      { message: "Error reading logs" },
+      { status: 500 }
+    );
   }
-
-  allLogs.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-  return NextResponse.json(allLogs);
 }

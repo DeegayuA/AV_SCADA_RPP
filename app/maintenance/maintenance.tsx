@@ -96,7 +96,7 @@ interface Log {
 }
 
 interface NoteLog extends Log {
-  tag?: string;
+  tags?: string[];
   issues?: string[];
   description?: string;
   uploadType: "maintenance" | "note";
@@ -1064,6 +1064,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
             data={dailyStatusGridData}
             onSlotClick={(log) =>
               handleStatusClick(
+                // CHANGED: Ensure this uses maintenance image API
                 `/api/maintenance/image/${format(
                   new Date(log.timestamp),
                   "yyyy-MM-dd"
@@ -1072,7 +1073,6 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
             }
           />
         </div>
-
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-2xl font-bold">Monthly Status & Logs</h2>
@@ -1491,32 +1491,57 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                       <TableHead>Timestamp</TableHead>
                       <TableHead>Item</TableHead>
                       <TableHead>User</TableHead>
+                      <TableHead>Tags</TableHead>
+                      <TableHead>Issues</TableHead>
+                      <TableHead>Description</TableHead>
                       <TableHead>Note Thumbnail</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedLogs
-                      .filter((log) => log.uploadType === "note") // ✅ show only note dialog uploads
-                      .map((log, index) => (
-                        <motion.tr
-                          key={index}
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: index * 0.05 }}
-                        >
-                          <TableCell>
-                            {format(
-                              new Date(log.timestamp),
-                              "yyyy-MM-dd HH:mm:ss"
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {log.itemName} #{log.itemNumber}
-                          </TableCell>
-                          <TableCell>{log.username}</TableCell>
-                          <TableCell>
+                    {(
+                      paginatedLogs.filter(
+                        (log) => log.uploadType === "note"
+                      ) as NoteLog[]
+                    ).map((log, index) => (
+                      <motion.tr
+                        key={index}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: index * 0.05 }}
+                      >
+                        <TableCell>
+                          {format(
+                            new Date(log.timestamp),
+                            "yyyy-MM-dd HH:mm:ss"
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {log.itemName} #{log.itemNumber}
+                        </TableCell>
+                        <TableCell>{log.username}</TableCell>
+
+                        {/* Tags */}
+                        <TableCell>
+                          {Array.isArray(log.tags)
+                            ? log.tags.join(", ")
+                            : log.tags || ""}
+                        </TableCell>
+
+                        {/* Issues */}
+                        <TableCell>
+                          {Array.isArray(log.issues)
+                            ? log.issues.join(", ")
+                            : log.issues || ""}
+                        </TableCell>
+
+                        {/* Description */}
+                        <TableCell>{log.description || ""}</TableCell>
+
+                        {/* Note Image - CHANGED: Use note-image API */}
+                        <TableCell>
+                          {log.filename && (
                             <img
-                              src={`/api/maintenance/image/${format(
+                              src={`/api/maintenance/note-image/${format(
                                 new Date(log.timestamp),
                                 "yyyy-MM-dd"
                               )}/${encodeURIComponent(log.filename)}`}
@@ -1524,16 +1549,17 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                               className="w-16 h-16 object-cover cursor-pointer rounded-md border"
                               onClick={() =>
                                 handleStatusClick(
-                                  `/api/maintenance/image/${format(
+                                  `/api/maintenance/note-image/${format(
                                     new Date(log.timestamp),
                                     "yyyy-MM-dd"
                                   )}/${encodeURIComponent(log.filename)}`
                                 )
                               }
                             />
-                          </TableCell>
-                        </motion.tr>
-                      ))}
+                          )}
+                        </TableCell>
+                      </motion.tr>
+                    ))}
                   </TableBody>
                 </Table>
 
@@ -1638,6 +1664,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
               )}
               onSlotClick={(log) =>
                 handleStatusClick(
+                  // CHANGED: Ensure this uses maintenance image API
                   `/api/maintenance/image/${format(
                     new Date(log.timestamp),
                     "yyyy-MM-dd"
