@@ -88,9 +88,9 @@ export async function POST(request: Request) {
     // Create note log entry - USE THE ACTUAL ITEM NAME AND NUMBER
     const noteLog = {
       timestamp: date.toISOString(),
-      itemName: itemName, // Use the actual item name from form data
-      itemNumber: itemNumber, // Use the actual item number from form data
-      username: username,
+      itemName: itemName, // This will use the actual item name
+      itemNumber: itemNumber, // This will use the actual item number
+      username: username, // This will use the actual username
       filename: filename,
       tags: tagsArray,
       issues: issuesArray,

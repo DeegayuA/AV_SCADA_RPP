@@ -1805,6 +1805,7 @@ interface OperatorViewProps extends ProgressProps {
   items: MaintenanceItem[];
   uploadLogs: Log[];
   onUploadSuccess: (log: Log) => void;
+  
   dailyStatusGridData: ReturnType<typeof processDailyStatus>;
 }
 
@@ -2135,7 +2136,11 @@ const OperatorViewItem: React.FC<{
                 </Button>
               </Label>
               <div className="mt-2">
-                <NoteDialog />
+                <NoteDialog
+                  itemName={item.name}
+                  itemNumber={number}
+                   
+                />
               </div>
             </>
           ) : (

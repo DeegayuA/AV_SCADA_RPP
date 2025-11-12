@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { useAppStore } from "@/stores/appStore";
 
 const TAG_OPTIONS: Record<string, string[]> = {
   "Inverter Maintenance": [
@@ -91,6 +92,7 @@ export default function NoteDialog({
   const [description, setDescription] = useState("");
   const [image, setImage] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const currentUser = useAppStore((state) => state.currentUser);
 
   // Keep selected issues valid when tags change
   useEffect(() => {
@@ -123,6 +125,7 @@ export default function NoteDialog({
   };
 
   // In NoteDialog component - make sure this part is correct:
+  // In your NoteDialog component, update the handleSubmit function:
   const handleSubmit = async () => {
     if (selectedTags.length === 0 || selectedIssues.length === 0) {
       toast.error("Please select at least one tag and one issue.");
@@ -136,9 +139,9 @@ export default function NoteDialog({
       formData.append("tags", JSON.stringify(selectedTags));
       formData.append("issues", JSON.stringify(selectedIssues));
       formData.append("description", description);
-      formData.append("itemName", itemName || "General Note"); // This should now receive the correct props
-      formData.append("itemNumber", itemNumber?.toString() || "1"); // This should now receive the correct props
-      formData.append("username", "Operator"); // You might want to get this from context/store
+      formData.append("itemName", itemName || "General Note");
+      formData.append("itemNumber", itemNumber?.toString() || "1");
+      formData.append("username", currentUser?.name || "Operator"); // Get from app store
       if (image) formData.append("image", image);
 
       const res = await fetch("/api/maintenance/notes", {
@@ -153,7 +156,7 @@ export default function NoteDialog({
         setSelectedIssues([]);
         setDescription("");
         setImage(null);
-        if (onNoteAdded) onNoteAdded(); // This will trigger the refresh
+        if (onNoteAdded) onNoteAdded();
       } else {
         toast.error("Failed to add note.");
       }
@@ -164,7 +167,6 @@ export default function NoteDialog({
       setIsSubmitting(false);
     }
   };
-
   // Get all available tags (excluding already selected ones)
   const availableTags = Object.keys(TAG_OPTIONS).filter(
     (tag) => !selectedTags.includes(tag)
