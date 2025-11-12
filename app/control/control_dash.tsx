@@ -69,9 +69,11 @@ import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appSto
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
+import DatabaseStatus from "@/app/DashboardData/DatabaseStatus";
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
+  dbStatus: "online" | "offline" | "disconnected";
   isConnected: boolean;
   connectWebSocket: () => void;
   onClickWsStatus: () => void;
@@ -87,192 +89,309 @@ interface DashboardHeaderControlProps {
   wsAddress?: string;
 }
 
-const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
-  ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
-    version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault, wsAddress
-  }) => {
-    const router = useRouter();
-    const currentPathname = usePathname();
-    const headerTitle = currentPathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Dashboard';
-    const isAdmin = currentUserRole === UserRole.ADMIN;
+const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> =
+  React.memo(
+    ({
+      plcStatus,
+      dbStatus,
+      isConnected,
+      connectWebSocket,
+      onClickWsStatus,
+      currentTime,
+      delay,
+      version,
+      onOpenConfigurator,
+      isEditMode,
+      toggleEditMode,
+      currentUserRole,
+      onRemoveAll,
+      onResetToDefault,
+      wsAddress,
+    }) => {
+      const router = useRouter();
+      const currentPathname = usePathname();
+      const headerTitle =
+        currentPathname
+          ?.split("/")
+          .filter(Boolean)
+          .slice(-1)[0]
+          ?.replace(/-/g, " ")
+          .replace(/\b\w/g, (l) => l.toUpperCase()) || "Dashboard";
+      const isAdmin = currentUserRole === UserRole.ADMIN;
 
-    const navigateToResetPage = useCallback(() => {
-      router.push('/reset');
-    }, [router]);
+      const navigateToResetPage = useCallback(() => {
+        router.push("/reset");
+      }, [router]);
 
-    return (
-      <>
-        <motion.div
-          className="flex flex-col sm:flex-row justify-between items-center mb-2 md:mb-4 gap-4 pt-3"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        >
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left">
-            {PLANT_NAME} {headerTitle}
-          </h1>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
-            <motion.div variants={itemVariants}>
-              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} delay={delay} />
-            </motion.div>
-            <motion.div variants={itemVariants}><SoundToggle /></motion.div>
-            <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
-            {isAdmin && isEditMode && (
-              <>
-                <motion.div variants={itemVariants}>
-                  <Button variant="default" size="sm" onClick={onOpenConfigurator} title="Add new cards to the dashboard">
-                    <Pencil className="mr-1.5 h-4 w-4" />
-                    <span className="hidden sm:inline">Edit Cards</span>
-                    <span className="sm:hidden">Edit</span>
-                  </Button>
-                </motion.div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <motion.div variants={itemVariants}>
-                      <Button variant="destructive" size="sm" title="Remove all cards from dashboard">
-                        <Trash2 className="mr-1.5 h-4 w-4" />
-                        <span className="hidden md:inline">Remove All</span>
-                        <span className="md:hidden sr-only">Remove All Cards</span>
-                      </Button>
-                    </motion.div>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeaderComponent>
-                      <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                      <AlertDialogDescription>
-                        This action will remove all cards from your current dashboard layout. This cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeaderComponent>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={onRemoveAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Remove All
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <motion.div variants={itemVariants}>
-                      <Button variant="outline" size="sm" title="Reset dashboard to default layout">
-                        <RotateCcw className="mr-1.5 h-4 w-4" />
-                        <span className="hidden md:inline">Reset Layout</span>
-                        <span className="md:hidden sr-only">Reset Layout</span>
-                      </Button>
-                    </motion.div>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeaderComponent>
-                      <AlertDialogTitleComponent>Reset to Default Layout?</AlertDialogTitleComponent>
-                      <AlertDialogDescription>
-                        This will discard your current layout and restore the default set of cards for this dashboard.
-                      </AlertDialogDescription>
-                    </AlertDialogHeaderComponent>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={onResetToDefault}>Reset Dashboard</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-
-            {isAdmin && (
-              <>
-                <motion.div variants={itemVariants}>
-                  <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant={isEditMode ? "secondary" : "ghost"} size="icon" onClick={toggleEditMode} title={isEditMode ? "Finalize Dashboard Edits" : "Enable Dashboard Layout Editing"}>
-                          {isEditMode ? <Check className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
-                          <span className="sr-only">{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</span>
+      return (
+        <>
+          <motion.div
+            className="flex flex-col sm:flex-row justify-between items-center mb-2 md:mb-4 gap-4 pt-3"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left">
+              {PLANT_NAME} {headerTitle}
+            </h1>
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
+              <motion.div variants={itemVariants}>
+                <PlcConnectionStatus status={plcStatus} />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <DatabaseStatus status={dbStatus} />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <WebSocketStatus
+                  isConnected={isConnected}
+                  onClick={onClickWsStatus}
+                  wsAddress={wsAddress}
+                  delay={delay}
+                />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <SoundToggle />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <ThemeToggle />
+              </motion.div>
+              {isAdmin && isEditMode && (
+                <>
+                  <motion.div variants={itemVariants}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={onOpenConfigurator}
+                      title="Add new cards to the dashboard"
+                    >
+                      <Pencil className="mr-1.5 h-4 w-4" />
+                      <span className="hidden sm:inline">Edit Cards</span>
+                      <span className="sm:hidden">Edit</span>
+                    </Button>
+                  </motion.div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <motion.div variants={itemVariants}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          title="Remove all cards from dashboard"
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" />
+                          <span className="hidden md:inline">Remove All</span>
+                          <span className="md:hidden sr-only">
+                            Remove All Cards
+                          </span>
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</p></TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </motion.div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <motion.div variants={itemVariants}>
-                      <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive/40 dark:hover:bg-destructive/20 dark:text-destructive/90 dark:hover:text-destructive"
-                              title="Access Application Reset Utility"
-                            >
-                              <ShieldAlert className="h-5 w-5" />
-                              <span className="sr-only">Reset Application Data</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="bg-destructive text-destructive-foreground">
-                            <p>Access Application Reset Utility (Admin)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </motion.div>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeaderComponent>
-                      <AlertDialogTitleComponent className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Confirm Navigation</AlertDialogTitleComponent>
-                      <AlertDialogDescription>
-                        You are about to navigate to the <strong>Application Data Management</strong> page. This section contains tools for critical operations like full application reset and data import/export.
-                        <br /><br />
-                        Proceed with caution. Ensure you understand the implications of actions performed on that page.
-                      </AlertDialogDescription>
-                    </AlertDialogHeaderComponent>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Stay on Dashboard</AlertDialogCancel>
-                      <AlertDialogAction onClick={navigateToResetPage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Go to Reset Page
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-          </div>
-        </motion.div>
+                      </motion.div>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeaderComponent>
+                        <AlertDialogTitleComponent>
+                          Are you sure?
+                        </AlertDialogTitleComponent>
+                        <AlertDialogDescription>
+                          This action will remove all cards from your current
+                          dashboard layout. This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeaderComponent>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={onRemoveAll}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Remove All
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <motion.div variants={itemVariants}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Reset dashboard to default layout"
+                        >
+                          <RotateCcw className="mr-1.5 h-4 w-4" />
+                          <span className="hidden md:inline">Reset Layout</span>
+                          <span className="md:hidden sr-only">
+                            Reset Layout
+                          </span>
+                        </Button>
+                      </motion.div>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeaderComponent>
+                        <AlertDialogTitleComponent>
+                          Reset to Default Layout?
+                        </AlertDialogTitleComponent>
+                        <AlertDialogDescription>
+                          This will discard your current layout and restore the
+                          default set of cards for this dashboard.
+                        </AlertDialogDescription>
+                      </AlertDialogHeaderComponent>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={onResetToDefault}>
+                          Reset Dashboard
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
 
-        <motion.div
-          className="text-xs text-muted-foreground mb-4 flex flex-col sm:flex-row justify-between items-center gap-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
-          <div className="flex items-center gap-2">
-            <Clock className="h-3 w-3" />
-            <span>{currentTime}</span>
-            {isConnected ? (
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                      : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
-                    }>
-                      {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Last data received {delay} ms ago</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
-              <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
-                (reconnect)
-              </Button>
-            )}
-          </div>
-          <span className='font-mono'>{version || '?.?.?'}</span>
-        </motion.div>
-      </>
-    );
-  });
+              {isAdmin && (
+                <>
+                  <motion.div variants={itemVariants}>
+                    <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={isEditMode ? "secondary" : "ghost"}
+                            size="icon"
+                            onClick={toggleEditMode}
+                            title={
+                              isEditMode
+                                ? "Finalize Dashboard Edits"
+                                : "Enable Dashboard Layout Editing"
+                            }
+                          >
+                            {isEditMode ? (
+                              <Check className="h-5 w-5" />
+                            ) : (
+                              <Settings className="h-5 w-5" />
+                            )}
+                            <span className="sr-only">
+                              {isEditMode
+                                ? "Done Editing Layout"
+                                : "Edit Dashboard Layout"}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            {isEditMode
+                              ? "Done Editing Layout"
+                              : "Edit Dashboard Layout"}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </motion.div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <motion.div variants={itemVariants}>
+                        <TooltipProvider delayDuration={100}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive/40 dark:hover:bg-destructive/20 dark:text-destructive/90 dark:hover:text-destructive"
+                                title="Access Application Reset Utility"
+                              >
+                                <ShieldAlert className="h-5 w-5" />
+                                <span className="sr-only">
+                                  Reset Application Data
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="bottom"
+                              className="bg-destructive text-destructive-foreground"
+                            >
+                              <p>Access Application Reset Utility (Admin)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </motion.div>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeaderComponent>
+                        <AlertDialogTitleComponent className="flex items-center">
+                          <AlertTriangle className="text-destructive mr-2 h-6 w-6" />
+                          Confirm Navigation
+                        </AlertDialogTitleComponent>
+                        <AlertDialogDescription>
+                          You are about to navigate to the{" "}
+                          <strong>Application Data Management</strong> page.
+                          This section contains tools for critical operations
+                          like full application reset and data import/export.
+                          <br />
+                          <br />
+                          Proceed with caution. Ensure you understand the
+                          implications of actions performed on that page.
+                        </AlertDialogDescription>
+                      </AlertDialogHeaderComponent>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Stay on Dashboard</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={navigateToResetPage}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Go to Reset Page
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="text-xs text-muted-foreground mb-4 flex flex-col sm:flex-row justify-between items-center gap-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="h-3 w-3" />
+              <span>{currentTime}</span>
+              {isConnected ? (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${
+                          delay < 3000
+                            ? "text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
+                            : delay < 10000
+                            ? "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50"
+                            : "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50"
+                        }`}
+                      >
+                        {delay > 30000
+                          ? ">30s lag"
+                          : `${(delay / 1000).toFixed(1)}s lag`}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Last data received {delay} ms ago</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1"
+                  onClick={() => connectWebSocket()}
+                  title="Attempt manual WebSocket reconnection"
+                >
+                  (reconnect)
+                </Button>
+              )}
+            </div>
+            <span className="font-mono">{version || "?.?.?"}</span>
+          </motion.div>
+        </>
+      );
+    }
+  );
 // interface HeaderConnectivityComponentProps extends DashboardHeaderControlProps { }
 // const HeaderConnectivityComponent: React.FC<HeaderConnectivityComponentProps> = (props) => {
 //   return <DashboardHeaderControl {...props} />;
@@ -337,14 +456,21 @@ const UnifiedDashboardPage: React.FC = () => {
   const currentPath = usePathname();
   const { resolvedTheme } = useTheme();
   const currentUser = useCurrentUser();
-  
+
   // Global state management
-  const isGlobalEditMode = useAppStore(state => state.isEditMode);
-  const toggleEditModeAction = useAppStore(state => state.toggleEditMode);
-  const nodeValues = useAppStore(state => state.opcUaNodeValues);
+  const isGlobalEditMode = useAppStore((state) => state.isEditMode);
+  const toggleEditModeAction = useAppStore((state) => state.toggleEditMode);
+  const nodeValues = useAppStore((state) => state.opcUaNodeValues);
 
   // WebSocket connection via dedicated hook
-  const { sendJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
+  const {
+    sendJsonMessage,
+    changeWebSocketUrl,
+    resetWebSocketUrl,
+    connect: connectWebSocket,
+    isConnected,
+    activeUrl: webSocketUrl,
+  } = useWebSocket();
 
   const currentUserRole = currentUser?.role;
 
@@ -353,289 +479,971 @@ const UnifiedDashboardPage: React.FC = () => {
   const [opcuaApiStatus, setOpcuaApiStatus] = useState<any>(null);
   const [opcuaConnectionStatus, setOpcuaConnectionStatus] = useState<any>(null);
   const [isStatusLoading, setIsStatusLoading] = useState<boolean>(false);
-  const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
-  const [currentTime, setCurrentTime] = useState<string>('');
+  const [plcStatus, setPlcStatus] = useState<
+    "online" | "offline" | "disconnected"
+  >("disconnected");
+  const [dbStatus, setDbStatus] = useState<
+    "online" | "offline" | "disconnected"
+  >("disconnected");
+  const [currentTime, setCurrentTime] = useState<string>("");
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
   const [isWsConfigModalOpen, setIsWsConfigModalOpen] = useState(false);
-  const [tempWsUrl, setTempWsUrl] = useState<string>('');
+  const [tempWsUrl, setTempWsUrl] = useState<string>("");
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
   const [isSldModalOpen, setIsSldModalOpen] = useState(false);
-  const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
+  const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] =
+    useState(false);
   const [isSldConfigOpen, setIsSldConfigOpen] = useState(false);
-  const [availableSldLayoutsForPage, setAvailableSldLayoutsForPage] = useState<{ id: string; name: string }[]>([]);
-  const [sldLayoutId, setSldLayoutId] = useState<string>(AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant');
-  const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
-  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>('1m');
+  const [availableSldLayoutsForPage, setAvailableSldLayoutsForPage] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const [sldLayoutId, setSldLayoutId] = useState<string>(
+    AVAILABLE_SLD_LAYOUT_IDS[0] || "main_plant"
+  );
+  const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>(
+    []
+  );
+  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>("1m");
   const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
-  const [powerGraphConfig, setPowerGraphConfig] = useState<PowerTimelineGraphConfig>({ series: [], exportMode: 'auto' });
-  const [allPossibleDataPoints, setAllPossibleDataPoints] = useState<ExtendedDataPoint[]>(allPossibleDataPointsConfig);
-  const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false);
-  const [weatherCardConfig, setWeatherCardConfig] = useState<WeatherCardConfig | null>(null);
+  const [powerGraphConfig, setPowerGraphConfig] =
+    useState<PowerTimelineGraphConfig>({ series: [], exportMode: "auto" });
+  const [allPossibleDataPoints, setAllPossibleDataPoints] = useState<
+    ExtendedDataPoint[]
+  >(allPossibleDataPointsConfig);
+  const [useDemoDataForGraph, setUseDemoDataForGraph] =
+    useState<boolean>(false);
+  const [weatherCardConfig, setWeatherCardConfig] =
+    useState<WeatherCardConfig | null>(null);
 
-  const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as ExtendedDataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
+  const currentlyDisplayedDataPoints = useMemo(
+    () =>
+      displayedDataPointIds
+        .map((id) => allPossibleDataPoints.find((dp) => dp.id === id))
+        .filter(Boolean) as ExtendedDataPoint[],
+    [displayedDataPointIds, allPossibleDataPoints]
+  );
   const lastToastTimestamps = useRef<Record<string, number>>({});
-  
-  const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
-  const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch' || p.uiType === 'input'), [individualPoints]);
-  const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
-  const gaugeItems = useMemo(() => individualPoints.filter(p => p.uiType === 'gauge'), [individualPoints]);
-  const otherDisplayItems = useMemo(() => individualPoints.filter(p => p.uiType === 'display' && p.category !== 'status'), [individualPoints]);
+
+  const { threePhaseGroups, individualPoints } = useMemo(
+    () => groupDataPoints(currentlyDisplayedDataPoints),
+    [currentlyDisplayedDataPoints]
+  );
+  const controlItems = useMemo(
+    () =>
+      individualPoints.filter(
+        (p) =>
+          p.uiType === "button" || p.uiType === "switch" || p.uiType === "input"
+      ),
+    [individualPoints]
+  );
+  const statusDisplayItems = useMemo(
+    () =>
+      individualPoints.filter(
+        (p) => p.category === "status" && p.uiType === "display"
+      ),
+    [individualPoints]
+  );
+  const gaugeItems = useMemo(
+    () => individualPoints.filter((p) => p.uiType === "gauge"),
+    [individualPoints]
+  );
+  const otherDisplayItems = useMemo(
+    () =>
+      individualPoints.filter(
+        (p) => p.uiType === "display" && p.category !== "status"
+      ),
+    [individualPoints]
+  );
   const topSections = useMemo<SectionToRender[]>(() => {
-    const s: SectionToRender[] = []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const bC = controlItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; const bS = statusDisplayItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; if (bC || bS) { if (statusDisplayItems.length > 0) s.push({ title: "Status Readings", items: statusDisplayItems, gridCols: cGC }); if (controlItems.length > 0) s.push({ title: "Controls", items: controlItems, gridCols: cGC }); } else { const cI = [...statusDisplayItems, ...controlItems]; if (cI.length > 0) s.push({ title: "Controls & Status", items: cI, gridCols: cGC }); } return s;
+    const s: SectionToRender[] = [];
+    const cGC =
+      "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
+    const bC = controlItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD;
+    const bS =
+      statusDisplayItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD;
+    if (bC || bS) {
+      if (statusDisplayItems.length > 0)
+        s.push({
+          title: "Status Readings",
+          items: statusDisplayItems,
+          gridCols: cGC,
+        });
+      if (controlItems.length > 0)
+        s.push({ title: "Controls", items: controlItems, gridCols: cGC });
+    } else {
+      const cI = [...statusDisplayItems, ...controlItems];
+      if (cI.length > 0)
+        s.push({ title: "Controls & Status", items: cI, gridCols: cGC });
+    }
+    return s;
   }, [controlItems, statusDisplayItems]);
-  const gaugesOverviewSectionDefinition = useMemo<SectionToRender | null>(() => {
-    if (gaugeItems.length > 0) return { title: "Gauges & Overview", items: gaugeItems, gridCols: 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8' }; return null;
-  }, [gaugeItems]);
+  const gaugesOverviewSectionDefinition =
+    useMemo<SectionToRender | null>(() => {
+      if (gaugeItems.length > 0)
+        return {
+          title: "Gauges & Overview",
+          items: gaugeItems,
+          gridCols:
+            "grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8",
+        };
+      return null;
+    }, [gaugeItems]);
   const bottomReadingsSections = useMemo<SectionToRender[]>(() => {
-    if (otherDisplayItems.length === 0) return []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const s: SectionToRender[] = []; const dBC = otherDisplayItems.reduce((acc, p) => { const k = p.category || 'miscellaneous'; if (!acc[k]) acc[k] = []; acc[k].push(p); return acc; }, {} as Record<string, DataPoint[]>); const gORP: DataPoint[] = []; Object.entries(dBC).sort(([a], [b]) => a.localeCompare(b)).forEach(([cat, pts]) => { if (pts.length > OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD) s.push({ title: `${cat.charAt(0).toUpperCase() + cat.slice(1)} Readings`, items: pts, gridCols: cGC }); else gORP.push(...pts); }); if (gORP.length > 0) { const oRS: SectionToRender = { title: "Other Readings", items: gORP, gridCols: cGC }; if (s.some(sec => sec.title !== "Other Readings")) s.push(oRS); else s.unshift(oRS); } return s.filter(sec => sec.items.length > 0);
+    if (otherDisplayItems.length === 0) return [];
+    const cGC =
+      "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
+    const s: SectionToRender[] = [];
+    const dBC = otherDisplayItems.reduce((acc, p) => {
+      const k = p.category || "miscellaneous";
+      if (!acc[k]) acc[k] = [];
+      acc[k].push(p);
+      return acc;
+    }, {} as Record<string, DataPoint[]>);
+    const gORP: DataPoint[] = [];
+    Object.entries(dBC)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .forEach(([cat, pts]) => {
+        if (pts.length > OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD)
+          s.push({
+            title: `${cat.charAt(0).toUpperCase() + cat.slice(1)} Readings`,
+            items: pts,
+            gridCols: cGC,
+          });
+        else gORP.push(...pts);
+      });
+    if (gORP.length > 0) {
+      const oRS: SectionToRender = {
+        title: "Other Readings",
+        items: gORP,
+        gridCols: cGC,
+      };
+      if (s.some((sec) => sec.title !== "Other Readings")) s.push(oRS);
+      else s.unshift(oRS);
+    }
+    return s.filter((sec) => sec.items.length > 0);
   }, [otherDisplayItems]);
-  const cardHoverEffect = useMemo((): TargetAndTransition => (resolvedTheme === 'dark' ? { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } } : { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } }), [resolvedTheme]);
-  const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => {
-    const g: Record<string, ConfiguratorThreePhaseGroup> = {}, i: DataPoint[] = []; const cS = new Set(displayedDataPointIds); allPossibleDataPoints.forEach(dp => { if (dp.threePhaseGroup && dp.phase && ['a', 'b', 'c', 'x', 'total'].includes(dp.phase)) { if (!g[dp.threePhaseGroup]) { let rN = dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig, '').trim().replace(/ \([ABCX]\)$/i, '').trim(); g[dp.threePhaseGroup] = { name: dp.threePhaseGroup, representativeName: rN || dp.threePhaseGroup, ids: [], category: dp.category || 'miscellaneous' }; } g[dp.threePhaseGroup].ids.push(dp.id); } else if (!dp.threePhaseGroup) { i.push(dp); } }); const aGA = Array.from(new Set(Object.values(g).flatMap(grp => grp.ids))); const tIP = i.filter(ind => !aGA.includes(ind.id)); const cDA = Array.from(cS); return { threePhaseGroupsForConfig: Object.values(g).filter(grp => grp.ids.some(id => !cDA.includes(id))).sort((a, b) => a.representativeName.localeCompare(b.representativeName)), individualPointsForConfig: tIP.filter(dp => !cDA.includes(dp.id)).sort((a, b) => a.name.localeCompare(b.name)) };
-  }, [allPossibleDataPoints, displayedDataPointIds]);
+  const cardHoverEffect = useMemo(
+    (): TargetAndTransition =>
+      resolvedTheme === "dark"
+        ? {
+            y: -4,
+            boxShadow:
+              "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)",
+            transition: { type: "spring", stiffness: 350, damping: 20 },
+          }
+        : {
+            y: -4,
+            boxShadow:
+              "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)",
+            transition: { type: "spring", stiffness: 350, damping: 20 },
+          },
+    [resolvedTheme]
+  );
+  const { threePhaseGroupsForConfig, individualPointsForConfig } =
+    useMemo(() => {
+      const g: Record<string, ConfiguratorThreePhaseGroup> = {},
+        i: DataPoint[] = [];
+      const cS = new Set(displayedDataPointIds);
+      allPossibleDataPoints.forEach((dp) => {
+        if (
+          dp.threePhaseGroup &&
+          dp.phase &&
+          ["a", "b", "c", "x", "total"].includes(dp.phase)
+        ) {
+          if (!g[dp.threePhaseGroup]) {
+            let rN = dp.name
+              .replace(/ (L[123]|Phase [ABCX]\b|Total\b)/gi, "")
+              .trim()
+              .replace(/ \([ABCX]\)$/i, "")
+              .trim();
+            g[dp.threePhaseGroup] = {
+              name: dp.threePhaseGroup,
+              representativeName: rN || dp.threePhaseGroup,
+              ids: [],
+              category: dp.category || "miscellaneous",
+            };
+          }
+          g[dp.threePhaseGroup].ids.push(dp.id);
+        } else if (!dp.threePhaseGroup) {
+          i.push(dp);
+        }
+      });
+      const aGA = Array.from(
+        new Set(Object.values(g).flatMap((grp) => grp.ids))
+      );
+      const tIP = i.filter((ind) => !aGA.includes(ind.id));
+      const cDA = Array.from(cS);
+      return {
+        threePhaseGroupsForConfig: Object.values(g)
+          .filter((grp) => grp.ids.some((id) => !cDA.includes(id)))
+          .sort((a, b) =>
+            a.representativeName.localeCompare(b.representativeName)
+          ),
+        individualPointsForConfig: tIP
+          .filter((dp) => !cDA.includes(dp.id))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    }, [allPossibleDataPoints, displayedDataPointIds]);
   const getHardcodedDefaultDataPointIds = useCallback(() => {
-    const cIds = ['grid-total-active-power-side-to-side', 'inverter-output-total-power', 'load-total-power', 'battery-capacity', 'battery-output-power', 'input-power-pv1', 'active-power-adjust', 'pf-reactive-power-adjust', 'export-power-percentage'].filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (cIds.length > 0) return cIds; return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
+    const cIds = [
+      "grid-total-active-power-side-to-side",
+      "inverter-output-total-power",
+      "load-total-power",
+      "battery-capacity",
+      "battery-output-power",
+      "input-power-pv1",
+      "active-power-adjust",
+      "pf-reactive-power-adjust",
+      "export-power-percentage",
+    ].filter((id) => allPossibleDataPoints.some((dp) => dp.id === id));
+    if (cIds.length > 0) return cIds;
+    return allPossibleDataPoints
+      .slice(0, DEFAULT_DISPLAY_COUNT)
+      .map((dp) => dp.id);
   }, [allPossibleDataPoints]);
   const getSmartDefaults = useDynamicDefaultDataPointIds(allPossibleDataPoints);
-  
+
   const processControlActionQueue = useCallback(async () => {
-    if (!isConnected) { return; }
+    if (!isConnected) {
+      return;
+    }
     const queuedActions = await getControlQueue();
     if (queuedActions.length === 0) return;
     console.log(`Processing ${queuedActions.length} queued control actions...`);
-    toast.info("Processing Queued Actions", { description: `Found ${queuedActions.length} pending command(s).` });
+    toast.info("Processing Queued Actions", {
+      description: `Found ${queuedActions.length} pending command(s).`,
+    });
     let allSentSuccessfully = true;
     for (const action of queuedActions) {
       try {
-        sendJsonMessage({ type: 'controlWrite', payload: { [action.nodeId]: action.value } });
+        sendJsonMessage({
+          type: "controlWrite",
+          payload: { [action.nodeId]: action.value },
+        });
       } catch (e) {
         allSentSuccessfully = false;
-        console.error(`Failed to send queued action for node ${action.nodeId}:`, e);
-        toast.error("Queue Send Failed", { description: `Command for ${action.nodeId || '??'} failed.` });
+        console.error(
+          `Failed to send queued action for node ${action.nodeId}:`,
+          e
+        );
+        toast.error("Queue Send Failed", {
+          description: `Command for ${action.nodeId || "??"} failed.`,
+        });
       }
     }
     await clearControlQueue();
-    if (allSentSuccessfully) toast.success("Queue Processed", { description: "All queued actions have been sent." });
-    else toast.warning("Queue Processing Incomplete", { description: "Some actions could not be sent." });
+    if (allSentSuccessfully)
+      toast.success("Queue Processed", {
+        description: "All queued actions have been sent.",
+      });
+    else
+      toast.warning("Queue Processing Incomplete", {
+        description: "Some actions could not be sent.",
+      });
   }, [isConnected, sendJsonMessage]);
 
-  const sendDataToWebSocket = useCallback(async (nodeId: string, value: boolean | number | string) => {
-    if (currentUserRole === UserRole.VIEWER) { toast.warning("Restricted Action", { description: "Viewers cannot send commands." }); playWarningSound(); return; }
-    const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId); let processedValue: any = value; let queueValue: any = undefined;
-    if (pointConfig?.dataType.includes('Int')) { let pN: number; if (typeof value === 'boolean') pN = value ? 1 : 0; else if (typeof value === 'string') pN = parseInt(value, 10); else pN = value as number; if (isNaN(pN)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; } processedValue = pN; queueValue = pN; }
-    else if (pointConfig?.dataType === 'Boolean') { let pB: boolean; if (typeof value === 'number') pB = value !== 0; else if (typeof value === 'string') pB = value.toLowerCase() === 'true' || value === '1'; else pB = value as boolean; processedValue = pB; queueValue = pB; }
-    else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') { let pF: number; if (typeof value === 'string') pF = parseFloat(value); else pF = value as number; if (isNaN(pF)) { toast.error('Send Error', { description: 'Invalid numeric value.' }); return; } processedValue = pF; queueValue = pF; }
-    if (typeof processedValue === 'number' && !isFinite(processedValue)) { toast.error('Send Error', { description: 'Numeric value is not finite (Infinity or NaN).' }); playErrorSound(); return; }
-    
-    logActivity('DATA_POINT_CHANGE', { nodeId: nodeId, newValue: processedValue, dataPointName: pointConfig?.name || 'Unknown DataPoint', dataType: pointConfig?.dataType || 'Unknown Type' }, currentPath);
-    
-    if (isConnected) {
-      try {
-        sendJsonMessage({ type: 'controlWrite', payload: { [pointConfig?.id || nodeId]: processedValue }});
-        toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` });
-        playInfoSound();
-      } catch (error) {
-        console.error("WebSocket send error:", error);
-        toast.error('Send Error', { description: 'Failed to send command. Queuing.' });
-        playErrorSound();
-        if (queueValue !== undefined) await queueControlAction(nodeId, queueValue);
-        else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
+  const sendDataToWebSocket = useCallback(
+    async (nodeId: string, value: boolean | number | string) => {
+      if (currentUserRole === UserRole.VIEWER) {
+        toast.warning("Restricted Action", {
+          description: "Viewers cannot send commands.",
+        });
+        playWarningSound();
+        return;
       }
-    } else {
-      toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` });
-      playWarningSound();
-      if (queueValue !== undefined) await queueControlAction(nodeId, queueValue);
-      else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
+      const pointConfig = allPossibleDataPoints.find(
+        (p) => p.nodeId === nodeId
+      );
+      let processedValue: any = value;
+      let queueValue: any = undefined;
+      if (pointConfig?.dataType.includes("Int")) {
+        let pN: number;
+        if (typeof value === "boolean") pN = value ? 1 : 0;
+        else if (typeof value === "string") pN = parseInt(value, 10);
+        else pN = value as number;
+        if (isNaN(pN)) {
+          toast.error("Send Error", { description: "Invalid integer value." });
+          return;
+        }
+        processedValue = pN;
+        queueValue = pN;
+      } else if (pointConfig?.dataType === "Boolean") {
+        let pB: boolean;
+        if (typeof value === "number") pB = value !== 0;
+        else if (typeof value === "string")
+          pB = value.toLowerCase() === "true" || value === "1";
+        else pB = value as boolean;
+        processedValue = pB;
+        queueValue = pB;
+      } else if (
+        pointConfig?.dataType === "Float" ||
+        pointConfig?.dataType === "Double"
+      ) {
+        let pF: number;
+        if (typeof value === "string") pF = parseFloat(value);
+        else pF = value as number;
+        if (isNaN(pF)) {
+          toast.error("Send Error", { description: "Invalid numeric value." });
+          return;
+        }
+        processedValue = pF;
+        queueValue = pF;
+      }
+      if (typeof processedValue === "number" && !isFinite(processedValue)) {
+        toast.error("Send Error", {
+          description: "Numeric value is not finite (Infinity or NaN).",
+        });
+        playErrorSound();
+        return;
+      }
+
+      logActivity(
+        "DATA_POINT_CHANGE",
+        {
+          nodeId: nodeId,
+          newValue: processedValue,
+          dataPointName: pointConfig?.name || "Unknown DataPoint",
+          dataType: pointConfig?.dataType || "Unknown Type",
+        },
+        currentPath
+      );
+
+      if (isConnected) {
+        try {
+          sendJsonMessage({
+            type: "controlWrite",
+            payload: { [pointConfig?.id || nodeId]: processedValue },
+          });
+          toast.info("Command Sent", {
+            description: `${pointConfig?.name || nodeId} = ${String(
+              processedValue
+            )}`,
+          });
+          playInfoSound();
+        } catch (error) {
+          console.error("WebSocket send error:", error);
+          toast.error("Send Error", {
+            description: "Failed to send command. Queuing.",
+          });
+          playErrorSound();
+          if (queueValue !== undefined)
+            await queueControlAction(nodeId, queueValue);
+          else
+            toast.error("Queue Error", {
+              description: `Cannot queue command for ${nodeId} due to undefined queue value.`,
+            });
+        }
+      } else {
+        toast.warning("System Offline", {
+          description: `Command for ${pointConfig?.name || nodeId} queued.`,
+        });
+        playWarningSound();
+        if (queueValue !== undefined)
+          await queueControlAction(nodeId, queueValue);
+        else
+          toast.error("Queue Error", {
+            description: `Cannot queue command for ${nodeId} due to undefined queue value.`,
+          });
+      }
+    },
+    [
+      currentUserRole,
+      allPossibleDataPoints,
+      isConnected,
+      sendJsonMessage,
+      currentPath,
+    ]
+  );
+
+  const checkDbStatus = useCallback(async () => {
+    if (!authCheckComplete) return;
+    try {
+      console.log("Checking database status...");
+      const response = await fetch("http://192.168.1.9:8003/db-status", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+        // Add mode: 'cors' to be explicit about CORS
+        mode: "cors",
+      });
+
+      console.log(
+        "Database status response:",
+        response.status,
+        response.statusText
+      );
+
+      if (!response.ok) {
+        console.error("Database status response not OK:", response.status);
+        setDbStatus("disconnected");
+        return;
+      }
+
+      const data = await response.json();
+      console.log("Database status data:", data);
+
+      // More robust status checking
+      if (data && typeof data.status === "string") {
+        setDbStatus(data.status === "online" ? "online" : "offline");
+      } else {
+        console.error("Invalid database status response format:", data);
+        setDbStatus("disconnected");
+      }
+    } catch (error) {
+      console.error("Failed to fetch database status:", error);
+      setDbStatus("disconnected");
     }
-  }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
+  }, [authCheckComplete]);
+
+  // Add this useEffect for debugging
+  useEffect(() => {
+    console.log("Current dbStatus:", dbStatus);
+  }, [dbStatus]);
 
   const checkPlcConnection = useCallback(async () => {
     if (!authCheckComplete) return;
     try {
-      const r = await fetch('/api/opcua/status');
+      const r = await fetch("/api/opcua/status");
       if (!r.ok) {
-        setPlcStatus('disconnected');
+        setPlcStatus("disconnected");
         return;
       }
       const d = await r.json();
       const nS = d.connectionStatus;
-      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
+      if (nS && ["online", "offline", "disconnected"].includes(nS)) {
         setPlcStatus(nS);
       } else {
-        setPlcStatus('disconnected');
+        setPlcStatus("disconnected");
       }
     } catch (e) {
-      setPlcStatus('disconnected');
+      setPlcStatus("disconnected");
     }
   }, [authCheckComplete]);
-  const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath, 'warn'); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
-  const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath, 'warn'); }, [currentUserRole, displayedDataPointIds, currentPath]);
-  const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
-    if (currentUserRole !== UserRole.ADMIN) return; const currentDisplayedSet = new Set(displayedDataPointIds); const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
-    if (newIdsToAdd.length === 0 && selectedIds.length > 0) { toast.warning("Items already shown or none selected to add."); setIsConfiguratorOpen(false); return; }
-    if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new card${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath, 'info'); }
-    setIsConfiguratorOpen(false);
-  }, [displayedDataPointIds, currentUserRole, currentPath]);
-  const handleSaveNewDataPoint = useCallback(async (data: any) => {
-    if (currentUserRole !== UserRole.ADMIN) {
-        toast.error("Permission Denied", { description: "You are not authorized to create new data points." });
+  const handleResetToDefault = useCallback(() => {
+    if (currentUserRole !== UserRole.ADMIN) return;
+    const smartDefaults = getSmartDefaults();
+    const defaultIds =
+      smartDefaults.length > 0
+        ? smartDefaults
+        : getHardcodedDefaultDataPointIds();
+    setDisplayedDataPointIds(defaultIds);
+    toast.info("Layout reset to default.");
+    logActivity(
+      "ADMIN_DASHBOARD_RESET_LAYOUT",
+      { resetToIds: defaultIds },
+      currentPath,
+      "warn"
+    );
+  }, [
+    getSmartDefaults,
+    getHardcodedDefaultDataPointIds,
+    currentUserRole,
+    currentPath,
+  ]);
+  const handleRemoveAllItems = useCallback(() => {
+    if (currentUserRole !== UserRole.ADMIN) return;
+    const oldIds = displayedDataPointIds;
+    setDisplayedDataPointIds([]);
+    toast.info("All cards removed.");
+    logActivity(
+      "ADMIN_DASHBOARD_REMOVE_ALL_CARDS",
+      { removedAll: true, previousIds: oldIds },
+      currentPath,
+      "warn"
+    );
+  }, [currentUserRole, displayedDataPointIds, currentPath]);
+  const handleAddMultipleDataPoints = useCallback(
+    (selectedIds: string[]) => {
+      if (currentUserRole !== UserRole.ADMIN) return;
+      const currentDisplayedSet = new Set(displayedDataPointIds);
+      const newIdsToAdd = selectedIds.filter(
+        (id) => !currentDisplayedSet.has(id)
+      );
+      if (newIdsToAdd.length === 0 && selectedIds.length > 0) {
+        toast.warning("Items already shown or none selected to add.");
+        setIsConfiguratorOpen(false);
+        return;
+      }
+      if (newIdsToAdd.length > 0) {
+        const newFullList = Array.from(
+          new Set([...displayedDataPointIds, ...newIdsToAdd])
+        );
+        setDisplayedDataPointIds(newFullList);
+        toast.success(
+          `${newIdsToAdd.length} new card${
+            newIdsToAdd.length > 1 ? "s" : ""
+          } added.`
+        );
+        logActivity(
+          "ADMIN_DASHBOARD_ADD_CARDS",
+          {
+            addedIds: newIdsToAdd,
+            addedCount: newIdsToAdd.length,
+            currentDashboardIds: newFullList,
+          },
+          currentPath,
+          "info"
+        );
+      }
+      setIsConfiguratorOpen(false);
+    },
+    [displayedDataPointIds, currentUserRole, currentPath]
+  );
+  const handleSaveNewDataPoint = useCallback(
+    async (data: any) => {
+      if (currentUserRole !== UserRole.ADMIN) {
+        toast.error("Permission Denied", {
+          description: "You are not authorized to create new data points.",
+        });
         return { success: false, error: "Permission Denied." };
-    }
-    if (!data.name || !data.nodeId || !data.dataType || !data.uiType) {
-        toast.error("Validation Failed", { description: "Missing required fields for the new data point." });
+      }
+      if (!data.name || !data.nodeId || !data.dataType || !data.uiType) {
+        toast.error("Validation Failed", {
+          description: "Missing required fields for the new data point.",
+        });
         return { success: false, error: "Missing required fields." };
-    }
+      }
 
-    const finalId = (data.id || data.name.toLowerCase().replace(/\s+/g, '-')).replace(/[^a-z0-9-]/g, '');
-    if (!finalId) {
-        toast.error("Validation Failed", { description: "Could not generate a valid ID from the provided name." });
+      const finalId = (
+        data.id || data.name.toLowerCase().replace(/\s+/g, "-")
+      ).replace(/[^a-z0-9-]/g, "");
+      if (!finalId) {
+        toast.error("Validation Failed", {
+          description: "Could not generate a valid ID from the provided name.",
+        });
         return { success: false, error: "Invalid ID." };
-    }
-    if (allPossibleDataPoints.some(p => p.id === finalId)) {
-        toast.error("Conflict", { description: `A data point with the ID '${finalId}' already exists.` });
+      }
+      if (allPossibleDataPoints.some((p) => p.id === finalId)) {
+        toast.error("Conflict", {
+          description: `A data point with the ID '${finalId}' already exists.`,
+        });
         return { success: false, error: `ID '${finalId}' already exists.` };
-    }
-    if (allPossibleDataPoints.some(p => p.nodeId === data.nodeId)) {
-        toast.error("Conflict", { description: `A data point with the OPC UA Node ID '${data.nodeId}' already exists.` });
-        return { success: false, error: `Node ID '${data.nodeId}' already exists.` };
-    }
+      }
+      if (allPossibleDataPoints.some((p) => p.nodeId === data.nodeId)) {
+        toast.error("Conflict", {
+          description: `A data point with the OPC UA Node ID '${data.nodeId}' already exists.`,
+        });
+        return {
+          success: false,
+          error: `Node ID '${data.nodeId}' already exists.`,
+        };
+      }
 
-    const newPoint: DataPoint = {
-      ...data,
-      id: finalId,
-      label: data.label || data.name,
-      category: data.category || 'Custom',
-      unit: data.unit || '',
-      description: data.description || '',
-      precision: data.precision ?? 2,
-      min: data.min ?? 0,
-      max: data.max ?? 100,
-      threePhaseGroup: data.threePhaseGroup || undefined,
-      phase: data.phase || undefined,
-    };
-    
-    const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
-    const customPoints = storedCustomPoints ? JSON.parse(storedCustomPoints) : [];
-    const updatedCustomPoints = [...customPoints, newPoint];
-    localStorage.setItem(CUSTOM_DATA_POINTS_KEY, JSON.stringify(updatedCustomPoints));
-    
-    setAllPossibleDataPoints(prevPoints => {
+      const newPoint: DataPoint = {
+        ...data,
+        id: finalId,
+        label: data.label || data.name,
+        category: data.category || "Custom",
+        unit: data.unit || "",
+        description: data.description || "",
+        precision: data.precision ?? 2,
+        min: data.min ?? 0,
+        max: data.max ?? 100,
+        threePhaseGroup: data.threePhaseGroup || undefined,
+        phase: data.phase || undefined,
+      };
+
+      const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
+      const customPoints = storedCustomPoints
+        ? JSON.parse(storedCustomPoints)
+        : [];
+      const updatedCustomPoints = [...customPoints, newPoint];
+      localStorage.setItem(
+        CUSTOM_DATA_POINTS_KEY,
+        JSON.stringify(updatedCustomPoints)
+      );
+
+      setAllPossibleDataPoints((prevPoints) => {
         const combined = [...prevPoints, newPoint];
         const uniqueMap = new Map<string, DataPoint>();
-        combined.forEach(p => {
-            if (p && p.id) {
-                uniqueMap.set(p.id, p);
-            }
+        combined.forEach((p) => {
+          if (p && p.id) {
+            uniqueMap.set(p.id, p);
+          }
         });
-        return Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name));
-    });
-    setDisplayedDataPointIds(prevIds => [...prevIds, newPoint.id]);
-    
-    toast.success("Data Point Created", { description: `'${newPoint.name}' has been created and added to the dashboard.` });
-    logActivity('ADMIN_DASHBOARD_CREATE_CARD', { newDataPoint: newPoint }, currentPath);
-    
-    return { success: true, newPoint: newPoint };
-  }, [allPossibleDataPoints, currentUserRole, currentPath]);
+        return Array.from(uniqueMap.values()).sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+      });
+      setDisplayedDataPointIds((prevIds) => [...prevIds, newPoint.id]);
 
-  const handleRemoveItem = useCallback((dpIdToRemove: string) => {
-    if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove); let newDisplayedIds: string[]; if (pointToRemove?.threePhaseGroup) { const removedItemsList = allPossibleDataPoints.filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup).map(dp => dp.id); newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id)); setDisplayedDataPointIds(newDisplayedIds); toast.info(`${pointToRemove.threePhaseGroup} group removed.`); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedGroupId: pointToRemove.threePhaseGroup, removedItemIds: removedItemsList, isGroup: true, currentDashboardIds: newDisplayedIds }, currentPath); } else { newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove); setDisplayedDataPointIds(newDisplayedIds); toast.info("Data point removed."); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedId: dpIdToRemove, isGroup: false, currentDashboardIds: newDisplayedIds }, currentPath); }
-  }, [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]);
-  const handleSldLayoutSelect = useCallback((newLayoutId: string) => { const oldLayout = sldLayoutId; setSldLayoutId(newLayoutId); if (isSldConfigOpen) setIsSldConfigOpen(false); if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false); logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath); }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]);
+      toast.success("Data Point Created", {
+        description: `'${newPoint.name}' has been created and added to the dashboard.`,
+      });
+      logActivity(
+        "ADMIN_DASHBOARD_CREATE_CARD",
+        { newDataPoint: newPoint },
+        currentPath
+      );
+
+      return { success: true, newPoint: newPoint };
+    },
+    [allPossibleDataPoints, currentUserRole, currentPath]
+  );
+
+  const handleRemoveItem = useCallback(
+    (dpIdToRemove: string) => {
+      if (currentUserRole !== UserRole.ADMIN) return;
+      const pointToRemove = allPossibleDataPoints.find(
+        (dp) => dp.id === dpIdToRemove
+      );
+      let newDisplayedIds: string[];
+      if (pointToRemove?.threePhaseGroup) {
+        const removedItemsList = allPossibleDataPoints
+          .filter((dp) => dp.threePhaseGroup === pointToRemove.threePhaseGroup)
+          .map((dp) => dp.id);
+        newDisplayedIds = displayedDataPointIds.filter(
+          (id) => !removedItemsList.includes(id)
+        );
+        setDisplayedDataPointIds(newDisplayedIds);
+        toast.info(`${pointToRemove.threePhaseGroup} group removed.`);
+        logActivity(
+          "ADMIN_DASHBOARD_REMOVE_CARD",
+          {
+            removedGroupId: pointToRemove.threePhaseGroup,
+            removedItemIds: removedItemsList,
+            isGroup: true,
+            currentDashboardIds: newDisplayedIds,
+          },
+          currentPath
+        );
+      } else {
+        newDisplayedIds = displayedDataPointIds.filter(
+          (id) => id !== dpIdToRemove
+        );
+        setDisplayedDataPointIds(newDisplayedIds);
+        toast.info("Data point removed.");
+        logActivity(
+          "ADMIN_DASHBOARD_REMOVE_CARD",
+          {
+            removedId: dpIdToRemove,
+            isGroup: false,
+            currentDashboardIds: newDisplayedIds,
+          },
+          currentPath
+        );
+      }
+    },
+    [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]
+  );
+  const handleSldLayoutSelect = useCallback(
+    (newLayoutId: string) => {
+      const oldLayout = sldLayoutId;
+      setSldLayoutId(newLayoutId);
+      if (isSldConfigOpen) setIsSldConfigOpen(false);
+      if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false);
+      logActivity(
+        "ADMIN_SLD_LAYOUT_CHANGE",
+        { oldLayoutId: oldLayout, newLayoutId: newLayoutId },
+        currentPath
+      );
+    },
+    [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]
+  );
   const fetchAndUpdatePageLayouts = useCallback(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       const layoutsFromStorage: { id: string; name: string }[] = [];
       for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i); if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length); let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-          try { const layoutJson = localStorage.getItem(key); if (layoutJson) { const parsedLayout = JSON.parse(layoutJson) as SLDLayout; if (parsedLayout.meta?.name) { layoutName = parsedLayout.meta.name; } } } catch (e) { console.warn(`ControlDash: Could not parse layout ${layoutIdKey} from localStorage for meta.name`, e); } layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
+        const key = localStorage.key(i);
+        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
+          let layoutName = layoutIdKey
+            .replace(/_/g, " ")
+            .replace(/\b\w/g, (l) => l.toUpperCase());
+          try {
+            const layoutJson = localStorage.getItem(key);
+            if (layoutJson) {
+              const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
+              if (parsedLayout.meta?.name) {
+                layoutName = parsedLayout.meta.name;
+              }
+            }
+          } catch (e) {
+            console.warn(
+              `ControlDash: Could not parse layout ${layoutIdKey} from localStorage for meta.name`,
+              e
+            );
+          }
+          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
         }
-      } const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
-      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS.filter(id => !layoutIdsFromStorage.has(id)).map(id => ({ id, name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), }));
-      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants]; combinedLayouts.sort((a, b) => a.name.localeCompare(b.name)); setAvailableSldLayoutsForPage(combinedLayouts);
+      }
+      const layoutIdsFromStorage = new Set(layoutsFromStorage.map((l) => l.id));
+      const layoutsFromConstants: { id: string; name: string }[] =
+        AVAILABLE_SLD_LAYOUT_IDS.filter(
+          (id) => !layoutIdsFromStorage.has(id)
+        ).map((id) => ({
+          id,
+          name: id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
+        }));
+      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
+      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
+      setAvailableSldLayoutsForPage(combinedLayouts);
     }
   }, []);
-  
+
   const handleSaveWsUrl = useCallback(() => {
     changeWebSocketUrl(tempWsUrl);
     setIsWsConfigModalOpen(false);
-    toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}` });
+    toast.success("WebSocket URL Updated", {
+      description: `Now connecting to: ${tempWsUrl}`,
+    });
   }, [tempWsUrl, changeWebSocketUrl]);
 
   const handleResetWsUrl = useCallback(() => {
-    if(resetWebSocketUrl) {
+    if (resetWebSocketUrl) {
       resetWebSocketUrl();
       setIsWsConfigModalOpen(false);
     }
   }, [resetWebSocketUrl]);
 
-    const handleOpenConfigurator = useCallback(() => {
+  const handleOpenConfigurator = useCallback(() => {
     setIsConfiguratorOpen(true);
   }, []);
 
   const handleWsStatusClick = useCallback(() => {
-    setTempWsUrl(webSocketUrl || '');
+    setTempWsUrl(webSocketUrl || "");
     setIsWsConfigModalOpen(true);
   }, [webSocketUrl]);
 
-  const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
-  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
+  const handleWeatherConfigChange = useCallback(
+    (newConfig: WeatherCardConfig) => {
+      setWeatherCardConfig(newConfig);
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          WEATHER_CARD_CONFIG_LS_KEY,
+          JSON.stringify(newConfig)
+        );
+      }
+      logActivity("WEATHER_CARD_CONFIG_CHANGE", { newConfig }, currentPath);
+    },
+    [currentPath]
+  );
+  const handleSldWidgetLayoutChange = useCallback(
+    (newLayoutId: string) => {
+      setSldLayoutId(newLayoutId);
+      logActivity("SLD_LAYOUT_CHANGE", { newLayoutId }, currentPath);
+    },
+    [setSldLayoutId, currentPath]
+  );
 
-  useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
-  useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]);
-  
   useEffect(() => {
-    if (authCheckComplete && typeof window !== 'undefined') {
-        const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
-        let customPoints: DataPoint[] = [];
-        if (storedCustomPoints) {
-            try {
-                const parsed = JSON.parse(storedCustomPoints);
-                if (Array.isArray(parsed)) customPoints = parsed;
-            } catch (e) {
-                console.error("Failed to parse custom data points:", e);
-            }
-        }
+    if (!authCheckComplete) return () => {};
+    checkDbStatus();
+    const dbInterval = setInterval(checkDbStatus, 30000); // Check every 30 seconds
+    return () => clearInterval(dbInterval);
+  }, [checkDbStatus, authCheckComplete]);
 
-        const combined = [...allPossibleDataPointsConfig, ...customPoints];
-        const uniqueMap = new Map<string, DataPoint>();
-        combined.forEach(p => {
-            if (p && p.id) { // Ensure point and its id are valid
-                uniqueMap.set(p.id, p);
-            }
-        });
-        setAllPossibleDataPoints(Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name)));
+  useEffect(() => {
+    initDB().catch(console.error);
+    ensureAppConfigIsSaved();
+  }, []);
+  useEffect(() => {
+    const storeHasHydrated = useAppStore.persist.hasHydrated();
+    if (!storeHasHydrated) return;
+    if (!currentUser?.email || currentUser.email === "guest@example.com") {
+      toast.error("Auth Required", { description: "Please log in." });
+      router.replace("/login");
+    } else {
+      setAuthCheckComplete(true);
+    }
+  }, [currentUser, router, currentPath]);
+
+  useEffect(() => {
+    if (authCheckComplete && typeof window !== "undefined") {
+      const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
+      let customPoints: DataPoint[] = [];
+      if (storedCustomPoints) {
+        try {
+          const parsed = JSON.parse(storedCustomPoints);
+          if (Array.isArray(parsed)) customPoints = parsed;
+        } catch (e) {
+          console.error("Failed to parse custom data points:", e);
+        }
+      }
+
+      const combined = [...allPossibleDataPointsConfig, ...customPoints];
+      const uniqueMap = new Map<string, DataPoint>();
+      combined.forEach((p) => {
+        if (p && p.id) {
+          // Ensure point and its id are valid
+          uniqueMap.set(p.id, p);
+        }
+      });
+      setAllPossibleDataPoints(
+        Array.from(uniqueMap.values()).sort((a, b) =>
+          a.name.localeCompare(b.name)
+        )
+      );
     }
   }, [authCheckComplete]);
-  
+
   useEffect(() => {
     if (isConnected) {
       processControlActionQueue();
     }
   }, [isConnected, processControlActionQueue]);
-  
+
   useEffect(() => {
     if (Object.keys(nodeValues).length > 0) {
       setLastUpdateTime(Date.now());
     }
   }, [nodeValues]);
 
-  useEffect(() => { fetchAndUpdatePageLayouts(); const handleStorageChange = (event: StorageEvent) => { if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) { fetchAndUpdatePageLayouts(); } else if (event.key === null) { fetchAndUpdatePageLayouts(); } }; window.addEventListener('storage', handleStorageChange); return () => { window.removeEventListener('storage', handleStorageChange); }; }, [fetchAndUpdatePageLayouts]);
-  useEffect(() => { if (availableSldLayoutsForPage.length > 0 && authCheckComplete) { const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY); if (currentStoredId && availableSldLayoutsForPage.some(l => l.id === currentStoredId)) { if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId); } else if (availableSldLayoutsForPage.some(l => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'))) { const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'; if (sldLayoutId !== defaultId) setSldLayoutId(defaultId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId); } else { const firstAvailableId = availableSldLayoutsForPage[0].id; if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId); } } }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]);
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
-  useEffect(() => { if (typeof window !== 'undefined' && allPossibleDataPoints.length > 0 && authCheckComplete) { const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY); if (s) { try { const p = JSON.parse(s) as string[]; const v = p.filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (v.length > 0) { setDisplayedDataPointIds(v); return; } else if (p.length > 0) localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } catch (e) { console.error("Parse err", e); localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } } const sm = getSmartDefaults(); setDisplayedDataPointIds(sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()); } }, [allPossibleDataPoints, getSmartDefaults, getHardcodedDefaultDataPointIds, authCheckComplete]);
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { if (displayedDataPointIds.length > 0) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify(displayedDataPointIds)); else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY)) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([])); } }, [displayedDataPointIds, authCheckComplete]);
-  useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
-  useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); connectWebSocket(); } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 1000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
-  useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
+  useEffect(() => {
+    fetchAndUpdatePageLayouts();
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+        fetchAndUpdatePageLayouts();
+      } else if (event.key === null) {
+        fetchAndUpdatePageLayouts();
+      }
+    };
+    window.addEventListener("storage", handleStorageChange);
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+    };
+  }, [fetchAndUpdatePageLayouts]);
+  useEffect(() => {
+    if (availableSldLayoutsForPage.length > 0 && authCheckComplete) {
+      const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY);
+      if (
+        currentStoredId &&
+        availableSldLayoutsForPage.some((l) => l.id === currentStoredId)
+      ) {
+        if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId);
+      } else if (
+        availableSldLayoutsForPage.some(
+          (l) => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || "main_plant")
+        )
+      ) {
+        const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || "main_plant";
+        if (sldLayoutId !== defaultId) setSldLayoutId(defaultId);
+        localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId);
+      } else {
+        const firstAvailableId = availableSldLayoutsForPage[0].id;
+        if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId);
+        localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId);
+      }
+    }
+  }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]);
+  useEffect(() => {
+    if (typeof window !== "undefined" && authCheckComplete)
+      localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId);
+  }, [sldLayoutId, authCheckComplete]);
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      allPossibleDataPoints.length > 0 &&
+      authCheckComplete
+    ) {
+      const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY);
+      if (s) {
+        try {
+          const p = JSON.parse(s) as string[];
+          const v = p.filter((id) =>
+            allPossibleDataPoints.some((dp) => dp.id === id)
+          );
+          if (v.length > 0) {
+            setDisplayedDataPointIds(v);
+            return;
+          } else if (p.length > 0)
+            localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);
+        } catch (e) {
+          console.error("Parse err", e);
+          localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);
+        }
+      }
+      const sm = getSmartDefaults();
+      setDisplayedDataPointIds(
+        sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()
+      );
+    }
+  }, [
+    allPossibleDataPoints,
+    getSmartDefaults,
+    getHardcodedDefaultDataPointIds,
+    authCheckComplete,
+  ]);
+  useEffect(() => {
+    if (typeof window !== "undefined" && authCheckComplete) {
+      if (displayedDataPointIds.length > 0)
+        localStorage.setItem(
+          USER_DASHBOARD_CONFIG_KEY,
+          JSON.stringify(displayedDataPointIds)
+        );
+      else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY))
+        localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([]));
+    }
+  }, [displayedDataPointIds, authCheckComplete]);
+  useEffect(() => {
+    const uc = () =>
+      setCurrentTime(
+        new Date().toLocaleString("en-GB", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      );
+    uc();
+    const i = setInterval(uc, 1000);
+    return () => clearInterval(i);
+  }, []);
+  useEffect(() => {
+    if (!authCheckComplete) return;
+    const lagI = setInterval(() => {
+      const cD = Date.now() - lastUpdateTime;
+      setDelay(cD);
+      const fS =
+        typeof window !== "undefined" &&
+        [
+          "reloadingDueToDelay",
+          "redirectingDueToExtremeDelay",
+          "opcuaRedirected",
+        ].some((f) => sessionStorage.getItem(f));
+      if (fS) return;
+      if (isConnected && cD > 60000) {
+        console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`);
+        toast.error("Critical Lag", {
+          id: "ws-lag",
+          description: "Re-establishing...",
+          duration: 10000,
+        });
+        connectWebSocket();
+      } else if (isConnected && cD > 30000) {
+        console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`);
+        toast.warning("Stale Warn", {
+          id: "ws-stale",
+          description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`,
+          duration: 8000,
+        });
+      }
+    }, 1000);
+    return () => clearInterval(lagI);
+  }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
+  useEffect(() => {
+    if (!authCheckComplete) return () => {};
+    checkPlcConnection();
+    const plcI = setInterval(checkPlcConnection, 15000);
+    return () => clearInterval(plcI);
+  }, [checkPlcConnection, authCheckComplete]);
   useEffect(() => {
     if (authCheckComplete) {
       const fetchGraphConfig = async () => {
         try {
-          const response = await fetch('/api/power-graph-backup');
+          const response = await fetch("/api/power-graph-backup");
           if (response.ok) {
             const config = await response.json();
-            if (config && Array.isArray(config.series) && config.series.length > 0) {
+            if (
+              config &&
+              Array.isArray(config.series) &&
+              config.series.length > 0
+            ) {
               setPowerGraphConfig(config);
             } else {
               // Fallback to legacy or default if server config is empty/invalid
@@ -651,48 +1459,140 @@ const UnifiedDashboardPage: React.FC = () => {
       };
 
       const handleLegacyConfigMigration = () => {
-        const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
-        const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
-        const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
+        const legacyGenDpIds = JSON.parse(
+          localStorage.getItem(GRAPH_GEN_KEY) || "[]"
+        );
+        const legacyUsageDpIds = JSON.parse(
+          localStorage.getItem(GRAPH_USAGE_KEY) || "[]"
+        );
+        const legacyWindDpIds = JSON.parse(
+          localStorage.getItem(GRAPH_WIND_KEY) || "[]"
+        );
 
-        if (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0) {
-          const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
+        if (
+          legacyGenDpIds.length > 0 ||
+          legacyUsageDpIds.length > 0 ||
+          legacyWindDpIds.length > 0
+        ) {
+          const exportMode =
+            (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as
+              | "auto"
+              | "manual") || "auto";
           const migratedSeries: TimelineSeries[] = [];
           if (legacyGenDpIds.length > 0) {
-            migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
+            migratedSeries.push({
+              id: "generation",
+              name: "Generation",
+              dpIds: legacyGenDpIds,
+              color: "#22c55e",
+              displayType: "line",
+              role: "generation",
+              icon: "Zap",
+              visible: true,
+              drawOnGraph: true,
+              unit: "kW",
+              multiplier: 1,
+              precision: 2,
+            });
           }
           if (legacyUsageDpIds.length > 0) {
-            migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
+            migratedSeries.push({
+              id: "usage",
+              name: "Usage",
+              dpIds: legacyUsageDpIds,
+              color: "#f97316",
+              displayType: "line",
+              role: "usage",
+              icon: "ShoppingCart",
+              visible: true,
+              drawOnGraph: true,
+              unit: "kW",
+              multiplier: 1,
+              precision: 2,
+            });
           }
           if (legacyWindDpIds.length > 0) {
-            migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
+            migratedSeries.push({
+              id: "wind",
+              name: "Wind",
+              dpIds: legacyWindDpIds,
+              color: "#3b82f6",
+              displayType: "line",
+              role: "generation",
+              icon: "Wind",
+              visible: true,
+              drawOnGraph: true,
+              unit: "kW",
+              multiplier: 1,
+              precision: 2,
+            });
           }
 
           const newConfig = { series: migratedSeries, exportMode };
           setPowerGraphConfig(newConfig);
 
           // Clean up old keys
-          [GRAPH_GEN_KEY, GRAPH_USAGE_KEY, GRAPH_EXPORT_KEY, GRAPH_WIND_KEY, GRAPH_EXPORT_MODE_KEY].forEach(key => localStorage.removeItem(key));
+          [
+            GRAPH_GEN_KEY,
+            GRAPH_USAGE_KEY,
+            GRAPH_EXPORT_KEY,
+            GRAPH_WIND_KEY,
+            GRAPH_EXPORT_MODE_KEY,
+          ].forEach((key) => localStorage.removeItem(key));
         } else {
           // Set a default configuration if no config is found at all
           setPowerGraphConfig({
             series: [
-              { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 },
-              { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 }
+              {
+                id: "generation",
+                name: "Generation",
+                dpIds: ["inverter-output-total-power"],
+                color: "#22c55e",
+                displayType: "line",
+                role: "generation",
+                icon: "Zap",
+                visible: true,
+                drawOnGraph: true,
+                unit: "kW",
+                multiplier: 1,
+                precision: 2,
+              },
+              {
+                id: "usage",
+                name: "Usage",
+                dpIds: ["grid-total-active-power-side-to-side"],
+                color: "#f97316",
+                displayType: "line",
+                role: "usage",
+                icon: "ShoppingCart",
+                visible: true,
+                drawOnGraph: true,
+                unit: "kW",
+                multiplier: 1,
+                precision: 2,
+              },
             ],
-            exportMode: 'auto'
+            exportMode: "auto",
           });
         }
       };
 
       fetchGraphConfig();
-      setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');
-      setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m');
+      setUseDemoDataForGraph(
+        localStorage.getItem(GRAPH_DEMO_MODE_KEY) === "true"
+      );
+      setGraphTimeScale(
+        (localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || "1m"
+      );
     }
   }, [authCheckComplete]);
 
-
-  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
+  useEffect(() => {
+    if (typeof window !== "undefined" && authCheckComplete) {
+      const loadedConfig = loadWeatherCardConfigFromStorage();
+      setWeatherCardConfig(loadedConfig);
+    }
+  }, [authCheckComplete]);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -700,12 +1600,12 @@ const UnifiedDashboardPage: React.FC = () => {
         setIsStatusLoading(true);
         try {
           const [apiRes, statusRes] = await Promise.all([
-            fetch('/api/opcua'),
-            fetch('/api/opcua/status')
+            fetch("/api/opcua"),
+            fetch("/api/opcua/status"),
           ]);
 
           if (!apiRes.ok || !statusRes.ok) {
-            throw new Error('One or more API requests failed');
+            throw new Error("One or more API requests failed");
           }
 
           const apiData = await apiRes.json();
@@ -713,10 +1613,12 @@ const UnifiedDashboardPage: React.FC = () => {
 
           setOpcuaApiStatus(apiData);
           setOpcuaConnectionStatus(statusData);
-
         } catch (error) {
           console.error("Failed to fetch OPC-UA status:", error);
-          toast.error("Failed to fetch status", { description: "Could not retrieve connection details from the server." });
+          toast.error("Failed to fetch status", {
+            description:
+              "Could not retrieve connection details from the server.",
+          });
           setOpcuaApiStatus(null);
           setOpcuaConnectionStatus(null);
         } finally {
@@ -730,51 +1632,172 @@ const UnifiedDashboardPage: React.FC = () => {
 
   const storeHasHydrated = useAppStore.persist.hasHydrated();
   if (!storeHasHydrated || !authCheckComplete || weatherCardConfig === null) {
-    return (<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+        <p className="mt-4 text-lg">Loading Control Panel...</p>
+      </div>
+    );
   }
 
-  const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
+  const sldSpecificEditMode =
+    isGlobalEditMode && currentUserRole === UserRole.ADMIN;
   const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
   const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
-  const commonRenderingProps = { isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket, playNotificationSound, lastToastTimestamps, onRemoveItem: handleRemoveItem, allPossibleDataPoints, containerVariants, currentUserRole, };
-  const hasAnyDynamicCardContent = topSections.length > 0 || !!gaugesOverviewSectionDefinition || bottomReadingsSections.length > 0;
+  const commonRenderingProps = {
+    isEditMode: isGlobalEditMode,
+    nodeValues,
+    isConnected,
+    currentHoverEffect: cardHoverEffect,
+    sendDataToWebSocket,
+    playNotificationSound,
+    lastToastTimestamps,
+    onRemoveItem: handleRemoveItem,
+    allPossibleDataPoints,
+    containerVariants,
+    currentUserRole,
+  };
+  const hasAnyDynamicCardContent =
+    topSections.length > 0 ||
+    !!gaugesOverviewSectionDefinition ||
+    bottomReadingsSections.length > 0;
 
   return (
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
       <div className="max-w-screen-4xl mx-auto">
         <DashboardHeaderControl
-          plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
+          plcStatus={plcStatus}
+          isConnected={isConnected}
+          connectWebSocket={connectWebSocket}
+          dbStatus={dbStatus}
           onClickWsStatus={handleWsStatusClick}
-          currentTime={currentTime} delay={delay} version={VERSION}
-          isEditMode={isGlobalEditMode} toggleEditMode={toggleEditModeAction}
-          currentUserRole={currentUserRole} onOpenConfigurator={handleOpenConfigurator}
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} wsAddress={webSocketUrl} />
+          currentTime={currentTime}
+          delay={delay}
+          version={VERSION}
+          isEditMode={isGlobalEditMode}
+          toggleEditMode={toggleEditModeAction}
+          currentUserRole={currentUserRole}
+          onOpenConfigurator={handleOpenConfigurator}
+          onRemoveAll={handleRemoveAllItems}
+          onResetToDefault={handleResetToDefault}
+          wsAddress={webSocketUrl}
+        />
 
-        {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
+        {topSections.length > 0 && (
+          <RenderingComponent
+            sections={topSections}
+            {...commonRenderingProps}
+          />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 xl:gap-4 my-4 md:my-6">
-          <Card className={cn(
-            threePhaseGroups.length > 0 ? "lg:col-span-4" : "lg:col-span-5",
-            "shadow-lg transition-all duration-300", sldSectionMinHeight
-          )}>
+          <Card
+            className={cn(
+              threePhaseGroups.length > 0 ? "lg:col-span-4" : "lg:col-span-5",
+              "shadow-lg transition-all duration-300",
+              sldSectionMinHeight
+            )}
+          >
             <CardContent className="p-3 sm:p-4 h-full flex flex-col">
               <div className="flex justify-between items-center mb-2 sm:mb-3">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg sm:text-xl font-semibold">Plant Layout</h3>
+                  <h3 className="text-lg sm:text-xl font-semibold">
+                    Plant Layout
+                  </h3>
                   {sldSpecificEditMode && (
-                    <Dialog open={isSldConfigOpen} onOpenChange={setIsSldConfigOpen}>
-                      <DialogTrigger asChild><Button variant="outline" size="sm" className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5" />Configure Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Button></DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal>
-                        <div className="py-4"><Select onValueChange={handleSldLayoutSelect} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..." /></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map(layout => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div>
+                    <Dialog
+                      open={isSldConfigOpen}
+                      onOpenChange={setIsSldConfigOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                        >
+                          <LayoutList className="h-3.5 w-3.5 mr-1.5" />
+                          Configure Layout:{" "}
+                          {(
+                            availableSldLayoutsForPage.find(
+                              (l) => l.id === sldLayoutId
+                            )?.name || sldLayoutId
+                          )
+                            .replace(/_/g, " ")
+                            .replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeaderComponentInternal>
+                          <DialogTitleComponentInternal>
+                            Select SLD Layout
+                          </DialogTitleComponentInternal>
+                        </DialogHeaderComponentInternal>
+                        <div className="py-4">
+                          <Select
+                            onValueChange={handleSldLayoutSelect}
+                            value={sldLayoutId}
+                          >
+                            <SelectTrigger className="w-full mb-2">
+                              <SelectValue placeholder="Choose..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableSldLayoutsForPage.map((layout) => (
+                                <SelectItem key={layout.id} value={layout.id}>
+                                  {layout.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Select SLD. Changes client-side until saved in
+                            editor.
+                          </p>
+                        </div>
                       </DialogContent>
                     </Dialog>
                   )}
-                  {!sldSpecificEditMode && sldLayoutId && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>}
+                  {!sldSpecificEditMode && sldLayoutId && (
+                    <span className="text-lg font-semibold text-muted-foreground ml-1">
+                      {" "}
+                      :{" "}
+                      {(
+                        availableSldLayoutsForPage.find(
+                          (l) => l.id === sldLayoutId
+                        )?.name || sldLayoutId
+                      )
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </span>
+                  )}
                 </div>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setIsSldModalOpen(true)} title="Open SLD"><Maximize2 className="h-5 w-5" /><span className="sr-only">Open SLD</span></Button></TooltipTrigger><TooltipContent><p>Open SLD in larger view</p></TooltipContent></Tooltip></TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsSldModalOpen(true)}
+                        title="Open SLD"
+                      >
+                        <Maximize2 className="h-5 w-5" />
+                        <span className="sr-only">Open SLD</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Open SLD in larger view</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-              <div style={{ height: sldInternalMaxHeight }} className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10">
-                <SLDWidget layoutId={sldLayoutId} isEditMode={sldSpecificEditMode} onLayoutIdChange={handleSldWidgetLayoutChange} />
+              <div
+                style={{ height: sldInternalMaxHeight }}
+                className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10"
+              >
+                <SLDWidget
+                  layoutId={sldLayoutId}
+                  isEditMode={sldSpecificEditMode}
+                  onLayoutIdChange={handleSldWidgetLayoutChange}
+                />
               </div>
             </CardContent>
           </Card>
@@ -782,9 +1805,20 @@ const UnifiedDashboardPage: React.FC = () => {
           {threePhaseGroups.length > 0 && (
             <Card className={cn("shadow-lg", sldSectionMinHeight)}>
               <CardContent className="p-3 sm:p-4 h-full flex flex-col">
-                <h3 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Three-Phase Elements</h3>
-                <div className="overflow-y-auto flex-grow" style={{ maxHeight: sldInternalMaxHeight }}>
-                  <DashboardSection title="" gridCols="grid-cols-1 gap-y-3" items={threePhaseGroups} isDisabled={!isConnected} {...commonRenderingProps} />
+                <h3 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">
+                  Three-Phase Elements
+                </h3>
+                <div
+                  className="overflow-y-auto flex-grow"
+                  style={{ maxHeight: sldInternalMaxHeight }}
+                >
+                  <DashboardSection
+                    title=""
+                    gridCols="grid-cols-1 gap-y-3"
+                    items={threePhaseGroups}
+                    isDisabled={!isConnected}
+                    {...commonRenderingProps}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -795,11 +1829,18 @@ const UnifiedDashboardPage: React.FC = () => {
           {weatherCardConfig && (
             <Card className="w-auto flex-shrink-0 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
               <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
-                <CardTitle className="text-xl sm:text-2xl">Weather Data</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl">
+                  Weather Data
+                </CardTitle>
               </CardHeader>
               <CardContent className="px-2 py-3 sm:px-3 flex-grow">
                 <div className="h-full">
-                  <WeatherCard initialConfig={weatherCardConfig} opcUaData={nodeValues} allPossibleDataPoints={allPossibleDataPoints} onConfigChange={handleWeatherConfigChange} />
+                  <WeatherCard
+                    initialConfig={weatherCardConfig}
+                    opcUaData={nodeValues}
+                    allPossibleDataPoints={allPossibleDataPoints}
+                    onConfigChange={handleWeatherConfigChange}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -809,20 +1850,55 @@ const UnifiedDashboardPage: React.FC = () => {
             <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div className="flex items-center gap-2">
-                  <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
+                  <CardTitle className="text-xl sm:text-2xl">
+                    Energy Timeline
+                  </CardTitle>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start flex-wrap">
                   {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
                     <TooltipProvider>
                       <Tooltip>
-                        <TooltipTrigger asChild><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}><Settings className="h-4 w-4" /><span className="sr-only">Config Graph</span></Button></TooltipTrigger>
-                        <TooltipContent><p>Configure Graph Data</p></TooltipContent>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setIsGraphConfiguratorOpen(true)}
+                          >
+                            <Settings className="h-4 w-4" />
+                            <span className="sr-only">Config Graph</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Configure Graph Data</p>
+                        </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   )}
                   <div className="flex items-center gap-1 flex-wrap">
-                    {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
-                      <Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto">{ts.toUpperCase()}</Button>
+                    {(
+                      [
+                        "30s",
+                        "1m",
+                        "5m",
+                        "30m",
+                        "1h",
+                        "6h",
+                        "12h",
+                        "1d",
+                        "7d",
+                        "1mo",
+                      ] as TimeScale[]
+                    ).map((ts) => (
+                      <Button
+                        key={ts}
+                        variant={graphTimeScale === ts ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setGraphTimeScale(ts)}
+                        className="text-xs px-2 py-1 h-auto"
+                      >
+                        {ts.toUpperCase()}
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -830,7 +1906,9 @@ const UnifiedDashboardPage: React.FC = () => {
             </CardHeader>
             <CardContent className="px-2 py-3 sm:px-3 flex-grow">
               <div className="h-full">
-                {(useDemoDataForGraph || (powerGraphConfig.series && powerGraphConfig.series.length > 0)) ? (
+                {useDemoDataForGraph ||
+                (powerGraphConfig.series &&
+                  powerGraphConfig.series.length > 0) ? (
                   <PowerTimelineGraph
                     nodeValues={nodeValues}
                     allPossibleDataPoints={allPossibleDataPoints}
@@ -838,7 +1916,14 @@ const UnifiedDashboardPage: React.FC = () => {
                     timeScale={graphTimeScale}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <p>
+                      Graph data points not configured.
+                      {isGlobalEditMode &&
+                        currentUserRole === UserRole.ADMIN &&
+                        " Click settings."}
+                    </p>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -846,29 +1931,71 @@ const UnifiedDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {gaugesOverviewSectionDefinition && (<RenderingComponent sections={[gaugesOverviewSectionDefinition]} {...commonRenderingProps} />)}
+      {gaugesOverviewSectionDefinition && (
+        <RenderingComponent
+          sections={[gaugesOverviewSectionDefinition]}
+          {...commonRenderingProps}
+        />
+      )}
 
-      {bottomReadingsSections.length > 0 && (<RenderingComponent sections={bottomReadingsSections} {...commonRenderingProps} />)}
+      {bottomReadingsSections.length > 0 && (
+        <RenderingComponent
+          sections={bottomReadingsSections}
+          {...commonRenderingProps}
+        />
+      )}
 
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
         <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
           <DialogHeaderComponentInternal className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
             <div className="flex items-center gap-2">
-              <DialogTitleComponentInternal>Plant Layout{!sldSpecificEditMode && sldLayoutId && ` : ${(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}</DialogTitleComponentInternal>
+              <DialogTitleComponentInternal>
+                Plant Layout
+                {!sldSpecificEditMode &&
+                  sldLayoutId &&
+                  ` : ${(
+                    availableSldLayoutsForPage.find((l) => l.id === sldLayoutId)
+                      ?.name || sldLayoutId
+                  )
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (l) => l.toUpperCase())}`}
+              </DialogTitleComponentInternal>
               {sldSpecificEditMode && (
-                <Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}>
+                <Dialog
+                  open={isModalSldLayoutConfigOpen}
+                  onOpenChange={setIsModalSldLayoutConfigOpen}
+                >
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                    >
                       <LayoutList className="h-3.5 w-3.5 mr-1.5" />
-                      Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      Layout:{" "}
+                      {(
+                        availableSldLayoutsForPage.find(
+                          (l) => l.id === sldLayoutId
+                        )?.name || sldLayoutId
+                      )
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeaderComponentInternal>
-                      <DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal>
+                      <DialogTitleComponentInternal>
+                        Select SLD Layout
+                      </DialogTitleComponentInternal>
                     </DialogHeaderComponentInternal>
                     <div className="py-4">
-                      <Select onValueChange={(v) => { setSldLayoutId(v); setIsModalSldLayoutConfigOpen(false); }} value={sldLayoutId}>
+                      <Select
+                        onValueChange={(v) => {
+                          setSldLayoutId(v);
+                          setIsModalSldLayoutConfigOpen(false);
+                        }}
+                        value={sldLayoutId}
+                      >
                         <SelectTrigger className="w-full mb-2">
                           <SelectValue placeholder="Choose..." />
                         </SelectTrigger>
@@ -880,7 +2007,9 @@ const UnifiedDashboardPage: React.FC = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Select SLD. Changes client-side until saved in editor.
+                      </p>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -894,7 +2023,11 @@ const UnifiedDashboardPage: React.FC = () => {
             </DialogClose>
           </DialogHeaderComponentInternal>
           <div className="flex-grow p-2 sm:p-4 overflow-hidden">
-            <SLDWidget layoutId={sldLayoutId} isEditMode={sldSpecificEditMode} onLayoutIdChange={handleSldWidgetLayoutChange} />
+            <SLDWidget
+              layoutId={sldLayoutId}
+              isEditMode={sldSpecificEditMode}
+              onLayoutIdChange={handleSldWidgetLayoutChange}
+            />
           </div>
         </DialogContent>
       </Dialog>
@@ -906,9 +2039,9 @@ const UnifiedDashboardPage: React.FC = () => {
         currentConfig={powerGraphConfig}
         onSaveConfiguration={async (newConfig) => {
           try {
-            const response = await fetch('/api/power-graph-backup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/power-graph-backup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(newConfig),
             });
             if (response.ok) {
@@ -917,11 +2050,13 @@ const UnifiedDashboardPage: React.FC = () => {
               toast.success("Power timeline configuration saved to server.");
             } else {
               const error = await response.json();
-              throw new Error(error.message || 'Failed to save configuration');
+              throw new Error(error.message || "Failed to save configuration");
             }
           } catch (error) {
             console.error("Error saving power graph config:", error);
-            toast.error("Save Failed", { description: (error as Error).message });
+            toast.error("Save Failed", {
+              description: (error as Error).message,
+            });
           }
         }}
       />
@@ -940,9 +2075,12 @@ const UnifiedDashboardPage: React.FC = () => {
       <Dialog open={isWsConfigModalOpen} onOpenChange={setIsWsConfigModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeaderComponentInternal>
-            <DialogTitleComponentInternal>Connection Status & Configuration</DialogTitleComponentInternal>
+            <DialogTitleComponentInternal>
+              Connection Status & Configuration
+            </DialogTitleComponentInternal>
             <DialogDescription>
-              View live status information and manually override the WebSocket URL if needed.
+              View live status information and manually override the WebSocket
+              URL if needed.
             </DialogDescription>
           </DialogHeaderComponentInternal>
           <div className="grid gap-4 py-4">
@@ -957,10 +2095,25 @@ const UnifiedDashboardPage: React.FC = () => {
                 <div className="space-y-3 text-xs">
                   {opcuaApiStatus ? (
                     <div className="p-2 border-l-2 pl-3 rounded-r-md bg-background">
-                      <p><strong>Service Status:</strong> <span className={cn(opcuaApiStatus.status?.includes("Connected") ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400")}>{opcuaApiStatus.status || 'N/A'}</span></p>
-                      <p className="text-muted-foreground">{opcuaApiStatus.message || 'No message.'}</p>
+                      <p>
+                        <strong>Service Status:</strong>{" "}
+                        <span
+                          className={cn(
+                            opcuaApiStatus.status?.includes("Connected")
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-yellow-600 dark:text-yellow-400"
+                          )}
+                        >
+                          {opcuaApiStatus.status || "N/A"}
+                        </span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        {opcuaApiStatus.message || "No message."}
+                      </p>
                     </div>
-                  ) : <p>Could not load API service status.</p>}
+                  ) : (
+                    <p>Could not load API service status.</p>
+                  )}
 
                   {opcuaConnectionStatus ? (
                     <div className="p-2 border-l-2 pl-3 rounded-r-md bg-background">
@@ -970,23 +2123,47 @@ const UnifiedDashboardPage: React.FC = () => {
                           className={cn(
                             opcuaConnectionStatus.connectionStatus === "online"
                               ? "text-green-600 dark:text-green-400"
-                              : opcuaConnectionStatus.connectionStatus === "offline"
+                              : opcuaConnectionStatus.connectionStatus ===
+                                "offline"
                               ? "text-yellow-600 dark:text-yellow-400"
                               : "text-red-600 dark:text-red-400"
                           )}
                         >
                           {opcuaConnectionStatus.connectionStatus === "online"
                             ? "Connected Remotely"
-                            : opcuaConnectionStatus.connectionStatus === "offline"
+                            : opcuaConnectionStatus.connectionStatus ===
+                              "offline"
                             ? "Connected Locally"
                             : opcuaConnectionStatus.connectionStatus || "N/A"}
                         </span>
                       </p>
-                       {opcuaConnectionStatus.testedEndpoint && <p><strong>Target Endpoint:</strong> <code className="text-muted-foreground">{opcuaConnectionStatus.testedEndpoint}</code></p>}
-                       {opcuaConnectionStatus.errorDetail && opcuaConnectionStatus.errorDetail.trim() !== '' && <p><strong>Details:</strong> <span className="text-destructive">{opcuaConnectionStatus.errorDetail}</span></p>}
-                       {!opcuaConnectionStatus.errorDetail && opcuaConnectionStatus.message && <p className="text-muted-foreground">{opcuaConnectionStatus.message}</p>}
+                      {opcuaConnectionStatus.testedEndpoint && (
+                        <p>
+                          <strong>Target Endpoint:</strong>{" "}
+                          <code className="text-muted-foreground">
+                            {opcuaConnectionStatus.testedEndpoint}
+                          </code>
+                        </p>
+                      )}
+                      {opcuaConnectionStatus.errorDetail &&
+                        opcuaConnectionStatus.errorDetail.trim() !== "" && (
+                          <p>
+                            <strong>Details:</strong>{" "}
+                            <span className="text-destructive">
+                              {opcuaConnectionStatus.errorDetail}
+                            </span>
+                          </p>
+                        )}
+                      {!opcuaConnectionStatus.errorDetail &&
+                        opcuaConnectionStatus.message && (
+                          <p className="text-muted-foreground">
+                            {opcuaConnectionStatus.message}
+                          </p>
+                        )}
                     </div>
-                  ) : <p>Could not load OPC-UA connection details.</p>}
+                  ) : (
+                    <p>Could not load OPC-UA connection details.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -1001,23 +2178,33 @@ const UnifiedDashboardPage: React.FC = () => {
                 placeholder="ws://localhost:2001"
                 aria-label="WebSocket URL Input"
               />
-               <p className="text-xs text-muted-foreground pt-1">
-                The WebSocket URL is usually detected automatically. Only change this if you need to connect to a different server.
+              <p className="text-xs text-muted-foreground pt-1">
+                The WebSocket URL is usually detected automatically. Only change
+                this if you need to connect to a different server.
               </p>
             </div>
           </div>
           <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
-            <Button variant="secondary" onClick={handleResetWsUrl} size="icon" title="Reset to Default">
+            <Button
+              variant="secondary"
+              onClick={handleResetWsUrl}
+              size="icon"
+              title="Reset to Default"
+            >
               <RotateCcw className="h-4 w-4" />
               <span className="sr-only">Reset to Default</span>
             </Button>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
-                <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)} className="w-full sm:w-auto">
-                    Close
-                </Button>
-                <Button onClick={handleSaveWsUrl} className="w-full sm:w-auto">
-                    Save & Reconnect
-                </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsWsConfigModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Close
+              </Button>
+              <Button onClick={handleSaveWsUrl} className="w-full sm:w-auto">
+                Save & Reconnect
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>
