@@ -2405,6 +2405,25 @@ const MaintenancePage = () => {
     (acc, item) => acc + item.quantity * item.timesPerDay,
     0
   );
+  useEffect(() => {
+    const fetchServerTime = async () => {
+      try {
+        const response = await fetch("/api/time");
+        const data = await response.json();
+        setServerTime(new Date(data.time));
+      } catch (error) {
+        console.error(
+          "Failed to fetch server time, using client time as fallback.",
+          error
+        );
+        setServerTime(new Date());
+      }
+    };
+    fetchServerTime();
+    const interval = setInterval(fetchServerTime, 1000);
+    return () => clearInterval(interval);
+  }, []);
+  
   const todaysCompletedChecks = uploadLogs.filter((log) =>
     isToday(new Date(log.timestamp))
   ).length;
