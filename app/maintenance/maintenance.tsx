@@ -1064,11 +1064,15 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
             data={dailyStatusGridData}
             onSlotClick={(log) =>
               handleStatusClick(
-                // CHANGED: Ensure this uses maintenance image API
-                `/api/maintenance/image/${format(
-                  new Date(log.timestamp),
-                  "yyyy-MM-dd"
-                )}/${encodeURIComponent(log.filename)}`
+                log.uploadType === "note"
+                  ? `/api/maintenance/note-image/${format(
+                      new Date(log.timestamp),
+                      "yyyy-MM-dd"
+                    )}/${encodeURIComponent(log.filename)}`
+                  : `/api/maintenance/image/${format(
+                      new Date(log.timestamp),
+                      "yyyy-MM-dd"
+                    )}/${encodeURIComponent(log.filename)}`
               )
             }
           />
@@ -1421,7 +1425,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
-                  {/* 🔹 same date range + user filter section */}
+                  {/* Date range and user filter - same as before */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -1484,7 +1488,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                   </Button>
                 </div>
 
-                {/* ✅ Table for Maintenance Note Logs */}
+                {/* ✅ Table for Maintenance Note Logs - ONLY SHOW NOTE TYPE */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1498,72 +1502,73 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {(
-                      paginatedLogs.filter(
-                        (log) => log.uploadType === "note"
-                      ) as NoteLog[]
-                    ).map((log, index) => (
-                      <motion.tr
-                        key={index}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <TableCell>
-                          {format(
-                            new Date(log.timestamp),
-                            "yyyy-MM-dd HH:mm:ss"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {log.itemName} #{log.itemNumber}
-                        </TableCell>
-                        <TableCell>{log.username}</TableCell>
-
-                        {/* Tags */}
-                        <TableCell>
-                          {Array.isArray(log.tags)
-                            ? log.tags.join(", ")
-                            : log.tags || ""}
-                        </TableCell>
-
-                        {/* Issues */}
-                        <TableCell>
-                          {Array.isArray(log.issues)
-                            ? log.issues.join(", ")
-                            : log.issues || ""}
-                        </TableCell>
-
-                        {/* Description */}
-                        <TableCell>{log.description || ""}</TableCell>
-
-                        {/* Note Image - CHANGED: Use note-image API */}
-                        <TableCell>
-                          {log.filename && (
-                            <img
-                              src={`/api/maintenance/note-image/${format(
+                    {paginatedLogs
+                      .filter((log) => log.uploadType === "note") // 🔹 ONLY NOTE LOGS
+                      .map((log, index) => {
+                        const noteLog = log as NoteLog; // Type assertion for TypeScript
+                        return (
+                          <motion.tr
+                            key={index}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: index * 0.05 }}
+                          >
+                            <TableCell>
+                              {format(
                                 new Date(log.timestamp),
-                                "yyyy-MM-dd"
-                              )}/${encodeURIComponent(log.filename)}`}
-                              alt="note thumbnail"
-                              className="w-16 h-16 object-cover cursor-pointer rounded-md border"
-                              onClick={() =>
-                                handleStatusClick(
-                                  `/api/maintenance/note-image/${format(
+                                "yyyy-MM-dd HH:mm:ss"
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {log.itemName} #{log.itemNumber}
+                            </TableCell>
+                            <TableCell>{log.username}</TableCell>
+
+                            {/* Tags */}
+                            <TableCell>
+                              {Array.isArray(noteLog.tags)
+                                ? noteLog.tags.join(", ")
+                                : noteLog.tags || ""}
+                            </TableCell>
+
+                            {/* Issues */}
+                            <TableCell>
+                              {Array.isArray(noteLog.issues)
+                                ? noteLog.issues.join(", ")
+                                : noteLog.issues || ""}
+                            </TableCell>
+
+                            {/* Description */}
+                            <TableCell>{noteLog.description || ""}</TableCell>
+
+                            {/* Note Image */}
+                            <TableCell>
+                              {log.filename && (
+                                <img
+                                  src={`/api/maintenance/note-image/${format(
                                     new Date(log.timestamp),
                                     "yyyy-MM-dd"
-                                  )}/${encodeURIComponent(log.filename)}`
-                                )
-                              }
-                            />
-                          )}
-                        </TableCell>
-                      </motion.tr>
-                    ))}
+                                  )}/${encodeURIComponent(log.filename)}`}
+                                  alt="note thumbnail"
+                                  className="w-16 h-16 object-cover cursor-pointer rounded-md border"
+                                  onClick={() =>
+                                    handleStatusClick(
+                                      `/api/maintenance/note-image/${format(
+                                        new Date(log.timestamp),
+                                        "yyyy-MM-dd"
+                                      )}/${encodeURIComponent(log.filename)}`
+                                    )
+                                  }
+                                />
+                              )}
+                            </TableCell>
+                          </motion.tr>
+                        );
+                      })}
                   </TableBody>
                 </Table>
 
-                {/* ✅ Pagination (reuse same controls) */}
+                {/* ✅ Pagination - Calculate based on filtered note logs only */}
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center space-x-2">
                     <Select
