@@ -1268,6 +1268,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                       />
                     </PopoverContent>
                   </Popover>
+
                   <Select
                     value={selectedUser || ""}
                     onValueChange={(value) => setSelectedUser(value)}
@@ -1283,6 +1284,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                       ))}
                     </SelectContent>
                   </Select>
+
                   <Button
                     onClick={handleExport}
                     disabled={isExporting}
@@ -1294,6 +1296,8 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                     Export CSV
                   </Button>
                 </div>
+
+                {/* Image Upload Log Table - ONLY maintenance image uploads */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1304,45 +1308,49 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {paginatedLogs.map((log, index) => (
-                      <motion.tr
-                        key={index}
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        transition={{ delay: index * 0.05 }}
-                      >
-                        <TableCell>
-                          {format(
-                            new Date(log.timestamp),
-                            "yyyy-MM-dd HH:mm:ss"
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {log.itemName} #{log.itemNumber}
-                        </TableCell>
-                        <TableCell>{log.username}</TableCell>
-                        <TableCell>
-                          <img
-                            src={`/api/maintenance/image/${format(
+                    {paginatedLogs
+                      .filter((log) => log.uploadType === "maintenance") // 🔹 ONLY MAINTENANCE IMAGE UPLOADS
+                      .map((log, index) => (
+                        <motion.tr
+                          key={index}
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          transition={{ delay: index * 0.05 }}
+                        >
+                          <TableCell>
+                            {format(
                               new Date(log.timestamp),
-                              "yyyy-MM-dd"
-                            )}/${encodeURIComponent(log.filename)}`}
-                            alt="thumbnail"
-                            className="w-16 h-16 object-cover cursor-pointer rounded-md border"
-                            onClick={() =>
-                              handleStatusClick(
-                                `/api/maintenance/image/${format(
-                                  new Date(log.timestamp),
-                                  "yyyy-MM-dd"
-                                )}/${encodeURIComponent(log.filename)}`
-                              )
-                            }
-                          />
-                        </TableCell>
-                      </motion.tr>
-                    ))}
+                              "yyyy-MM-dd HH:mm:ss"
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {log.itemName} #{log.itemNumber}
+                          </TableCell>
+                          <TableCell>{log.username}</TableCell>
+                          <TableCell>
+                            <img
+                              src={`/api/maintenance/image/${format(
+                                new Date(log.timestamp),
+                                "yyyy-MM-dd"
+                              )}/${encodeURIComponent(log.filename)}`}
+                              alt="maintenance image thumbnail"
+                              className="w-16 h-16 object-cover cursor-pointer rounded-md border"
+                              onClick={() =>
+                                handleStatusClick(
+                                  `/api/maintenance/image/${format(
+                                    new Date(log.timestamp),
+                                    "yyyy-MM-dd"
+                                  )}/${encodeURIComponent(log.filename)}`
+                                )
+                              }
+                            />
+                          </TableCell>
+                        </motion.tr>
+                      ))}
                   </TableBody>
                 </Table>
+
+                {/* Pagination for maintenance image uploads only */}
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center space-x-2">
                     <Select
@@ -1372,7 +1380,11 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                     </Button>
                     <span>
                       Page {logCurrentPage} of{" "}
-                      {Math.ceil(filteredLogs.length / logPageSize)}
+                      {Math.ceil(
+                        filteredLogs.filter(
+                          (log) => log.uploadType === "maintenance"
+                        ).length / logPageSize
+                      )}
                     </span>
                     <Button
                       variant="outline"
@@ -1380,13 +1392,21 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                         setLogCurrentPage((prev) =>
                           Math.min(
                             prev + 1,
-                            Math.ceil(filteredLogs.length / logPageSize)
+                            Math.ceil(
+                              filteredLogs.filter(
+                                (log) => log.uploadType === "maintenance"
+                              ).length / logPageSize
+                            )
                           )
                         )
                       }
                       disabled={
                         logCurrentPage >=
-                        Math.ceil(filteredLogs.length / logPageSize)
+                        Math.ceil(
+                          filteredLogs.filter(
+                            (log) => log.uploadType === "maintenance"
+                          ).length / logPageSize
+                        )
                       }
                     >
                       Next
@@ -1396,6 +1416,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
               </CardContent>
             </Card>
           </TabsContent>
+
           <TabsContent value="note-log">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
@@ -1425,7 +1446,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col sm:flex-row items-center gap-4 mb-4">
-                  {/* Date range and user filter - same as before */}
+                  {/* Date range and user filter controls */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -1488,7 +1509,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                   </Button>
                 </div>
 
-                {/* ✅ Table for Maintenance Note Logs - ONLY SHOW NOTE TYPE */}
+                {/* Maintenance Note Log Table - ONLY note logs */}
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1505,7 +1526,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                     {paginatedLogs
                       .filter((log) => log.uploadType === "note") // 🔹 ONLY NOTE LOGS
                       .map((log, index) => {
-                        const noteLog = log as NoteLog; // Type assertion for TypeScript
+                        const noteLog = log as NoteLog;
                         return (
                           <motion.tr
                             key={index}
@@ -1523,25 +1544,17 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                               {log.itemName} #{log.itemNumber}
                             </TableCell>
                             <TableCell>{log.username}</TableCell>
-
-                            {/* Tags */}
                             <TableCell>
                               {Array.isArray(noteLog.tags)
                                 ? noteLog.tags.join(", ")
                                 : noteLog.tags || ""}
                             </TableCell>
-
-                            {/* Issues */}
                             <TableCell>
                               {Array.isArray(noteLog.issues)
                                 ? noteLog.issues.join(", ")
                                 : noteLog.issues || ""}
                             </TableCell>
-
-                            {/* Description */}
                             <TableCell>{noteLog.description || ""}</TableCell>
-
-                            {/* Note Image */}
                             <TableCell>
                               {log.filename && (
                                 <img
@@ -1568,7 +1581,7 @@ const AdminStatusView: React.FC<AdminStatusViewProps> = ({
                   </TableBody>
                 </Table>
 
-                {/* ✅ Pagination - Calculate based on filtered note logs only */}
+                {/* Pagination for note logs only */}
                 <div className="flex items-center justify-between mt-4">
                   <div className="flex items-center space-x-2">
                     <Select

@@ -23,7 +23,7 @@ export async function GET(
 
     // Try multiple possible file locations for note images
     const possiblePaths = [
-      // Path used by maintenance upload: public/maintenance_note_image/YYYY-MM-DD/filename
+      // Path where your note images are stored
       path.join(
         process.cwd(),
         "public",
@@ -31,10 +31,16 @@ export async function GET(
         date,
         filename
       ),
-      // Alternative path: uploads/notes/YYYY-MM-DD/filename
-      path.join(process.cwd(), "uploads", "notes", date, filename),
-      // Fallback to maintenance images if notes are stored there
-      path.join(process.cwd(), "public", "maintenance_image", date, filename),
+      // Preview images
+      path.join(
+        process.cwd(),
+        "public",
+        "maintenance_note_image_preview",
+        date,
+        filename
+      ),
+      // Fallback to maintenance images
+      path.join(process.cwd(), "public", "maintenance_note_image", date, filename),
     ];
 
     let fileBuffer: Buffer | null = null;
