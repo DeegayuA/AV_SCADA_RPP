@@ -456,21 +456,15 @@ const UnifiedDashboardPage: React.FC = () => {
   const currentPath = usePathname();
   const { resolvedTheme } = useTheme();
   const currentUser = useCurrentUser();
-
+  
+  
   // Global state management
-  const isGlobalEditMode = useAppStore((state) => state.isEditMode);
-  const toggleEditModeAction = useAppStore((state) => state.toggleEditMode);
-  const nodeValues = useAppStore((state) => state.opcUaNodeValues);
+  const isGlobalEditMode = useAppStore(state => state.isEditMode);
+  const toggleEditModeAction = useAppStore(state => state.toggleEditMode);
+  const nodeValues = useAppStore(state => state.opcUaNodeValues);
 
   // WebSocket connection via dedicated hook
-  const {
-    sendJsonMessage,
-    changeWebSocketUrl,
-    resetWebSocketUrl,
-    connect: connectWebSocket,
-    isConnected,
-    activeUrl: webSocketUrl,
-  } = useWebSocket();
+  const { sendJsonMessage, changeWebSocketUrl, resetWebSocketUrl, connect: connectWebSocket, isConnected, activeUrl: webSocketUrl } = useWebSocket();
 
   const currentUserRole = currentUser?.role;
 
@@ -479,394 +473,115 @@ const UnifiedDashboardPage: React.FC = () => {
   const [opcuaApiStatus, setOpcuaApiStatus] = useState<any>(null);
   const [opcuaConnectionStatus, setOpcuaConnectionStatus] = useState<any>(null);
   const [isStatusLoading, setIsStatusLoading] = useState<boolean>(false);
-  const [plcStatus, setPlcStatus] = useState<
-    "online" | "offline" | "disconnected"
-  >("disconnected");
+  const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
   const [dbStatus, setDbStatus] = useState<
     "online" | "offline" | "disconnected"
   >("disconnected");
-  const [currentTime, setCurrentTime] = useState<string>("");
+  const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
   const [isWsConfigModalOpen, setIsWsConfigModalOpen] = useState(false);
-  const [tempWsUrl, setTempWsUrl] = useState<string>("");
+  const [tempWsUrl, setTempWsUrl] = useState<string>('');
   const [isConfiguratorOpen, setIsConfiguratorOpen] = useState(false);
   const [isSldModalOpen, setIsSldModalOpen] = useState(false);
-  const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] =
-    useState(false);
+  const [isModalSldLayoutConfigOpen, setIsModalSldLayoutConfigOpen] = useState(false);
   const [isSldConfigOpen, setIsSldConfigOpen] = useState(false);
-  const [availableSldLayoutsForPage, setAvailableSldLayoutsForPage] = useState<
-    { id: string; name: string }[]
-  >([]);
-  const [sldLayoutId, setSldLayoutId] = useState<string>(
-    AVAILABLE_SLD_LAYOUT_IDS[0] || "main_plant"
-  );
-  const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>(
-    []
-  );
-  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>("1m");
+  const [availableSldLayoutsForPage, setAvailableSldLayoutsForPage] = useState<{ id: string; name: string }[]>([]);
+  const [sldLayoutId, setSldLayoutId] = useState<string>(AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant');
+  const [displayedDataPointIds, setDisplayedDataPointIds] = useState<string[]>([]);
+  const [graphTimeScale, setGraphTimeScale] = useState<TimeScale>('1m');
   const [isGraphConfiguratorOpen, setIsGraphConfiguratorOpen] = useState(false);
-  const [powerGraphConfig, setPowerGraphConfig] =
-    useState<PowerTimelineGraphConfig>({ series: [], exportMode: "auto" });
-  const [allPossibleDataPoints, setAllPossibleDataPoints] = useState<
-    ExtendedDataPoint[]
-  >(allPossibleDataPointsConfig);
-  const [useDemoDataForGraph, setUseDemoDataForGraph] =
-    useState<boolean>(false);
-  const [weatherCardConfig, setWeatherCardConfig] =
-    useState<WeatherCardConfig | null>(null);
+  const [powerGraphConfig, setPowerGraphConfig] = useState<PowerTimelineGraphConfig>({ series: [], exportMode: 'auto' });
+  const [allPossibleDataPoints, setAllPossibleDataPoints] = useState<ExtendedDataPoint[]>(allPossibleDataPointsConfig);
+  const [useDemoDataForGraph, setUseDemoDataForGraph] = useState<boolean>(false);
+  const [weatherCardConfig, setWeatherCardConfig] = useState<WeatherCardConfig | null>(null);
 
-  const currentlyDisplayedDataPoints = useMemo(
-    () =>
-      displayedDataPointIds
-        .map((id) => allPossibleDataPoints.find((dp) => dp.id === id))
-        .filter(Boolean) as ExtendedDataPoint[],
-    [displayedDataPointIds, allPossibleDataPoints]
-  );
+  const currentlyDisplayedDataPoints = useMemo(() => displayedDataPointIds.map(id => allPossibleDataPoints.find(dp => dp.id === id)).filter(Boolean) as ExtendedDataPoint[], [displayedDataPointIds, allPossibleDataPoints]);
   const lastToastTimestamps = useRef<Record<string, number>>({});
-
-  const { threePhaseGroups, individualPoints } = useMemo(
-    () => groupDataPoints(currentlyDisplayedDataPoints),
-    [currentlyDisplayedDataPoints]
-  );
-  const controlItems = useMemo(
-    () =>
-      individualPoints.filter(
-        (p) =>
-          p.uiType === "button" || p.uiType === "switch" || p.uiType === "input"
-      ),
-    [individualPoints]
-  );
-  const statusDisplayItems = useMemo(
-    () =>
-      individualPoints.filter(
-        (p) => p.category === "status" && p.uiType === "display"
-      ),
-    [individualPoints]
-  );
-  const gaugeItems = useMemo(
-    () => individualPoints.filter((p) => p.uiType === "gauge"),
-    [individualPoints]
-  );
-  const otherDisplayItems = useMemo(
-    () =>
-      individualPoints.filter(
-        (p) => p.uiType === "display" && p.category !== "status"
-      ),
-    [individualPoints]
-  );
+  
+  const { threePhaseGroups, individualPoints } = useMemo(() => groupDataPoints(currentlyDisplayedDataPoints), [currentlyDisplayedDataPoints]);
+  const controlItems = useMemo(() => individualPoints.filter(p => p.uiType === 'button' || p.uiType === 'switch' || p.uiType === 'input'), [individualPoints]);
+  const statusDisplayItems = useMemo(() => individualPoints.filter(p => p.category === 'status' && p.uiType === 'display'), [individualPoints]);
+  const gaugeItems = useMemo(() => individualPoints.filter(p => p.uiType === 'gauge'), [individualPoints]);
+  const otherDisplayItems = useMemo(() => individualPoints.filter(p => p.uiType === 'display' && p.category !== 'status'), [individualPoints]);
   const topSections = useMemo<SectionToRender[]>(() => {
-    const s: SectionToRender[] = [];
-    const cGC =
-      "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
-    const bC = controlItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD;
-    const bS =
-      statusDisplayItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD;
-    if (bC || bS) {
-      if (statusDisplayItems.length > 0)
-        s.push({
-          title: "Status Readings",
-          items: statusDisplayItems,
-          gridCols: cGC,
-        });
-      if (controlItems.length > 0)
-        s.push({ title: "Controls", items: controlItems, gridCols: cGC });
-    } else {
-      const cI = [...statusDisplayItems, ...controlItems];
-      if (cI.length > 0)
-        s.push({ title: "Controls & Status", items: cI, gridCols: cGC });
-    }
-    return s;
+    const s: SectionToRender[] = []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const bC = controlItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; const bS = statusDisplayItems.length > CONTROLS_AND_STATUS_BREAKOUT_THRESHOLD; if (bC || bS) { if (statusDisplayItems.length > 0) s.push({ title: "Status Readings", items: statusDisplayItems, gridCols: cGC }); if (controlItems.length > 0) s.push({ title: "Controls", items: controlItems, gridCols: cGC }); } else { const cI = [...statusDisplayItems, ...controlItems]; if (cI.length > 0) s.push({ title: "Controls & Status", items: cI, gridCols: cGC }); } return s;
   }, [controlItems, statusDisplayItems]);
-  const gaugesOverviewSectionDefinition =
-    useMemo<SectionToRender | null>(() => {
-      if (gaugeItems.length > 0)
-        return {
-          title: "Gauges & Overview",
-          items: gaugeItems,
-          gridCols:
-            "grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8",
-        };
-      return null;
-    }, [gaugeItems]);
+  const gaugesOverviewSectionDefinition = useMemo<SectionToRender | null>(() => {
+    if (gaugeItems.length > 0) return { title: "Gauges & Overview", items: gaugeItems, gridCols: 'grid-cols-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8' }; return null;
+  }, [gaugeItems]);
   const bottomReadingsSections = useMemo<SectionToRender[]>(() => {
-    if (otherDisplayItems.length === 0) return [];
-    const cGC =
-      "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6";
-    const s: SectionToRender[] = [];
-    const dBC = otherDisplayItems.reduce((acc, p) => {
-      const k = p.category || "miscellaneous";
-      if (!acc[k]) acc[k] = [];
-      acc[k].push(p);
-      return acc;
-    }, {} as Record<string, DataPoint[]>);
-    const gORP: DataPoint[] = [];
-    Object.entries(dBC)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .forEach(([cat, pts]) => {
-        if (pts.length > OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD)
-          s.push({
-            title: `${cat.charAt(0).toUpperCase() + cat.slice(1)} Readings`,
-            items: pts,
-            gridCols: cGC,
-          });
-        else gORP.push(...pts);
-      });
-    if (gORP.length > 0) {
-      const oRS: SectionToRender = {
-        title: "Other Readings",
-        items: gORP,
-        gridCols: cGC,
-      };
-      if (s.some((sec) => sec.title !== "Other Readings")) s.push(oRS);
-      else s.unshift(oRS);
-    }
-    return s.filter((sec) => sec.items.length > 0);
+    if (otherDisplayItems.length === 0) return []; const cGC = 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6'; const s: SectionToRender[] = []; const dBC = otherDisplayItems.reduce((acc, p) => { const k = p.category || 'miscellaneous'; if (!acc[k]) acc[k] = []; acc[k].push(p); return acc; }, {} as Record<string, DataPoint[]>); const gORP: DataPoint[] = []; Object.entries(dBC).sort(([a], [b]) => a.localeCompare(b)).forEach(([cat, pts]) => { if (pts.length > OTHER_READINGS_CATEGORY_BREAKOUT_THRESHOLD) s.push({ title: `${cat.charAt(0).toUpperCase() + cat.slice(1)} Readings`, items: pts, gridCols: cGC }); else gORP.push(...pts); }); if (gORP.length > 0) { const oRS: SectionToRender = { title: "Other Readings", items: gORP, gridCols: cGC }; if (s.some(sec => sec.title !== "Other Readings")) s.push(oRS); else s.unshift(oRS); } return s.filter(sec => sec.items.length > 0);
   }, [otherDisplayItems]);
-  const cardHoverEffect = useMemo(
-    (): TargetAndTransition =>
-      resolvedTheme === "dark"
-        ? {
-            y: -4,
-            boxShadow:
-              "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)",
-            transition: { type: "spring", stiffness: 350, damping: 20 },
-          }
-        : {
-            y: -4,
-            boxShadow:
-              "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)",
-            transition: { type: "spring", stiffness: 350, damping: 20 },
-          },
-    [resolvedTheme]
-  );
-  const { threePhaseGroupsForConfig, individualPointsForConfig } =
-    useMemo(() => {
-      const g: Record<string, ConfiguratorThreePhaseGroup> = {},
-        i: DataPoint[] = [];
-      const cS = new Set(displayedDataPointIds);
-      allPossibleDataPoints.forEach((dp) => {
-        if (
-          dp.threePhaseGroup &&
-          dp.phase &&
-          ["a", "b", "c", "x", "total"].includes(dp.phase)
-        ) {
-          if (!g[dp.threePhaseGroup]) {
-            let rN = dp.name
-              .replace(/ (L[123]|Phase [ABCX]\b|Total\b)/gi, "")
-              .trim()
-              .replace(/ \([ABCX]\)$/i, "")
-              .trim();
-            g[dp.threePhaseGroup] = {
-              name: dp.threePhaseGroup,
-              representativeName: rN || dp.threePhaseGroup,
-              ids: [],
-              category: dp.category || "miscellaneous",
-            };
-          }
-          g[dp.threePhaseGroup].ids.push(dp.id);
-        } else if (!dp.threePhaseGroup) {
-          i.push(dp);
-        }
-      });
-      const aGA = Array.from(
-        new Set(Object.values(g).flatMap((grp) => grp.ids))
-      );
-      const tIP = i.filter((ind) => !aGA.includes(ind.id));
-      const cDA = Array.from(cS);
-      return {
-        threePhaseGroupsForConfig: Object.values(g)
-          .filter((grp) => grp.ids.some((id) => !cDA.includes(id)))
-          .sort((a, b) =>
-            a.representativeName.localeCompare(b.representativeName)
-          ),
-        individualPointsForConfig: tIP
-          .filter((dp) => !cDA.includes(dp.id))
-          .sort((a, b) => a.name.localeCompare(b.name)),
-      };
-    }, [allPossibleDataPoints, displayedDataPointIds]);
+  const cardHoverEffect = useMemo((): TargetAndTransition => (resolvedTheme === 'dark' ? { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.15), 0 5px 8px -5px rgba(0,0,0,0.2)", transition: { type: 'spring', stiffness: 350, damping: 20 } } : { y: -4, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.08), 0 5px 8px -5px rgba(0,0,0,0.08)", transition: { type: 'spring', stiffness: 350, damping: 20 } }), [resolvedTheme]);
+  const { threePhaseGroupsForConfig, individualPointsForConfig } = useMemo(() => {
+    const g: Record<string, ConfiguratorThreePhaseGroup> = {}, i: DataPoint[] = []; const cS = new Set(displayedDataPointIds); allPossibleDataPoints.forEach(dp => { if (dp.threePhaseGroup && dp.phase && ['a', 'b', 'c', 'x', 'total'].includes(dp.phase)) { if (!g[dp.threePhaseGroup]) { let rN = dp.name.replace(/ (L[123]|Phase [ABCX]\b|Total\b)/ig, '').trim().replace(/ \([ABCX]\)$/i, '').trim(); g[dp.threePhaseGroup] = { name: dp.threePhaseGroup, representativeName: rN || dp.threePhaseGroup, ids: [], category: dp.category || 'miscellaneous' }; } g[dp.threePhaseGroup].ids.push(dp.id); } else if (!dp.threePhaseGroup) { i.push(dp); } }); const aGA = Array.from(new Set(Object.values(g).flatMap(grp => grp.ids))); const tIP = i.filter(ind => !aGA.includes(ind.id)); const cDA = Array.from(cS); return { threePhaseGroupsForConfig: Object.values(g).filter(grp => grp.ids.some(id => !cDA.includes(id))).sort((a, b) => a.representativeName.localeCompare(b.representativeName)), individualPointsForConfig: tIP.filter(dp => !cDA.includes(dp.id)).sort((a, b) => a.name.localeCompare(b.name)) };
+  }, [allPossibleDataPoints, displayedDataPointIds]);
   const getHardcodedDefaultDataPointIds = useCallback(() => {
-    const cIds = [
-      "grid-total-active-power-side-to-side",
-      "inverter-output-total-power",
-      "load-total-power",
-      "battery-capacity",
-      "battery-output-power",
-      "input-power-pv1",
-      "active-power-adjust",
-      "pf-reactive-power-adjust",
-      "export-power-percentage",
-    ].filter((id) => allPossibleDataPoints.some((dp) => dp.id === id));
-    if (cIds.length > 0) return cIds;
-    return allPossibleDataPoints
-      .slice(0, DEFAULT_DISPLAY_COUNT)
-      .map((dp) => dp.id);
+    const cIds = ['grid-total-active-power-side-to-side', 'inverter-output-total-power', 'load-total-power', 'battery-capacity', 'battery-output-power', 'input-power-pv1', 'active-power-adjust', 'pf-reactive-power-adjust', 'export-power-percentage'].filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (cIds.length > 0) return cIds; return allPossibleDataPoints.slice(0, DEFAULT_DISPLAY_COUNT).map(dp => dp.id);
   }, [allPossibleDataPoints]);
   const getSmartDefaults = useDynamicDefaultDataPointIds(allPossibleDataPoints);
-
+  
   const processControlActionQueue = useCallback(async () => {
-    if (!isConnected) {
-      return;
-    }
+    if (!isConnected) { return; }
     const queuedActions = await getControlQueue();
     if (queuedActions.length === 0) return;
     console.log(`Processing ${queuedActions.length} queued control actions...`);
-    toast.info("Processing Queued Actions", {
-      description: `Found ${queuedActions.length} pending command(s).`,
-    });
+    toast.info("Processing Queued Actions", { description: `Found ${queuedActions.length} pending command(s).` });
     let allSentSuccessfully = true;
     for (const action of queuedActions) {
       try {
-        sendJsonMessage({
-          type: "controlWrite",
-          payload: { [action.nodeId]: action.value },
-        });
+        sendJsonMessage({ type: 'controlWrite', payload: { [action.nodeId]: action.value } });
       } catch (e) {
         allSentSuccessfully = false;
-        console.error(
-          `Failed to send queued action for node ${action.nodeId}:`,
-          e
-        );
-        toast.error("Queue Send Failed", {
-          description: `Command for ${action.nodeId || "??"} failed.`,
-        });
+        console.error(`Failed to send queued action for node ${action.nodeId}:`, e);
+        toast.error("Queue Send Failed", { description: `Command for ${action.nodeId || '??'} failed.` });
       }
     }
     await clearControlQueue();
-    if (allSentSuccessfully)
-      toast.success("Queue Processed", {
-        description: "All queued actions have been sent.",
-      });
-    else
-      toast.warning("Queue Processing Incomplete", {
-        description: "Some actions could not be sent.",
-      });
+    if (allSentSuccessfully) toast.success("Queue Processed", { description: "All queued actions have been sent." });
+    else toast.warning("Queue Processing Incomplete", { description: "Some actions could not be sent." });
   }, [isConnected, sendJsonMessage]);
 
-  const sendDataToWebSocket = useCallback(
-    async (nodeId: string, value: boolean | number | string) => {
-      if (currentUserRole === UserRole.VIEWER) {
-        toast.warning("Restricted Action", {
-          description: "Viewers cannot send commands.",
-        });
-        playWarningSound();
-        return;
-      }
-      const pointConfig = allPossibleDataPoints.find(
-        (p) => p.nodeId === nodeId
-      );
-      let processedValue: any = value;
-      let queueValue: any = undefined;
-      if (pointConfig?.dataType.includes("Int")) {
-        let pN: number;
-        if (typeof value === "boolean") pN = value ? 1 : 0;
-        else if (typeof value === "string") pN = parseInt(value, 10);
-        else pN = value as number;
-        if (isNaN(pN)) {
-          toast.error("Send Error", { description: "Invalid integer value." });
-          return;
-        }
-        processedValue = pN;
-        queueValue = pN;
-      } else if (pointConfig?.dataType === "Boolean") {
-        let pB: boolean;
-        if (typeof value === "number") pB = value !== 0;
-        else if (typeof value === "string")
-          pB = value.toLowerCase() === "true" || value === "1";
-        else pB = value as boolean;
-        processedValue = pB;
-        queueValue = pB;
-      } else if (
-        pointConfig?.dataType === "Float" ||
-        pointConfig?.dataType === "Double"
-      ) {
-        let pF: number;
-        if (typeof value === "string") pF = parseFloat(value);
-        else pF = value as number;
-        if (isNaN(pF)) {
-          toast.error("Send Error", { description: "Invalid numeric value." });
-          return;
-        }
-        processedValue = pF;
-        queueValue = pF;
-      }
-      if (typeof processedValue === "number" && !isFinite(processedValue)) {
-        toast.error("Send Error", {
-          description: "Numeric value is not finite (Infinity or NaN).",
-        });
+  const sendDataToWebSocket = useCallback(async (nodeId: string, value: boolean | number | string) => {
+    if (currentUserRole === UserRole.VIEWER) { toast.warning("Restricted Action", { description: "Viewers cannot send commands." }); playWarningSound(); return; }
+    const pointConfig = allPossibleDataPoints.find(p => p.nodeId === nodeId); let processedValue: any = value; let queueValue: any = undefined;
+    if (pointConfig?.dataType.includes('Int')) { let pN: number; if (typeof value === 'boolean') pN = value ? 1 : 0; else if (typeof value === 'string') pN = parseInt(value, 10); else pN = value as number; if (isNaN(pN)) { toast.error('Send Error', { description: 'Invalid integer value.' }); return; } processedValue = pN; queueValue = pN; }
+    else if (pointConfig?.dataType === 'Boolean') { let pB: boolean; if (typeof value === 'number') pB = value !== 0; else if (typeof value === 'string') pB = value.toLowerCase() === 'true' || value === '1'; else pB = value as boolean; processedValue = pB; queueValue = pB; }
+    else if (pointConfig?.dataType === 'Float' || pointConfig?.dataType === 'Double') { let pF: number; if (typeof value === 'string') pF = parseFloat(value); else pF = value as number; if (isNaN(pF)) { toast.error('Send Error', { description: 'Invalid numeric value.' }); return; } processedValue = pF; queueValue = pF; }
+    if (typeof processedValue === 'number' && !isFinite(processedValue)) { toast.error('Send Error', { description: 'Numeric value is not finite (Infinity or NaN).' }); playErrorSound(); return; }
+    
+    logActivity('DATA_POINT_CHANGE', { nodeId: nodeId, newValue: processedValue, dataPointName: pointConfig?.name || 'Unknown DataPoint', dataType: pointConfig?.dataType || 'Unknown Type' }, currentPath);
+    
+    if (isConnected) {
+      try {
+        sendJsonMessage({ type: 'controlWrite', payload: { [pointConfig?.id || nodeId]: processedValue }});
+        toast.info('Command Sent', { description: `${pointConfig?.name || nodeId} = ${String(processedValue)}` });
+        playInfoSound();
+      } catch (error) {
+        console.error("WebSocket send error:", error);
+        toast.error('Send Error', { description: 'Failed to send command. Queuing.' });
         playErrorSound();
-        return;
+        if (queueValue !== undefined) await queueControlAction(nodeId, queueValue);
+        else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
       }
-
-      logActivity(
-        "DATA_POINT_CHANGE",
-        {
-          nodeId: nodeId,
-          newValue: processedValue,
-          dataPointName: pointConfig?.name || "Unknown DataPoint",
-          dataType: pointConfig?.dataType || "Unknown Type",
-        },
-        currentPath
-      );
-
-      if (isConnected) {
-        try {
-          sendJsonMessage({
-            type: "controlWrite",
-            payload: { [pointConfig?.id || nodeId]: processedValue },
-          });
-          toast.info("Command Sent", {
-            description: `${pointConfig?.name || nodeId} = ${String(
-              processedValue
-            )}`,
-          });
-          playInfoSound();
-        } catch (error) {
-          console.error("WebSocket send error:", error);
-          toast.error("Send Error", {
-            description: "Failed to send command. Queuing.",
-          });
-          playErrorSound();
-          if (queueValue !== undefined)
-            await queueControlAction(nodeId, queueValue);
-          else
-            toast.error("Queue Error", {
-              description: `Cannot queue command for ${nodeId} due to undefined queue value.`,
-            });
-        }
-      } else {
-        toast.warning("System Offline", {
-          description: `Command for ${pointConfig?.name || nodeId} queued.`,
-        });
-        playWarningSound();
-        if (queueValue !== undefined)
-          await queueControlAction(nodeId, queueValue);
-        else
-          toast.error("Queue Error", {
-            description: `Cannot queue command for ${nodeId} due to undefined queue value.`,
-          });
-      }
-    },
-    [
-      currentUserRole,
-      allPossibleDataPoints,
-      isConnected,
-      sendJsonMessage,
-      currentPath,
-    ]
-  );
+    } else {
+      toast.warning('System Offline', { description: `Command for ${pointConfig?.name || nodeId} queued.` });
+      playWarningSound();
+      if (queueValue !== undefined) await queueControlAction(nodeId, queueValue);
+      else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
+    }
+  }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
 
   const checkDbStatus = useCallback(async () => {
     if (!authCheckComplete) return;
     try {
-      console.log("Checking database status...");
-      const response = await fetch("http://192.168.1.9:8003/db-status", {
+      console.log("Checking database status via proxy...");
+      const response = await fetch("/api/db-status", {
         method: "GET",
         headers: {
           Accept: "application/json",
         },
-        // Add mode: 'cors' to be explicit about CORS
-        mode: "cors",
       });
 
       console.log(
@@ -884,7 +599,6 @@ const UnifiedDashboardPage: React.FC = () => {
       const data = await response.json();
       console.log("Database status data:", data);
 
-      // More robust status checking
       if (data && typeof data.status === "string") {
         setDbStatus(data.status === "online" ? "online" : "offline");
       } else {
@@ -898,335 +612,140 @@ const UnifiedDashboardPage: React.FC = () => {
   }, [authCheckComplete]);
 
   // Add this useEffect for debugging
-  useEffect(() => {
-    console.log("Current dbStatus:", dbStatus);
-  }, [dbStatus]);
+useEffect(() => {
+  console.log("Current dbStatus:", dbStatus);
+}, [dbStatus]);
 
   const checkPlcConnection = useCallback(async () => {
     if (!authCheckComplete) return;
     try {
-      const r = await fetch("/api/opcua/status");
+      const r = await fetch('/api/opcua/status');
       if (!r.ok) {
-        setPlcStatus("disconnected");
+        setPlcStatus('disconnected');
         return;
       }
       const d = await r.json();
       const nS = d.connectionStatus;
-      if (nS && ["online", "offline", "disconnected"].includes(nS)) {
+      if (nS && ['online', 'offline', 'disconnected'].includes(nS)) {
         setPlcStatus(nS);
       } else {
-        setPlcStatus("disconnected");
+        setPlcStatus('disconnected');
       }
     } catch (e) {
-      setPlcStatus("disconnected");
+      setPlcStatus('disconnected');
     }
   }, [authCheckComplete]);
-  const handleResetToDefault = useCallback(() => {
-    if (currentUserRole !== UserRole.ADMIN) return;
-    const smartDefaults = getSmartDefaults();
-    const defaultIds =
-      smartDefaults.length > 0
-        ? smartDefaults
-        : getHardcodedDefaultDataPointIds();
-    setDisplayedDataPointIds(defaultIds);
-    toast.info("Layout reset to default.");
-    logActivity(
-      "ADMIN_DASHBOARD_RESET_LAYOUT",
-      { resetToIds: defaultIds },
-      currentPath,
-      "warn"
-    );
-  }, [
-    getSmartDefaults,
-    getHardcodedDefaultDataPointIds,
-    currentUserRole,
-    currentPath,
-  ]);
-  const handleRemoveAllItems = useCallback(() => {
-    if (currentUserRole !== UserRole.ADMIN) return;
-    const oldIds = displayedDataPointIds;
-    setDisplayedDataPointIds([]);
-    toast.info("All cards removed.");
-    logActivity(
-      "ADMIN_DASHBOARD_REMOVE_ALL_CARDS",
-      { removedAll: true, previousIds: oldIds },
-      currentPath,
-      "warn"
-    );
-  }, [currentUserRole, displayedDataPointIds, currentPath]);
-  const handleAddMultipleDataPoints = useCallback(
-    (selectedIds: string[]) => {
-      if (currentUserRole !== UserRole.ADMIN) return;
-      const currentDisplayedSet = new Set(displayedDataPointIds);
-      const newIdsToAdd = selectedIds.filter(
-        (id) => !currentDisplayedSet.has(id)
-      );
-      if (newIdsToAdd.length === 0 && selectedIds.length > 0) {
-        toast.warning("Items already shown or none selected to add.");
-        setIsConfiguratorOpen(false);
-        return;
-      }
-      if (newIdsToAdd.length > 0) {
-        const newFullList = Array.from(
-          new Set([...displayedDataPointIds, ...newIdsToAdd])
-        );
-        setDisplayedDataPointIds(newFullList);
-        toast.success(
-          `${newIdsToAdd.length} new card${
-            newIdsToAdd.length > 1 ? "s" : ""
-          } added.`
-        );
-        logActivity(
-          "ADMIN_DASHBOARD_ADD_CARDS",
-          {
-            addedIds: newIdsToAdd,
-            addedCount: newIdsToAdd.length,
-            currentDashboardIds: newFullList,
-          },
-          currentPath,
-          "info"
-        );
-      }
-      setIsConfiguratorOpen(false);
-    },
-    [displayedDataPointIds, currentUserRole, currentPath]
-  );
-  const handleSaveNewDataPoint = useCallback(
-    async (data: any) => {
-      if (currentUserRole !== UserRole.ADMIN) {
-        toast.error("Permission Denied", {
-          description: "You are not authorized to create new data points.",
-        });
+  const handleResetToDefault = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const smartDefaults = getSmartDefaults(); const defaultIds = smartDefaults.length > 0 ? smartDefaults : getHardcodedDefaultDataPointIds(); setDisplayedDataPointIds(defaultIds); toast.info("Layout reset to default."); logActivity('ADMIN_DASHBOARD_RESET_LAYOUT', { resetToIds: defaultIds }, currentPath, 'warn'); }, [getSmartDefaults, getHardcodedDefaultDataPointIds, currentUserRole, currentPath]);
+  const handleRemoveAllItems = useCallback(() => { if (currentUserRole !== UserRole.ADMIN) return; const oldIds = displayedDataPointIds; setDisplayedDataPointIds([]); toast.info("All cards removed."); logActivity('ADMIN_DASHBOARD_REMOVE_ALL_CARDS', { removedAll: true, previousIds: oldIds }, currentPath, 'warn'); }, [currentUserRole, displayedDataPointIds, currentPath]);
+  const handleAddMultipleDataPoints = useCallback((selectedIds: string[]) => {
+    if (currentUserRole !== UserRole.ADMIN) return; const currentDisplayedSet = new Set(displayedDataPointIds); const newIdsToAdd = selectedIds.filter(id => !currentDisplayedSet.has(id));
+    if (newIdsToAdd.length === 0 && selectedIds.length > 0) { toast.warning("Items already shown or none selected to add."); setIsConfiguratorOpen(false); return; }
+    if (newIdsToAdd.length > 0) { const newFullList = Array.from(new Set([...displayedDataPointIds, ...newIdsToAdd])); setDisplayedDataPointIds(newFullList); toast.success(`${newIdsToAdd.length} new card${newIdsToAdd.length > 1 ? 's' : ''} added.`); logActivity('ADMIN_DASHBOARD_ADD_CARDS', { addedIds: newIdsToAdd, addedCount: newIdsToAdd.length, currentDashboardIds: newFullList }, currentPath, 'info'); }
+    setIsConfiguratorOpen(false);
+  }, [displayedDataPointIds, currentUserRole, currentPath]);
+  const handleSaveNewDataPoint = useCallback(async (data: any) => {
+    if (currentUserRole !== UserRole.ADMIN) {
+        toast.error("Permission Denied", { description: "You are not authorized to create new data points." });
         return { success: false, error: "Permission Denied." };
-      }
-      if (!data.name || !data.nodeId || !data.dataType || !data.uiType) {
-        toast.error("Validation Failed", {
-          description: "Missing required fields for the new data point.",
-        });
+    }
+    if (!data.name || !data.nodeId || !data.dataType || !data.uiType) {
+        toast.error("Validation Failed", { description: "Missing required fields for the new data point." });
         return { success: false, error: "Missing required fields." };
-      }
+    }
 
-      const finalId = (
-        data.id || data.name.toLowerCase().replace(/\s+/g, "-")
-      ).replace(/[^a-z0-9-]/g, "");
-      if (!finalId) {
-        toast.error("Validation Failed", {
-          description: "Could not generate a valid ID from the provided name.",
-        });
+    const finalId = (data.id || data.name.toLowerCase().replace(/\s+/g, '-')).replace(/[^a-z0-9-]/g, '');
+    if (!finalId) {
+        toast.error("Validation Failed", { description: "Could not generate a valid ID from the provided name." });
         return { success: false, error: "Invalid ID." };
-      }
-      if (allPossibleDataPoints.some((p) => p.id === finalId)) {
-        toast.error("Conflict", {
-          description: `A data point with the ID '${finalId}' already exists.`,
-        });
+    }
+    if (allPossibleDataPoints.some(p => p.id === finalId)) {
+        toast.error("Conflict", { description: `A data point with the ID '${finalId}' already exists.` });
         return { success: false, error: `ID '${finalId}' already exists.` };
-      }
-      if (allPossibleDataPoints.some((p) => p.nodeId === data.nodeId)) {
-        toast.error("Conflict", {
-          description: `A data point with the OPC UA Node ID '${data.nodeId}' already exists.`,
-        });
-        return {
-          success: false,
-          error: `Node ID '${data.nodeId}' already exists.`,
-        };
-      }
+    }
+    if (allPossibleDataPoints.some(p => p.nodeId === data.nodeId)) {
+        toast.error("Conflict", { description: `A data point with the OPC UA Node ID '${data.nodeId}' already exists.` });
+        return { success: false, error: `Node ID '${data.nodeId}' already exists.` };
+    }
 
-      const newPoint: DataPoint = {
-        ...data,
-        id: finalId,
-        label: data.label || data.name,
-        category: data.category || "Custom",
-        unit: data.unit || "",
-        description: data.description || "",
-        precision: data.precision ?? 2,
-        min: data.min ?? 0,
-        max: data.max ?? 100,
-        threePhaseGroup: data.threePhaseGroup || undefined,
-        phase: data.phase || undefined,
-      };
-
-      const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
-      const customPoints = storedCustomPoints
-        ? JSON.parse(storedCustomPoints)
-        : [];
-      const updatedCustomPoints = [...customPoints, newPoint];
-      localStorage.setItem(
-        CUSTOM_DATA_POINTS_KEY,
-        JSON.stringify(updatedCustomPoints)
-      );
-
-      setAllPossibleDataPoints((prevPoints) => {
+    const newPoint: DataPoint = {
+      ...data,
+      id: finalId,
+      label: data.label || data.name,
+      category: data.category || 'Custom',
+      unit: data.unit || '',
+      description: data.description || '',
+      precision: data.precision ?? 2,
+      min: data.min ?? 0,
+      max: data.max ?? 100,
+      threePhaseGroup: data.threePhaseGroup || undefined,
+      phase: data.phase || undefined,
+    };
+    
+    const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
+    const customPoints = storedCustomPoints ? JSON.parse(storedCustomPoints) : [];
+    const updatedCustomPoints = [...customPoints, newPoint];
+    localStorage.setItem(CUSTOM_DATA_POINTS_KEY, JSON.stringify(updatedCustomPoints));
+    
+    setAllPossibleDataPoints(prevPoints => {
         const combined = [...prevPoints, newPoint];
         const uniqueMap = new Map<string, DataPoint>();
-        combined.forEach((p) => {
-          if (p && p.id) {
-            uniqueMap.set(p.id, p);
-          }
+        combined.forEach(p => {
+            if (p && p.id) {
+                uniqueMap.set(p.id, p);
+            }
         });
-        return Array.from(uniqueMap.values()).sort((a, b) =>
-          a.name.localeCompare(b.name)
-        );
-      });
-      setDisplayedDataPointIds((prevIds) => [...prevIds, newPoint.id]);
+        return Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name));
+    });
+    setDisplayedDataPointIds(prevIds => [...prevIds, newPoint.id]);
+    
+    toast.success("Data Point Created", { description: `'${newPoint.name}' has been created and added to the dashboard.` });
+    logActivity('ADMIN_DASHBOARD_CREATE_CARD', { newDataPoint: newPoint }, currentPath);
+    
+    return { success: true, newPoint: newPoint };
+  }, [allPossibleDataPoints, currentUserRole, currentPath]);
 
-      toast.success("Data Point Created", {
-        description: `'${newPoint.name}' has been created and added to the dashboard.`,
-      });
-      logActivity(
-        "ADMIN_DASHBOARD_CREATE_CARD",
-        { newDataPoint: newPoint },
-        currentPath
-      );
-
-      return { success: true, newPoint: newPoint };
-    },
-    [allPossibleDataPoints, currentUserRole, currentPath]
-  );
-
-  const handleRemoveItem = useCallback(
-    (dpIdToRemove: string) => {
-      if (currentUserRole !== UserRole.ADMIN) return;
-      const pointToRemove = allPossibleDataPoints.find(
-        (dp) => dp.id === dpIdToRemove
-      );
-      let newDisplayedIds: string[];
-      if (pointToRemove?.threePhaseGroup) {
-        const removedItemsList = allPossibleDataPoints
-          .filter((dp) => dp.threePhaseGroup === pointToRemove.threePhaseGroup)
-          .map((dp) => dp.id);
-        newDisplayedIds = displayedDataPointIds.filter(
-          (id) => !removedItemsList.includes(id)
-        );
-        setDisplayedDataPointIds(newDisplayedIds);
-        toast.info(`${pointToRemove.threePhaseGroup} group removed.`);
-        logActivity(
-          "ADMIN_DASHBOARD_REMOVE_CARD",
-          {
-            removedGroupId: pointToRemove.threePhaseGroup,
-            removedItemIds: removedItemsList,
-            isGroup: true,
-            currentDashboardIds: newDisplayedIds,
-          },
-          currentPath
-        );
-      } else {
-        newDisplayedIds = displayedDataPointIds.filter(
-          (id) => id !== dpIdToRemove
-        );
-        setDisplayedDataPointIds(newDisplayedIds);
-        toast.info("Data point removed.");
-        logActivity(
-          "ADMIN_DASHBOARD_REMOVE_CARD",
-          {
-            removedId: dpIdToRemove,
-            isGroup: false,
-            currentDashboardIds: newDisplayedIds,
-          },
-          currentPath
-        );
-      }
-    },
-    [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]
-  );
-  const handleSldLayoutSelect = useCallback(
-    (newLayoutId: string) => {
-      const oldLayout = sldLayoutId;
-      setSldLayoutId(newLayoutId);
-      if (isSldConfigOpen) setIsSldConfigOpen(false);
-      if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false);
-      logActivity(
-        "ADMIN_SLD_LAYOUT_CHANGE",
-        { oldLayoutId: oldLayout, newLayoutId: newLayoutId },
-        currentPath
-      );
-    },
-    [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]
-  );
+  const handleRemoveItem = useCallback((dpIdToRemove: string) => {
+    if (currentUserRole !== UserRole.ADMIN) return; const pointToRemove = allPossibleDataPoints.find(dp => dp.id === dpIdToRemove); let newDisplayedIds: string[]; if (pointToRemove?.threePhaseGroup) { const removedItemsList = allPossibleDataPoints.filter(dp => dp.threePhaseGroup === pointToRemove.threePhaseGroup).map(dp => dp.id); newDisplayedIds = displayedDataPointIds.filter(id => !removedItemsList.includes(id)); setDisplayedDataPointIds(newDisplayedIds); toast.info(`${pointToRemove.threePhaseGroup} group removed.`); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedGroupId: pointToRemove.threePhaseGroup, removedItemIds: removedItemsList, isGroup: true, currentDashboardIds: newDisplayedIds }, currentPath); } else { newDisplayedIds = displayedDataPointIds.filter(id => id !== dpIdToRemove); setDisplayedDataPointIds(newDisplayedIds); toast.info("Data point removed."); logActivity('ADMIN_DASHBOARD_REMOVE_CARD', { removedId: dpIdToRemove, isGroup: false, currentDashboardIds: newDisplayedIds }, currentPath); }
+  }, [allPossibleDataPoints, currentUserRole, displayedDataPointIds, currentPath]);
+  const handleSldLayoutSelect = useCallback((newLayoutId: string) => { const oldLayout = sldLayoutId; setSldLayoutId(newLayoutId); if (isSldConfigOpen) setIsSldConfigOpen(false); if (isModalSldLayoutConfigOpen) setIsModalSldLayoutConfigOpen(false); logActivity('ADMIN_SLD_LAYOUT_CHANGE', { oldLayoutId: oldLayout, newLayoutId: newLayoutId }, currentPath); }, [sldLayoutId, currentPath, isSldConfigOpen, isModalSldLayoutConfigOpen]);
   const fetchAndUpdatePageLayouts = useCallback(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       const layoutsFromStorage: { id: string; name: string }[] = [];
       for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length);
-          let layoutName = layoutIdKey
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (l) => l.toUpperCase());
-          try {
-            const layoutJson = localStorage.getItem(key);
-            if (layoutJson) {
-              const parsedLayout = JSON.parse(layoutJson) as SLDLayout;
-              if (parsedLayout.meta?.name) {
-                layoutName = parsedLayout.meta.name;
-              }
-            }
-          } catch (e) {
-            console.warn(
-              `ControlDash: Could not parse layout ${layoutIdKey} from localStorage for meta.name`,
-              e
-            );
-          }
-          layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
+        const key = localStorage.key(i); if (key && key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
+          const layoutIdKey = key.substring(LOCAL_STORAGE_KEY_PREFIX.length); let layoutName = layoutIdKey.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+          try { const layoutJson = localStorage.getItem(key); if (layoutJson) { const parsedLayout = JSON.parse(layoutJson) as SLDLayout; if (parsedLayout.meta?.name) { layoutName = parsedLayout.meta.name; } } } catch (e) { console.warn(`ControlDash: Could not parse layout ${layoutIdKey} from localStorage for meta.name`, e); } layoutsFromStorage.push({ id: layoutIdKey, name: layoutName });
         }
-      }
-      const layoutIdsFromStorage = new Set(layoutsFromStorage.map((l) => l.id));
-      const layoutsFromConstants: { id: string; name: string }[] =
-        AVAILABLE_SLD_LAYOUT_IDS.filter(
-          (id) => !layoutIdsFromStorage.has(id)
-        ).map((id) => ({
-          id,
-          name: id.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase()),
-        }));
-      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants];
-      combinedLayouts.sort((a, b) => a.name.localeCompare(b.name));
-      setAvailableSldLayoutsForPage(combinedLayouts);
+      } const layoutIdsFromStorage = new Set(layoutsFromStorage.map(l => l.id));
+      const layoutsFromConstants: { id: string; name: string }[] = AVAILABLE_SLD_LAYOUT_IDS.filter(id => !layoutIdsFromStorage.has(id)).map(id => ({ id, name: id.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()), }));
+      const combinedLayouts = [...layoutsFromStorage, ...layoutsFromConstants]; combinedLayouts.sort((a, b) => a.name.localeCompare(b.name)); setAvailableSldLayoutsForPage(combinedLayouts);
     }
   }, []);
-
+  
   const handleSaveWsUrl = useCallback(() => {
     changeWebSocketUrl(tempWsUrl);
     setIsWsConfigModalOpen(false);
-    toast.success("WebSocket URL Updated", {
-      description: `Now connecting to: ${tempWsUrl}`,
-    });
+    toast.success("WebSocket URL Updated", { description: `Now connecting to: ${tempWsUrl}` });
   }, [tempWsUrl, changeWebSocketUrl]);
 
   const handleResetWsUrl = useCallback(() => {
-    if (resetWebSocketUrl) {
+    if(resetWebSocketUrl) {
       resetWebSocketUrl();
       setIsWsConfigModalOpen(false);
     }
   }, [resetWebSocketUrl]);
 
-  const handleOpenConfigurator = useCallback(() => {
+    const handleOpenConfigurator = useCallback(() => {
     setIsConfiguratorOpen(true);
   }, []);
 
   const handleWsStatusClick = useCallback(() => {
-    setTempWsUrl(webSocketUrl || "");
+    setTempWsUrl(webSocketUrl || '');
     setIsWsConfigModalOpen(true);
   }, [webSocketUrl]);
 
-  const handleWeatherConfigChange = useCallback(
-    (newConfig: WeatherCardConfig) => {
-      setWeatherCardConfig(newConfig);
-      if (typeof window !== "undefined") {
-        localStorage.setItem(
-          WEATHER_CARD_CONFIG_LS_KEY,
-          JSON.stringify(newConfig)
-        );
-      }
-      logActivity("WEATHER_CARD_CONFIG_CHANGE", { newConfig }, currentPath);
-    },
-    [currentPath]
-  );
-  const handleSldWidgetLayoutChange = useCallback(
-    (newLayoutId: string) => {
-      setSldLayoutId(newLayoutId);
-      logActivity("SLD_LAYOUT_CHANGE", { newLayoutId }, currentPath);
-    },
-    [setSldLayoutId, currentPath]
-  );
+  const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
+  const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
 
   useEffect(() => {
     if (!authCheckComplete) return () => {};
@@ -1235,215 +754,61 @@ const UnifiedDashboardPage: React.FC = () => {
     return () => clearInterval(dbInterval);
   }, [checkDbStatus, authCheckComplete]);
 
+  useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
+  useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]);
+  
   useEffect(() => {
-    initDB().catch(console.error);
-    ensureAppConfigIsSaved();
-  }, []);
-  useEffect(() => {
-    const storeHasHydrated = useAppStore.persist.hasHydrated();
-    if (!storeHasHydrated) return;
-    if (!currentUser?.email || currentUser.email === "guest@example.com") {
-      toast.error("Auth Required", { description: "Please log in." });
-      router.replace("/login");
-    } else {
-      setAuthCheckComplete(true);
-    }
-  }, [currentUser, router, currentPath]);
-
-  useEffect(() => {
-    if (authCheckComplete && typeof window !== "undefined") {
-      const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
-      let customPoints: DataPoint[] = [];
-      if (storedCustomPoints) {
-        try {
-          const parsed = JSON.parse(storedCustomPoints);
-          if (Array.isArray(parsed)) customPoints = parsed;
-        } catch (e) {
-          console.error("Failed to parse custom data points:", e);
+    if (authCheckComplete && typeof window !== 'undefined') {
+        const storedCustomPoints = localStorage.getItem(CUSTOM_DATA_POINTS_KEY);
+        let customPoints: DataPoint[] = [];
+        if (storedCustomPoints) {
+            try {
+                const parsed = JSON.parse(storedCustomPoints);
+                if (Array.isArray(parsed)) customPoints = parsed;
+            } catch (e) {
+                console.error("Failed to parse custom data points:", e);
+            }
         }
-      }
 
-      const combined = [...allPossibleDataPointsConfig, ...customPoints];
-      const uniqueMap = new Map<string, DataPoint>();
-      combined.forEach((p) => {
-        if (p && p.id) {
-          // Ensure point and its id are valid
-          uniqueMap.set(p.id, p);
-        }
-      });
-      setAllPossibleDataPoints(
-        Array.from(uniqueMap.values()).sort((a, b) =>
-          a.name.localeCompare(b.name)
-        )
-      );
+        const combined = [...allPossibleDataPointsConfig, ...customPoints];
+        const uniqueMap = new Map<string, DataPoint>();
+        combined.forEach(p => {
+            if (p && p.id) { // Ensure point and its id are valid
+                uniqueMap.set(p.id, p);
+            }
+        });
+        setAllPossibleDataPoints(Array.from(uniqueMap.values()).sort((a,b) => a.name.localeCompare(b.name)));
     }
   }, [authCheckComplete]);
-
+  
   useEffect(() => {
     if (isConnected) {
       processControlActionQueue();
     }
   }, [isConnected, processControlActionQueue]);
-
+  
   useEffect(() => {
     if (Object.keys(nodeValues).length > 0) {
       setLastUpdateTime(Date.now());
     }
   }, [nodeValues]);
 
-  useEffect(() => {
-    fetchAndUpdatePageLayouts();
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) {
-        fetchAndUpdatePageLayouts();
-      } else if (event.key === null) {
-        fetchAndUpdatePageLayouts();
-      }
-    };
-    window.addEventListener("storage", handleStorageChange);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, [fetchAndUpdatePageLayouts]);
-  useEffect(() => {
-    if (availableSldLayoutsForPage.length > 0 && authCheckComplete) {
-      const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY);
-      if (
-        currentStoredId &&
-        availableSldLayoutsForPage.some((l) => l.id === currentStoredId)
-      ) {
-        if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId);
-      } else if (
-        availableSldLayoutsForPage.some(
-          (l) => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || "main_plant")
-        )
-      ) {
-        const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || "main_plant";
-        if (sldLayoutId !== defaultId) setSldLayoutId(defaultId);
-        localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId);
-      } else {
-        const firstAvailableId = availableSldLayoutsForPage[0].id;
-        if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId);
-        localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId);
-      }
-    }
-  }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]);
-  useEffect(() => {
-    if (typeof window !== "undefined" && authCheckComplete)
-      localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId);
-  }, [sldLayoutId, authCheckComplete]);
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      allPossibleDataPoints.length > 0 &&
-      authCheckComplete
-    ) {
-      const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY);
-      if (s) {
-        try {
-          const p = JSON.parse(s) as string[];
-          const v = p.filter((id) =>
-            allPossibleDataPoints.some((dp) => dp.id === id)
-          );
-          if (v.length > 0) {
-            setDisplayedDataPointIds(v);
-            return;
-          } else if (p.length > 0)
-            localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);
-        } catch (e) {
-          console.error("Parse err", e);
-          localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY);
-        }
-      }
-      const sm = getSmartDefaults();
-      setDisplayedDataPointIds(
-        sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()
-      );
-    }
-  }, [
-    allPossibleDataPoints,
-    getSmartDefaults,
-    getHardcodedDefaultDataPointIds,
-    authCheckComplete,
-  ]);
-  useEffect(() => {
-    if (typeof window !== "undefined" && authCheckComplete) {
-      if (displayedDataPointIds.length > 0)
-        localStorage.setItem(
-          USER_DASHBOARD_CONFIG_KEY,
-          JSON.stringify(displayedDataPointIds)
-        );
-      else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY))
-        localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([]));
-    }
-  }, [displayedDataPointIds, authCheckComplete]);
-  useEffect(() => {
-    const uc = () =>
-      setCurrentTime(
-        new Date().toLocaleString("en-GB", {
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-          hour12: false,
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        })
-      );
-    uc();
-    const i = setInterval(uc, 1000);
-    return () => clearInterval(i);
-  }, []);
-  useEffect(() => {
-    if (!authCheckComplete) return;
-    const lagI = setInterval(() => {
-      const cD = Date.now() - lastUpdateTime;
-      setDelay(cD);
-      const fS =
-        typeof window !== "undefined" &&
-        [
-          "reloadingDueToDelay",
-          "redirectingDueToExtremeDelay",
-          "opcuaRedirected",
-        ].some((f) => sessionStorage.getItem(f));
-      if (fS) return;
-      if (isConnected && cD > 60000) {
-        console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`);
-        toast.error("Critical Lag", {
-          id: "ws-lag",
-          description: "Re-establishing...",
-          duration: 10000,
-        });
-        connectWebSocket();
-      } else if (isConnected && cD > 30000) {
-        console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`);
-        toast.warning("Stale Warn", {
-          id: "ws-stale",
-          description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`,
-          duration: 8000,
-        });
-      }
-    }, 1000);
-    return () => clearInterval(lagI);
-  }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
-  useEffect(() => {
-    if (!authCheckComplete) return () => {};
-    checkPlcConnection();
-    const plcI = setInterval(checkPlcConnection, 15000);
-    return () => clearInterval(plcI);
-  }, [checkPlcConnection, authCheckComplete]);
+  useEffect(() => { fetchAndUpdatePageLayouts(); const handleStorageChange = (event: StorageEvent) => { if (event.key && event.key.startsWith(LOCAL_STORAGE_KEY_PREFIX)) { fetchAndUpdatePageLayouts(); } else if (event.key === null) { fetchAndUpdatePageLayouts(); } }; window.addEventListener('storage', handleStorageChange); return () => { window.removeEventListener('storage', handleStorageChange); }; }, [fetchAndUpdatePageLayouts]);
+  useEffect(() => { if (availableSldLayoutsForPage.length > 0 && authCheckComplete) { const currentStoredId = localStorage.getItem(DEFAULT_SLD_LAYOUT_ID_KEY); if (currentStoredId && availableSldLayoutsForPage.some(l => l.id === currentStoredId)) { if (sldLayoutId !== currentStoredId) setSldLayoutId(currentStoredId); } else if (availableSldLayoutsForPage.some(l => l.id === (AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'))) { const defaultId = AVAILABLE_SLD_LAYOUT_IDS[0] || 'main_plant'; if (sldLayoutId !== defaultId) setSldLayoutId(defaultId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, defaultId); } else { const firstAvailableId = availableSldLayoutsForPage[0].id; if (sldLayoutId !== firstAvailableId) setSldLayoutId(firstAvailableId); localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, firstAvailableId); } } }, [availableSldLayoutsForPage, authCheckComplete, sldLayoutId]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) localStorage.setItem(DEFAULT_SLD_LAYOUT_ID_KEY, sldLayoutId); }, [sldLayoutId, authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && allPossibleDataPoints.length > 0 && authCheckComplete) { const s = localStorage.getItem(USER_DASHBOARD_CONFIG_KEY); if (s) { try { const p = JSON.parse(s) as string[]; const v = p.filter(id => allPossibleDataPoints.some(dp => dp.id === id)); if (v.length > 0) { setDisplayedDataPointIds(v); return; } else if (p.length > 0) localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } catch (e) { console.error("Parse err", e); localStorage.removeItem(USER_DASHBOARD_CONFIG_KEY); } } const sm = getSmartDefaults(); setDisplayedDataPointIds(sm.length > 0 ? sm : getHardcodedDefaultDataPointIds()); } }, [allPossibleDataPoints, getSmartDefaults, getHardcodedDefaultDataPointIds, authCheckComplete]);
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { if (displayedDataPointIds.length > 0) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify(displayedDataPointIds)); else if (localStorage.getItem(USER_DASHBOARD_CONFIG_KEY)) localStorage.setItem(USER_DASHBOARD_CONFIG_KEY, JSON.stringify([])); } }, [displayedDataPointIds, authCheckComplete]);
+  useEffect(() => { const uc = () => setCurrentTime(new Date().toLocaleString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, day: '2-digit', month: 'short', year: 'numeric' })); uc(); const i = setInterval(uc, 1000); return () => clearInterval(i); }, []);
+  useEffect(() => { if (!authCheckComplete) return; const lagI = setInterval(() => { const cD = Date.now() - lastUpdateTime; setDelay(cD); const fS = typeof window !== 'undefined' && ['reloadingDueToDelay', 'redirectingDueToExtremeDelay', 'opcuaRedirected'].some(f => sessionStorage.getItem(f)); if (fS) return; if (isConnected && cD > 60000) { console.error(`CRIT WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.error('Critical Lag', { id: 'ws-lag', description: 'Re-establishing...', duration: 10000 }); connectWebSocket(); } else if (isConnected && cD > 30000) { console.warn(`High WS lag(${(Number(cD) / 1000).toFixed(1)}s).`); toast.warning('Stale Warn', { id: 'ws-stale', description: `Last upd >${(Number(cD) / 1000).toFixed(0)}s ago.`, duration: 8000 }); } }, 1000); return () => clearInterval(lagI); }, [lastUpdateTime, isConnected, authCheckComplete, connectWebSocket]);
+  useEffect(() => { if (!authCheckComplete) return () => { }; checkPlcConnection(); const plcI = setInterval(checkPlcConnection, 15000); return () => clearInterval(plcI); }, [checkPlcConnection, authCheckComplete]);
   useEffect(() => {
     if (authCheckComplete) {
       const fetchGraphConfig = async () => {
         try {
-          const response = await fetch("/api/power-graph-backup");
+          const response = await fetch('/api/power-graph-backup');
           if (response.ok) {
             const config = await response.json();
-            if (
-              config &&
-              Array.isArray(config.series) &&
-              config.series.length > 0
-            ) {
+            if (config && Array.isArray(config.series) && config.series.length > 0) {
               setPowerGraphConfig(config);
             } else {
               // Fallback to legacy or default if server config is empty/invalid
@@ -1459,140 +824,48 @@ const UnifiedDashboardPage: React.FC = () => {
       };
 
       const handleLegacyConfigMigration = () => {
-        const legacyGenDpIds = JSON.parse(
-          localStorage.getItem(GRAPH_GEN_KEY) || "[]"
-        );
-        const legacyUsageDpIds = JSON.parse(
-          localStorage.getItem(GRAPH_USAGE_KEY) || "[]"
-        );
-        const legacyWindDpIds = JSON.parse(
-          localStorage.getItem(GRAPH_WIND_KEY) || "[]"
-        );
+        const legacyGenDpIds = JSON.parse(localStorage.getItem(GRAPH_GEN_KEY) || '[]');
+        const legacyUsageDpIds = JSON.parse(localStorage.getItem(GRAPH_USAGE_KEY) || '[]');
+        const legacyWindDpIds = JSON.parse(localStorage.getItem(GRAPH_WIND_KEY) || '[]');
 
-        if (
-          legacyGenDpIds.length > 0 ||
-          legacyUsageDpIds.length > 0 ||
-          legacyWindDpIds.length > 0
-        ) {
-          const exportMode =
-            (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as
-              | "auto"
-              | "manual") || "auto";
+        if (legacyGenDpIds.length > 0 || legacyUsageDpIds.length > 0 || legacyWindDpIds.length > 0) {
+          const exportMode = (localStorage.getItem(GRAPH_EXPORT_MODE_KEY) as 'auto' | 'manual') || 'auto';
           const migratedSeries: TimelineSeries[] = [];
           if (legacyGenDpIds.length > 0) {
-            migratedSeries.push({
-              id: "generation",
-              name: "Generation",
-              dpIds: legacyGenDpIds,
-              color: "#22c55e",
-              displayType: "line",
-              role: "generation",
-              icon: "Zap",
-              visible: true,
-              drawOnGraph: true,
-              unit: "kW",
-              multiplier: 1,
-              precision: 2,
-            });
+            migratedSeries.push({ id: 'generation', name: 'Generation', dpIds: legacyGenDpIds, color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
           }
           if (legacyUsageDpIds.length > 0) {
-            migratedSeries.push({
-              id: "usage",
-              name: "Usage",
-              dpIds: legacyUsageDpIds,
-              color: "#f97316",
-              displayType: "line",
-              role: "usage",
-              icon: "ShoppingCart",
-              visible: true,
-              drawOnGraph: true,
-              unit: "kW",
-              multiplier: 1,
-              precision: 2,
-            });
+            migratedSeries.push({ id: 'usage', name: 'Usage', dpIds: legacyUsageDpIds, color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
           }
           if (legacyWindDpIds.length > 0) {
-            migratedSeries.push({
-              id: "wind",
-              name: "Wind",
-              dpIds: legacyWindDpIds,
-              color: "#3b82f6",
-              displayType: "line",
-              role: "generation",
-              icon: "Wind",
-              visible: true,
-              drawOnGraph: true,
-              unit: "kW",
-              multiplier: 1,
-              precision: 2,
-            });
+            migratedSeries.push({ id: 'wind', name: 'Wind', dpIds: legacyWindDpIds, color: '#3b82f6', displayType: 'line', role: 'generation', icon: 'Wind', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 });
           }
 
           const newConfig = { series: migratedSeries, exportMode };
           setPowerGraphConfig(newConfig);
 
           // Clean up old keys
-          [
-            GRAPH_GEN_KEY,
-            GRAPH_USAGE_KEY,
-            GRAPH_EXPORT_KEY,
-            GRAPH_WIND_KEY,
-            GRAPH_EXPORT_MODE_KEY,
-          ].forEach((key) => localStorage.removeItem(key));
+          [GRAPH_GEN_KEY, GRAPH_USAGE_KEY, GRAPH_EXPORT_KEY, GRAPH_WIND_KEY, GRAPH_EXPORT_MODE_KEY].forEach(key => localStorage.removeItem(key));
         } else {
           // Set a default configuration if no config is found at all
           setPowerGraphConfig({
             series: [
-              {
-                id: "generation",
-                name: "Generation",
-                dpIds: ["inverter-output-total-power"],
-                color: "#22c55e",
-                displayType: "line",
-                role: "generation",
-                icon: "Zap",
-                visible: true,
-                drawOnGraph: true,
-                unit: "kW",
-                multiplier: 1,
-                precision: 2,
-              },
-              {
-                id: "usage",
-                name: "Usage",
-                dpIds: ["grid-total-active-power-side-to-side"],
-                color: "#f97316",
-                displayType: "line",
-                role: "usage",
-                icon: "ShoppingCart",
-                visible: true,
-                drawOnGraph: true,
-                unit: "kW",
-                multiplier: 1,
-                precision: 2,
-              },
+              { id: 'generation', name: 'Generation', dpIds: ['inverter-output-total-power'], color: '#22c55e', displayType: 'line', role: 'generation', icon: 'Zap', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 },
+              { id: 'usage', name: 'Usage', dpIds: ['grid-total-active-power-side-to-side'], color: '#f97316', displayType: 'line', role: 'usage', icon: 'ShoppingCart', visible: true, drawOnGraph: true, unit: 'kW', multiplier: 1, precision: 2 }
             ],
-            exportMode: "auto",
+            exportMode: 'auto'
           });
         }
       };
 
       fetchGraphConfig();
-      setUseDemoDataForGraph(
-        localStorage.getItem(GRAPH_DEMO_MODE_KEY) === "true"
-      );
-      setGraphTimeScale(
-        (localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || "1m"
-      );
+      setUseDemoDataForGraph(localStorage.getItem(GRAPH_DEMO_MODE_KEY) === 'true');
+      setGraphTimeScale((localStorage.getItem(GRAPH_TIMESCALESETTING_KEY) as TimeScale) || '1m');
     }
   }, [authCheckComplete]);
 
-  useEffect(() => {
-    if (typeof window !== "undefined" && authCheckComplete) {
-      const loadedConfig = loadWeatherCardConfigFromStorage();
-      setWeatherCardConfig(loadedConfig);
-    }
-  }, [authCheckComplete]);
+
+  useEffect(() => { if (typeof window !== 'undefined' && authCheckComplete) { const loadedConfig = loadWeatherCardConfigFromStorage(); setWeatherCardConfig(loadedConfig); } }, [authCheckComplete]);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -1600,12 +873,12 @@ const UnifiedDashboardPage: React.FC = () => {
         setIsStatusLoading(true);
         try {
           const [apiRes, statusRes] = await Promise.all([
-            fetch("/api/opcua"),
-            fetch("/api/opcua/status"),
+            fetch('/api/opcua'),
+            fetch('/api/opcua/status')
           ]);
 
           if (!apiRes.ok || !statusRes.ok) {
-            throw new Error("One or more API requests failed");
+            throw new Error('One or more API requests failed');
           }
 
           const apiData = await apiRes.json();
@@ -1613,12 +886,10 @@ const UnifiedDashboardPage: React.FC = () => {
 
           setOpcuaApiStatus(apiData);
           setOpcuaConnectionStatus(statusData);
+
         } catch (error) {
           console.error("Failed to fetch OPC-UA status:", error);
-          toast.error("Failed to fetch status", {
-            description:
-              "Could not retrieve connection details from the server.",
-          });
+          toast.error("Failed to fetch status", { description: "Could not retrieve connection details from the server." });
           setOpcuaApiStatus(null);
           setOpcuaConnectionStatus(null);
         } finally {
@@ -1632,35 +903,14 @@ const UnifiedDashboardPage: React.FC = () => {
 
   const storeHasHydrated = useAppStore.persist.hasHydrated();
   if (!storeHasHydrated || !authCheckComplete || weatherCardConfig === null) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-        <p className="mt-4 text-lg">Loading Control Panel...</p>
-      </div>
-    );
+    return (<div className="flex flex-col items-center justify-center min-h-screen bg-background text-foreground"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="mt-4 text-lg">Loading Control Panel...</p></div>);
   }
 
-  const sldSpecificEditMode =
-    isGlobalEditMode && currentUserRole === UserRole.ADMIN;
+  const sldSpecificEditMode = isGlobalEditMode && currentUserRole === UserRole.ADMIN;
   const sldSectionMinHeight = "min-h-[350px] sm:min-h-[400px]";
   const sldInternalMaxHeight = `calc(60vh - 3.5rem)`;
-  const commonRenderingProps = {
-    isEditMode: isGlobalEditMode,
-    nodeValues,
-    isConnected,
-    currentHoverEffect: cardHoverEffect,
-    sendDataToWebSocket,
-    playNotificationSound,
-    lastToastTimestamps,
-    onRemoveItem: handleRemoveItem,
-    allPossibleDataPoints,
-    containerVariants,
-    currentUserRole,
-  };
-  const hasAnyDynamicCardContent =
-    topSections.length > 0 ||
-    !!gaugesOverviewSectionDefinition ||
-    bottomReadingsSections.length > 0;
+  const commonRenderingProps = { isEditMode: isGlobalEditMode, nodeValues, isConnected, currentHoverEffect: cardHoverEffect, sendDataToWebSocket, playNotificationSound, lastToastTimestamps, onRemoveItem: handleRemoveItem, allPossibleDataPoints, containerVariants, currentUserRole, };
+  const hasAnyDynamicCardContent = topSections.length > 0 || !!gaugesOverviewSectionDefinition || bottomReadingsSections.length > 0;
 
   return (
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
