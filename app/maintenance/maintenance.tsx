@@ -63,6 +63,7 @@ import Image from 'next/image';
 import { MaintenanceNotesLog } from '@/components/maintenance/MaintenanceNotesLog';
 import { MaintenanceNote } from '@/types/maintenance-note';
 import { NoteDialog } from '@/components/maintenance/NoteDialog';
+import DatabaseStatus from "@/app/DashboardData/DatabaseStatus";
 
 
 const useCountdown = (targetDate: Date | null, serverTime: Date | null) => {
@@ -192,10 +193,17 @@ const processDailyStatus = (
 
 const DashboardHeaderControl = React.memo(
   ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
+    plcStatus,
+    dbStatus,
+    isConnected,
+    connectWebSocket,
+    onClickWsStatus,
+    currentTime,
+    delay,
     version,
   }: {
     plcStatus: "online" | "offline" | "disconnected";
+    dbStatus: "online" | "offline" | "disconnected";
     isConnected: boolean;
     connectWebSocket: () => void;
     onClickWsStatus: () => void;
@@ -218,12 +226,25 @@ const DashboardHeaderControl = React.memo(
             {PLANT_NAME} {headerTitle}
           </h1>
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div><PlcConnectionStatus status={plcStatus} /></motion.div>
             <motion.div>
-              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} delay={delay} />
+              <PlcConnectionStatus status={plcStatus} />
             </motion.div>
-            <motion.div><SoundToggle /></motion.div>
-            <motion.div><ThemeToggle /></motion.div>
+            <motion.div>
+              <DatabaseStatus status={dbStatus} />
+            </motion.div>
+            <motion.div>
+              <WebSocketStatus
+                isConnected={isConnected}
+                onClick={onClickWsStatus}
+                delay={delay}
+              />
+            </motion.div>
+            <motion.div>
+              <SoundToggle />
+            </motion.div>
+            <motion.div>
+              <ThemeToggle />
+            </motion.div>
           </div>
         </motion.div>
 
@@ -240,27 +261,43 @@ const DashboardHeaderControl = React.memo(
               <TooltipProvider delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <span className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                      : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
-                    }>
-                      {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
+                    <span
+                      className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${
+                        delay < 3000
+                          ? "text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
+                          : delay < 10000
+                          ? "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50"
+                          : "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50"
+                      }`}
+                    >
+                      {delay > 30000
+                        ? ">30s lag"
+                        : `${(delay / 1000).toFixed(1)}s lag`}
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent><p>Last data received {delay} ms ago</p></TooltipContent>
+                  <TooltipContent>
+                    <p>Last data received {delay} ms ago</p>
+                  </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             ) : (
-              <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1"
+                onClick={() => connectWebSocket()}
+                title="Attempt manual WebSocket reconnection"
+              >
                 (reconnect)
               </Button>
             )}
           </div>
-          <span className='font-mono'>{version || '?.?.?'}</span>
+          <span className="font-mono">{version || "?.?.?"}</span>
         </motion.div>
       </>
     );
-  });
+  }
+);
 DashboardHeaderControl.displayName = 'DashboardHeaderControl';
 
 interface ProgressProps {
@@ -1544,6 +1581,44 @@ const MaintenancePage = () => {
     }
   }, [setPlcStatus]);
 
+   const [dbStatus, setDbStatus] = useState<
+     "online" | "offline" | "disconnected"
+   >("disconnected");
+
+   // Add this function to check database status
+   const checkDbStatus = useCallback(async () => {
+     try {
+       const response = await fetch("/api/db-status", {
+         method: "GET",
+         headers: {
+           Accept: "application/json",
+         },
+       });
+
+       if (!response.ok) {
+         setDbStatus("disconnected");
+         return;
+       }
+
+       const data = await response.json();
+       if (data && typeof data.status === "string") {
+         setDbStatus(data.status === "online" ? "online" : "offline");
+       } else {
+         setDbStatus("disconnected");
+       }
+     } catch (error) {
+       setDbStatus("disconnected");
+     }
+   }, []);
+
+   // Add this useEffect to periodically check database status
+   useEffect(() => {
+     checkDbStatus();
+     const dbInterval = setInterval(checkDbStatus, 30000); // Check every 30 seconds
+     return () => clearInterval(dbInterval);
+   }, [checkDbStatus]);
+
+
   const fetchAllData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -1639,6 +1714,7 @@ const MaintenancePage = () => {
     <div className="p-4 sm:p-6 md:p-8">
       <DashboardHeaderControl
         plcStatus={plcStatus}
+        dbStatus={dbStatus} 
         isConnected={isConnected}
         connectWebSocket={connectWebSocket}
         onClickWsStatus={handleWsStatusClick}

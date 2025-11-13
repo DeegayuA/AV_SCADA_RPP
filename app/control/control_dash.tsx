@@ -69,9 +69,11 @@ import { useAppStore, useCurrentUser, useWebSocketStatus } from '@/stores/appSto
 import { logActivity } from '@/lib/activityLog';
 import WeatherCard, { WeatherCardConfig, loadWeatherCardConfigFromStorage } from './WeatherCard';
 import { useWebSocket } from '@/hooks/useWebSocketListener';
+import DatabaseStatus from "@/app/DashboardData/DatabaseStatus";
 
 interface DashboardHeaderControlProps {
   plcStatus: "online" | "offline" | "disconnected";
+  dbStatus: "online" | "offline" | "disconnected";
   isConnected: boolean;
   connectWebSocket: () => void;
   onClickWsStatus: () => void;
@@ -87,192 +89,309 @@ interface DashboardHeaderControlProps {
   wsAddress?: string;
 }
 
-const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> = React.memo(
-  ({
-    plcStatus, isConnected, connectWebSocket, onClickWsStatus, currentTime, delay,
-    version, onOpenConfigurator, isEditMode, toggleEditMode, currentUserRole, onRemoveAll, onResetToDefault, wsAddress
-  }) => {
-    const router = useRouter();
-    const currentPathname = usePathname();
-    const headerTitle = currentPathname?.split('/').filter(Boolean).slice(-1)[0]?.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || 'Dashboard';
-    const isAdmin = currentUserRole === UserRole.ADMIN;
+const DashboardHeaderControl: React.FC<DashboardHeaderControlProps> =
+  React.memo(
+    ({
+      plcStatus,
+      dbStatus,
+      isConnected,
+      connectWebSocket,
+      onClickWsStatus,
+      currentTime,
+      delay,
+      version,
+      onOpenConfigurator,
+      isEditMode,
+      toggleEditMode,
+      currentUserRole,
+      onRemoveAll,
+      onResetToDefault,
+      wsAddress,
+    }) => {
+      const router = useRouter();
+      const currentPathname = usePathname();
+      const headerTitle =
+        currentPathname
+          ?.split("/")
+          .filter(Boolean)
+          .slice(-1)[0]
+          ?.replace(/-/g, " ")
+          .replace(/\b\w/g, (l) => l.toUpperCase()) || "Dashboard";
+      const isAdmin = currentUserRole === UserRole.ADMIN;
 
-    const navigateToResetPage = useCallback(() => {
-      router.push('/reset');
-    }, [router]);
+      const navigateToResetPage = useCallback(() => {
+        router.push("/reset");
+      }, [router]);
 
-    return (
-      <>
-        <motion.div
-          className="flex flex-col sm:flex-row justify-between items-center mb-2 md:mb-4 gap-4 pt-3"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
-        >
-          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left">
-            {PLANT_NAME} {headerTitle}
-          </h1>
-          <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
-            <motion.div variants={itemVariants}><PlcConnectionStatus status={plcStatus} /></motion.div>
-            <motion.div variants={itemVariants}>
-              <WebSocketStatus isConnected={isConnected} onClick={onClickWsStatus} wsAddress={wsAddress} delay={delay} />
-            </motion.div>
-            <motion.div variants={itemVariants}><SoundToggle /></motion.div>
-            <motion.div variants={itemVariants}><ThemeToggle /></motion.div>
-            {isAdmin && isEditMode && (
-              <>
-                <motion.div variants={itemVariants}>
-                  <Button variant="default" size="sm" onClick={onOpenConfigurator} title="Add new cards to the dashboard">
-                    <Pencil className="mr-1.5 h-4 w-4" />
-                    <span className="hidden sm:inline">Edit Cards</span>
-                    <span className="sm:hidden">Edit</span>
-                  </Button>
-                </motion.div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <motion.div variants={itemVariants}>
-                      <Button variant="destructive" size="sm" title="Remove all cards from dashboard">
-                        <Trash2 className="mr-1.5 h-4 w-4" />
-                        <span className="hidden md:inline">Remove All</span>
-                        <span className="md:hidden sr-only">Remove All Cards</span>
-                      </Button>
-                    </motion.div>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeaderComponent>
-                      <AlertDialogTitleComponent>Are you sure?</AlertDialogTitleComponent>
-                      <AlertDialogDescription>
-                        This action will remove all cards from your current dashboard layout. This cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeaderComponent>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={onRemoveAll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Remove All
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <motion.div variants={itemVariants}>
-                      <Button variant="outline" size="sm" title="Reset dashboard to default layout">
-                        <RotateCcw className="mr-1.5 h-4 w-4" />
-                        <span className="hidden md:inline">Reset Layout</span>
-                        <span className="md:hidden sr-only">Reset Layout</span>
-                      </Button>
-                    </motion.div>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeaderComponent>
-                      <AlertDialogTitleComponent>Reset to Default Layout?</AlertDialogTitleComponent>
-                      <AlertDialogDescription>
-                        This will discard your current layout and restore the default set of cards for this dashboard.
-                      </AlertDialogDescription>
-                    </AlertDialogHeaderComponent>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={onResetToDefault}>Reset Dashboard</AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-
-            {isAdmin && (
-              <>
-                <motion.div variants={itemVariants}>
-                  <TooltipProvider delayDuration={100}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant={isEditMode ? "secondary" : "ghost"} size="icon" onClick={toggleEditMode} title={isEditMode ? "Finalize Dashboard Edits" : "Enable Dashboard Layout Editing"}>
-                          {isEditMode ? <Check className="h-5 w-5" /> : <Settings className="h-5 w-5" />}
-                          <span className="sr-only">{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</span>
+      return (
+        <>
+          <motion.div
+            className="flex flex-col sm:flex-row justify-between items-center mb-2 md:mb-4 gap-4 pt-3"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-center sm:text-left">
+              {PLANT_NAME} {headerTitle}
+            </h1>
+            <div className="flex items-center gap-2 sm:gap-3 flex-wrap justify-center">
+              <motion.div variants={itemVariants}>
+                <PlcConnectionStatus status={plcStatus} />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <DatabaseStatus status={dbStatus} />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <WebSocketStatus
+                  isConnected={isConnected}
+                  onClick={onClickWsStatus}
+                  wsAddress={wsAddress}
+                  delay={delay}
+                />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <SoundToggle />
+              </motion.div>
+              <motion.div variants={itemVariants}>
+                <ThemeToggle />
+              </motion.div>
+              {isAdmin && isEditMode && (
+                <>
+                  <motion.div variants={itemVariants}>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={onOpenConfigurator}
+                      title="Add new cards to the dashboard"
+                    >
+                      <Pencil className="mr-1.5 h-4 w-4" />
+                      <span className="hidden sm:inline">Edit Cards</span>
+                      <span className="sm:hidden">Edit</span>
+                    </Button>
+                  </motion.div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <motion.div variants={itemVariants}>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          title="Remove all cards from dashboard"
+                        >
+                          <Trash2 className="mr-1.5 h-4 w-4" />
+                          <span className="hidden md:inline">Remove All</span>
+                          <span className="md:hidden sr-only">
+                            Remove All Cards
+                          </span>
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>{isEditMode ? "Done Editing Layout" : "Edit Dashboard Layout"}</p></TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-                </motion.div>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <motion.div variants={itemVariants}>
-                      <TooltipProvider delayDuration={100}>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive/40 dark:hover:bg-destructive/20 dark:text-destructive/90 dark:hover:text-destructive"
-                              title="Access Application Reset Utility"
-                            >
-                              <ShieldAlert className="h-5 w-5" />
-                              <span className="sr-only">Reset Application Data</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="bg-destructive text-destructive-foreground">
-                            <p>Access Application Reset Utility (Admin)</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </motion.div>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeaderComponent>
-                      <AlertDialogTitleComponent className="flex items-center"><AlertTriangle className="text-destructive mr-2 h-6 w-6" />Confirm Navigation</AlertDialogTitleComponent>
-                      <AlertDialogDescription>
-                        You are about to navigate to the <strong>Application Data Management</strong> page. This section contains tools for critical operations like full application reset and data import/export.
-                        <br /><br />
-                        Proceed with caution. Ensure you understand the implications of actions performed on that page.
-                      </AlertDialogDescription>
-                    </AlertDialogHeaderComponent>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Stay on Dashboard</AlertDialogCancel>
-                      <AlertDialogAction onClick={navigateToResetPage} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                        Go to Reset Page
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-          </div>
-        </motion.div>
+                      </motion.div>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeaderComponent>
+                        <AlertDialogTitleComponent>
+                          Are you sure?
+                        </AlertDialogTitleComponent>
+                        <AlertDialogDescription>
+                          This action will remove all cards from your current
+                          dashboard layout. This cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeaderComponent>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={onRemoveAll}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Remove All
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <motion.div variants={itemVariants}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          title="Reset dashboard to default layout"
+                        >
+                          <RotateCcw className="mr-1.5 h-4 w-4" />
+                          <span className="hidden md:inline">Reset Layout</span>
+                          <span className="md:hidden sr-only">
+                            Reset Layout
+                          </span>
+                        </Button>
+                      </motion.div>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeaderComponent>
+                        <AlertDialogTitleComponent>
+                          Reset to Default Layout?
+                        </AlertDialogTitleComponent>
+                        <AlertDialogDescription>
+                          This will discard your current layout and restore the
+                          default set of cards for this dashboard.
+                        </AlertDialogDescription>
+                      </AlertDialogHeaderComponent>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={onResetToDefault}>
+                          Reset Dashboard
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
 
-        <motion.div
-          className="text-xs text-muted-foreground mb-4 flex flex-col sm:flex-row justify-between items-center gap-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.2, duration: 0.5 }}
-        >
-          <div className="flex items-center gap-2">
-            <Clock className="h-3 w-3" />
-            <span>{currentTime}</span>
-            {isConnected ? (
-              <TooltipProvider delayDuration={100}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${delay < 3000 ? 'text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50'
-                      : delay < 10000 ? 'text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50'
-                        : 'text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50'}`
-                    }>
-                      {delay > 30000 ? '>30s lag' : `${(delay / 1000).toFixed(1)}s lag`}
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Last data received {delay} ms ago</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            ) : (
-              <Button variant="ghost" size="sm" className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1" onClick={() => connectWebSocket()} title="Attempt manual WebSocket reconnection">
-                (reconnect)
-              </Button>
-            )}
-          </div>
-          <span className='font-mono'>{version || '?.?.?'}</span>
-        </motion.div>
-      </>
-    );
-  });
+              {isAdmin && (
+                <>
+                  <motion.div variants={itemVariants}>
+                    <TooltipProvider delayDuration={100}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant={isEditMode ? "secondary" : "ghost"}
+                            size="icon"
+                            onClick={toggleEditMode}
+                            title={
+                              isEditMode
+                                ? "Finalize Dashboard Edits"
+                                : "Enable Dashboard Layout Editing"
+                            }
+                          >
+                            {isEditMode ? (
+                              <Check className="h-5 w-5" />
+                            ) : (
+                              <Settings className="h-5 w-5" />
+                            )}
+                            <span className="sr-only">
+                              {isEditMode
+                                ? "Done Editing Layout"
+                                : "Edit Dashboard Layout"}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>
+                            {isEditMode
+                              ? "Done Editing Layout"
+                              : "Edit Dashboard Layout"}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </motion.div>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <motion.div variants={itemVariants}>
+                        <TooltipProvider delayDuration={100}>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive dark:border-destructive/40 dark:hover:bg-destructive/20 dark:text-destructive/90 dark:hover:text-destructive"
+                                title="Access Application Reset Utility"
+                              >
+                                <ShieldAlert className="h-5 w-5" />
+                                <span className="sr-only">
+                                  Reset Application Data
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent
+                              side="bottom"
+                              className="bg-destructive text-destructive-foreground"
+                            >
+                              <p>Access Application Reset Utility (Admin)</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </motion.div>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeaderComponent>
+                        <AlertDialogTitleComponent className="flex items-center">
+                          <AlertTriangle className="text-destructive mr-2 h-6 w-6" />
+                          Confirm Navigation
+                        </AlertDialogTitleComponent>
+                        <AlertDialogDescription>
+                          You are about to navigate to the{" "}
+                          <strong>Application Data Management</strong> page.
+                          This section contains tools for critical operations
+                          like full application reset and data import/export.
+                          <br />
+                          <br />
+                          Proceed with caution. Ensure you understand the
+                          implications of actions performed on that page.
+                        </AlertDialogDescription>
+                      </AlertDialogHeaderComponent>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Stay on Dashboard</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={navigateToResetPage}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Go to Reset Page
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </>
+              )}
+            </div>
+          </motion.div>
+
+          <motion.div
+            className="text-xs text-muted-foreground mb-4 flex flex-col sm:flex-row justify-between items-center gap-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="h-3 w-3" />
+              <span>{currentTime}</span>
+              {isConnected ? (
+                <TooltipProvider delayDuration={100}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        className={`font-mono cursor-default px-1.5 py-0.5 rounded text-xs ${
+                          delay < 3000
+                            ? "text-green-700 bg-green-100 dark:text-green-300 dark:bg-green-900/50"
+                            : delay < 10000
+                            ? "text-yellow-700 bg-yellow-100 dark:text-yellow-300 dark:bg-yellow-900/50"
+                            : "text-red-700 bg-red-100 dark:text-red-300 dark:bg-red-900/50"
+                        }`}
+                      >
+                        {delay > 30000
+                          ? ">30s lag"
+                          : `${(delay / 1000).toFixed(1)}s lag`}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Last data received {delay} ms ago</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="px-1.5 py-0.5 h-auto text-xs text-muted-foreground hover:text-foreground -ml-1"
+                  onClick={() => connectWebSocket()}
+                  title="Attempt manual WebSocket reconnection"
+                >
+                  (reconnect)
+                </Button>
+              )}
+            </div>
+            <span className="font-mono">{version || "?.?.?"}</span>
+          </motion.div>
+        </>
+      );
+    }
+  );
 // interface HeaderConnectivityComponentProps extends DashboardHeaderControlProps { }
 // const HeaderConnectivityComponent: React.FC<HeaderConnectivityComponentProps> = (props) => {
 //   return <DashboardHeaderControl {...props} />;
@@ -338,6 +457,7 @@ const UnifiedDashboardPage: React.FC = () => {
   const { resolvedTheme } = useTheme();
   const currentUser = useCurrentUser();
   
+  
   // Global state management
   const isGlobalEditMode = useAppStore(state => state.isEditMode);
   const toggleEditModeAction = useAppStore(state => state.toggleEditMode);
@@ -354,6 +474,9 @@ const UnifiedDashboardPage: React.FC = () => {
   const [opcuaConnectionStatus, setOpcuaConnectionStatus] = useState<any>(null);
   const [isStatusLoading, setIsStatusLoading] = useState<boolean>(false);
   const [plcStatus, setPlcStatus] = useState<'online' | 'offline' | 'disconnected'>('disconnected');
+  const [dbStatus, setDbStatus] = useState<
+    "online" | "offline" | "disconnected"
+  >("disconnected");
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(Date.now());
   const [delay, setDelay] = useState<number>(0);
@@ -449,6 +572,49 @@ const UnifiedDashboardPage: React.FC = () => {
       else toast.error('Queue Error', { description: `Cannot queue command for ${nodeId} due to undefined queue value.` });
     }
   }, [currentUserRole, allPossibleDataPoints, isConnected, sendJsonMessage, currentPath]);
+
+  const checkDbStatus = useCallback(async () => {
+    if (!authCheckComplete) return;
+    try {
+      console.log("Checking database status via proxy...");
+      const response = await fetch("/api/db-status", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      console.log(
+        "Database status response:",
+        response.status,
+        response.statusText
+      );
+
+      if (!response.ok) {
+        console.error("Database status response not OK:", response.status);
+        setDbStatus("disconnected");
+        return;
+      }
+
+      const data = await response.json();
+      console.log("Database status data:", data);
+
+      if (data && typeof data.status === "string") {
+        setDbStatus(data.status === "online" ? "online" : "offline");
+      } else {
+        console.error("Invalid database status response format:", data);
+        setDbStatus("disconnected");
+      }
+    } catch (error) {
+      console.error("Failed to fetch database status:", error);
+      setDbStatus("disconnected");
+    }
+  }, [authCheckComplete]);
+
+  // Add this useEffect for debugging
+useEffect(() => {
+  console.log("Current dbStatus:", dbStatus);
+}, [dbStatus]);
 
   const checkPlcConnection = useCallback(async () => {
     if (!authCheckComplete) return;
@@ -580,6 +746,13 @@ const UnifiedDashboardPage: React.FC = () => {
 
   const handleWeatherConfigChange = useCallback((newConfig: WeatherCardConfig) => { setWeatherCardConfig(newConfig); if (typeof window !== 'undefined') { localStorage.setItem(WEATHER_CARD_CONFIG_LS_KEY, JSON.stringify(newConfig)); } logActivity('WEATHER_CARD_CONFIG_CHANGE', { newConfig }, currentPath); }, [currentPath]);
   const handleSldWidgetLayoutChange = useCallback((newLayoutId: string) => { setSldLayoutId(newLayoutId); logActivity('SLD_LAYOUT_CHANGE', { newLayoutId }, currentPath); }, [setSldLayoutId, currentPath]);
+
+  useEffect(() => {
+    if (!authCheckComplete) return () => {};
+    checkDbStatus();
+    const dbInterval = setInterval(checkDbStatus, 30000); // Check every 30 seconds
+    return () => clearInterval(dbInterval);
+  }, [checkDbStatus, authCheckComplete]);
 
   useEffect(() => { initDB().catch(console.error); ensureAppConfigIsSaved(); }, []);
   useEffect(() => { const storeHasHydrated = useAppStore.persist.hasHydrated(); if (!storeHasHydrated) return; if (!currentUser?.email || currentUser.email === 'guest@example.com') { toast.error("Auth Required", { description: "Please log in." }); router.replace('/login'); } else { setAuthCheckComplete(true); } }, [currentUser, router, currentPath]);
@@ -743,38 +916,138 @@ const UnifiedDashboardPage: React.FC = () => {
     <div className="bg-background text-foreground px-2 sm:px-4 md:px-6 lg:px-8 transition-colors duration-300 pb-8">
       <div className="max-w-screen-4xl mx-auto">
         <DashboardHeaderControl
-          plcStatus={plcStatus} isConnected={isConnected} connectWebSocket={connectWebSocket}
+          plcStatus={plcStatus}
+          isConnected={isConnected}
+          connectWebSocket={connectWebSocket}
+          dbStatus={dbStatus}
           onClickWsStatus={handleWsStatusClick}
-          currentTime={currentTime} delay={delay} version={VERSION}
-          isEditMode={isGlobalEditMode} toggleEditMode={toggleEditModeAction}
-          currentUserRole={currentUserRole} onOpenConfigurator={handleOpenConfigurator}
-          onRemoveAll={handleRemoveAllItems} onResetToDefault={handleResetToDefault} wsAddress={webSocketUrl} />
+          currentTime={currentTime}
+          delay={delay}
+          version={VERSION}
+          isEditMode={isGlobalEditMode}
+          toggleEditMode={toggleEditModeAction}
+          currentUserRole={currentUserRole}
+          onOpenConfigurator={handleOpenConfigurator}
+          onRemoveAll={handleRemoveAllItems}
+          onResetToDefault={handleResetToDefault}
+          wsAddress={webSocketUrl}
+        />
 
-        {topSections.length > 0 && (<RenderingComponent sections={topSections} {...commonRenderingProps} />)}
+        {topSections.length > 0 && (
+          <RenderingComponent
+            sections={topSections}
+            {...commonRenderingProps}
+          />
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-2 xl:gap-4 my-4 md:my-6">
-          <Card className={cn(
-            threePhaseGroups.length > 0 ? "lg:col-span-4" : "lg:col-span-5",
-            "shadow-lg transition-all duration-300", sldSectionMinHeight
-          )}>
+          <Card
+            className={cn(
+              threePhaseGroups.length > 0 ? "lg:col-span-4" : "lg:col-span-5",
+              "shadow-lg transition-all duration-300",
+              sldSectionMinHeight
+            )}
+          >
             <CardContent className="p-3 sm:p-4 h-full flex flex-col">
               <div className="flex justify-between items-center mb-2 sm:mb-3">
                 <div className="flex items-center gap-2">
-                  <h3 className="text-lg sm:text-xl font-semibold">Plant Layout</h3>
+                  <h3 className="text-lg sm:text-xl font-semibold">
+                    Plant Layout
+                  </h3>
                   {sldSpecificEditMode && (
-                    <Dialog open={isSldConfigOpen} onOpenChange={setIsSldConfigOpen}>
-                      <DialogTrigger asChild><Button variant="outline" size="sm" className="h-7 px-2 text-xs"><LayoutList className="h-3.5 w-3.5 mr-1.5" />Configure Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</Button></DialogTrigger>
-                      <DialogContent className="sm:max-w-[425px]"><DialogHeaderComponentInternal><DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal></DialogHeaderComponentInternal>
-                        <div className="py-4"><Select onValueChange={handleSldLayoutSelect} value={sldLayoutId}><SelectTrigger className="w-full mb-2"><SelectValue placeholder="Choose..." /></SelectTrigger><SelectContent>{availableSldLayoutsForPage.map(layout => <SelectItem key={layout.id} value={layout.id}>{layout.name}</SelectItem>)}</SelectContent></Select><p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p></div>
+                    <Dialog
+                      open={isSldConfigOpen}
+                      onOpenChange={setIsSldConfigOpen}
+                    >
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-xs"
+                        >
+                          <LayoutList className="h-3.5 w-3.5 mr-1.5" />
+                          Configure Layout:{" "}
+                          {(
+                            availableSldLayoutsForPage.find(
+                              (l) => l.id === sldLayoutId
+                            )?.name || sldLayoutId
+                          )
+                            .replace(/_/g, " ")
+                            .replace(/\b\w/g, (l) => l.toUpperCase())}
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeaderComponentInternal>
+                          <DialogTitleComponentInternal>
+                            Select SLD Layout
+                          </DialogTitleComponentInternal>
+                        </DialogHeaderComponentInternal>
+                        <div className="py-4">
+                          <Select
+                            onValueChange={handleSldLayoutSelect}
+                            value={sldLayoutId}
+                          >
+                            <SelectTrigger className="w-full mb-2">
+                              <SelectValue placeholder="Choose..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableSldLayoutsForPage.map((layout) => (
+                                <SelectItem key={layout.id} value={layout.id}>
+                                  {layout.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <p className="text-sm text-muted-foreground mt-2">
+                            Select SLD. Changes client-side until saved in
+                            editor.
+                          </p>
+                        </div>
                       </DialogContent>
                     </Dialog>
                   )}
-                  {!sldSpecificEditMode && sldLayoutId && <span className="text-lg font-semibold text-muted-foreground ml-1"> : {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>}
+                  {!sldSpecificEditMode && sldLayoutId && (
+                    <span className="text-lg font-semibold text-muted-foreground ml-1">
+                      {" "}
+                      :{" "}
+                      {(
+                        availableSldLayoutsForPage.find(
+                          (l) => l.id === sldLayoutId
+                        )?.name || sldLayoutId
+                      )
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
+                    </span>
+                  )}
                 </div>
-                <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={() => setIsSldModalOpen(true)} title="Open SLD"><Maximize2 className="h-5 w-5" /><span className="sr-only">Open SLD</span></Button></TooltipTrigger><TooltipContent><p>Open SLD in larger view</p></TooltipContent></Tooltip></TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setIsSldModalOpen(true)}
+                        title="Open SLD"
+                      >
+                        <Maximize2 className="h-5 w-5" />
+                        <span className="sr-only">Open SLD</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Open SLD in larger view</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </div>
-              <div style={{ height: sldInternalMaxHeight }} className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10">
-                <SLDWidget layoutId={sldLayoutId} isEditMode={sldSpecificEditMode} onLayoutIdChange={handleSldWidgetLayoutChange} />
+              <div
+                style={{ height: sldInternalMaxHeight }}
+                className="overflow-hidden rounded-md border flex-grow bg-muted/20 dark:bg-muted/10"
+              >
+                <SLDWidget
+                  layoutId={sldLayoutId}
+                  isEditMode={sldSpecificEditMode}
+                  onLayoutIdChange={handleSldWidgetLayoutChange}
+                />
               </div>
             </CardContent>
           </Card>
@@ -782,9 +1055,20 @@ const UnifiedDashboardPage: React.FC = () => {
           {threePhaseGroups.length > 0 && (
             <Card className={cn("shadow-lg", sldSectionMinHeight)}>
               <CardContent className="p-3 sm:p-4 h-full flex flex-col">
-                <h3 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">Three-Phase Elements</h3>
-                <div className="overflow-y-auto flex-grow" style={{ maxHeight: sldInternalMaxHeight }}>
-                  <DashboardSection title="" gridCols="grid-cols-1 gap-y-3" items={threePhaseGroups} isDisabled={!isConnected} {...commonRenderingProps} />
+                <h3 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-3">
+                  Three-Phase Elements
+                </h3>
+                <div
+                  className="overflow-y-auto flex-grow"
+                  style={{ maxHeight: sldInternalMaxHeight }}
+                >
+                  <DashboardSection
+                    title=""
+                    gridCols="grid-cols-1 gap-y-3"
+                    items={threePhaseGroups}
+                    isDisabled={!isConnected}
+                    {...commonRenderingProps}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -795,11 +1079,18 @@ const UnifiedDashboardPage: React.FC = () => {
           {weatherCardConfig && (
             <Card className="w-auto flex-shrink-0 shadow-xl border-2 border-primary/20 dark:border-primary/30 h-full flex flex-col">
               <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
-                <CardTitle className="text-xl sm:text-2xl">Weather Data</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl">
+                  Weather Data
+                </CardTitle>
               </CardHeader>
               <CardContent className="px-2 py-3 sm:px-3 flex-grow">
                 <div className="h-full">
-                  <WeatherCard initialConfig={weatherCardConfig} opcUaData={nodeValues} allPossibleDataPoints={allPossibleDataPoints} onConfigChange={handleWeatherConfigChange} />
+                  <WeatherCard
+                    initialConfig={weatherCardConfig}
+                    opcUaData={nodeValues}
+                    allPossibleDataPoints={allPossibleDataPoints}
+                    onConfigChange={handleWeatherConfigChange}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -809,20 +1100,55 @@ const UnifiedDashboardPage: React.FC = () => {
             <CardHeader className="pb-3 pt-4 px-4 flex-shrink-0">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div className="flex items-center gap-2">
-                  <CardTitle className="text-xl sm:text-2xl">Energy Timeline</CardTitle>
+                  <CardTitle className="text-xl sm:text-2xl">
+                    Energy Timeline
+                  </CardTitle>
                 </div>
                 <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start flex-wrap">
                   {isGlobalEditMode && currentUserRole === UserRole.ADMIN && (
                     <TooltipProvider>
                       <Tooltip>
-                        <TooltipTrigger asChild><Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setIsGraphConfiguratorOpen(true)}><Settings className="h-4 w-4" /><span className="sr-only">Config Graph</span></Button></TooltipTrigger>
-                        <TooltipContent><p>Configure Graph Data</p></TooltipContent>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setIsGraphConfiguratorOpen(true)}
+                          >
+                            <Settings className="h-4 w-4" />
+                            <span className="sr-only">Config Graph</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Configure Graph Data</p>
+                        </TooltipContent>
                       </Tooltip>
                     </TooltipProvider>
                   )}
                   <div className="flex items-center gap-1 flex-wrap">
-                    {(['30s', '1m', '5m', '30m', '1h', '6h', '12h', '1d', '7d', '1mo'] as TimeScale[]).map((ts) => (
-                      <Button key={ts} variant={graphTimeScale === ts ? "default" : "outline"} size="sm" onClick={() => setGraphTimeScale(ts)} className="text-xs px-2 py-1 h-auto">{ts.toUpperCase()}</Button>
+                    {(
+                      [
+                        "30s",
+                        "1m",
+                        "5m",
+                        "30m",
+                        "1h",
+                        "6h",
+                        "12h",
+                        "1d",
+                        "7d",
+                        "1mo",
+                      ] as TimeScale[]
+                    ).map((ts) => (
+                      <Button
+                        key={ts}
+                        variant={graphTimeScale === ts ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setGraphTimeScale(ts)}
+                        className="text-xs px-2 py-1 h-auto"
+                      >
+                        {ts.toUpperCase()}
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -830,7 +1156,9 @@ const UnifiedDashboardPage: React.FC = () => {
             </CardHeader>
             <CardContent className="px-2 py-3 sm:px-3 flex-grow">
               <div className="h-full">
-                {(useDemoDataForGraph || (powerGraphConfig.series && powerGraphConfig.series.length > 0)) ? (
+                {useDemoDataForGraph ||
+                (powerGraphConfig.series &&
+                  powerGraphConfig.series.length > 0) ? (
                   <PowerTimelineGraph
                     nodeValues={nodeValues}
                     allPossibleDataPoints={allPossibleDataPoints}
@@ -838,7 +1166,14 @@ const UnifiedDashboardPage: React.FC = () => {
                     timeScale={graphTimeScale}
                   />
                 ) : (
-                  <div className="flex items-center justify-center h-full text-muted-foreground"><p>Graph data points not configured.{isGlobalEditMode && currentUserRole === UserRole.ADMIN && " Click settings."}</p></div>
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <p>
+                      Graph data points not configured.
+                      {isGlobalEditMode &&
+                        currentUserRole === UserRole.ADMIN &&
+                        " Click settings."}
+                    </p>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -846,29 +1181,71 @@ const UnifiedDashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {gaugesOverviewSectionDefinition && (<RenderingComponent sections={[gaugesOverviewSectionDefinition]} {...commonRenderingProps} />)}
+      {gaugesOverviewSectionDefinition && (
+        <RenderingComponent
+          sections={[gaugesOverviewSectionDefinition]}
+          {...commonRenderingProps}
+        />
+      )}
 
-      {bottomReadingsSections.length > 0 && (<RenderingComponent sections={bottomReadingsSections} {...commonRenderingProps} />)}
+      {bottomReadingsSections.length > 0 && (
+        <RenderingComponent
+          sections={bottomReadingsSections}
+          {...commonRenderingProps}
+        />
+      )}
 
       <Dialog open={isSldModalOpen} onOpenChange={setIsSldModalOpen}>
         <DialogContent className="sm:max-w-[90vw] w-[95vw] h-[90vh] p-0 flex flex-col dark:bg-background bg-background border dark:border-slate-800">
           <DialogHeaderComponentInternal className="p-4 border-b dark:border-slate-700 flex flex-row justify-between items-center sticky top-0 bg-inherit z-10">
             <div className="flex items-center gap-2">
-              <DialogTitleComponentInternal>Plant Layout{!sldSpecificEditMode && sldLayoutId && ` : ${(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`}</DialogTitleComponentInternal>
+              <DialogTitleComponentInternal>
+                Plant Layout
+                {!sldSpecificEditMode &&
+                  sldLayoutId &&
+                  ` : ${(
+                    availableSldLayoutsForPage.find((l) => l.id === sldLayoutId)
+                      ?.name || sldLayoutId
+                  )
+                    .replace(/_/g, " ")
+                    .replace(/\b\w/g, (l) => l.toUpperCase())}`}
+              </DialogTitleComponentInternal>
               {sldSpecificEditMode && (
-                <Dialog open={isModalSldLayoutConfigOpen} onOpenChange={setIsModalSldLayoutConfigOpen}>
+                <Dialog
+                  open={isModalSldLayoutConfigOpen}
+                  onOpenChange={setIsModalSldLayoutConfigOpen}
+                >
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                    >
                       <LayoutList className="h-3.5 w-3.5 mr-1.5" />
-                      Layout: {(availableSldLayoutsForPage.find(l => l.id === sldLayoutId)?.name || sldLayoutId).replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      Layout:{" "}
+                      {(
+                        availableSldLayoutsForPage.find(
+                          (l) => l.id === sldLayoutId
+                        )?.name || sldLayoutId
+                      )
+                        .replace(/_/g, " ")
+                        .replace(/\b\w/g, (l) => l.toUpperCase())}
                     </Button>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-[425px]">
                     <DialogHeaderComponentInternal>
-                      <DialogTitleComponentInternal>Select SLD Layout</DialogTitleComponentInternal>
+                      <DialogTitleComponentInternal>
+                        Select SLD Layout
+                      </DialogTitleComponentInternal>
                     </DialogHeaderComponentInternal>
                     <div className="py-4">
-                      <Select onValueChange={(v) => { setSldLayoutId(v); setIsModalSldLayoutConfigOpen(false); }} value={sldLayoutId}>
+                      <Select
+                        onValueChange={(v) => {
+                          setSldLayoutId(v);
+                          setIsModalSldLayoutConfigOpen(false);
+                        }}
+                        value={sldLayoutId}
+                      >
                         <SelectTrigger className="w-full mb-2">
                           <SelectValue placeholder="Choose..." />
                         </SelectTrigger>
@@ -880,7 +1257,9 @@ const UnifiedDashboardPage: React.FC = () => {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-sm text-muted-foreground mt-2">Select SLD. Changes client-side until saved in editor.</p>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Select SLD. Changes client-side until saved in editor.
+                      </p>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -894,7 +1273,11 @@ const UnifiedDashboardPage: React.FC = () => {
             </DialogClose>
           </DialogHeaderComponentInternal>
           <div className="flex-grow p-2 sm:p-4 overflow-hidden">
-            <SLDWidget layoutId={sldLayoutId} isEditMode={sldSpecificEditMode} onLayoutIdChange={handleSldWidgetLayoutChange} />
+            <SLDWidget
+              layoutId={sldLayoutId}
+              isEditMode={sldSpecificEditMode}
+              onLayoutIdChange={handleSldWidgetLayoutChange}
+            />
           </div>
         </DialogContent>
       </Dialog>
@@ -906,9 +1289,9 @@ const UnifiedDashboardPage: React.FC = () => {
         currentConfig={powerGraphConfig}
         onSaveConfiguration={async (newConfig) => {
           try {
-            const response = await fetch('/api/power-graph-backup', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
+            const response = await fetch("/api/power-graph-backup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify(newConfig),
             });
             if (response.ok) {
@@ -917,11 +1300,13 @@ const UnifiedDashboardPage: React.FC = () => {
               toast.success("Power timeline configuration saved to server.");
             } else {
               const error = await response.json();
-              throw new Error(error.message || 'Failed to save configuration');
+              throw new Error(error.message || "Failed to save configuration");
             }
           } catch (error) {
             console.error("Error saving power graph config:", error);
-            toast.error("Save Failed", { description: (error as Error).message });
+            toast.error("Save Failed", {
+              description: (error as Error).message,
+            });
           }
         }}
       />
@@ -940,9 +1325,12 @@ const UnifiedDashboardPage: React.FC = () => {
       <Dialog open={isWsConfigModalOpen} onOpenChange={setIsWsConfigModalOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeaderComponentInternal>
-            <DialogTitleComponentInternal>Connection Status & Configuration</DialogTitleComponentInternal>
+            <DialogTitleComponentInternal>
+              Connection Status & Configuration
+            </DialogTitleComponentInternal>
             <DialogDescription>
-              View live status information and manually override the WebSocket URL if needed.
+              View live status information and manually override the WebSocket
+              URL if needed.
             </DialogDescription>
           </DialogHeaderComponentInternal>
           <div className="grid gap-4 py-4">
@@ -957,10 +1345,25 @@ const UnifiedDashboardPage: React.FC = () => {
                 <div className="space-y-3 text-xs">
                   {opcuaApiStatus ? (
                     <div className="p-2 border-l-2 pl-3 rounded-r-md bg-background">
-                      <p><strong>Service Status:</strong> <span className={cn(opcuaApiStatus.status?.includes("Connected") ? "text-green-600 dark:text-green-400" : "text-yellow-600 dark:text-yellow-400")}>{opcuaApiStatus.status || 'N/A'}</span></p>
-                      <p className="text-muted-foreground">{opcuaApiStatus.message || 'No message.'}</p>
+                      <p>
+                        <strong>Service Status:</strong>{" "}
+                        <span
+                          className={cn(
+                            opcuaApiStatus.status?.includes("Connected")
+                              ? "text-green-600 dark:text-green-400"
+                              : "text-yellow-600 dark:text-yellow-400"
+                          )}
+                        >
+                          {opcuaApiStatus.status || "N/A"}
+                        </span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        {opcuaApiStatus.message || "No message."}
+                      </p>
                     </div>
-                  ) : <p>Could not load API service status.</p>}
+                  ) : (
+                    <p>Could not load API service status.</p>
+                  )}
 
                   {opcuaConnectionStatus ? (
                     <div className="p-2 border-l-2 pl-3 rounded-r-md bg-background">
@@ -970,23 +1373,47 @@ const UnifiedDashboardPage: React.FC = () => {
                           className={cn(
                             opcuaConnectionStatus.connectionStatus === "online"
                               ? "text-green-600 dark:text-green-400"
-                              : opcuaConnectionStatus.connectionStatus === "offline"
+                              : opcuaConnectionStatus.connectionStatus ===
+                                "offline"
                               ? "text-yellow-600 dark:text-yellow-400"
                               : "text-red-600 dark:text-red-400"
                           )}
                         >
                           {opcuaConnectionStatus.connectionStatus === "online"
                             ? "Connected Remotely"
-                            : opcuaConnectionStatus.connectionStatus === "offline"
+                            : opcuaConnectionStatus.connectionStatus ===
+                              "offline"
                             ? "Connected Locally"
                             : opcuaConnectionStatus.connectionStatus || "N/A"}
                         </span>
                       </p>
-                       {opcuaConnectionStatus.testedEndpoint && <p><strong>Target Endpoint:</strong> <code className="text-muted-foreground">{opcuaConnectionStatus.testedEndpoint}</code></p>}
-                       {opcuaConnectionStatus.errorDetail && opcuaConnectionStatus.errorDetail.trim() !== '' && <p><strong>Details:</strong> <span className="text-destructive">{opcuaConnectionStatus.errorDetail}</span></p>}
-                       {!opcuaConnectionStatus.errorDetail && opcuaConnectionStatus.message && <p className="text-muted-foreground">{opcuaConnectionStatus.message}</p>}
+                      {opcuaConnectionStatus.testedEndpoint && (
+                        <p>
+                          <strong>Target Endpoint:</strong>{" "}
+                          <code className="text-muted-foreground">
+                            {opcuaConnectionStatus.testedEndpoint}
+                          </code>
+                        </p>
+                      )}
+                      {opcuaConnectionStatus.errorDetail &&
+                        opcuaConnectionStatus.errorDetail.trim() !== "" && (
+                          <p>
+                            <strong>Details:</strong>{" "}
+                            <span className="text-destructive">
+                              {opcuaConnectionStatus.errorDetail}
+                            </span>
+                          </p>
+                        )}
+                      {!opcuaConnectionStatus.errorDetail &&
+                        opcuaConnectionStatus.message && (
+                          <p className="text-muted-foreground">
+                            {opcuaConnectionStatus.message}
+                          </p>
+                        )}
                     </div>
-                  ) : <p>Could not load OPC-UA connection details.</p>}
+                  ) : (
+                    <p>Could not load OPC-UA connection details.</p>
+                  )}
                 </div>
               )}
             </div>
@@ -1001,23 +1428,33 @@ const UnifiedDashboardPage: React.FC = () => {
                 placeholder="ws://localhost:2001"
                 aria-label="WebSocket URL Input"
               />
-               <p className="text-xs text-muted-foreground pt-1">
-                The WebSocket URL is usually detected automatically. Only change this if you need to connect to a different server.
+              <p className="text-xs text-muted-foreground pt-1">
+                The WebSocket URL is usually detected automatically. Only change
+                this if you need to connect to a different server.
               </p>
             </div>
           </div>
           <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-between w-full">
-            <Button variant="secondary" onClick={handleResetWsUrl} size="icon" title="Reset to Default">
+            <Button
+              variant="secondary"
+              onClick={handleResetWsUrl}
+              size="icon"
+              title="Reset to Default"
+            >
               <RotateCcw className="h-4 w-4" />
               <span className="sr-only">Reset to Default</span>
             </Button>
             <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
-                <Button variant="outline" onClick={() => setIsWsConfigModalOpen(false)} className="w-full sm:w-auto">
-                    Close
-                </Button>
-                <Button onClick={handleSaveWsUrl} className="w-full sm:w-auto">
-                    Save & Reconnect
-                </Button>
+              <Button
+                variant="outline"
+                onClick={() => setIsWsConfigModalOpen(false)}
+                className="w-full sm:w-auto"
+              >
+                Close
+              </Button>
+              <Button onClick={handleSaveWsUrl} className="w-full sm:w-auto">
+                Save & Reconnect
+              </Button>
             </div>
           </DialogFooter>
         </DialogContent>
